@@ -187,11 +187,11 @@ def filter_low_rated_tracks(tracks):
             album_rating = getattr(album, "userRating", None) if album else None
             track_rating = getattr(track, "userRating", None)
 
-            if artist_rating is not None and artist_rating <= 2:
+            if artist_rating is not None and artist_rating <= 4:
                 continue
-            if album_rating is not None and album_rating <= 2:
+            if album_rating is not None and album_rating <= 4:
                 continue
-            if track_rating is not None and track_rating <= 2:
+            if track_rating is not None and track_rating <= 4:
                 continue
 
             filtered.append(track)
