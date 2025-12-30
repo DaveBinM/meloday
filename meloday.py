@@ -12,6 +12,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # Get the base directory of the script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def resolve_path(path, base):
+    return path if os.path.isabs(path) else os.path.join(base, path)
+
+
 def load_config(filepath="config.yml"):
     with open(os.path.join(BASE_DIR, filepath), "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
@@ -32,12 +36,13 @@ def get_period_phrase(period):
     return PERIOD_PHRASES.get(period, f"in the {period}")
 
 # Convert paths to be relative to BASE_DIR
-COVER_IMAGE_DIR = os.path.join(BASE_DIR, config["directories"]["cover_images"])
-MOOD_MAP_PATH = os.path.join(BASE_DIR, config["files"]["mood_map"])
-FONTS_DIR = os.path.join(BASE_DIR, config["directories"]["fonts"])
+COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
+FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
+MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
 
-FONT_MAIN_PATH = os.path.join(FONTS_DIR, config["fonts"]["main"])
-FONT_MELODAY_PATH = os.path.join(FONTS_DIR, config["fonts"]["meloday"])
+FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
+FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
+
 
 time_periods = config["time_periods"]
 
@@ -457,30 +462,48 @@ def apply_text_to_cover(image_path, text):
     except Exception:
         return image_path
 
+import traceback
+
 def create_or_update_playlist(name, tracks, description, cover_file):
-    try:
-        existing_playlist = None
-        for playlist in plex.playlists():
-            if playlist.title.startswith("Meloday for "):
-                existing_playlist = playlist
-                break
+    # Find an existing Meloday playlist safely
+    existing_playlist = None
+    for pl in plex.playlists():
+        title = getattr(pl, "title", None)
+        if isinstance(title, str) and title.startswith("Meloday for "):
+            existing_playlist = pl
+            break
 
-        valid_tracks = [t for t in tracks if hasattr(t, "ratingKey")]
-        if existing_playlist:
-            existing_playlist.removeItems(existing_playlist.items())
-            existing_playlist.addItems(valid_tracks)
-            existing_playlist.editTitle(name)
-            existing_playlist.editSummary(description)
-        else:
-            existing_playlist = plex.createPlaylist(name, items=valid_tracks)
-            existing_playlist.editSummary(description)
+    # Only keep real tracks
+    valid_tracks = [t for t in tracks if getattr(t, "ratingKey", None)]
+    if not valid_tracks:
+        raise RuntimeError("No valid tracks to add (missing ratingKey).")
 
-        cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
-        if os.path.exists(cover_path):
+    # Create/update the playlist (DO NOT swallow exceptions here)
+    if existing_playlist:
+        existing_playlist.removeItems(existing_playlist.items())
+        existing_playlist.addItems(valid_tracks)
+        existing_playlist.editTitle(name)
+        existing_playlist.editSummary(description)
+        playlist_obj = existing_playlist
+    else:
+        playlist_obj = plex.createPlaylist(name, items=valid_tracks)
+        playlist_obj.editSummary(description)
+
+    print(f"[OK] Playlist now: {playlist_obj.title} | items: {playlist_obj.leafCount}")
+
+    # Cover upload should never stop playlist creation
+    cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
+    if os.path.exists(cover_path):
+        try:
             new_cover = apply_text_to_cover(cover_path, name)
-            existing_playlist.uploadPoster(filepath=new_cover)
-    except Exception:
-        pass
+            playlist_obj.uploadPoster(filepath=new_cover)
+            print(f"[OK] Uploaded poster: {new_cover}")
+        except Exception:
+            print("[WARN] Poster upload failed (playlist still created):")
+            traceback.print_exc()
+    else:
+        print(f"[WARN] Cover file not found: {cover_path}")
+
 
 def find_first_and_last_tracks(tracks, period):
     if not tracks:
