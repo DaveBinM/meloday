@@ -99,6 +99,23 @@ def filter_excluded_tracks(tracks, now=None):
 
     return cleaned
 
+def remix_album_penalty(track) -> int:
+    """Lower is better. Penalize remix releases (EPs/singles/albums titled 'Remix/Remixes')."""
+    meta = album_meta(track)
+    title = (meta.get("album_title") or "").casefold()
+    subtype = (meta.get("album_subtype") or "").casefold()
+
+    # Title-based detection catches: "Go Bang (Remixes) - EP", "Remixes", etc.
+    if "remix" in title or "remixes" in title:
+        return 1
+
+    # If Plex subtype ever reports Remix, also treat it as a remix release.
+    if "remix" in subtype:
+        return 1
+
+    return 0
+
+
 PLEX_URL = config["plex"]["url"]
 PLEX_TOKEN = config["plex"]["token"]
 MUSIC_LIBRARY = config["plex"]["music_library"]
@@ -314,11 +331,17 @@ def better_copy(a, b):
     if a_rank != b_rank:
         return a if a_rank < b_rank else b
 
+    # 3) Prefer non-remix album titles (e.g., 'Changa' over 'Go Bang (Remixes) - EP')
+    a_pen = remix_album_penalty(a)
+    b_pen = remix_album_penalty(b)
+    if a_pen != b_pen:
+        return a if a_pen < b_pen else b
+
     # Pre-fetch meta once
     a_meta = album_meta(a)
     b_meta = album_meta(b)
 
-    # 3) Prefer compilation/soundtrack over live (when both are non-studio)
+    # 4) Prefer compilation/soundtrack over live (when both are non-studio)
     a_comp = is_compilation_like(a)
     b_comp = is_compilation_like(b)
     a_live = is_live_like(a)
@@ -334,7 +357,7 @@ def better_copy(a, b):
     if a_live != b_live:
         return a if not a_live else b
 
-    # 4) Prefer copies where album-artist matches the track primary artist
+    # 5) Prefer copies where album-artist matches the track primary artist
     a_track_artist = primary_artist(track_artist_name(a)).casefold()
     b_track_artist = primary_artist(track_artist_name(b)).casefold()
 
@@ -346,13 +369,13 @@ def better_copy(a, b):
     if a_match != b_match:
         return a if a_match else b
 
-    # 5) Prefer non-Various Artists albums
+    # 6) Prefer non-Various Artists albums
     a_va = is_various_artists(a_album_artist)
     b_va = is_various_artists(b_album_artist)
     if a_va != b_va:
         return b if a_va else a
 
-    # 6) Prefer higher user rating if present
+    # 7) Prefer higher user rating if present
     a_rating = getattr(a, "userRating", None)
     b_rating = getattr(b, "userRating", None)
     if isinstance(a_rating, (int, float)) and isinstance(b_rating, (int, float)) and a_rating != b_rating:
