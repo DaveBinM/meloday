@@ -269,33 +269,70 @@ def is_studio_album(track) -> bool:
     # If we can't tell, assume it's a studio album.
     return True
 
+def is_compilation_like(track) -> bool:
+    meta = album_meta(track)
+    subtype = (meta.get("album_subtype") or "").casefold()
+    if any(x in subtype for x in ("compilation", "soundtrack")):
+        return True
+    title = meta.get("album_title", "") or (getattr(track, "parentTitle", "") or "")
+    return bool(_COMPILATION_TITLE_RE.search(title))
+
+def is_live_like(track) -> bool:
+    meta = album_meta(track)
+    subtype = (meta.get("album_subtype") or "").casefold()
+    if "live" in subtype:
+        return True
+    title = meta.get("album_title", "") or (getattr(track, "parentTitle", "") or "")
+    return bool(_LIVE_TITLE_RE.search(title))
+
+
 def better_copy(a, b):
-    """Choose which duplicate track entry to keep (prefer studio albums, then artist albums over VA)."""
+    """Choose which duplicate track entry to keep."""
     # 1) Prefer studio albums
     a_studio = is_studio_album(a)
     b_studio = is_studio_album(b)
     if a_studio != b_studio:
         return a if a_studio else b
 
-    # 2) Prefer copies where album-artist matches the track primary artist
+    # Pre-fetch meta once
+    a_meta = album_meta(a)
+    b_meta = album_meta(b)
+
+    # 2) Prefer compilation/soundtrack over live (when both are non-studio)
+    a_comp = is_compilation_like(a)
+    b_comp = is_compilation_like(b)
+    a_live = is_live_like(a)
+    b_live = is_live_like(b)
+
+    # Explicit: compilation-like beats live-like if that's the head-to-head
+    if a_comp and b_live and not b_comp and not a_live:
+        return a
+    if b_comp and a_live and not a_comp and not b_live:
+        return b
+
+    # Otherwise prefer non-live
+    if a_live != b_live:
+        return a if not a_live else b
+
+    # 3) Prefer copies where album-artist matches the track primary artist
     a_track_artist = primary_artist(track_artist_name(a)).casefold()
     b_track_artist = primary_artist(track_artist_name(b)).casefold()
 
-    a_album_artist = primary_artist(album_meta(a).get("album_artist", "")).casefold()
-    b_album_artist = primary_artist(album_meta(b).get("album_artist", "")).casefold()
+    a_album_artist = primary_artist(a_meta.get("album_artist", "")).casefold()
+    b_album_artist = primary_artist(b_meta.get("album_artist", "")).casefold()
 
     a_match = bool(a_album_artist) and a_album_artist == a_track_artist
     b_match = bool(b_album_artist) and b_album_artist == b_track_artist
     if a_match != b_match:
         return a if a_match else b
 
-    # 3) Prefer non-Various Artists albums
+    # 4) Prefer non-Various Artists albums
     a_va = is_various_artists(a_album_artist)
     b_va = is_various_artists(b_album_artist)
     if a_va != b_va:
         return b if a_va else a
 
-    # 4) Prefer higher user rating if present
+    # 5) Prefer higher user rating if present
     a_rating = getattr(a, "userRating", None)
     b_rating = getattr(b, "userRating", None)
     if isinstance(a_rating, (int, float)) and isinstance(b_rating, (int, float)) and a_rating != b_rating:
@@ -306,6 +343,7 @@ def better_copy(a, b):
         return b
 
     return a
+
 
 
 # ---------------------------------------------------------------------
