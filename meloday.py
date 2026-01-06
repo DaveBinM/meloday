@@ -23,10 +23,33 @@ def load_config(filepath="config.yml"):
 
 config = load_config()
 
+PLEX_URL = config["plex"]["url"]
+PLEX_TOKEN = config["plex"]["token"]
+MUSIC_LIBRARY = config["plex"]["music_library"]
+CHRISTMAS_COLLECTION_NAME = config["plex"]["christmas_collection"]
+EXCLUDE_LABEL_NAME = config["plex"]["exclude_label"]
 
-# Seasonal / privacy exclusions
-CHRISTMAS_COLLECTION_NAME = "Christmas Music"   # Plex Album Collection name
-NOSHARE_LABEL_NAME = "noshare"                  # Plex Labels tag name
+EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
+HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
+MAX_TRACKS = config["playlist"]["max_tracks"]
+SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
+
+PERIOD_PHRASES = config["period_phrases"]
+def get_period_phrase(period):
+    return PERIOD_PHRASES.get(period, f"in the {period}")
+
+# Convert paths to be relative to BASE_DIR
+COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
+FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
+MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
+
+FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
+FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
+
+
+time_periods = config["time_periods"]
+
+plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 def _in_christmas_window(now: datetime) -> bool:
     """True if date is within Dec 1..Dec 25 (inclusive) in the server's local time."""
@@ -73,7 +96,7 @@ def filter_excluded_tracks(tracks, now=None):
     cleaned = []
     for t in tracks:
         # Track-level label exclusion
-        if has_label(t, NOSHARE_LABEL_NAME):
+        if has_label(t, EXCLUDE_LABEL_NAME):
             continue
 
         # Album-level checks (cached)
@@ -89,7 +112,7 @@ def filter_excluded_tracks(tracks, now=None):
                     album = None
                 album_cache[parent_key] = album
 
-        if album and has_label(album, NOSHARE_LABEL_NAME):
+        if album and has_label(album, EXCLUDE_LABEL_NAME):
             continue
 
         if (not in_xmas) and album and _album_in_collection(album, CHRISTMAS_COLLECTION_NAME):
@@ -114,33 +137,6 @@ def remix_album_penalty(track) -> int:
         return 1
 
     return 0
-
-
-PLEX_URL = config["plex"]["url"]
-PLEX_TOKEN = config["plex"]["token"]
-MUSIC_LIBRARY = config["plex"]["music_library"]
-
-EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
-HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
-MAX_TRACKS = config["playlist"]["max_tracks"]
-SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
-
-PERIOD_PHRASES = config["period_phrases"]
-def get_period_phrase(period):
-    return PERIOD_PHRASES.get(period, f"in the {period}")
-
-# Convert paths to be relative to BASE_DIR
-COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
-FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
-MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
-
-FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
-FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
-
-
-time_periods = config["time_periods"]
-
-plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 
 def norm_text(s: str) -> str:
@@ -868,7 +864,7 @@ def create_or_update_playlist(name, tracks, description, cover_file):
         playlist_obj = plex.createPlaylist(name, items=valid_tracks)
         playlist_obj.editSummary(description)
 
-    print(f"[OK] Playlist updated: {playlist_obj.title} | items: {playlist_obj.leafCount}")
+    print(f"[OK] Playlist updated: {name} | items: {playlist_obj.leafCount}")
 
     cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
     if os.path.exists(cover_path):

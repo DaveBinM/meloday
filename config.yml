@@ -1,7 +1,9 @@
 plex:
   url: "http://localhost:32400"                     # The URL of your Plex Media Server
-  token: "YOUR_PLEX_TOKEN"                     # Your Plex API authentication token
+  token: "YOUR_PLEX_TOKEN"                          # Your Plex API authentication token
   music_library: "Music"                            # The name of your Plex music library
+  exclude_label: "noshare"                          # The name of the label used to exclude things
+  christmas_collection: "Christmas Music"           # The name of the Christmas album collection
 
 
 playlist:
