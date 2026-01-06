@@ -129,9 +129,11 @@ This will install:
 Edit the `config.yml` file to set your Plex server details:
 
 plex:  
-  url: "http://localhost:32400"  # Replace with your Plex URL  
-  token: "YOUR_PLEX_TOKEN"  # Replace with your Plex authentication token - [How to find it](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
-  music_library: "Music"  # Replace with the name of your Plex music library  
+  url: "http://localhost:32400"             # Replace with your Plex URL  
+  token: "YOUR_PLEX_TOKEN"                  # Replace with your Plex authentication token - [How to find it](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)  
+  music_library: "Music"                    # Replace with the name of your Plex music library  
+  exclude_label: "noshare"                  # The name of the label used to exclude things  
+  christmas_collection: "Christmas Music"   # The name of the Christmas album collection  
 
 Modify playlist settings if needed (*recommended to try it initially with these settings*):
 
