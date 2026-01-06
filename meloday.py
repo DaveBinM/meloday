@@ -672,37 +672,76 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
 
 # --- OPTIMIZED SONIC SORTING LOGIC ---
-def sort_by_sonic_similarity_greedy(tracks, limit=20, max_distance=1.0):
-    """Optimized greedy sort that pre-fetches similarity data."""
-    if len(tracks) < 2:
-        return tracks
+def get_sonic_distance(track_a_key, track_b_key, similarity_cache, limit=20):
+    """Returns a bidirectional distance score. Lower is more similar."""
+    penalty = limit * 20
+    # Distance from A to B
+    rank_ab = similarity_cache.get(track_a_key, {}).get(track_b_key, penalty)
+    # Distance from B to A
+    rank_ba = similarity_cache.get(track_b_key, {}).get(track_a_key, penalty)
+    return rank_ab + rank_ba
 
-    # Pre-fetch similarity data (O(N) network calls)
+def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
+    """Combines Double-Ended Greedy + 2-opt refinement for the smoothest possible flow."""
+    if not tracks:
+        return []
+
+    # 1. Pre-fetch similarity data and cache artist names for separation penalty
+    all_involved = tracks + [first_track, last_track]
     similarity_cache = {}
-    for track in tracks:
+    artist_map = {}
+    for track in all_involved:
+        # Cache normalized primary artist for separation penalty
+        artist_map[track.ratingKey] = norm_text(primary_artist(track_artist_name(track)))
         try:
-            similars = track.sonicallySimilar(limit=limit, maxDistance=max_distance)
-            similarity_cache[track.ratingKey] = {
-                t.ratingKey: i for i, t in enumerate(similars)
-            }
+            sims = track.sonicallySimilar(limit=limit)
+            similarity_cache[track.ratingKey] = {t.ratingKey: i for i, t in enumerate(sims)}
         except Exception:
             similarity_cache[track.ratingKey] = {}
 
-    remaining = list(tracks)
-    sorted_list = []
-    current = remaining.pop(random.randrange(len(remaining)))
-    sorted_list.append(current)
+    def get_adj_dist(ka, kb):
+        base_dist = get_sonic_distance(ka, kb, similarity_cache, limit)
+        # Apply heavy penalty if artists are the same to minimize back-to-back clustering
+        if artist_map.get(ka) == artist_map.get(kb):
+            return base_dist + (limit * 100)
+        return base_dist
 
+    # 2. Artist-Aware Greedy Initialization (Starting from 'first_track')
+    remaining = list(tracks)
+    path = []
+    current_key = first_track.ratingKey
+    
     while remaining:
-        current_similars = similarity_cache.get(current.ratingKey, {})
         next_track = min(
             remaining,
-            key=lambda candidate: current_similars.get(candidate.ratingKey, 100)
+            key=lambda t: get_adj_dist(current_key, t.ratingKey)
         )
-        sorted_list.append(next_track)
+        path.append(next_track)
         remaining.remove(next_track)
-        current = next_track
-    return sorted_list
+        current_key = next_track.ratingKey
+
+    # 3. 2-opt Refinement using artist-aware distance
+    def calculate_total_distance(p):
+        # Distance from first to start of middle
+        d = get_adj_dist(first_track.ratingKey, p[0].ratingKey)
+        # Internal middle transitions
+        for i in range(len(p) - 1):
+            d += get_adj_dist(p[i].ratingKey, p[i+1].ratingKey)
+        # Distance from end of middle to last
+        d += get_adj_dist(p[-1].ratingKey, last_track.ratingKey)
+        return d
+
+    improved = True
+    while improved:
+        improved = False
+        for i in range(len(path) - 1):
+            for j in range(i + 1, len(path)):
+                # Flip the segment and see if the artist-aware total distance improves
+                new_path = path[:i] + path[i:j+1][::-1] + path[j+1:]
+                if calculate_total_distance(new_path) < calculate_total_distance(path):
+                    path = new_path
+                    improved = True
+    return path
 # ------------------------------------
 
 
@@ -885,9 +924,9 @@ def main():
     middle = [t for t in final_tracks[:MAX_TRACKS] if t not in {first, last}]
 
     # Step 4: Sonic sort (GREEDY)
-    if middle:
-        print_status(80, "Optimized greedy sonic sort...")
-        middle = sort_by_sonic_similarity_greedy(middle)
+    if middle and first and last:
+        print_status(80, "Double-ended 2-opt sonic refinement...")
+        middle = sort_by_sonic_similarity_refined(middle, first, last, limit=SONIC_SIMILAR_LIMIT)
 
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
 
