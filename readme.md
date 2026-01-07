@@ -43,13 +43,15 @@ Each update brings a **new cover, a new name, and a refreshed mix of tracks** th
 ### 4) Exclusions (Privacy + Seasonal Rules)  
 Meloday supports a couple of simple “keep this out of the mix” rules:
 
-- **Label exclusion:** If a track or album has the Plex label **`noshare`** (or your label of choice), it won’t be used.  
+- **Label exclusion:** If a track or album has a Plex label, such as **`noshare`** (which I use), or your label of choice, it won’t be used.  
   This is an easy way to keep private, niche, or “not for this playlist” music out of rotation.
 
-- **Christmas collection rule:** If you keep holiday music in a Plex **album collection** named **`Christmas Music`**, Meloday will:
+- **Christmas collection rule:** If you keep holiday music in a Plex **album collection** named **`Christmas Music`**, for example, Meloday will:
   - allow it during **December 1st → December 25th**, and  
   - keep it out of the playlist for the rest of the year  
   (so it doesn’t keep resurfacing in July).
+
+These are configurable in the config file
 
 ### 5) Filters & Organises Tracks (Less repetition, better variety)  
 Meloday tries hard to keep the playlist from feeling like “the same 15 songs again”:

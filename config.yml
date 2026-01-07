@@ -10,16 +10,23 @@ playlist:
   exclude_played_days: 4                            # Ignore tracks played in the last X days to avoid repeats
   history_lookback_days: 30                         # How many days of listening history to analyze for playlist generation
   max_tracks: 50                                    # The maximum number of tracks allowed in a single playlist
-  sonic_similar_limit: 8                            # Number of sonically similar tracks to fetch for each track during sorting
+  sonic_similar_limit: 20                           # Number of sonically similar tracks to fetch for each track during sorting
   
   historical_ratio: 0.3                             # The max % of tracks sourced from listening history for each playlist
   sonic_similarity_limit: 50                        # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; shouldn't be higher than max tracks)
   sonic_similarity_distance: 1.0                    # Maximum similarity distance for sonic matching (lower = stricter matching)
 
+seasonal:
+  christmas:
+    start_month: 12
+    start_day: 1
+    end_month: 12
+    end_day: 25
+
 
 directories:
-  cover_images: "assets/covers/flat"    # Path where cover images for playlists are stored
-  fonts: "assets/fonts"          # Path to font files used for text overlays
+  cover_images: "assets/covers/flat"                # Path where cover images for playlists are stored
+  fonts: "assets/fonts"                             # Path to font files used for text overlays
 
 
 fonts:

@@ -34,6 +34,12 @@ HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
 
+xmas_cfg = config.get("seasonal", {}).get("christmas", {})
+XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
+XMAS_START_DAY   = xmas_cfg.get("start_day", 1)
+XMAS_END_MONTH   = xmas_cfg.get("end_month", 12)
+XMAS_END_DAY     = xmas_cfg.get("end_day", 25)
+
 PERIOD_PHRASES = config["period_phrases"]
 def get_period_phrase(period):
     return PERIOD_PHRASES.get(period, f"in the {period}")
@@ -52,8 +58,20 @@ time_periods = config["time_periods"]
 plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 def _in_christmas_window(now: datetime) -> bool:
-    """True if date is within Dec 1..Dec 25 (inclusive) in the server's local time."""
-    return (now.month == 12) and (1 <= now.day <= 25)
+    """True if date is within the configured window in the server's local time."""
+    # Create date objects for the current year to compare
+    try:
+        start_date = datetime(now.year, XMAS_START_MONTH, XMAS_START_DAY)
+        end_date = datetime(now.year, XMAS_END_MONTH, XMAS_END_DAY)
+        
+        # Handle windows that cross into the next year (e.g., Dec 1 to Jan 5)
+        if start_date > end_date:
+            return now >= start_date or now <= end_date
+            
+        return start_date <= now <= end_date
+    except ValueError:
+        # Fallback to default behavior if config dates are invalid
+        return (now.month == 12) and (1 <= now.day <= 25)
 
 def _tag_list_contains(tags, needle: str) -> bool:
     """True if a Plex tag list contains a tag equal to needle (case-insensitive)."""
