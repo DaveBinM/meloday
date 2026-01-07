@@ -18,10 +18,10 @@ playlist:
 
 seasonal:
   christmas:
-    start_month: 12
-    start_day: 1
-    end_month: 12
-    end_day: 25
+    start_month: 12                                 # The month Christmas music can start being included
+    start_day: 1                                    # The day of the start month
+    end_month: 12                                   # The month Christmas music should be excluded again
+    end_day: 25                                     # The day Christmas music should be excluded again
 
 
 directories:

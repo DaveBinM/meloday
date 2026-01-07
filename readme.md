@@ -145,6 +145,13 @@ playlist:
   max_tracks: 50  # Maximum number of tracks in the playlist  
   sonic_similar_limit: 20  # How wide it looks when expanding with “similar” tracks (higher = more variety)  
 
+seasonal:  
+  christmas:  
+    start_month: 12                                 # The month Christmas music can start being included  
+    start_day: 1                                    # The day of the start month  
+    end_month: 12                                   # The month Christmas music should be excluded again  
+    end_day: 25                                     # The day Christmas music should be excluded again  
+
 ### 3) Run the script:
 python meloday.py  
 
