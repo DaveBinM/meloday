@@ -7,14 +7,14 @@ plex:
 
 
 playlist:
-  exclude_played_days: 4                            # Ignore tracks played in the last X days to avoid repeats
-  history_lookback_days: 30                         # How many days of listening history to analyze for playlist generation
+  exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
+  history_lookback_days: 60                         # How many days of listening history to analyze for playlist generation
   max_tracks: 50                                    # The maximum number of tracks allowed in a single playlist
   sonic_similar_limit: 20                           # Number of sonically similar tracks to fetch for each track during sorting
   
-  historical_ratio: 0.3                             # The max % of tracks sourced from listening history for each playlist
+  historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
   sonic_similarity_limit: 50                        # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; shouldn't be higher than max tracks)
-  sonic_similarity_distance: 1.0                    # Maximum similarity distance for sonic matching (lower = stricter matching)
+  sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter matching). The max value is 0.25
 
 seasonal:
   christmas:

@@ -35,7 +35,7 @@ MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
 SONIC_SIMILARITY_SEARCH_LIMIT = min(config["playlist"].get("sonic_similarity_limit", MAX_TRACKS), MAX_TRACKS)
-SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 1.0)
+SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
 XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
