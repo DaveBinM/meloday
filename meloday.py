@@ -113,7 +113,6 @@ def filter_excluded_tracks(tracks, now=None):
     now = now or datetime.now()
     in_xmas = _in_christmas_window(now)
 
-    album_cache = {}
     cleaned = []
     for t in tracks:
         # Track-level label exclusion
@@ -124,14 +123,14 @@ def filter_excluded_tracks(tracks, now=None):
         album = None
         parent_key = getattr(t, "parentRatingKey", None)
         if parent_key:
-            if parent_key in album_cache:
-                album = album_cache[parent_key]
+            if parent_key in _album_obj_cache:
+                album = _album_obj_cache[parent_key]
             else:
                 try:
                     album = plex.fetchItem(parent_key)
                 except Exception:
                     album = None
-                album_cache[parent_key] = album
+                _album_obj_cache[parent_key] = album
 
         if album and has_label(album, EXCLUDE_LABEL_NAME):
             continue
@@ -196,7 +195,15 @@ def track_artist_name(track) -> str:
 
     # As a last resort, try plexapi's artist() accessor.
     try:
-        a = track.artist() if callable(getattr(track, "artist", None)) else None
+        # Check cache first to fix redundant API calls and fragmented caching
+        artist_key = getattr(track, "grandparentRatingKey", None)
+        if artist_key and artist_key in _artist_obj_cache:
+            a = _artist_obj_cache[artist_key]
+        else:
+            a = track.artist() if callable(getattr(track, "artist", None)) else None
+            if artist_key:
+                _artist_obj_cache[artist_key] = a
+        
         at = getattr(a, "title", None) if a else None
         if isinstance(at, str) and at.strip() and not ((at or '').strip().casefold() in {'various artists','various'}):
             return at.strip()
@@ -229,6 +236,10 @@ def is_various_artists(name: str) -> bool:
 # Cache album metadata lookups so we don't spam Plex.
 _album_meta_cache: dict[str, dict] = {}
 
+# Unified caches for Plex objects to fix redundant API calls and fragmented caching
+_album_obj_cache = {}
+_artist_obj_cache = {}
+
 def album_meta(track) -> dict:
     """Fetch album metadata (title, album-artist, subtype) with caching."""
     album_key = getattr(track, "parentRatingKey", None) or getattr(track, "parentKey", None) or getattr(track, "parentGuid", None)
@@ -242,7 +253,14 @@ def album_meta(track) -> dict:
         "album_subtype": "",
     }
     try:
-        album = track.album() if callable(getattr(track, "album", None)) else None
+        # Check cache first to fix redundant API calls
+        if album_key and album_key in _album_obj_cache:
+            album = _album_obj_cache[album_key]
+        else:
+            album = track.album() if callable(getattr(track, "album", None)) else None
+            if album_key:
+                _album_obj_cache[album_key] = album
+                
         if album is not None:
             meta["album_title"] = (getattr(album, "title", meta["album_title"]) or meta["album_title"]).strip()
             meta["album_artist"] = (getattr(album, "parentTitle", "") or "").strip()
@@ -552,9 +570,25 @@ def filter_low_rated_tracks(tracks):
         try:
             if not getattr(track, "ratingKey", None) or not getattr(track, "parentRatingKey", None):
                 continue
-            artist = track.artist() if callable(getattr(track, "artist", None)) else None
+            
+            # Use unified caches to fix redundant API calls and fragmented caching
+            artist_key = getattr(track, "grandparentRatingKey", None)
+            if artist_key and artist_key in _artist_obj_cache:
+                artist = _artist_obj_cache[artist_key]
+            else:
+                artist = track.artist() if callable(getattr(track, "artist", None)) else None
+                if artist_key:
+                    _artist_obj_cache[artist_key] = artist
+                    
             artist_rating = getattr(artist, "userRating", None) if artist else None
-            album = plex.fetchItem(track.parentRatingKey)
+            
+            album_key = track.parentRatingKey
+            if album_key in _album_obj_cache:
+                album = _album_obj_cache[album_key]
+            else:
+                album = plex.fetchItem(album_key)
+                _album_obj_cache[album_key] = album
+                
             album_rating = getattr(album, "userRating", None) if album else None
             track_rating = getattr(track, "userRating", None)
 
@@ -904,7 +938,9 @@ def create_or_update_playlist(name, tracks, description, cover_file):
     valid_tracks = [t for t in tracks if getattr(t, "ratingKey", None)]
     
     if not valid_tracks:
-        raise RuntimeError("No valid tracks to add (missing ratingKey).")
+        # Gracefully exit if no tracks found to fix the "Empty Result" crash
+        print("[WARN] No valid tracks to add. Skipping playlist update.")
+        return
 
     if existing_playlist:
         existing_playlist.removeItems(existing_playlist.items())
@@ -974,7 +1010,9 @@ def main():
     # Step 4: Sonic sort (GREEDY)
     if middle and first and last:
         print_status(80, "Double-ended 2-opt sonic refinement...")
-        middle = sort_by_sonic_similarity_refined(middle, first, last, limit=SONIC_SIMILAR_LIMIT)
+        # Fix sorting breadth logic: ensure sorting breadth covers the tracks in the list
+        sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
+        middle = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
 
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
 
