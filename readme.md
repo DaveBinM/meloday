@@ -140,8 +140,8 @@ plex:
 Modify playlist settings if needed (*recommended to try it initially with these settings*):
 
 playlist:  
-  exclude_played_days: 4  # Ignore tracks played in the last X days  
-  history_lookback_days: 30  # How many days of listening history to analyse  
+  exclude_played_days: 3  # Ignore tracks played in the last X days  
+  history_lookback_days: 60  # How many days of listening history to analyse  
   max_tracks: 50  # Maximum number of tracks in the playlist  
   sonic_similar_limit: 20  # How wide it looks when expanding with “similar” tracks (higher = more variety)  
 
