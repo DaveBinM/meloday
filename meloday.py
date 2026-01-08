@@ -33,6 +33,9 @@ EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
 HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
+HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
+SONIC_SIMILARITY_SEARCH_LIMIT = min(config["playlist"].get("sonic_similarity_limit", MAX_TRACKS), MAX_TRACKS)
+SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 1.0)
 
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
 XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
@@ -483,6 +486,30 @@ def fetch_historical_tracks(period):
         ]
         if fallback_entries:
             filtered_tracks = fallback_entries
+    # --- Resolve TrackHistory -> Track ---
+    resolved = []
+    cache = {}
+
+    for h in filtered_tracks:
+        rk = getattr(h, "ratingKey", None)
+        if not rk:
+            continue
+
+        # Cache to avoid repeated Plex calls
+        if rk in cache:
+            t = cache[rk]
+        else:
+            try:
+                t = plex.fetchItem(rk)
+            except Exception:
+                t = None
+            cache[rk] = t
+
+        # Keep only real tracks
+        if t is not None and getattr(t, "type", None) == "track":
+            resolved.append(t)
+
+    filtered_tracks = resolved
 
     # Apply label + seasonal collection exclusions
     filtered_tracks = filter_excluded_tracks(filtered_tracks, now=now)
@@ -501,8 +528,8 @@ def fetch_historical_tracks(period):
     rare_tracks = sorted_tracks[split_index:]
 
     balanced_selection = (
-        random.sample(rare_tracks, min(len(rare_tracks), int(MAX_TRACKS * 0.75)))
-        + random.sample(popular_tracks, min(len(popular_tracks), int(MAX_TRACKS * 0.25)))
+        random.sample(rare_tracks, min(len(rare_tracks), int(MAX_TRACKS * (1 - HISTORICAL_RATIO))))
+        + random.sample(popular_tracks, min(len(popular_tracks), int(MAX_TRACKS * HISTORICAL_RATIO)))
     )
 
     if genre_count:
@@ -654,7 +681,7 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
     for track in reference_tracks:
         try:
-            similars = track.sonicallySimilar(limit=SONIC_SIMILAR_LIMIT)
+            similars = track.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT, maxDistance=SONIC_SIMILARITY_DISTANCE)
 
             # Ensure we're filtering by last play date
             filtered_similars = []
@@ -784,24 +811,31 @@ def generate_playlist_title_and_description(period, tracks):
     highlight_styles = [s for s in highlight_styles if s not in {most_common_genre, most_common_mood}]
     highlight_styles = list(dict.fromkeys(highlight_styles))[:max_styles]
     
-    # Ensure highlight styles are filled
-    while len(highlight_styles) < max_styles:
-        additional = sorted_genres + sorted_moods
-        for s in additional:
-            if s not in highlight_styles:
-                highlight_styles.append(s)
-            if len(highlight_styles) == max_styles:
-                break
+    # Ensure highlight styles are filled with whatever is available
+    additional = sorted_genres + sorted_moods
+    for s in additional:
+        if len(highlight_styles) >= max_styles:
+            break
+        if s not in highlight_styles:
+            highlight_styles.append(s)
+
+    # Build the highlight phrase safely
+    if len(highlight_styles) > 1:
+        extra_info = f"Here's some {', '.join(highlight_styles[:-1])}, and {highlight_styles[-1]} tracks as well."
+    elif len(highlight_styles) == 1:
+        extra_info = f"Here's some {highlight_styles[0]} tracks as well."
+    else:
+        extra_info = "Enjoy this selection of your favorites."
 
     if second_common_mood:
         description = (
             f"You listened to {most_common_mood} and {most_common_genre} tracks on {day_name} {period_phrase}. "
-            f"Here's some {', '.join(highlight_styles[:-1])}, and {highlight_styles[-1]} tracks as well."
+            f"{extra_info}"
         )
     else:
         description = (
             f"You listened to {most_common_genre} and {most_common_mood} tracks on {day_name} {period_phrase}. "
-            f"Here's some {', '.join(highlight_styles[:-1])}, and {highlight_styles[-1]} tracks as well."
+            f"{extra_info}"
         )
 
     try:
@@ -910,10 +944,10 @@ def main():
     period = get_current_time_period()
     print_status(10, f"Period: {period}")
 
-    # Step 1: Fetch historical (Guarantee ~30% historical)
+    # Step 1: Fetch historical (Guarantee based on configured historical_ratio)
     print_status(20, "Fetching historical tracks...")
     historical, excluded_keys = fetch_historical_tracks(period)
-    guaranteed = random.sample(historical, min(int(MAX_TRACKS * 0.3), len(historical)))
+    guaranteed = random.sample(historical, min(int(MAX_TRACKS * HISTORICAL_RATIO), len(historical)))
 
     # Step 2: Fetch similar
     print_status(30, "Fetching sonically similar tracks...")
