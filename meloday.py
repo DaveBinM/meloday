@@ -34,7 +34,8 @@ HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
-SONIC_SIMILARITY_SEARCH_LIMIT = config["playlist"].get("sonic_similarity_limit", MAX_TRACKS)
+# Set a floor of MAX_TRACKS * 2 for the similarity search limit
+SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
@@ -361,6 +362,13 @@ def title_variant_rank(track) -> int:
 
 def better_copy(a, b):
     """Choose which duplicate track entry to keep."""
+    # 0) Prefer vastly sonically superior matches (difference > 0.08)
+    # Historical tracks have an assumed distance of 0.00
+    a_dist = getattr(a, "sonic_distance", 0.00)
+    b_dist = getattr(b, "sonic_distance", 0.00)
+    if abs(a_dist - b_dist) > 0.08:
+        return a if a_dist < b_dist else b
+
     # 1) Prefer studio albums
     a_studio = is_studio_album(a)
     b_studio = is_studio_album(b)
@@ -532,6 +540,8 @@ def fetch_historical_tracks(period):
 
         # Keep only real tracks
         if t is not None and getattr(t, "type", None) == "track":
+            # Tag history tracks with 0.0 distance for deduplication logic
+            t.sonic_distance = 0.0
             resolved.append(t)
 
     filtered_tracks = resolved
@@ -663,8 +673,8 @@ def process_tracks(tracks):
     Dedup strategy:
         - Key on (cleaned title, primary track artist) so the same recording on
         different albums (studio vs compilation/soundtrack) collapses.
-        - When duplicates exist, keep the "better" copy (prefer studio album, then
-        artist album over Various Artists, then higher userRating).
+        - When duplicates exist, keep the "better" copy (prefer vastly sonically
+        superior matches, then studio album, artist album, then userRating).
     """
     filtered_tracks = filter_low_rated_tracks(tracks)
 
@@ -730,6 +740,10 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
             # Ensure we're filtering by last play date
             filtered_similars = []
             for s in similars:
+                # Capture the sonic distance for use in better_copy comparison
+                # If distance isn't exposed, default to the maxDistance limit
+                s.sonic_distance = getattr(s, 'distance', SONIC_SIMILARITY_DISTANCE)
+
                 last_played = getattr(s, "lastViewedAt", None)
 
                 # Exclude if it was played recently
@@ -767,19 +781,20 @@ def get_sonic_distance(track_a_key, track_b_key, similarity_cache, limit=20):
     return rank_ab + rank_ba
 
 def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
-    """Combines Double-Ended Greedy + 2-opt refinement for the smoothest possible flow."""
+    """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
     if not tracks:
         return []
 
-    # 1. Pre-fetch similarity data and cache artist names for separation penalty
+    # 1. Pre-fetch similarity data and cache metadata for separation penalty
     all_involved = tracks + [first_track, last_track]
     similarity_cache = {}
     meta_cache = {}
     for track in all_involved:
-        # Cache normalized primary artist, genres, and year for soft distance logic
+        # Cache normalized primary artist, genres, moods, and year for soft distance logic
         meta_cache[track.ratingKey] = {
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": set(str(g) for g in (getattr(track, "genres", None) or [])),
+            "moods": set(str(m) for m in (getattr(track, "moods", None) or [])),
             "year": getattr(track, "year", None)
         }
         try:
@@ -792,9 +807,12 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     def get_adj_dist(ka, kb):
         base_dist = get_sonic_distance(ka, kb, similarity_cache, limit)
         
-        # Soft Distance Fallback: If no sonic similarity found (max penalty reached)
+        # Soft Distance Fallback: If no direct sonic similarity found (blind spot), check metadata
         if base_dist >= (limit * 40):
             ma, mb = meta_cache[ka], meta_cache[kb]
+            # Preference for shared Mood (often smoother than genre)
+            if ma["moods"] & mb["moods"]:
+                base_dist -= (limit * 8)
             # Preference for shared genre
             if ma["genres"] & mb["genres"]:
                 base_dist -= (limit * 5)
