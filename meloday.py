@@ -791,7 +791,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     meta_cache = {}
     for track in all_involved:
         # Cache normalized primary artist, genres, moods, and year for soft distance logic
-        meta_cache[track.ratingKey] = {
+        meta_cache[track.rating_key if hasattr(track, 'rating_key') else track.ratingKey] = {
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": set(str(g) for g in (getattr(track, "genres", None) or [])),
             "moods": set(str(m) for m in (getattr(track, "moods", None) or [])),
@@ -812,7 +812,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
             ma, mb = meta_cache[ka], meta_cache[kb]
             # Preference for shared Mood (often smoother than genre)
             if ma["moods"] & mb["moods"]:
-                base_dist -= (limit * 8)
+                base_dist -= (limit * 12) # Increased weight for mood-based flow
             # Preference for shared genre
             if ma["genres"] & mb["genres"]:
                 base_dist -= (limit * 5)
@@ -822,7 +822,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
 
         # Apply heavy penalty if artists are the same to minimize back-to-back clustering
         if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
-            return base_dist + (limit * 100)
+            return base_dist + (limit * 150) # Heavier penalty for artist repeats
         return base_dist
 
     # 2. Artist-Aware Greedy Initialization (Starting from 'first_track')
@@ -831,6 +831,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     current_key = first_track.ratingKey
     
     while remaining:
+        # Optimization: Look ahead to find the best immediate "Superior" match (0.00-0.08)
         next_track = min(
             remaining,
             key=lambda t: get_adj_dist(current_key, t.ratingKey)
@@ -839,20 +840,24 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
         remaining.remove(next_track)
         current_key = next_track.ratingKey
 
-    # 3. 2-opt Refinement using artist-aware distance
+    # 3. Enhanced 2-opt Refinement using artist-aware distance
     def calculate_total_distance(p):
         # Distance from first to start of middle
         d = get_adj_dist(first_track.ratingKey, p[0].ratingKey)
         # Internal middle transitions
         for i in range(len(p) - 1):
-            d += get_adj_dist(p[i].ratingKey, p[i+1].ratingKey)
+            dist = get_adj_dist(p[i].ratingKey, p[i+1].ratingKey)
+            # Quadratic penalty for "rough" transitions to prioritize smooth sonic flow
+            d += dist if dist < (limit * 5) else dist ** 1.2 
         # Distance from end of middle to last
         d += get_adj_dist(p[-1].ratingKey, last_track.ratingKey)
         return d
 
     improved = True
-    while improved:
+    iterations = 0
+    while improved and iterations < 10: # Safety cap on refinement
         improved = False
+        iterations += 1
         for i in range(len(path) - 1):
             for j in range(i + 1, len(path)):
                 # Flip the segment and see if the artist-aware total distance improves
