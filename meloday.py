@@ -34,7 +34,7 @@ HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
-SONIC_SIMILARITY_SEARCH_LIMIT = min(config["playlist"].get("sonic_similarity_limit", MAX_TRACKS), MAX_TRACKS)
+SONIC_SIMILARITY_SEARCH_LIMIT = config["playlist"].get("sonic_similarity_limit", MAX_TRACKS)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
@@ -91,7 +91,8 @@ def has_label(obj, label_name: str) -> bool:
     """True if Plex item has a Labels tag equal to label_name (case-insensitive)."""
     try:
         return _tag_list_contains(getattr(obj, "labels", None), label_name)
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Error checking label for object: {e}")
         return False
 
 def _album_in_collection(album, collection_name: str) -> bool:
@@ -100,10 +101,12 @@ def _album_in_collection(album, collection_name: str) -> bool:
         # collections are sometimes not populated until reload()
         try:
             album.reload()
-        except Exception:
+        except Exception as e:
+            print(f"[WARN] Error reloading album {album.title}: {e}")
             pass
         return _tag_list_contains(getattr(album, "collections", None), collection_name)
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Error checking collection for album: {e}")
         return False
 
 def filter_excluded_tracks(tracks, now=None):
@@ -128,7 +131,8 @@ def filter_excluded_tracks(tracks, now=None):
             else:
                 try:
                     album = plex.fetchItem(parent_key)
-                except Exception:
+                except Exception as e:
+                    print(f"[WARN] Failed to fetch album parent key {parent_key} for {t.title}: {e}")
                     album = None
                 _album_obj_cache[parent_key] = album
 
@@ -207,7 +211,8 @@ def track_artist_name(track) -> str:
         at = getattr(a, "title", None) if a else None
         if isinstance(at, str) and at.strip() and not ((at or '').strip().casefold() in {'various artists','various'}):
             return at.strip()
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Error resolving artist for track {track.title}: {e}")
         pass
 
     # If we still can't tell, return whatever grandparentTitle we had (even if VA), or 'unknown'.
@@ -275,9 +280,11 @@ def album_meta(track) -> dict:
                     if sub is not None:
                         tag = sub.get("tag", "") or ""
                         meta["album_subtype"] = tag.strip()
-                except Exception:
+                except Exception as e:
+                    print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
                     pass
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Error fetching metadata for {track.title}: {e}")
         pass
 
     _album_meta_cache[cache_key] = meta
@@ -499,8 +506,7 @@ def fetch_historical_tracks(period):
     if not filtered_tracks:
         fallback_entries = [
             entry for entry in music_section.history(mindate=history_start)
-            if entry.viewedAt and entry.viewedAt.hour in period_hours
-               and entry.ratingKey not in excluded_keys
+            if entry.ratingKey not in excluded_keys
         ]
         if fallback_entries:
             filtered_tracks = fallback_entries
@@ -519,7 +525,8 @@ def fetch_historical_tracks(period):
         else:
             try:
                 t = plex.fetchItem(rk)
-            except Exception:
+            except Exception as e:
+                print(f"[WARN] Failed to resolve track rating key {rk}: {e}")
                 t = None
             cache[rk] = t
 
@@ -600,7 +607,8 @@ def filter_low_rated_tracks(tracks):
                 continue
 
             filtered.append(track)
-        except Exception:
+        except Exception as e:
+            print(f"  [!] Warning: Could not check rating for '{track.title}' - {e}. Skipping filter.")
             pass
     return filtered
 
@@ -678,7 +686,8 @@ def process_tracks(tracks):
             else:
                 best_by_key[track_key] = track
                 key_order.append(track_key)
-        except Exception:
+        except Exception as e:
+            print(f"[WARN] Error during duplicate comparison for {track.title}: {e}")
             continue
 
     deduped_tracks = [best_by_key[k] for k in key_order]
@@ -702,7 +711,8 @@ def process_tracks(tracks):
             artist_count[artist_name] += 1
             genre_count[track_genre] += 1
             unique_tracks.append(track)
-        except Exception:
+        except Exception as e:
+            print(f"[WARN] Error enforcing limits for {track.title}: {e}")
             continue
 
     return unique_tracks
@@ -764,20 +774,36 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     # 1. Pre-fetch similarity data and cache artist names for separation penalty
     all_involved = tracks + [first_track, last_track]
     similarity_cache = {}
-    artist_map = {}
+    meta_cache = {}
     for track in all_involved:
-        # Cache normalized primary artist for separation penalty
-        artist_map[track.ratingKey] = norm_text(primary_artist(track_artist_name(track)))
+        # Cache normalized primary artist, genres, and year for soft distance logic
+        meta_cache[track.ratingKey] = {
+            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "genres": set(str(g) for g in (getattr(track, "genres", None) or [])),
+            "year": getattr(track, "year", None)
+        }
         try:
             sims = track.sonicallySimilar(limit=limit)
             similarity_cache[track.ratingKey] = {t.ratingKey: i for i, t in enumerate(sims)}
-        except Exception:
+        except Exception as e:
+            print(f"[WARN] Could not fetch sonic similarity for {track.title}: {e}")
             similarity_cache[track.ratingKey] = {}
 
     def get_adj_dist(ka, kb):
         base_dist = get_sonic_distance(ka, kb, similarity_cache, limit)
+        
+        # Soft Distance Fallback: If no sonic similarity found (max penalty reached)
+        if base_dist >= (limit * 40):
+            ma, mb = meta_cache[ka], meta_cache[kb]
+            # Preference for shared genre
+            if ma["genres"] & mb["genres"]:
+                base_dist -= (limit * 5)
+            # Preference for same decade
+            if ma["year"] and mb["year"] and (ma["year"] // 10 == mb["year"] // 10):
+                base_dist -= (limit * 2)
+
         # Apply heavy penalty if artists are the same to minimize back-to-back clustering
-        if artist_map.get(ka) == artist_map.get(kb):
+        if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
             return base_dist + (limit * 100)
         return base_dist
 
