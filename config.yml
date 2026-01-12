@@ -5,6 +5,13 @@ plex:
   exclude_label: "noshare"                          # The name of the label used to exclude things
   christmas_collection: "Christmas Music"           # The name of the Christmas album collection
 
+essentia:
+  enabled: false
+  cache_path: "assets/essentia_cache.json"
+  bpm_weight: 0.15          # Influence of tempo on track distance
+  key_weight: 0.10          # Influence of harmonic compatibility on track distance
+  path_mapping: {}          # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
+
 
 playlist:
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
