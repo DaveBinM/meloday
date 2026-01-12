@@ -4,11 +4,20 @@ import re
 import random
 import json
 import unicodedata
+import portalocker
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
 from plexapi.audio import Track
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+
+# Essentia integration with fallback
+try:
+    import essentia
+    import essentia.standard as es
+    ESSENTIA_AVAILABLE = True
+except ImportError:
+    ESSENTIA_AVAILABLE = False
 
 # Get the base directory of the script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +46,88 @@ HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
 # Set a floor of MAX_TRACKS * 2 for the similarity search limit
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
+
+# Essentia Configuration
+ess_cfg = config.get("essentia", {})
+ESSENTIA_ENABLED = ess_cfg.get("enabled", True) and ESSENTIA_AVAILABLE
+ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.json"), BASE_DIR)
+BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
+KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
+PATH_MAPPING = ess_cfg.get("path_mapping", {})
+
+CAMELOT_MAP = {
+    'Ab minor': '1A', 'B major': '1B', 'Eb minor': '2A', 'F# major': '2B',
+    'Bb minor': '3A', 'Db major': '3B', 'F minor': '4A', 'Ab major': '4B',
+    'C minor': '5A', 'Eb major': '5B', 'G minor': '6A', 'Bb major': '6B',
+    'D minor': '7A', 'F major': '7B', 'A minor': '8A', 'C major': '8B',
+    'E minor': '9A', 'G major': '9B', 'B minor': '10A', 'D major': '10B',
+    'F# minor': '11A', 'A major': '11B', 'Db minor': '12A', 'E major': '12B'
+}
+
+_essentia_cache = {}
+
+def load_essentia_cache():
+    global _essentia_cache
+    if os.path.exists(ESSENTIA_CACHE_PATH):
+        try:
+            # Open with a shared lock for reading
+            with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='r', timeout=10) as f:
+                _essentia_cache = json.load(f)
+        except Exception as e:
+            print(f"[WARN] Could not load Essentia cache: {e}")
+            _essentia_cache = {}
+
+def save_essentia_cache():
+    os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
+    try:
+        # Open with an exclusive lock for writing
+        # This prevents the other script from reading/writing until this is done
+        with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
+            json.dump(_essentia_cache, f)
+    except Exception as e:
+        print(f"[ERROR] Could not save Essentia cache safely: {e}")
+
+def get_local_path(track):
+    if not track.locations: return None
+    path = track.locations[0]
+    for remote, local in PATH_MAPPING.items():
+        if path.startswith(remote):
+            path = path.replace(remote, local, 1)
+            break
+    return path if os.path.exists(path) else None
+
+def analyze_track_essentia(track):
+    rk = str(track.ratingKey)
+    if rk in _essentia_cache: return _essentia_cache[rk]
+    if not ESSENTIA_ENABLED: return None
+    
+    file_path = get_local_path(track)
+    if not file_path: return None
+
+    try:
+        loader = es.MonoLoader(filename=file_path)
+        audio = loader()
+        bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
+        key_alg = es.KeyExtractor()(audio)
+        camelot = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
+        data = {"bpm": round(bpm, 2), "key": camelot}
+        _essentia_cache[rk] = data
+        return data
+    except Exception:
+        return None
+
+def get_bpm_distance(bpm1, bpm2):
+    if not bpm1 or not bpm2: return 0.5
+    diffs = [abs(bpm1 - bpm2), abs(bpm1 - bpm2 * 2), abs(bpm1 * 2 - bpm2)]
+    return min(min(diffs) / 20.0, 1.0)
+
+def get_harmonic_distance(key1, key2):
+    if key1 == "0A" or key2 == "0A": return 0.5
+    idx1, type1 = int(key1[:-1]), key1[-1]
+    idx2, type2 = int(key2[:-1]), key2[-1]
+    dist = abs(idx1 - idx2)
+    if dist > 6: dist = 12 - dist
+    return (dist + (0 if type1 == type2 else 1)) / 7.0
 
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
 XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
@@ -805,7 +896,14 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
         else:
             dist = (base_dist / 0.25) * 0.4
 
-    # 2. Artist Clustering Penalty (Strict)
+    # 2. Add Essentia Logic for Tempo and Key
+    if ESSENTIA_ENABLED:
+        ea, eb = _essentia_cache.get(str(ka)), _essentia_cache.get(str(kb))
+        if ea and eb:
+            dist += (get_bpm_distance(ea["bpm"], eb["bpm"]) * BPM_WEIGHT)
+            dist += (get_harmonic_distance(ea["key"], eb["key"]) * KEY_WEIGHT)
+
+    # 3. Artist Clustering Penalty (Strict)
     if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
         dist += 0.5 
 
@@ -862,9 +960,9 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
         full_path = [first_track] + p + [last_track]
         for i in range(len(full_path) - 1):
             step_dist = get_adj_dist(full_path[i].ratingKey, full_path[i+1].ratingKey, similarity_cache, meta_cache, limit)
-            # Quadratic penalty for gaps that represent big tonal shifts
-            if step_dist > 0.5:
-                d += (step_dist ** 2) * 10 
+            # Non-linear "Jarring Transition" penalty to prioritize local smoothness
+            if step_dist > 0.4:
+                d += (step_dist ** 3) * 20 
             else:
                 d += step_dist
         return d
@@ -878,6 +976,22 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
                 if total_cost(new_path) < total_cost(path):
                     path = new_path
                     improved = True
+    
+    # Generate transition log
+    try:
+        log_path = resolve_path("assets/transition_log.txt", BASE_DIR)
+        with open(log_path, "w", encoding="utf-8") as log:
+            log.write(f"Transition Quality Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            log.write("-" * 80 + "\n")
+            full_path = [first_track] + path + [last_track]
+            for i in range(len(full_path) - 1):
+                t1, t2 = full_path[i], full_path[i+1]
+                dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, meta_cache, limit)
+                status = "[JUMP]" if dist > 0.4 else "[FLOW]"
+                log.write(f"{status} {dist:.3f} | {t1.title} -> {t2.title}\n")
+    except Exception as e:
+        print(f"[WARN] Failed to write transition log: {e}")
+
     return path
 # ------------------------------------
 
@@ -1042,6 +1156,13 @@ def main():
     period = get_current_time_period()
     print_status(10, f"Period: {period}")
 
+    # Confirm Essentia Status
+    if ESSENTIA_ENABLED:
+        print(f"[DIAGNOSTIC] Essentia is ACTIVE. Analyzing keys and BPM.")
+    else:
+        reason = "Library not found" if not ESSENTIA_AVAILABLE else "Disabled in config"
+        print(f"[DIAGNOSTIC] Essentia is INACTIVE ({reason}). Using standard sorting.")
+
     # Step 1: Fetch historical (Guarantee based on configured historical_ratio)
     print_status(20, "Fetching historical tracks...")
     historical, excluded_keys = fetch_historical_tracks(period)
@@ -1071,6 +1192,13 @@ def main():
 
     # Step 4: Sonic sort (GREEDY)
     if middle and first and last:
+        if ESSENTIA_ENABLED:
+            print_status(75, "Performing deep sonic analysis (Essentia)...")
+            load_essentia_cache()
+            for t in [first, last] + middle:
+                analyze_track_essentia(t)
+            save_essentia_cache()
+
         print_status(80, "Double-ended 2-opt sonic refinement...")
         # Fix sorting breadth logic: ensure sorting breadth covers the tracks in the list
         sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
