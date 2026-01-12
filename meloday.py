@@ -771,98 +771,111 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
 
 # --- OPTIMIZED SONIC SORTING LOGIC ---
-def get_sonic_distance(track_a_key, track_b_key, similarity_cache, limit=20):
-    """Returns a bidirectional distance score. Lower is more similar."""
-    penalty = limit * 20
-    # Distance from A to B
-    rank_ab = similarity_cache.get(track_a_key, {}).get(track_b_key, penalty)
-    # Distance from B to A
-    rank_ba = similarity_cache.get(track_b_key, {}).get(track_a_key, penalty)
-    return rank_ab + rank_ba
+def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
+    """
+    Calculates a normalized distance between 0.0 and 1.0.
+    0.0 = Identical | 1.0 = Completely Dissimilar
+    """
+    # 1. Check for raw sonic distance if available (0.0 - 0.25)
+    # We normalize 0.25 to a 0.0-0.5 scale to leave room for metadata penalties
+    base_dist = similarity_cache.get(ka, {}).get(kb, None)
+    
+    if base_dist is None:
+        # Fallback: Synthetic Distance based on metadata
+        ma, mb = meta_cache[ka], meta_cache[kb]
+        score = 0.8  # Start with high dissimilarity
+        
+        # Mood is the strongest indicator of "tonal shift"
+        shared_moods = ma["moods"] & mb["moods"]
+        if shared_moods:
+            score -= 0.4
+        elif ma["genres"] & mb["genres"]: # Genre is secondary
+            score -= 0.2
+            
+        # Era/Decade similarity prevents "time-travel" jumps
+        if ma["year"] and mb["year"]:
+            if abs(ma["year"] - mb["year"]) <= 5:
+                score -= 0.1
+        
+        dist = score
+    else:
+        # Scale the 0-20 rank or 0.0-0.25 distance to a standard float
+        if isinstance(base_dist, int):
+            dist = (base_dist / limit) * 0.4
+        else:
+            dist = (base_dist / 0.25) * 0.4
+
+    # 2. Artist Clustering Penalty (Strict)
+    if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
+        dist += 0.5 
+
+    return min(dist, 1.0)
 
 def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
     if not tracks:
         return []
 
-    # 1. Pre-fetch similarity data and cache metadata for separation penalty
     all_involved = tracks + [first_track, last_track]
     similarity_cache = {}
     meta_cache = {}
+
+    # Pre-calculate metadata and fetch similarities
     for track in all_involved:
-        # Cache normalized primary artist, genres, moods, and year for soft distance logic
-        meta_cache[track.rating_key if hasattr(track, 'rating_key') else track.ratingKey] = {
+        t_key = track.ratingKey
+        meta_cache[t_key] = {
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": set(str(g) for g in (getattr(track, "genres", None) or [])),
             "moods": set(str(m) for m in (getattr(track, "moods", None) or [])),
             "year": getattr(track, "year", None)
         }
         try:
+            # Try to get raw distances if available, else get ranks
             sims = track.sonicallySimilar(limit=limit)
-            similarity_cache[track.ratingKey] = {t.ratingKey: i for i, t in enumerate(sims)}
-        except Exception as e:
-            print(f"[WARN] Could not fetch sonic similarity for {track.title}: {e}")
-            similarity_cache[track.ratingKey] = {}
+            similarity_cache[t_key] = {
+                s.ratingKey: getattr(s, 'distance', i) 
+                for i, s in enumerate(sims)
+            }
+        except Exception:
+            similarity_cache[t_key] = {}
 
-    def get_adj_dist(ka, kb):
-        base_dist = get_sonic_distance(ka, kb, similarity_cache, limit)
-        
-        # Soft Distance Fallback: If no direct sonic similarity found (blind spot), check metadata
-        if base_dist >= (limit * 40):
-            ma, mb = meta_cache[ka], meta_cache[kb]
-            # Preference for shared Mood (often smoother than genre)
-            if ma["moods"] & mb["moods"]:
-                base_dist -= (limit * 12) # Increased weight for mood-based flow
-            # Preference for shared genre
-            if ma["genres"] & mb["genres"]:
-                base_dist -= (limit * 5)
-            # Preference for same decade
-            if ma["year"] and mb["year"] and (ma["year"] // 10 == mb["year"] // 10):
-                base_dist -= (limit * 2)
-
-        # Apply heavy penalty if artists are the same to minimize back-to-back clustering
-        if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
-            return base_dist + (limit * 150) # Heavier penalty for artist repeats
-        return base_dist
-
-    # 2. Artist-Aware Greedy Initialization (Starting from 'first_track')
+    # --- 1. BI-DIRECTIONAL GREEDY INITIALIZATION ---
     remaining = list(tracks)
     path = []
     current_key = first_track.ratingKey
-    
-    while remaining:
-        # Optimization: Look ahead to find the best immediate "Superior" match (0.00-0.08)
-        next_track = min(
-            remaining,
-            key=lambda t: get_adj_dist(current_key, t.ratingKey)
-        )
-        path.append(next_track)
-        remaining.remove(next_track)
-        current_key = next_track.ratingKey
+    end_key = last_track.ratingKey
 
-    # 3. Enhanced 2-opt Refinement using artist-aware distance
-    def calculate_total_distance(p):
-        # Distance from first to start of middle
-        d = get_adj_dist(first_track.ratingKey, p[0].ratingKey)
-        # Internal middle transitions
-        for i in range(len(p) - 1):
-            dist = get_adj_dist(p[i].ratingKey, p[i+1].ratingKey)
-            # Quadratic penalty for "rough" transitions to prioritize smooth sonic flow
-            d += dist if dist < (limit * 5) else dist ** 1.2 
-        # Distance from end of middle to last
-        d += get_adj_dist(p[-1].ratingKey, last_track.ratingKey)
+    while remaining:
+        # Score = Distance from Current + (Distance to End * 0.3)
+        best_track = min(
+            remaining,
+            key=lambda t: get_adj_dist(current_key, t.ratingKey, similarity_cache, meta_cache, limit) + 
+                          (get_adj_dist(t.ratingKey, end_key, similarity_cache, meta_cache, limit) * 0.3)
+        )
+        path.append(best_track)
+        remaining.remove(best_track)
+        current_key = best_track.ratingKey
+
+    # --- 2. 2-OPT REFINEMENT WITH JUMP PENALTY ---
+    def total_cost(p):
+        d = 0
+        full_path = [first_track] + p + [last_track]
+        for i in range(len(full_path) - 1):
+            step_dist = get_adj_dist(full_path[i].ratingKey, full_path[i+1].ratingKey, similarity_cache, meta_cache, limit)
+            # Quadratic penalty for gaps that represent big tonal shifts
+            if step_dist > 0.5:
+                d += (step_dist ** 2) * 10 
+            else:
+                d += step_dist
         return d
 
     improved = True
-    iterations = 0
-    while improved and iterations < 10: # Safety cap on refinement
+    while improved:
         improved = False
-        iterations += 1
         for i in range(len(path) - 1):
             for j in range(i + 1, len(path)):
-                # Flip the segment and see if the artist-aware total distance improves
                 new_path = path[:i] + path[i:j+1][::-1] + path[j+1:]
-                if calculate_total_distance(new_path) < calculate_total_distance(path):
+                if total_cost(new_path) < total_cost(path):
                     path = new_path
                     improved = True
     return path
