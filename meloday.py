@@ -999,6 +999,21 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
 
     return min(dist, 1.0)
 
+def write_transition_log(full_path, similarity_cache, meta_cache, limit=20):
+    """Generates a log detailing the transition quality between tracks."""
+    try:
+        log_path = resolve_path("assets/transition_log.txt", BASE_DIR)
+        with open(log_path, "w", encoding="utf-8") as log:
+            log.write(f"Transition Quality Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            log.write("-" * 80 + "\n")
+            for i in range(len(full_path) - 1):
+                t1, t2 = full_path[i], full_path[i+1]
+                dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, meta_cache, limit)
+                status = "[JUMP]" if dist > 0.4 else "[FLOW]"
+                log.write(f"{status} {dist:.3f} | {t1.title} -> {t2.title}\n")
+    except Exception as e:
+        print(f"[WARN] Failed to write transition log: {e}")
+
 def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
     if not tracks:
@@ -1073,28 +1088,18 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
                     path = new_path
                     improved = True
     
-    # Generate transition log
-    try:
-        log_path = resolve_path("assets/transition_log.txt", BASE_DIR)
-        with open(log_path, "w", encoding="utf-8") as log:
-            log.write(f"Transition Quality Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            log.write("-" * 80 + "\n")
-            full_path = [first_track] + path + [last_track]
-            for i in range(len(full_path) - 1):
-                t1, t2 = full_path[i], full_path[i+1]
-                dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, meta_cache, limit)
-                status = "[JUMP]" if dist > 0.4 else "[FLOW]"
-                log.write(f"{status} {dist:.3f} | {t1.title} -> {t2.title}\n")
-    except Exception as e:
-        print(f"[WARN] Failed to write transition log: {e}")
-
-    return path
+    return path, similarity_cache, meta_cache
 
 # Bridge Pass [Smarter Bridge Track Selection]
 def fill_sonic_gaps(path, limit=20):
-    """Identifies jumps > 0.5 and attempts to insert a bridge track from the library."""
+    """Identifies jumps > 0.5 and attempts to insert a bridge track from the library while strictly respecting MAX_TRACKS."""
     if not path or len(path) < 2: return path
     final_path = []
+    
+    # Safety and Deduplication Logic
+    existing_keys = {t.ratingKey for t in path}
+    now = datetime.now()
+    exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
     
     def get_track_meta(track):
         rk = track.ratingKey
@@ -1115,20 +1120,81 @@ def fill_sonic_gaps(path, limit=20):
         dist = get_adj_dist(t1.ratingKey, t2.ratingKey, {}, m_cache, limit)
         
         if dist > 0.5:
+            print(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} ({dist:.3f}). Searching for candidate...")
             try:
                 # Search Plex for tracks similar to the first song
-                potential_bridges = t1.sonicallySimilar(limit=10)
+                potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
+                found_bridge = False
                 for bridge in potential_bridges:
+                    # Filter against duplicates and recently played
+                    if bridge.ratingKey in existing_keys:
+                        print(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        continue
+                        
+                    last_p = getattr(bridge, "lastViewedAt", None)
+                    if last_p and last_p >= exclude_start:
+                        print(f"  [!] Skipping '{bridge.title}': Recently played.")
+                        continue
+                    
+                    # Filter against labels, seasonal exclusions, and low ratings
+                    if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
+                        print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                        continue
+
                     bm = get_track_meta(bridge)
                     # Check bridge compatibility with second song
                     b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
-                    if b_dist < 0.4:
+                    if b_dist < 0.5:
+                        print(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
                         print(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
                         final_path.append(bridge)
+                        existing_keys.add(bridge.ratingKey) 
+                        found_bridge = True
                         break
-            except Exception: pass
+                    #else:
+                    #    print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                
+                if not found_bridge:
+                    print(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
+            except Exception as e: 
+                print(f"  [ERR] Bridge error: {e}")
+                pass
                 
     final_path.append(path[-1])
+
+    # Smart Truncation Logic to stay within MAX_TRACKS
+    if len(final_path) > MAX_TRACKS:
+        print(f"[BRIDGE] Smart Truncating playlist from {len(final_path)} to {MAX_TRACKS}...")
+        
+        while len(final_path) > MAX_TRACKS:
+            best_remove_idx = -1
+            min_added_distance = float('inf')
+
+            # Evaluate every track except the first and last
+            for i in range(1, len(final_path) - 1):
+                t_prev = final_path[i-1]
+                t_next = final_path[i+1]
+                
+                # Metadata for neighbor distance calculation
+                m_cache = {
+                    t_prev.ratingKey: get_track_meta(t_prev),
+                    t_next.ratingKey: get_track_meta(t_next)
+                }
+                
+                # Calculate what the new jump would be if we removed final_path[i]
+                new_dist = get_adj_dist(t_prev.ratingKey, t_next.ratingKey, {}, m_cache, limit)
+                
+                if new_dist < min_added_distance:
+                    min_added_distance = new_dist
+                    best_remove_idx = i
+            
+            # Remove the "least essential" track for sonic flow
+            if best_remove_idx != -1:
+                removed_t = final_path.pop(best_remove_idx)
+                # Optional: print(f"  [-] Removing '{removed_t.title}' to minimize sonic jump.")
+
+        print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
+
     return final_path
 # ------------------------------------
 
@@ -1327,6 +1393,10 @@ def main():
     middle = [t for t in final_tracks[:MAX_TRACKS] if t not in {first, last}]
 
     # Step 4: Sonic sort (GREEDY)
+    similarity_cache = {}
+    meta_cache = {}
+    sort_breadth = 20
+
     if middle and first and last:
         if ESSENTIA_ENABLED:
             print_status(75, "Performing parallel deep sonic analysis...")
@@ -1348,7 +1418,7 @@ def main():
         print_status(80, "Double-ended 2-opt sonic refinement...")
         # Ensure sorting breadth covers the tracks in the list
         sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
-        middle = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
+        middle, similarity_cache, meta_cache = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
 
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
 
@@ -1358,6 +1428,19 @@ def main():
         print_status(85, "Creating Sonic Bridges...")
         sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
         final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb)
+
+        # Final Log Update after bridging
+        # Refresh meta_cache for any newly added bridge tracks
+        for t in final_ordered_tracks:
+            if t.ratingKey not in meta_cache:
+                ec = _essentia_cache.get(str(t.ratingKey), {})
+                meta_cache[t.ratingKey] = {
+                    "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(t))),
+                    "genres": set(ec.get("genres") or (str(g) for g in (getattr(t, "genres", None) or []))),
+                    "moods": set(ec.get("moods") or (str(m) for m in (getattr(t, "moods", None) or []))),
+                    "year": ec.get("year") or getattr(t, "year", None)
+                }
+        write_transition_log(final_ordered_tracks, similarity_cache, meta_cache, limit=sb)
 
     # Step 5: Playlist Update
     print_status(90, "Creating/Updating playlist...")
