@@ -8,10 +8,14 @@ plex:
 essentia:
   enabled: false
   cache_path: "assets/essentia_cache.json"
-  bpm_weight: 0.15          # Influence of tempo on track distance
-  key_weight: 0.10          # Influence of harmonic compatibility on track distance
-  path_mapping: {}          # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
+  bpm_weight: 0.15                                  # Influence of tempo on track distance
+  key_weight: 0.10                                  # Influence of harmonic compatibility on track distance
+  energy_weight: 0.10                               # Influence of loudness consistency
+  era_weight: 0.05                                  # Influence of production era (year)
+  path_mapping: {}                                  # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
 
+bridging:
+  enabled: true                                     # Set to false to skip adding bridging tracks between sonic jumps
 
 playlist:
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats

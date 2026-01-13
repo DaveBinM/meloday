@@ -62,6 +62,9 @@ ENERGY_WEIGHT = 0.10
 ERA_WEIGHT = 0.05
 PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
+# Bridging Configuration
+BRIDGING_ENABLED = config.get("bridging", {}).get("enabled", True)
+
 # Seasonal Rules
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
 XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
@@ -1090,6 +1093,16 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     
     return path, similarity_cache, meta_cache
 
+def get_track_meta(track):
+    rk = track.ratingKey
+    ec = _essentia_cache.get(str(rk), {})
+    return {
+        "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
+        "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
+        "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
+        "year": ec.get("year") or getattr(track, "year", None)
+    }
+
 # Bridge Pass [Smarter Bridge Track Selection]
 def fill_sonic_gaps(path, limit=20):
     """Identifies jumps > 0.5 and attempts to insert a bridge track from the library while strictly respecting MAX_TRACKS."""
@@ -1101,16 +1114,6 @@ def fill_sonic_gaps(path, limit=20):
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
     
-    def get_track_meta(track):
-        rk = track.ratingKey
-        ec = _essentia_cache.get(str(rk), {})
-        return {
-            "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
-            "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
-            "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
-            "year": ec.get("year") or getattr(track, "year", None)
-        }
-
     for i in range(len(path) - 1):
         t1, t2 = path[i], path[i+1]
         final_path.append(t1)
@@ -1141,6 +1144,10 @@ def fill_sonic_gaps(path, limit=20):
                         print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
+                    # Trigger quick analysis for bridge candidates if needed
+                    if ESSENTIA_ENABLED:
+                        analyze_track_essentia(bridge)
+
                     bm = get_track_meta(bridge)
                     # Check bridge compatibility with second song
                     b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
@@ -1151,8 +1158,8 @@ def fill_sonic_gaps(path, limit=20):
                         existing_keys.add(bridge.ratingKey) 
                         found_bridge = True
                         break
-                    #else:
-                    #    print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                    else:
+                        print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
                 
                 if not found_bridge:
                     print(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
@@ -1190,8 +1197,7 @@ def fill_sonic_gaps(path, limit=20):
             
             # Remove the "least essential" track for sonic flow
             if best_remove_idx != -1:
-                removed_t = final_path.pop(best_remove_idx)
-                # Optional: print(f"  [-] Removing '{removed_t.title}' to minimize sonic jump.")
+                final_path.pop(best_remove_idx)
 
         print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
 
@@ -1423,23 +1429,21 @@ def main():
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
 
     # Bridge Pass
-    if len(final_ordered_tracks) > 2:
+    if BRIDGING_ENABLED and len(final_ordered_tracks) > 2:
         # Step 4.5: Smooth technical gaps between vibe-compatible tracks.
         print_status(85, "Creating Sonic Bridges...")
         sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
         final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb)
 
-        # Final Log Update after bridging
+        # Final Log Update after bridging and smart truncation
         # Refresh meta_cache for any newly added bridge tracks
         for t in final_ordered_tracks:
             if t.ratingKey not in meta_cache:
-                ec = _essentia_cache.get(str(t.ratingKey), {})
-                meta_cache[t.ratingKey] = {
-                    "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(t))),
-                    "genres": set(ec.get("genres") or (str(g) for g in (getattr(t, "genres", None) or []))),
-                    "moods": set(ec.get("moods") or (str(m) for m in (getattr(t, "moods", None) or []))),
-                    "year": ec.get("year") or getattr(t, "year", None)
-                }
+                meta_cache[t.ratingKey] = get_track_meta(t)
+        
+        if ESSENTIA_ENABLED:
+            save_essentia_cache()
+
         write_transition_log(final_ordered_tracks, similarity_cache, meta_cache, limit=sb)
 
     # Step 5: Playlist Update
