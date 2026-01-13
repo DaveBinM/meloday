@@ -3,11 +3,11 @@ import time
 import json
 import portalocker
 import concurrent.futures
-from datetime import timedelta
+from datetime import timedelta, datetime
 from meloday import (
-    plex, MUSIC_LIBRARY, analyze_track_essentia, 
+    PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia, 
     save_essentia_cache, ESSENTIA_ENABLED, 
-    ESSENTIA_CACHE_PATH, _essentia_cache
+    ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer
 )
 
 # --- 1. CACHE UTILITIES ---
@@ -28,9 +28,13 @@ def analysis_worker(track_id):
     """
     Worker function to fetch and analyze a single track.
     RatingKey is passed instead of the object to minimize pickling overhead.
+    Utilizes a local Plex session to ensure stability across multiple processes.
     """
     try:
-        track = plex.fetchItem(track_id)
+        # Initialize a new local connection session for process isolation
+        local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+        track = local_plex.fetchItem(track_id)
+        
         # This call now handles metadata syncing for cached tracks 
         # and full analysis for new tracks.
         result = analyze_track_essentia(track)
@@ -48,22 +52,41 @@ def bulk_analyze():
 
     print(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
     
-    # Fetch all tracks as a flat list for direct file access
-    music_section = plex.library.section(MUSIC_LIBRARY)
+    # Pre-load cache to filter processing list
+    current_cache = load_essentia_cache_exclusive()
+    _essentia_cache.update(current_cache)
+    
+    # Fetch all tracks as a flat list
+    local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+    music_section = local_plex_main.library.section(MUSIC_LIBRARY)
     print("Fetching tracks from Plex... (This may take a minute)")
     all_tracks = music_section.search(libtype='track') 
-    total = len(all_tracks)
     
-    to_process = [t.ratingKey for t in all_tracks]
+    # 1. Filter the processing list to avoid redundant work
+    now_ts = datetime.now().timestamp()
+    to_process = []
+    for t in all_tracks:
+        rk = str(t.ratingKey)
+        # Only process if not in cache, or if the metadata sync is older than 7 days
+        if rk not in _essentia_cache:
+            to_process.append(t.ratingKey)
+        else:
+            last_sync = _essentia_cache[rk].get("last_synced", 0)
+            if (now_ts - last_sync) > 604800:
+                to_process.append(t.ratingKey)
+
     num_to_process = len(to_process)
-    
-    print(f"Found {total} tracks. Processing analysis and metadata sync...")
+    if num_to_process == 0:
+        print("--- Success! All tracks are analyzed and metadata is up to date. ---")
+        return
+
+    print(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
 
     start_time = time.time()
     batch_size = 50
     completed = 0
 
-    # Utilize ProcessPoolExecutor for true CPU parallelism
+    # 2. Utilize ProcessPoolExecutor for true CPU parallelism
     with concurrent.futures.ProcessPoolExecutor() as executor:
         for i in range(0, num_to_process, batch_size):
             batch_ids = to_process[i:i + batch_size]
@@ -81,7 +104,7 @@ def bulk_analyze():
             est = timedelta(seconds=int((num_to_process - completed) * avg))
             print(f"Progress: [{completed}/{num_to_process}] | Est: {est} | In Cache: {len(_essentia_cache)} ", end='\r')
         
-            # Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
+            # 3. Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
             disk_cache = load_essentia_cache_exclusive()
             disk_cache.update(_essentia_cache)
             with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
