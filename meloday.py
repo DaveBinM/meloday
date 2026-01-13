@@ -5,13 +5,14 @@ import random
 import json
 import unicodedata
 import portalocker
+import traceback
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
 from plexapi.audio import Track
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-# Essentia integration with fallback
+# --- 1. ENVIRONMENT & ESSENTIA DETECTION ---
 try:
     import essentia
     import essentia.standard as es
@@ -19,42 +20,59 @@ try:
 except ImportError:
     ESSENTIA_AVAILABLE = False
 
-# Get the base directory of the script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def resolve_path(path, base):
     return path if os.path.isabs(path) else os.path.join(base, path)
 
-
 def load_config(filepath="config.yml"):
     with open(os.path.join(BASE_DIR, filepath), "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
 
+# --- 2. GLOBAL CONFIGURATION (Mapped from config.yml) ---
 config = load_config()
 
+# Plex Connection
 PLEX_URL = config["plex"]["url"]
 PLEX_TOKEN = config["plex"]["token"]
 MUSIC_LIBRARY = config["plex"]["music_library"]
 CHRISTMAS_COLLECTION_NAME = config["plex"]["christmas_collection"]
 EXCLUDE_LABEL_NAME = config["plex"]["exclude_label"]
 
+# Playlist & Logic Rules
 EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
 HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
-# Set a floor of MAX_TRACKS * 2 for the similarity search limit
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
-# Essentia Configuration
+# Essentia Logic & Weights
 ess_cfg = config.get("essentia", {})
 ESSENTIA_ENABLED = ess_cfg.get("enabled", True) and ESSENTIA_AVAILABLE
 ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.json"), BASE_DIR)
 BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
 KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
+ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
+ERA_WEIGHT = ess_cfg.get("era_weight", 0.05)
 PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
+# Seasonal Rules
+xmas_cfg = config.get("seasonal", {}).get("christmas", {})
+XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
+XMAS_START_DAY   = xmas_cfg.get("start_day", 1)
+XMAS_END_MONTH   = xmas_cfg.get("end_month", 12)
+XMAS_END_DAY     = xmas_cfg.get("end_day", 25)
+
+# Asset Paths
+COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
+FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
+MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
+FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
+FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
+
+# Musical Data Maps
 CAMELOT_MAP = {
     'Ab minor': '1A', 'B major': '1B', 'Eb minor': '2A', 'F# major': '2B',
     'Bb minor': '3A', 'Db major': '3B', 'F minor': '4A', 'Ab major': '4B',
@@ -64,7 +82,18 @@ CAMELOT_MAP = {
     'F# minor': '11A', 'A major': '11B', 'Db minor': '12A', 'E major': '12B'
 }
 
+# Daypart Logic
+PERIOD_PHRASES = config["period_phrases"]
+time_periods = config["time_periods"]
+
+# --- 3. SYSTEM INITIALIZATION ---
 _essentia_cache = {}
+_album_meta_cache = {}
+_album_obj_cache = {}
+_artist_obj_cache = {}
+plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+
+# --- 4. CORE FUNCTIONS ---
 
 def load_essentia_cache():
     global _essentia_cache
@@ -94,7 +123,12 @@ def get_local_path(track):
         if path.startswith(remote):
             path = path.replace(remote, local, 1)
             break
-    return path if os.path.exists(path) else None
+            
+    if os.path.exists(path):
+        return path
+    else:
+        print(f"[DIAGNOSTIC] File not found: {path}")
+        return None
 
 def analyze_track_essentia(track):
     rk = str(track.ratingKey)
@@ -107,13 +141,33 @@ def analyze_track_essentia(track):
     try:
         loader = es.MonoLoader(filename=file_path)
         audio = loader()
+
+        # BPM & Key Extraction
         bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
         key_alg = es.KeyExtractor()(audio)
         camelot = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
-        data = {"bpm": round(bpm, 2), "key": camelot}
+
+        # Energy/Intensity via Integrated Loudness (EBU R128)
+        # FIX: Mux mono signal to pseudo-stereo for loudness analyzer compatibility
+        audio_stereo = es.StereoMuxer()(audio, audio)
+        loudness_stats = es.LoudnessEBUR128()(audio_stereo)
+        integrated_loudness = loudness_stats[2]
+
+        # FIX: Fallback to Album Year if Track Year is missing
+        track_year = getattr(track, "year", None)
+        if not track_year:
+            track_year = album_meta(track).get("year")
+
+        data = {
+            "bpm": round(bpm, 2), 
+            "key": camelot,
+            "energy": round(integrated_loudness, 2),
+            "year": track_year
+        }
         _essentia_cache[rk] = data
         return data
-    except Exception:
+    except Exception as e:
+        print(f"[DIAGNOSTIC] Essentia failed for '{track.title}': {e}")
         return None
 
 def get_bpm_distance(bpm1, bpm2):
@@ -128,29 +182,9 @@ def get_harmonic_distance(key1, key2):
     dist = abs(idx1 - idx2)
     if dist > 6: dist = 12 - dist
     return (dist + (0 if type1 == type2 else 1)) / 7.0
-
-xmas_cfg = config.get("seasonal", {}).get("christmas", {})
-XMAS_START_MONTH = xmas_cfg.get("start_month", 12)
-XMAS_START_DAY   = xmas_cfg.get("start_day", 1)
-XMAS_END_MONTH   = xmas_cfg.get("end_month", 12)
-XMAS_END_DAY     = xmas_cfg.get("end_day", 25)
-
-PERIOD_PHRASES = config["period_phrases"]
+    
 def get_period_phrase(period):
     return PERIOD_PHRASES.get(period, f"in the {period}")
-
-# Convert paths to be relative to BASE_DIR
-COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
-FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
-MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
-
-FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
-FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
-
-
-time_periods = config["time_periods"]
-
-plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 def _in_christmas_window(now: datetime) -> bool:
     """True if date is within the configured window in the server's local time."""
@@ -348,6 +382,7 @@ def album_meta(track) -> dict:
         "album_title": (getattr(track, "parentTitle", "") or "").strip(),
         "album_artist": "",
         "album_subtype": "",
+        "year": None,
     }
     try:
         # Check cache first to fix redundant API calls
@@ -361,6 +396,7 @@ def album_meta(track) -> dict:
         if album is not None:
             meta["album_title"] = (getattr(album, "title", meta["album_title"]) or meta["album_title"]).strip()
             meta["album_artist"] = (getattr(album, "parentTitle", "") or "").strip()
+            meta["year"] = getattr(album, "year", None) # NEW: Cache album year
             # Plex may expose subtype/albumType differently depending on server/version.
             meta["album_subtype"] = (getattr(album, "subtype", "") or getattr(album, "albumType", "") or "").strip()
             # Fallback: query raw metadata XML and extract <Subformat tag="...">
@@ -551,7 +587,7 @@ def get_current_time_period():
     # Fallback if not found
     return "Late Night"
 
-def load_descriptor_map(filepath="moodmap.json"):
+def load_descriptor_map(filepath):
     try:
         with open(filepath, "r", encoding="utf-8") as file:
             return json.load(file)
@@ -896,12 +932,24 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
         else:
             dist = (base_dist / 0.25) * 0.4
 
-    # 2. Add Essentia Logic for Tempo and Key
+    # 2. Add Essentia Logic for Tempo, Key, Energy, and Era
     if ESSENTIA_ENABLED:
         ea, eb = _essentia_cache.get(str(ka)), _essentia_cache.get(str(kb))
-        if ea and eb:
+        if ea and eb and "energy" in ea and "energy" in eb:
+            # Tempo & Key
             dist += (get_bpm_distance(ea["bpm"], eb["bpm"]) * BPM_WEIGHT)
             dist += (get_harmonic_distance(ea["key"], eb["key"]) * KEY_WEIGHT)
+
+            # Energy/Loudness Jump Penalty
+            energy_diff = abs(ea["energy"] - eb["energy"])
+            energy_dist = min(energy_diff / 10.0, 1.0) # 10dB diff = max penalty
+            dist += (energy_dist * ENERGY_WEIGHT)
+            
+            # Era/Decade Jump Penalty
+            if ea["year"] and eb["year"]:
+                year_diff = abs(ea["year"] - eb["year"])
+                year_dist = min(year_diff / 50.0, 1.0) # Penalty scales up to 50 years
+                dist += (year_dist * ERA_WEIGHT)
 
     # 3. Artist Clustering Penalty (Strict)
     if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
@@ -997,7 +1045,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
 
 
 def generate_playlist_title_and_description(period, tracks):
-    descriptor_map = load_descriptor_map("moodmap.json")
+    descriptor_map = load_descriptor_map(MOOD_MAP_PATH)
     day_name = datetime.now().strftime("%A")
 
     top_genres = [str(g) for t in tracks for g in (t.genres or [])]
@@ -1107,8 +1155,6 @@ def apply_text_to_cover(image_path, text):
         print(f"[WARN] apply_text_to_cover failed: {e}")
         return image_path
 
-import traceback
-
 def create_or_update_playlist(name, tracks, description, cover_file):
     existing_playlist = next((pl for pl in plex.playlists() if str(getattr(pl, "title", "")).startswith("Meloday for ")), None)
     valid_tracks = [t for t in tracks if getattr(t, "ratingKey", None)]
@@ -1159,6 +1205,7 @@ def main():
     # Confirm Essentia Status
     if ESSENTIA_ENABLED:
         print(f"[DIAGNOSTIC] Essentia is ACTIVE. Analyzing keys and BPM.")
+        load_essentia_cache()
     else:
         reason = "Library not found" if not ESSENTIA_AVAILABLE else "Disabled in config"
         print(f"[DIAGNOSTIC] Essentia is INACTIVE ({reason}). Using standard sorting.")
@@ -1194,7 +1241,6 @@ def main():
     if middle and first and last:
         if ESSENTIA_ENABLED:
             print_status(75, "Performing deep sonic analysis (Essentia)...")
-            load_essentia_cache()
             for t in [first, last] + middle:
                 analyze_track_essentia(t)
             save_essentia_cache()
