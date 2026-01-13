@@ -1142,6 +1142,11 @@ def fill_sonic_gaps(path, limit=20):
     final_path = []
     
     # Safety and Deduplication Logic
+    # Track identity by (Normalized Title, Normalized Artist) to catch duplicates across different albums
+    existing_identities = {
+        (norm_text(clean_title(t.title)), norm_text(primary_artist(track_artist_name(t)))) 
+        for t in path
+    }
     existing_keys = {t.ratingKey for t in path}
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
@@ -1161,8 +1166,11 @@ def fill_sonic_gaps(path, limit=20):
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
                 found_bridge = False
                 for bridge in potential_bridges:
-                    # Filter against duplicates and recently played
-                    if bridge.ratingKey in existing_keys:
+                    # Check identity instead of just ratingKey to prevent cross-album duplicates
+                    b_identity = (norm_text(clean_title(bridge.title)), norm_text(primary_artist(track_artist_name(bridge))))
+                    
+                    # Dedupe on ratingKey first, and then use track and artist name as a fallback
+                    if bridge.ratingKey in existing_keys or b_identity in existing_identities:
                         #print(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
                         
@@ -1187,7 +1195,8 @@ def fill_sonic_gaps(path, limit=20):
                         print(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
                         print(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
                         final_path.append(bridge)
-                        existing_keys.add(bridge.ratingKey) 
+                        existing_identities.add(b_identity) 
+                        existing_keys.add(bridge.ratingKey)
                         found_bridge = True
                         break
                     #else:
