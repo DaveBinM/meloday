@@ -16,6 +16,7 @@ essentia:
 
 bridging:
   enabled: true                                     # Set to false to skip adding bridging tracks between sonic jumps
+  smart_truncation: false                           # Set to true to ensure max_tracks isn't exceeded. Set to false to ensure the best sonic flow
 
 playlist:
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
@@ -24,7 +25,7 @@ playlist:
   sonic_similar_limit: 20                           # Number of sonically similar tracks to fetch for each track during sorting
   
   historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
-  sonic_similarity_limit: 50                        # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; shouldn't be higher than max tracks)
+  sonic_similarity_limit: 100                       # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; default is 2x max tracks)
   sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter matching). The max value is 0.25
 
 seasonal:
@@ -32,7 +33,7 @@ seasonal:
     start_month: 12                                 # The month Christmas music can start being included
     start_day: 1                                    # The day of the start month
     end_month: 12                                   # The month Christmas music should be excluded again
-    end_day: 25                                     # The day Christmas music should be excluded again
+    end_day: 25                                     # The day of the end month
 
 
 directories:
