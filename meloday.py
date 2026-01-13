@@ -6,6 +6,7 @@ import json
 import unicodedata
 import portalocker
 import traceback
+import concurrent.futures
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
@@ -17,6 +18,9 @@ try:
     import essentia
     import essentia.standard as es
     ESSENTIA_AVAILABLE = True
+    # SILENCE ESSENTIA WARNINGS: Fixes the "No network created" noise in parallel mode
+    essentia.log.infoActive = False
+    essentia.log.warningActive = False
 except ImportError:
     ESSENTIA_AVAILABLE = False
 
@@ -54,8 +58,8 @@ ESSENTIA_ENABLED = ess_cfg.get("enabled", True) and ESSENTIA_AVAILABLE
 ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.json"), BASE_DIR)
 BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
 KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
-ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
-ERA_WEIGHT = ess_cfg.get("era_weight", 0.05)
+ENERGY_WEIGHT = 0.10
+ERA_WEIGHT = 0.05
 PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
 # Seasonal Rules
@@ -91,6 +95,7 @@ _essentia_cache = {}
 _album_meta_cache = {}
 _album_obj_cache = {}
 _artist_obj_cache = {}
+_global_sonic_cache = {}
 plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 # --- 4. CORE FUNCTIONS ---
@@ -132,7 +137,20 @@ def get_local_path(track):
 
 def analyze_track_essentia(track):
     rk = str(track.ratingKey)
-    if rk in _essentia_cache: return _essentia_cache[rk]
+    
+    # Metadata Update Handling
+    # If the track is already in the cache, we refresh the text fields from Plex
+    # to ensure changes to genres/moods/artist names are captured.
+    if rk in _essentia_cache and "energy" in _essentia_cache[rk]:
+        data = _essentia_cache[rk]
+        data["artist"] = norm_text(primary_artist(track_artist_name(track)))
+        data["genres"] = list(str(g) for g in (getattr(track, "genres", None) or []))
+        data["moods"] = list(str(m) for m in (getattr(track, "moods", None) or []))
+        # Update year if it was previously null
+        if data.get("year") is None:
+            data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
+        return data
+
     if not ESSENTIA_ENABLED: return None
     
     file_path = get_local_path(track)
@@ -148,27 +166,39 @@ def analyze_track_essentia(track):
         camelot = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
 
         # Energy/Intensity via Integrated Loudness (EBU R128)
-        # FIX: Mux mono signal to pseudo-stereo for loudness analyzer compatibility
+        # Mux mono signal to pseudo-stereo for loudness analyzer compatibility
         audio_stereo = es.StereoMuxer()(audio, audio)
         loudness_stats = es.LoudnessEBUR128()(audio_stereo)
         integrated_loudness = loudness_stats[2]
 
-        # FIX: Fallback to Album Year if Track Year is missing
+        # Year Fallback: Check track first, then album
         track_year = getattr(track, "year", None)
         if not track_year:
             track_year = album_meta(track).get("year")
 
+        # Comprehensive Metadata Caching
         data = {
             "bpm": round(bpm, 2), 
             "key": camelot,
             "energy": round(integrated_loudness, 2),
-            "year": track_year
+            "year": track_year,
+            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "genres": list(str(g) for g in (getattr(track, "genres", None) or [])),
+            "moods": list(str(m) for m in (getattr(track, "moods", None) or []))
         }
         _essentia_cache[rk] = data
         return data
     except Exception as e:
         print(f"[DIAGNOSTIC] Essentia failed for '{track.title}': {e}")
         return None
+
+# Worker for Multiprocessing compatibility
+def analysis_worker(track_id):
+    try:
+        track = plex.fetchItem(track_id)
+        return str(track_id), analyze_track_essentia(track)
+    except Exception:
+        return str(track_id), None
 
 def get_bpm_distance(bpm1, bpm2):
     if not bpm1 or not bpm2: return 0.5
@@ -396,7 +426,7 @@ def album_meta(track) -> dict:
         if album is not None:
             meta["album_title"] = (getattr(album, "title", meta["album_title"]) or meta["album_title"]).strip()
             meta["album_artist"] = (getattr(album, "parentTitle", "") or "").strip()
-            meta["year"] = getattr(album, "year", None) # NEW: Cache album year
+            meta["year"] = getattr(album, "year", None)
             # Plex may expose subtype/albumType differently depending on server/version.
             meta["album_subtype"] = (getattr(album, "subtype", "") or getattr(album, "albumType", "") or "").strip()
             # Fallback: query raw metadata XML and extract <Subformat tag="...">
@@ -614,7 +644,7 @@ def wrap_text(text, font, draw, max_width):
 
 # ---------------------------------------------------------------------
 def fetch_historical_tracks(period):
-    """Fetch tracks from Plex history that match the current daypart. while excluding recently played tracks."""
+    """Fetch tracks from Plex history that match the current daypart while excluding recently played tracks."""
     music_section = plex.library.section(MUSIC_LIBRARY)
     now = datetime.now()
     period_hours = set(time_periods[period]["hours"])
@@ -632,48 +662,36 @@ def fetch_historical_tracks(period):
     ]
 
     excluded_keys = {entry.ratingKey for entry in excluded_entries}
-    filtered_tracks = [
+    filtered_entries = [
         entry for entry in history_entries
         if entry.ratingKey not in excluded_keys
     ]
 
     # If no historical tracks found, fallback
-    if not filtered_tracks:
+    if not filtered_entries:
         fallback_entries = [
             entry for entry in music_section.history(mindate=history_start)
             if entry.ratingKey not in excluded_keys
         ]
         if fallback_entries:
-            filtered_tracks = fallback_entries
-    # --- Resolve TrackHistory -> Track ---
-    resolved = []
-    cache = {}
+            filtered_entries = fallback_entries
 
-    for h in filtered_tracks:
-        rk = getattr(h, "ratingKey", None)
-        if not rk:
-            continue
+    # Asynchronous Metadata Fetching for historical tracks
+    def resolve_track(entry):
+        rk = getattr(entry, "ratingKey", None)
+        if not rk: return None
+        try:
+            t = plex.fetchItem(rk)
+            if t and getattr(t, "type", None) == "track":
+                t.sonic_distance = 0.0
+                return t
+        except Exception: pass
+        return None
 
-        # Cache to avoid repeated Plex calls
-        if rk in cache:
-            t = cache[rk]
-        else:
-            try:
-                t = plex.fetchItem(rk)
-            except Exception as e:
-                print(f"[WARN] Failed to resolve track rating key {rk}: {e}")
-                t = None
-            cache[rk] = t
-
-        # Keep only real tracks
-        if t is not None and getattr(t, "type", None) == "track":
-            # Tag history tracks with 0.0 distance for deduplication logic
-            t.sonic_distance = 0.0
-            resolved.append(t)
-
-    filtered_tracks = resolved
-
-    # Apply label + seasonal collection exclusions
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        resolved = list(executor.map(resolve_track, filtered_entries))
+    
+    filtered_tracks = [t for t in resolved if t is not None]
     filtered_tracks = filter_excluded_tracks(filtered_tracks, now=now)
 
     # Genre balancing
@@ -863,13 +881,19 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
     for track in reference_tracks:
         try:
             similars = track.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT, maxDistance=SONIC_SIMILARITY_DISTANCE)
-
-            # Ensure we're filtering by last play date
             filtered_similars = []
+
+            # Global Sonic Caching
+            # Capture distance data now so the sorting algorithm doesn't have to call Plex again.
+            rk_a = track.ratingKey
+            if rk_a not in _global_sonic_cache:
+                _global_sonic_cache[rk_a] = {}
+
             for s in similars:
-                # Capture the sonic distance for use in better_copy comparison
-                # If distance isn't exposed, default to the maxDistance limit
-                s.sonic_distance = getattr(s, 'distance', SONIC_SIMILARITY_DISTANCE)
+                # Capture and reuse distance data
+                dist = getattr(s, 'distance', SONIC_SIMILARITY_DISTANCE)
+                _global_sonic_cache[rk_a][s.ratingKey] = dist
+                s.sonic_distance = dist
 
                 last_played = getattr(s, "lastViewedAt", None)
 
@@ -903,9 +927,12 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
     Calculates a normalized distance between 0.0 and 1.0.
     0.0 = Identical | 1.0 = Completely Dissimilar
     """
-    # 1. Check for raw sonic distance if available (0.0 - 0.25)
-    # We normalize 0.25 to a 0.0-0.5 scale to leave room for metadata penalties
-    base_dist = similarity_cache.get(ka, {}).get(kb, None)
+    # 1. Check for raw sonic distance in global cache first
+    base_dist = _global_sonic_cache.get(ka, {}).get(kb, None)
+    
+    if base_dist is None:
+        # Check the local similarity matrix provided during sorting
+        base_dist = similarity_cache.get(ka, {}).get(kb, None)
     
     if base_dist is None:
         # Fallback: Synthetic Distance based on metadata
@@ -969,21 +996,27 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     # Pre-calculate metadata and fetch similarities
     for track in all_involved:
         t_key = track.ratingKey
+        
+        # Unified Metadata Caching
+        # Use stored metadata if available to eliminate hits to Plex API.
+        ec = _essentia_cache.get(str(t_key), {})
         meta_cache[t_key] = {
-            "artist": norm_text(primary_artist(track_artist_name(track))),
-            "genres": set(str(g) for g in (getattr(track, "genres", None) or [])),
-            "moods": set(str(m) for m in (getattr(track, "moods", None) or [])),
-            "year": getattr(track, "year", None)
+            "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
+            "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
+            "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
+            "year": ec.get("year") or getattr(track, "year", None)
         }
-        try:
-            # Try to get raw distances if available, else get ranks
-            sims = track.sonicallySimilar(limit=limit)
-            similarity_cache[t_key] = {
-                s.ratingKey: getattr(s, 'distance', i) 
-                for i, s in enumerate(sims)
-            }
-        except Exception:
-            similarity_cache[t_key] = {}
+        
+        # Only query Plex if the similarity data isn't in our global reuse cache
+        if t_key not in _global_sonic_cache:
+            try:
+                sims = track.sonicallySimilar(limit=limit)
+                similarity_cache[t_key] = {
+                    s.ratingKey: getattr(s, 'distance', i) 
+                    for i, s in enumerate(sims)
+                }
+            except Exception:
+                similarity_cache[t_key] = {}
 
     # --- 1. BI-DIRECTIONAL GREEDY INITIALIZATION ---
     remaining = list(tracks)
@@ -1240,13 +1273,24 @@ def main():
     # Step 4: Sonic sort (GREEDY)
     if middle and first and last:
         if ESSENTIA_ENABLED:
-            print_status(75, "Performing deep sonic analysis (Essentia)...")
-            for t in [first, last] + middle:
-                analyze_track_essentia(t)
+            print_status(75, "Performing parallel deep sonic analysis...")
+            load_essentia_cache()
+            
+            # TRUE MULTIPROCESSING: Parallelizes audio analysis across all CPU cores
+            # Uses ProcessPoolExecutor to bypass GIL and resolve internal Essentia clashing.
+            tracks_to_analyze = [first, last] + middle
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                # Passing IDs instead of Plex objects to allow for pickling across processes
+                results = list(executor.map(analysis_worker, [t.ratingKey for t in tracks_to_analyze]))
+                # Merge results back into the main memory cache
+                for tid, data in results:
+                    if data:
+                        _essentia_cache[str(tid)] = data
+                
             save_essentia_cache()
 
         print_status(80, "Double-ended 2-opt sonic refinement...")
-        # Fix sorting breadth logic: ensure sorting breadth covers the tracks in the list
+        # Ensure sorting breadth covers the tracks in the list
         sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
         middle = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
 
