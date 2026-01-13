@@ -71,8 +71,15 @@ def bulk_analyze():
         if rk not in _essentia_cache:
             to_process.append(t.ratingKey)
         else:
-            last_sync = _essentia_cache[rk].get("last_synced", 0)
-            if (now_ts - last_sync) > 604800:
+            cached_data = _essentia_cache[rk]
+            last_sync = cached_data.get("last_synced", 0)
+            
+            # Check if path has changed or if time limit has expired
+            # get_local_path is imported via meloday (used in analyze_track_essentia logic)
+            from meloday import get_local_path
+            current_path = get_local_path(t)
+            
+            if cached_data.get("file_path") != current_path or (now_ts - last_sync) > 604800:
                 to_process.append(t.ratingKey)
 
     num_to_process = len(to_process)

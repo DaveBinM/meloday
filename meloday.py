@@ -200,7 +200,10 @@ def analyze_track_essentia(track):
         # Throttled Metadata Syncing
         # Only call Plex to update text metadata if the entry is older than 7 days (604800s).
         last_sync = data.get("last_synced", 0)
-        if (now_ts - last_sync) < 604800:
+        file_path = get_local_path(track)
+        
+        # Check if the file path has changed (e.g., quality upgrade) while keeping same ratingKey
+        if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
             return data
 
         data["artist"] = norm_text(primary_artist(track_artist_name(track)))
@@ -210,8 +213,11 @@ def analyze_track_essentia(track):
         if data.get("year") is None:
             data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
         
-        data["last_synced"] = now_ts
-        return data
+        # If path is still the same, we just update text metadata and return
+        if data.get("file_path") == file_path:
+            data["last_synced"] = now_ts
+            return data
+        # If path changed, we fall through to perform new acoustic analysis
 
     if not ESSENTIA_ENABLED: return None
     
@@ -247,6 +253,7 @@ def analyze_track_essentia(track):
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": list(str(g) for g in (getattr(track, "genres", None) or [])),
             "moods": list(str(m) for m in (getattr(track, "moods", None) or [])),
+            "file_path": file_path,
             "last_synced": now_ts # Added for throttling
         }
         _essentia_cache[rk] = data
