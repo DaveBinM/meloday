@@ -255,7 +255,8 @@ def _tag_list_contains(tags, needle: str) -> bool:
         return False
     n = needle.strip().casefold()
     for t in tags:
-        val = getattr(t, "tag", None) or getattr(t, "title", None)
+        # Handle both Plex objects and lean cached strings
+        val = t if isinstance(t, str) else (getattr(t, "tag", None) or getattr(t, "title", None))
         if isinstance(val, str) and val.strip().casefold() == n:
             return True
     return False
@@ -263,7 +264,9 @@ def _tag_list_contains(tags, needle: str) -> bool:
 def has_label(obj, label_name: str) -> bool:
     """True if Plex item has a Labels tag equal to label_name (case-insensitive)."""
     try:
-        return _tag_list_contains(getattr(obj, "labels", None), label_name)
+        # Handle both Plex objects and lean cached dicts
+        labels = obj.get("labels") if isinstance(obj, dict) else getattr(obj, "labels", None)
+        return _tag_list_contains(labels, label_name)
     except Exception as e:
         print(f"[WARN] Error checking label for object: {e}")
         return False
@@ -272,12 +275,16 @@ def _album_in_collection(album, collection_name: str) -> bool:
     """True if an Album is in the given Plex Collection name."""
     try:
         # collections are sometimes not populated until reload()
-        try:
-            album.reload()
-        except Exception as e:
-            print(f"[WARN] Error reloading album {album.title}: {e}")
-            pass
-        return _tag_list_contains(getattr(album, "collections", None), collection_name)
+        # skip reload if we already have the lean dict
+        if not isinstance(album, dict):
+            try:
+                album.reload()
+            except Exception as e:
+                print(f"[WARN] Error reloading album {album.title}: {e}")
+                pass
+        
+        tags = album.get("collections") if isinstance(album, dict) else getattr(album, "collections", None)
+        return _tag_list_contains(tags, collection_name)
     except Exception as e:
         print(f"[WARN] Error checking collection for album: {e}")
         return False
@@ -302,12 +309,9 @@ def filter_excluded_tracks(tracks, now=None):
             if parent_key in _album_obj_cache:
                 album = _album_obj_cache[parent_key]
             else:
-                try:
-                    album = plex.fetchItem(parent_key)
-                except Exception as e:
-                    print(f"[WARN] Failed to fetch album parent key {parent_key} for {t.title}: {e}")
-                    album = None
-                _album_obj_cache[parent_key] = album
+                # This will populate _album_obj_cache with lean dict via album_meta
+                album_meta(t)
+                album = _album_obj_cache.get(parent_key)
 
         if album and has_label(album, EXCLUDE_LABEL_NAME):
             continue
@@ -377,11 +381,18 @@ def track_artist_name(track) -> str:
         if artist_key and artist_key in _artist_obj_cache:
             a = _artist_obj_cache[artist_key]
         else:
-            a = track.artist() if callable(getattr(track, "artist", None)) else None
-            if artist_key:
+            artist_obj = track.artist() if callable(getattr(track, "artist", None)) else None
+            if artist_key and artist_obj:
+                # Store only what we need in a lean dict
+                a = {
+                    "title": getattr(artist_obj, "title", None),
+                    "userRating": getattr(artist_obj, "userRating", None)
+                }
                 _artist_obj_cache[artist_key] = a
+            else:
+                a = None
         
-        at = getattr(a, "title", None) if a else None
+        at = a.get("title") if isinstance(a, dict) else (getattr(a, "title", None) if a else None)
         if isinstance(at, str) and at.strip() and not ((at or '').strip().casefold() in {'various artists','various'}):
             return at.strip()
     except Exception as e:
@@ -432,33 +443,46 @@ def album_meta(track) -> dict:
         "year": None,
     }
     try:
-        # Check cache first to fix redundant API calls
-        if album_key and album_key in _album_obj_cache:
-            album = _album_obj_cache[album_key]
+        # Check lean cache first to fix redundant API calls
+        if album_key and album_key in _album_obj_cache and isinstance(_album_obj_cache[album_key], dict):
+            album_data = _album_obj_cache[album_key]
+            meta["album_title"] = album_data.get("title", meta["album_title"])
+            meta["album_artist"] = album_data.get("parentTitle", "")
+            meta["year"] = album_data.get("year")
+            meta["album_subtype"] = album_data.get("subtype", "")
         else:
             album = track.album() if callable(getattr(track, "album", None)) else None
-            if album_key:
-                _album_obj_cache[album_key] = album
+            if album is not None:
+                meta["album_title"] = (getattr(album, "title", meta["album_title"]) or meta["album_title"]).strip()
+                meta["album_artist"] = (getattr(album, "parentTitle", "") or "").strip()
+                meta["year"] = getattr(album, "year", None)
+                # Plex may expose subtype/albumType differently depending on server/version.
+                meta["album_subtype"] = (getattr(album, "subtype", "") or getattr(album, "albumType", "") or "").strip()
+                # Fallback: query raw metadata XML and extract <Subformat tag="...">
+                if not meta["album_subtype"]:
+                    try:
+                        # Process-Safe raw query logic
+                        # Using track._server instead of the global plex instance for process isolation.
+                        data = track._server.query(getattr(album, "key", f"/library/metadata/{album.ratingKey}"))
+                        sub = data.find(".//Subformat")
+                        if sub is not None:
+                            tag = sub.get("tag", "") or ""
+                            meta["album_subtype"] = tag.strip()
+                    except Exception as e:
+                        print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
+                        pass
                 
-        if album is not None:
-            meta["album_title"] = (getattr(album, "title", meta["album_title"]) or meta["album_title"]).strip()
-            meta["album_artist"] = (getattr(album, "parentTitle", "") or "").strip()
-            meta["year"] = getattr(album, "year", None)
-            # Plex may expose subtype/albumType differently depending on server/version.
-            meta["album_subtype"] = (getattr(album, "subtype", "") or getattr(album, "albumType", "") or "").strip()
-            # Fallback: query raw metadata XML and extract <Subformat tag="...">
-            if not meta["album_subtype"]:
-                try:
-                    # Process-Safe raw query logic
-                    # Using track._server instead of the global plex instance for process isolation.
-                    data = track._server.query(getattr(album, "key", f"/library/metadata/{album.ratingKey}"))
-                    sub = data.find(".//Subformat")
-                    if sub is not None:
-                        tag = sub.get("tag", "") or ""
-                        meta["album_subtype"] = tag.strip()
-                except Exception as e:
-                    print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
-                    pass
+                # Store only what we need in a lean dict for both caches
+                if album_key:
+                    _album_obj_cache[album_key] = {
+                        "title": meta["album_title"],
+                        "parentTitle": meta["album_artist"],
+                        "year": meta["year"],
+                        "subtype": meta["album_subtype"],
+                        "userRating": getattr(album, "userRating", None),
+                        "labels": [l.tag for l in getattr(album, "labels", [])],
+                        "collections": [c.tag for c in getattr(album, "collections", [])]
+                    }
     except Exception as e:
         print(f"[WARN] Error fetching metadata for {track.title}: {e}")
         pass
@@ -751,25 +775,33 @@ def filter_low_rated_tracks(tracks):
             if not getattr(track, "ratingKey", None) or not getattr(track, "parentRatingKey", None):
                 continue
             
-            # Use unified caches to fix redundant API calls and fragmented caching
+            # Use lean caches to fix redundant API calls and fragmented caching
             artist_key = getattr(track, "grandparentRatingKey", None)
             if artist_key and artist_key in _artist_obj_cache:
                 artist = _artist_obj_cache[artist_key]
             else:
-                artist = track.artist() if callable(getattr(track, "artist", None)) else None
-                if artist_key:
+                artist_obj = track.artist() if callable(getattr(track, "artist", None)) else None
+                if artist_key and artist_obj:
+                    # Store only what we need in a lean dict
+                    artist = {
+                        "title": getattr(artist_obj, "title", None),
+                        "userRating": getattr(artist_obj, "userRating", None)
+                    }
                     _artist_obj_cache[artist_key] = artist
+                else:
+                    artist = None
                     
-            artist_rating = getattr(artist, "userRating", None) if artist else None
+            artist_rating = artist.get("userRating") if isinstance(artist, dict) else (getattr(artist, "userRating", None) if artist else None)
             
             album_key = track.parentRatingKey
             if album_key in _album_obj_cache:
                 album = _album_obj_cache[album_key]
             else:
-                album = plex.fetchItem(album_key)
-                _album_obj_cache[album_key] = album
+                # Use album_meta to populate the lean dict in _album_obj_cache
+                album_meta(track)
+                album = _album_obj_cache.get(album_key)
                 
-            album_rating = getattr(album, "userRating", None) if album else None
+            album_rating = album.get("userRating") if isinstance(album, dict) else (getattr(album, "userRating", None) if album else None)
             track_rating = getattr(track, "userRating", None)
 
             if artist_rating is not None and artist_rating <= 4:
@@ -1131,17 +1163,17 @@ def fill_sonic_gaps(path, limit=20):
                 for bridge in potential_bridges:
                     # Filter against duplicates and recently played
                     if bridge.ratingKey in existing_keys:
-                        print(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        #print(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
                         
                     last_p = getattr(bridge, "lastViewedAt", None)
                     if last_p and last_p >= exclude_start:
-                        print(f"  [!] Skipping '{bridge.title}': Recently played.")
+                        #print(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     
                     # Filter against labels, seasonal exclusions, and low ratings
                     if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
-                        print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                        #print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
                     # Trigger quick analysis for bridge candidates if needed
@@ -1158,8 +1190,8 @@ def fill_sonic_gaps(path, limit=20):
                         existing_keys.add(bridge.ratingKey) 
                         found_bridge = True
                         break
-                    else:
-                        print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                    #else:
+                        #print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
                 
                 if not found_bridge:
                     print(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
@@ -1409,9 +1441,9 @@ def main():
             load_essentia_cache()
             
             # TRUE MULTIPROCESSING: Parallelizes audio analysis across all CPU cores
-            # Uses ProcessPoolExecutor to bypass GIL and resolve internal Essentia clashing.
+            # Uses ProcessPoolExecutor with max_tasks_per_child to manage memory bloat
             tracks_to_analyze = [first, last] + middle
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
                 # Passing IDs instead of Plex objects to allow for pickling across processes
                 results = list(executor.map(analysis_worker, [t.ratingKey for t in tracks_to_analyze]))
                 # Merge results back into the main memory cache

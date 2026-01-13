@@ -86,8 +86,9 @@ def bulk_analyze():
     batch_size = 50
     completed = 0
 
-    # 2. Utilize ProcessPoolExecutor for true CPU parallelism
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
+    # Workers restart after every 5 tracks to prevent memory bloat from accumulating
+    with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
         for i in range(0, num_to_process, batch_size):
             batch_ids = to_process[i:i + batch_size]
             future_to_track = {executor.submit(analysis_worker, tid): tid for tid in batch_ids}
