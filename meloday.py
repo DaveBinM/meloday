@@ -1,5 +1,9 @@
 import yaml
 import os
+
+# This must happen before any essentia imports to stop the SVM Info messages
+os.environ['ESSENTIA_LOG_LEVEL'] = '1' 
+
 import re
 import random
 import json
@@ -7,6 +11,7 @@ import unicodedata
 import portalocker
 import traceback
 import concurrent.futures
+import logging 
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
@@ -16,15 +21,53 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # --- 1. ENVIRONMENT & ESSENTIA DETECTION ---
 try:
     import essentia
-    import essentia.standard as es
-    ESSENTIA_AVAILABLE = True
-    # SILENCE ESSENTIA WARNINGS: Fixes the "No network created" noise in parallel mode
+    # SILENCE ESSENTIA BEFORE IMPORTING STANDARDS
+    # This ensures that even during sub-process imports, the INFO flags are False
     essentia.log.infoActive = False
     essentia.log.warningActive = False
+    
+    import essentia.standard as es
+    ESSENTIA_AVAILABLE = True
 except ImportError:
     ESSENTIA_AVAILABLE = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- LOGGING INITIALIZATION ---
+LOG_FILE = os.path.join(BASE_DIR, "assets", "meloday_run.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# Use 'a' (append) mode to prevent sub-processes from truncating the file on import
+file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+
+logger = logging.getLogger("Meloday")
+logger.setLevel(logging.INFO)
+# Clear existing handlers to prevent duplicates
+if logger.hasHandlers():
+    logger.handlers.clear()
+logger.addHandler(file_handler)
+
+def log_text(msg):
+    """
+    Strictly filters string to ensure no NUL bytes or non-printable 
+    control characters trigger grep's binary detection, and flushes to disk.
+    """
+    if msg:
+        # Keep only printable characters and standard whitespace
+        clean_msg = "".join(ch for ch in str(msg) if ch.isprintable() or ch in ("\n", "\r", "\t"))
+        # Remove NUL bytes which trigger binary detection in grep
+        clean_msg = clean_msg.replace('\x00', '')
+        logger.info(clean_msg)
+        # Force the OS to write to disk immediately (integrated into all selection/filtering loops)
+        file_handler.flush()
+
+# Wrapper to ensure every print is also logged
+def m_print(msg):
+    print(msg)
+    log_text(msg)
+
+log_text("=== MELODAY RUN STARTED ===") #
 
 def resolve_path(path, base):
     return path if os.path.isabs(path) else os.path.join(base, path)
@@ -58,8 +101,8 @@ ESSENTIA_ENABLED = ess_cfg.get("enabled", True) and ESSENTIA_AVAILABLE
 ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.json"), BASE_DIR)
 BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
 KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
-ENERGY_WEIGHT = 0.10
-ERA_WEIGHT = 0.05
+ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
+ERA_WEIGHT = ess_cfg.get("era_weight", 0.05)
 PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
 # Bridging Configuration
@@ -111,7 +154,7 @@ def load_essentia_cache():
             with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='r', timeout=10) as f:
                 _essentia_cache = json.load(f)
         except Exception as e:
-            print(f"[WARN] Could not load Essentia cache: {e}")
+            m_print(f"[WARN] Could not load Essentia cache: {e}")
             _essentia_cache = {}
 
 def save_essentia_cache():
@@ -122,7 +165,7 @@ def save_essentia_cache():
         with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
             json.dump(_essentia_cache, f)
     except Exception as e:
-        print(f"[ERROR] Could not save Essentia cache safely: {e}")
+        m_print(f"[ERROR] Could not save Essentia cache safely: {e}")
 
 def get_local_path(track):
     if not track.locations: return None
@@ -135,12 +178,17 @@ def get_local_path(track):
     if os.path.exists(path):
         return path
     else:
-        print(f"[DIAGNOSTIC] File not found: {path}")
+        m_print(f"[DIAGNOSTIC] File not found: {path}")
         return None
 
 def analyze_track_essentia(track):
     rk = str(track.ratingKey)
     now_ts = datetime.now().timestamp()
+
+    # Re-silence inside sub-processes to handle parallel worker logs
+    if ESSENTIA_AVAILABLE:
+        essentia.log.infoActive = False
+        essentia.log.warningActive = False
     
     # Metadata Update Handling
     # If the track is already in the cache, we refresh the text fields from Plex
@@ -203,12 +251,17 @@ def analyze_track_essentia(track):
         _essentia_cache[rk] = data
         return data
     except Exception as e:
-        print(f"[DIAGNOSTIC] Essentia failed for '{track.title}': {e}")
+        m_print(f"[DIAGNOSTIC] Essentia failed for '{track.title}': {e}")
         return None
 
 # Worker for Multiprocessing compatibility
 def analysis_worker(track_id):
     try:
+        # Silence Essentia explicitly in parallel worker processes
+        if ESSENTIA_AVAILABLE:
+            essentia.log.infoActive = False
+            essentia.log.warningActive = False
+
         # Process-Safe Plex Connection
         # Initialize a new local connection session for process isolation.
         local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
@@ -268,7 +321,7 @@ def has_label(obj, label_name: str) -> bool:
         labels = obj.get("labels") if isinstance(obj, dict) else getattr(obj, "labels", None)
         return _tag_list_contains(labels, label_name)
     except Exception as e:
-        print(f"[WARN] Error checking label for object: {e}")
+        m_print(f"[WARN] Error checking label for object: {e}")
         return False
 
 def _album_in_collection(album, collection_name: str) -> bool:
@@ -280,13 +333,13 @@ def _album_in_collection(album, collection_name: str) -> bool:
             try:
                 album.reload()
             except Exception as e:
-                print(f"[WARN] Error reloading album {album.title}: {e}")
+                m_print(f"[WARN] Error reloading album {album.title}: {e}")
                 pass
         
         tags = album.get("collections") if isinstance(album, dict) else getattr(album, "collections", None)
         return _tag_list_contains(tags, collection_name)
     except Exception as e:
-        print(f"[WARN] Error checking collection for album: {e}")
+        m_print(f"[WARN] Error checking collection for album: {e}")
         return False
 
 def filter_excluded_tracks(tracks, now=None):
@@ -300,6 +353,7 @@ def filter_excluded_tracks(tracks, now=None):
     for t in tracks:
         # Track-level label exclusion
         if has_label(t, EXCLUDE_LABEL_NAME):
+            log_text(f"[EXCLUSION] Track '{t.title}' ({t.ratingKey}) skipped: Label '{EXCLUDE_LABEL_NAME}' found.") #
             continue
 
         # Album-level checks (cached)
@@ -314,9 +368,11 @@ def filter_excluded_tracks(tracks, now=None):
                 album = _album_obj_cache.get(parent_key)
 
         if album and has_label(album, EXCLUDE_LABEL_NAME):
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Album '{album.get('title')}' has Label '{EXCLUDE_LABEL_NAME}'.") #
             continue
 
         if (not in_xmas) and album and _album_in_collection(album, CHRISTMAS_COLLECTION_NAME):
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Seasonal filtering (Christmas collection).") #
             continue
 
         cleaned.append(t)
@@ -396,7 +452,7 @@ def track_artist_name(track) -> str:
         if isinstance(at, str) and at.strip() and not ((at or '').strip().casefold() in {'various artists','various'}):
             return at.strip()
     except Exception as e:
-        print(f"[WARN] Error resolving artist for track {track.title}: {e}")
+        m_print(f"[WARN] Error resolving artist for track {track.title}: {e}")
         pass
 
     # If we still can't tell, return whatever grandparentTitle we had (even if VA), or 'unknown'.
@@ -469,7 +525,7 @@ def album_meta(track) -> dict:
                             tag = sub.get("tag", "") or ""
                             meta["album_subtype"] = tag.strip()
                     except Exception as e:
-                        print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
+                        m_print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
                         pass
                 
                 # Store only what we need in a lean dict for both caches
@@ -484,7 +540,7 @@ def album_meta(track) -> dict:
                         "collections": [c.tag for c in getattr(album, "collections", [])]
                     }
     except Exception as e:
-        print(f"[WARN] Error fetching metadata for {track.title}: {e}")
+        m_print(f"[WARN] Error fetching metadata for {track.title}: {e}")
         pass
 
     _album_meta_cache[cache_key] = meta
@@ -566,25 +622,33 @@ def better_copy(a, b):
     a_dist = getattr(a, "sonic_distance", 0.00)
     b_dist = getattr(b, "sonic_distance", 0.00)
     if abs(a_dist - b_dist) > 0.08:
-        return a if a_dist < b_dist else b
+        winner = a if a_dist < b_dist else b
+        log_text(f"[DEDUPE] Sonic Priority: Kept '{winner.title}' ({winner.ratingKey}) due to distance ({min(a_dist, b_dist):.3f}).") #
+        return winner
 
     # 1) Prefer studio albums
     a_studio = is_studio_album(a)
     b_studio = is_studio_album(b)
     if a_studio != b_studio:
-        return a if a_studio else b
+        winner = a if a_studio else b
+        log_text(f"[DEDUPE] Format Priority: Kept '{winner.title}' (Studio Album preferred).") #
+        return winner
 
     # 2) Prefer the "plain/original" title within the same dedupe key
     a_rank = title_variant_rank(a)
     b_rank = title_variant_rank(b)
     if a_rank != b_rank:
-        return a if a_rank < b_rank else b
+        winner = a if a_rank < b_rank else b
+        log_text(f"[DEDUPE] Variant Priority: Kept '{winner.title}' (Original title preferred over edit/remix).") #
+        return winner
 
     # 3) Prefer non-remix album titles (e.g., 'Changa' over 'Go Bang (Remixes) - EP')
     a_pen = remix_album_penalty(a)
     b_pen = remix_album_penalty(b)
     if a_pen != b_pen:
-        return a if a_pen < b_pen else b
+        winner = a if a_pen < b_pen else b
+        log_text(f"[DEDUPE] Album Penalty Priority: Kept '{winner.title}' (Non-remix collection preferred).") #
+        return winner
 
     # Pre-fetch meta once
     a_meta = album_meta(a)
@@ -645,7 +709,7 @@ def print_status(percent, message):
     bar_length = 30
     filled_length = int(bar_length * percent // 100)
     bar = '=' * filled_length + '-' * (bar_length - filled_length)
-    print(f"[{bar}] {percent:3d}%  {message}")
+    m_print(f"[{bar}] {percent:3d}%  {message}")
 
 # ---------------------------------------------------------------------
 def get_current_time_period():
@@ -664,7 +728,7 @@ def load_descriptor_map(filepath):
         with open(filepath, "r", encoding="utf-8") as file:
             return json.load(file)
     except Exception as e:
-        print(f"Error loading descriptor dictionary: {e}")
+        m_print(f"Error loading descriptor dictionary: {e}")
         return {}
 
 def wrap_text(text, font, draw, max_width):
@@ -694,6 +758,8 @@ def fetch_historical_tracks(period):
     history_start = now - timedelta(days=HISTORY_LOOKBACK_DAYS)
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
 
+    log_text(f"[SELECTION] Scanning history for period '{period}' (Lookback: {HISTORY_LOOKBACK_DAYS} days).") #
+
     history_entries = [
         entry for entry in music_section.history(mindate=history_start)
         if entry.viewedAt and entry.viewedAt.hour in period_hours
@@ -711,6 +777,7 @@ def fetch_historical_tracks(period):
 
     # If no historical tracks found, fallback
     if not filtered_entries:
+        log_text("[SELECTION] No direct daypart matches found. Attempting generic history fallback.") #
         fallback_entries = [
             entry for entry in music_section.history(mindate=history_start)
             if entry.ratingKey not in excluded_keys
@@ -734,6 +801,10 @@ def fetch_historical_tracks(period):
         resolved = list(executor.map(resolve_track, filtered_entries))
     
     filtered_tracks = [t for t in resolved if t is not None]
+    
+    # Audit log for historical pool size
+    log_text(f"[SELECTION] Found {len(filtered_tracks)} historical tracks after exclusion/lookback filtering.") #
+
     filtered_tracks = filter_excluded_tracks(filtered_tracks, now=now)
 
     # Genre balancing
@@ -758,6 +829,7 @@ def fetch_historical_tracks(period):
         most_common_genre, most_common_count = genre_count.most_common(1)[0]
         max_genre_limit = int(MAX_TRACKS * 0.25)
         if most_common_count > max_genre_limit:
+            log_text(f"[SELECTION] Balancing '{most_common_genre}' (Limit: {max_genre_limit}) to prevent over-saturation.") #
             def _has_genre(track, genre_str):
                 return any(str(g) == genre_str for g in (getattr(track, "genres", None) or []))
             balanced_selection = (
@@ -805,15 +877,18 @@ def filter_low_rated_tracks(tracks):
             track_rating = getattr(track, "userRating", None)
 
             if artist_rating is not None and artist_rating <= 4:
+                log_text(f"[EXCLUSION] Track '{track.title}' skipped: Artist rating is low ({artist_rating}).") #
                 continue
             if album_rating is not None and album_rating <= 4:
+                log_text(f"[EXCLUSION] Track '{track.title}' skipped: Album rating is low ({album_rating}).") #
                 continue
             if track_rating is not None and track_rating <= 4:
+                log_text(f"[EXCLUSION] Track '{track.title}' skipped: User rating is low ({track_rating}).") #
                 continue
 
             filtered.append(track)
         except Exception as e:
-            print(f"  [!] Warning: Could not check rating for '{track.title}' - {e}. Skipping filter.")
+            m_print(f"  [!] Warning: Could not check rating for '{track.title}' - {e}. Skipping filter.")
             pass
     return filtered
 
@@ -892,7 +967,7 @@ def process_tracks(tracks):
                 best_by_key[track_key] = track
                 key_order.append(track_key)
         except Exception as e:
-            print(f"[WARN] Error during duplicate comparison for {track.title}: {e}")
+            m_print(f"[WARN] Error during duplicate comparison for {track.title}: {e}")
             continue
 
     deduped_tracks = [best_by_key[k] for k in key_order]
@@ -917,9 +992,10 @@ def process_tracks(tracks):
             genre_count[track_genre] += 1
             unique_tracks.append(track)
         except Exception as e:
-            print(f"[WARN] Error enforcing limits for {track.title}: {e}")
+            m_print(f"[WARN] Error enforcing limits for {track.title}: {e}")
             continue
 
+    log_text(f"[DEDUPE] Pool processed. Kept {len(unique_tracks)} unique tracks after deduplication and balance checks.") #
     return unique_tracks
 
 def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
@@ -927,6 +1003,8 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
     similar_tracks = []
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
+
+    log_text(f"[SONIC] Searching similarities for {len(reference_tracks)} seed tracks.") #
 
     for track in reference_tracks:
         try:
@@ -949,12 +1027,12 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
                 # Exclude if it was played recently
                 if last_played and last_played >= exclude_start:
-                    print(f"EXCLUDED (sonicallySimilar): {s.title} - Last played {last_played}")
+                    log_text(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
                     continue
 
                 # Exclude if it's already in the excluded keys
                 if excluded_keys and s.ratingKey in excluded_keys:
-                    print(f"EXCLUDED (recent play): {s.title} - In excluded keys")
+                    log_text(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
                     continue
 
                 filtered_similars.append(s)
@@ -965,7 +1043,7 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
             similar_tracks.extend(final_similars)
 
         except Exception as e:
-            print(f"Error fetching sonically similar tracks: {e}")
+            m_print(f"Error fetching sonically similar tracks: {e}")
             pass
 
     return similar_tracks
@@ -1047,7 +1125,7 @@ def write_transition_log(full_path, similarity_cache, meta_cache, limit=20):
                 status = "[JUMP]" if dist > 0.4 else "[FLOW]"
                 log.write(f"{status} {dist:.3f} | {t1.title} -> {t2.title}\n")
     except Exception as e:
-        print(f"[WARN] Failed to write transition log: {e}")
+        m_print(f"[WARN] Failed to write transition log: {e}")
 
 def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
@@ -1089,6 +1167,8 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
     current_key = first_track.ratingKey
     end_key = last_track.ratingKey
 
+    log_text(f"[ORDERING] Initializing Greedy path (Start: '{first_track.title}', End: '{last_track.title}').") #
+
     while remaining:
         # Score = Distance from Current + (Distance to End * 0.3)
         best_track = min(
@@ -1113,6 +1193,7 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
                 d += step_dist
         return d
 
+    start_cost = total_cost(path) #
     improved = True
     while improved:
         improved = False
@@ -1122,6 +1203,9 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
                 if total_cost(new_path) < total_cost(path):
                     path = new_path
                     improved = True
+    
+    end_cost = total_cost(path) #
+    log_text(f"[ORDERING] 2-opt refinement complete. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.") #
     
     return path, similarity_cache, meta_cache
 
@@ -1136,7 +1220,7 @@ def get_track_meta(track):
     }
 
 # Bridge Pass [Smarter Bridge Track Selection]
-def fill_sonic_gaps(path, limit=20):
+def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
     """Identifies jumps > 0.5 and attempts to insert a bridge track from the library while strictly respecting MAX_TRACKS."""
     if not path or len(path) < 2: return path
     final_path = []
@@ -1160,7 +1244,8 @@ def fill_sonic_gaps(path, limit=20):
         dist = get_adj_dist(t1.ratingKey, t2.ratingKey, {}, m_cache, limit)
         
         if dist > 0.5:
-            print(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} ({dist:.3f}). Searching for candidate...")
+            log_text(f"[BRIDGE] Attempting bridge: '{t1.title}' -> '{t2.title}' (Gap: {dist:.3f}).") #
+            log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} ({dist:.3f}). Searching for candidate...")#
             try:
                 # Search Plex for tracks similar to the first song
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
@@ -1171,17 +1256,17 @@ def fill_sonic_gaps(path, limit=20):
                     
                     # Dedupe on ratingKey first, and then use track and artist name as a fallback
                     if bridge.ratingKey in existing_keys or b_identity in existing_identities:
-                        #print(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")#
                         continue
                         
                     last_p = getattr(bridge, "lastViewedAt", None)
                     if last_p and last_p >= exclude_start:
-                        #print(f"  [!] Skipping '{bridge.title}': Recently played.")
+                        log_text(f"  [!] Skipping '{bridge.title}': Recently played.")#
                         continue
                     
                     # Filter against labels, seasonal exclusions, and low ratings
                     if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
-                        #print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")#
                         continue
 
                     # Trigger quick analysis for bridge candidates if needed
@@ -1192,27 +1277,29 @@ def fill_sonic_gaps(path, limit=20):
                     # Check bridge compatibility with second song
                     b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
                     if b_dist < 0.5:
-                        print(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
-                        print(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
+                        log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}).") #
+                        log_text(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")#
+                        log_text(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")#
                         final_path.append(bridge)
                         existing_identities.add(b_identity) 
                         existing_keys.add(bridge.ratingKey)
                         found_bridge = True
                         break
-                    #else:
-                        #print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                    else:
+                        log_text(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")#
                 
                 if not found_bridge:
-                    print(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
+                    log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
+                    log_text(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
             except Exception as e: 
-                print(f"  [ERR] Bridge error: {e}")
+                m_print(f"  [ERR] Bridge error: {e}")
                 pass
                 
     final_path.append(path[-1])
 
     # Smart Truncation Logic to stay within MAX_TRACKS
     if len(final_path) > MAX_TRACKS:
-        print(f"[BRIDGE] Smart Truncating playlist from {len(final_path)} to {MAX_TRACKS}...")
+        m_print(f"[BRIDGE] Smart Truncating playlist from {len(final_path)} to {MAX_TRACKS}...")
         
         while len(final_path) > MAX_TRACKS:
             best_remove_idx = -1
@@ -1238,9 +1325,11 @@ def fill_sonic_gaps(path, limit=20):
             
             # Remove the "least essential" track for sonic flow
             if best_remove_idx != -1:
+                removed_track = final_path[best_remove_idx] #
+                log_text(f"[BRIDGE] Removed '{removed_track.title}' to minimize sonic impact during truncation.") #
                 final_path.pop(best_remove_idx)
 
-        print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
+        m_print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
 
     return final_path
 # ------------------------------------
@@ -1354,7 +1443,7 @@ def apply_text_to_cover(image_path, text):
         combined.convert("RGB").save(new_path)
         return new_path
     except Exception as e:
-        print(f"[WARN] apply_text_to_cover failed: {e}")
+        m_print(f"[WARN] apply_text_to_cover failed: {e}")
         return image_path
 
 def create_or_update_playlist(name, tracks, description, cover_file):
@@ -1363,7 +1452,7 @@ def create_or_update_playlist(name, tracks, description, cover_file):
     
     if not valid_tracks:
         # Gracefully exit if no tracks found to fix the "Empty Result" crash
-        print("[WARN] No valid tracks to add. Skipping playlist update.")
+        m_print("[WARN] No valid tracks to add. Skipping playlist update.")
         return
 
     if existing_playlist:
@@ -1376,19 +1465,19 @@ def create_or_update_playlist(name, tracks, description, cover_file):
         playlist_obj = plex.createPlaylist(name, items=valid_tracks)
         playlist_obj.editSummary(description)
 
-    print(f"[OK] Playlist updated: {name} | items: {playlist_obj.leafCount}")
+    m_print(f"[OK] Playlist updated: {name} | items: {playlist_obj.leafCount}")
 
     cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
     if os.path.exists(cover_path):
         try:
             new_cover = apply_text_to_cover(cover_path, name)
             playlist_obj.uploadPoster(filepath=new_cover)
-            print(f"[OK] Uploaded poster: {new_cover}")
-        except Exception:
-            print("[WARN] Poster upload failed (playlist still created):")
-            traceback.print_exc()
+            m_print(f"[OK] Uploaded poster: {new_cover}")
+        except Exception as e:
+            m_print("[WARN] Poster upload failed (playlist still created):")
+            log_text(f"[WARN] Poster upload failed: {str(e)}") #
     else:
-        print(f"[WARN] Cover file not found: {cover_path}")
+        m_print(f"[WARN] Cover file not found: {cover_path}")
 
 def find_first_and_last_tracks(tracks, period):
     if not tracks: return None, None
@@ -1399,6 +1488,12 @@ def find_first_and_last_tracks(tracks, period):
     return first, last
 
 def main():
+    # Force log truncation once at the start of the main process
+    with open(LOG_FILE, 'w', encoding='utf-8') as f:
+        f.truncate(0)
+
+    log_text("=== MELODAY RUN STARTED ===") #
+
     # Step 0% - Start
     print_status(0, "Starting track selection...")
     period = get_current_time_period()
@@ -1406,11 +1501,11 @@ def main():
 
     # Confirm Essentia Status
     if ESSENTIA_ENABLED:
-        print(f"[DIAGNOSTIC] Essentia is ACTIVE. Analyzing keys and BPM.")
+        m_print(f"[DIAGNOSTIC] Essentia is ACTIVE. Analyzing keys and BPM.")
         load_essentia_cache()
     else:
         reason = "Library not found" if not ESSENTIA_AVAILABLE else "Disabled in config"
-        print(f"[DIAGNOSTIC] Essentia is INACTIVE ({reason}). Using standard sorting.")
+        m_print(f"[DIAGNOSTIC] Essentia is INACTIVE ({reason}). Using standard sorting.")
 
     # Step 1: Fetch historical (Guarantee based on configured historical_ratio)
     print_status(20, "Fetching historical tracks...")
@@ -1435,7 +1530,7 @@ def main():
         final_tracks = process_tracks(final_tracks + additional)[:MAX_TRACKS]
         if not additional: break
 
-    print_status(70, "Finding first & last historical tracks...")
+    print_status(50, "Finding first & last historical tracks...")
     first, last = find_first_and_last_tracks(final_tracks[:MAX_TRACKS], period)
     middle = [t for t in final_tracks[:MAX_TRACKS] if t not in {first, last}]
 
@@ -1446,7 +1541,7 @@ def main():
 
     if middle and first and last:
         if ESSENTIA_ENABLED:
-            print_status(75, "Performing parallel deep sonic analysis...")
+            print_status(60, "Performing parallel deep sonic analysis...")
             load_essentia_cache()
             
             # TRUE MULTIPROCESSING: Parallelizes audio analysis across all CPU cores
@@ -1462,7 +1557,7 @@ def main():
                 
             save_essentia_cache()
 
-        print_status(80, "Double-ended 2-opt sonic refinement...")
+        print_status(70, "Double-ended 2-opt sonic refinement...")
         # Ensure sorting breadth covers the tracks in the list
         sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
         middle, similarity_cache, meta_cache = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
@@ -1472,7 +1567,7 @@ def main():
     # Bridge Pass
     if BRIDGING_ENABLED and len(final_ordered_tracks) > 2:
         # Step 4.5: Smooth technical gaps between vibe-compatible tracks.
-        print_status(85, "Creating Sonic Bridges...")
+        print_status(80, "Creating Sonic Bridges...")
         sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
         final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb)
 
@@ -1492,6 +1587,7 @@ def main():
     title, desc = generate_playlist_title_and_description(period, final_ordered_tracks)
     create_or_update_playlist(title, final_ordered_tracks, desc, time_periods[period]['cover'])
     print_status(100, "Playlist creation/update complete!")
+    log_text("=== MELODAY RUN COMPLETED SUCCESSFULLY ===") #
 
 if __name__ == "__main__":
     main()
