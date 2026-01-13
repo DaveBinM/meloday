@@ -399,12 +399,12 @@ def remix_album_penalty(track) -> int:
 def norm_text(s: str) -> str:
     if not s:
         return ""
+    
     s = unicodedata.normalize("NFKC", s)
-    # Normalize common punctuation variants
-    s = (s.replace("’", "'").replace("‘", "'")
-            .replace("–", "-").replace("—", "-").replace("‐", "-"))
     s = s.casefold()
+    s = re.sub(r"[^\w\s]", "", s)
     s = re.sub(r"\s+", " ", s).strip()
+    
     return s
 
 def track_artist_name(track) -> str:
@@ -907,7 +907,7 @@ def clean_title(title):
         r" - .*mix$", r" - .*dub$", r" - .*remix$", r" - .*edit$", r" - .*version$"
     ]
 
-    title_clean = title.lower().strip()
+    title_clean = title.casefold().strip()
 
     # 1) Remove feat/ft patterns and dash-suffix patterns first
     for pattern in featuring_patterns:
