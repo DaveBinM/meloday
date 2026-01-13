@@ -2,6 +2,7 @@ import os
 import time
 import json
 import portalocker
+import concurrent.futures
 from datetime import timedelta
 from meloday import (
     plex, MUSIC_LIBRARY, analyze_track_essentia, 
@@ -21,7 +22,23 @@ def load_essentia_cache_exclusive():
             return {}
     return {}
 
-# --- 2. CORE ANALYSIS LOGIC ---
+# --- 2. WORKER WRAPPER ---
+
+def analysis_worker(track_id):
+    """
+    Worker function to fetch and analyze a single track.
+    RatingKey is passed instead of the object to minimize pickling overhead.
+    """
+    try:
+        track = plex.fetchItem(track_id)
+        # This call now handles metadata syncing for cached tracks 
+        # and full analysis for new tracks.
+        result = analyze_track_essentia(track)
+        return str(track_id), result
+    except Exception:
+        return str(track_id), None
+
+# --- 3. CORE ANALYSIS LOGIC ---
 
 def bulk_analyze():
     """Iterates through the entire library to perform deep acoustic analysis."""
@@ -29,7 +46,7 @@ def bulk_analyze():
         print("[ERROR] Essentia is not installed or enabled. Analysis cannot proceed.")
         return
 
-    print(f"--- Starting Full Library Analysis: {MUSIC_LIBRARY} ---")
+    print(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
     
     # Fetch all tracks as a flat list for direct file access
     music_section = plex.library.section(MUSIC_LIBRARY)
@@ -37,45 +54,34 @@ def bulk_analyze():
     all_tracks = music_section.search(libtype='track') 
     total = len(all_tracks)
     
-    print(f"Found {total} tracks. Beginning deep analysis (BPM, Key, Energy, Era)...")
+    to_process = [t.ratingKey for t in all_tracks]
+    num_to_process = len(to_process)
+    
+    print(f"Found {total} tracks. Processing analysis and metadata sync...")
 
     start_time = time.time()
-    new_analyzed = 0
+    batch_size = 50
+    completed = 0
 
-    for i, track in enumerate(all_tracks, 1):
-        rk = str(track.ratingKey)
-        
-        # Simple skip for already-processed tracks (useful if you restart the script)
-        if rk in _essentia_cache:
-            continue
+    # Utilize ProcessPoolExecutor for true CPU parallelism
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for i in range(0, num_to_process, batch_size):
+            batch_ids = to_process[i:i + batch_size]
+            future_to_track = {executor.submit(analysis_worker, tid): tid for tid in batch_ids}
             
-        # Analysis with Retry Logic for server stability
-        max_retries = 3
-        data = None
-        for attempt in range(max_retries):
-            try:
-                # This call will display [DIAGNOSTIC] messages if issues occur
-                data = analyze_track_essentia(track)
-                break 
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    print(f"\n[RETRY] Attempt {attempt + 1} for '{track.title}': {e}")
-                    time.sleep(2)
-                else:
-                    print(f"\n[SKIP] Failed to analyze '{track.title}' after {max_retries} attempts.")
+            for future in concurrent.futures.as_completed(future_to_track):
+                rk, data = future.result()
+                if data:
+                    _essentia_cache[rk] = data
+                completed += 1
 
-        if data:
-            new_analyzed += 1
-
-        # Periodic status updates with time estimation
-        if i % 10 == 0 or i == total:
+            # Periodic status updates with time estimation
             elapsed = time.time() - start_time
-            avg = elapsed / i
-            est = timedelta(seconds=int((total - i) * avg))
-            print(f"Progress: [{i}/{total}] | Est: {est} | Analyzed: {new_analyzed} ", end='\r')
+            avg = elapsed / completed
+            est = timedelta(seconds=int((num_to_process - completed) * avg))
+            print(f"Progress: [{completed}/{num_to_process}] | Est: {est} | In Cache: {len(_essentia_cache)} ", end='\r')
         
-        # Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
-        if i % 50 == 0:
+            # Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
             disk_cache = load_essentia_cache_exclusive()
             disk_cache.update(_essentia_cache)
             with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
@@ -83,10 +89,10 @@ def bulk_analyze():
 
     # Final persistent save
     save_essentia_cache()
-    print(f"\n--- Success! Analysis complete. ---")
+    print(f"\n--- Success! Analysis and Sync complete. ---")
     print(f"Total tracks in cache: {len(_essentia_cache)}")
 
-# --- 3. EXECUTION ---
+# --- 4. EXECUTION ---
 
 if __name__ == "__main__":
     bulk_analyze()
