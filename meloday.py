@@ -107,6 +107,7 @@ PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
 # Bridging Configuration
 BRIDGING_ENABLED = config.get("bridging", {}).get("enabled", True)
+SMART_TRUNCATION_ENABLED = config.get("bridging", {}).get("smart_truncation", True)
 
 # Seasonal Rules
 xmas_cfg = config.get("seasonal", {}).get("christmas", {})
@@ -1298,7 +1299,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
     final_path.append(path[-1])
 
     # Smart Truncation Logic to stay within MAX_TRACKS
-    if len(final_path) > MAX_TRACKS:
+    if SMART_TRUNCATION_ENABLED and len(final_path) > MAX_TRACKS:
         m_print(f"[BRIDGE] Smart Truncating playlist from {len(final_path)} to {MAX_TRACKS}...")
         
         while len(final_path) > MAX_TRACKS:
