@@ -137,18 +137,28 @@ def get_local_path(track):
 
 def analyze_track_essentia(track):
     rk = str(track.ratingKey)
+    now_ts = datetime.now().timestamp()
     
     # Metadata Update Handling
     # If the track is already in the cache, we refresh the text fields from Plex
     # to ensure changes to genres/moods/artist names are captured.
     if rk in _essentia_cache and "energy" in _essentia_cache[rk]:
         data = _essentia_cache[rk]
+        
+        # Throttled Metadata Syncing
+        # Only call Plex to update text metadata if the entry is older than 7 days (604800s).
+        last_sync = data.get("last_synced", 0)
+        if (now_ts - last_sync) < 604800:
+            return data
+
         data["artist"] = norm_text(primary_artist(track_artist_name(track)))
         data["genres"] = list(str(g) for g in (getattr(track, "genres", None) or []))
         data["moods"] = list(str(m) for m in (getattr(track, "moods", None) or []))
         # Update year if it was previously null
         if data.get("year") is None:
             data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
+        
+        data["last_synced"] = now_ts
         return data
 
     if not ESSENTIA_ENABLED: return None
@@ -184,7 +194,8 @@ def analyze_track_essentia(track):
             "year": track_year,
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": list(str(g) for g in (getattr(track, "genres", None) or [])),
-            "moods": list(str(m) for m in (getattr(track, "moods", None) or []))
+            "moods": list(str(m) for m in (getattr(track, "moods", None) or [])),
+            "last_synced": now_ts # Added for throttling
         }
         _essentia_cache[rk] = data
         return data
@@ -195,7 +206,10 @@ def analyze_track_essentia(track):
 # Worker for Multiprocessing compatibility
 def analysis_worker(track_id):
     try:
-        track = plex.fetchItem(track_id)
+        # Process-Safe Plex Connection
+        # Initialize a new local connection session for process isolation.
+        local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+        track = local_plex.fetchItem(track_id)
         return str(track_id), analyze_track_essentia(track)
     except Exception:
         return str(track_id), None
@@ -432,8 +446,9 @@ def album_meta(track) -> dict:
             # Fallback: query raw metadata XML and extract <Subformat tag="...">
             if not meta["album_subtype"]:
                 try:
-                    # album.key is usually like "/library/metadata/<ratingKey>"
-                    data = plex.query(getattr(album, "key", f"/library/metadata/{album.ratingKey}"))
+                    # Process-Safe raw query logic
+                    # Using track._server instead of the global plex instance for process isolation.
+                    data = track._server.query(getattr(album, "key", f"/library/metadata/{album.ratingKey}"))
                     sub = data.find(".//Subformat")
                     if sub is not None:
                         tag = sub.get("tag", "") or ""
@@ -1074,6 +1089,47 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
         print(f"[WARN] Failed to write transition log: {e}")
 
     return path
+
+# Bridge Pass [Smarter Bridge Track Selection]
+def fill_sonic_gaps(path, limit=20):
+    """Identifies jumps > 0.5 and attempts to insert a bridge track from the library."""
+    if not path or len(path) < 2: return path
+    final_path = []
+    
+    def get_track_meta(track):
+        rk = track.ratingKey
+        ec = _essentia_cache.get(str(rk), {})
+        return {
+            "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
+            "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
+            "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
+            "year": ec.get("year") or getattr(track, "year", None)
+        }
+
+    for i in range(len(path) - 1):
+        t1, t2 = path[i], path[i+1]
+        final_path.append(t1)
+        
+        # Check distance between the two songs
+        m_cache = {t1.ratingKey: get_track_meta(t1), t2.ratingKey: get_track_meta(t2)}
+        dist = get_adj_dist(t1.ratingKey, t2.ratingKey, {}, m_cache, limit)
+        
+        if dist > 0.5:
+            try:
+                # Search Plex for tracks similar to the first song
+                potential_bridges = t1.sonicallySimilar(limit=10)
+                for bridge in potential_bridges:
+                    bm = get_track_meta(bridge)
+                    # Check bridge compatibility with second song
+                    b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
+                    if b_dist < 0.4:
+                        print(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
+                        final_path.append(bridge)
+                        break
+            except Exception: pass
+                
+    final_path.append(path[-1])
+    return final_path
 # ------------------------------------
 
 
@@ -1295,6 +1351,13 @@ def main():
         middle = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
 
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
+
+    # Bridge Pass
+    if len(final_ordered_tracks) > 2:
+        # Step 4.5: Smooth technical gaps between vibe-compatible tracks.
+        print_status(85, "Creating Sonic Bridges...")
+        sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
+        final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb)
 
     # Step 5: Playlist Update
     print_status(90, "Creating/Updating playlist...")
