@@ -34,7 +34,7 @@ except ImportError:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- LOGGING INITIALIZATION ---
-LOG_FILE = os.path.join(BASE_DIR, "assets", "meloday_run.log")
+LOG_FILE = os.path.join(BASE_DIR, "logs", "meloday_run.log")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 # Use 'a' (append) mode to prevent sub-processes from truncating the file on import
@@ -1116,7 +1116,7 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
 def write_transition_log(full_path, similarity_cache, meta_cache, limit=20):
     """Generates a log detailing the transition quality between tracks."""
     try:
-        log_path = resolve_path("assets/transition_log.txt", BASE_DIR)
+        log_path = resolve_path("logs/transition_log.txt", BASE_DIR)
         with open(log_path, "w", encoding="utf-8") as log:
             log.write(f"Transition Quality Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             log.write("-" * 80 + "\n")
@@ -1581,7 +1581,9 @@ def main():
         if ESSENTIA_ENABLED:
             save_essentia_cache()
 
-        write_transition_log(final_ordered_tracks, similarity_cache, meta_cache, limit=sb)
+    # Define a default sb (sort breadth) in case the bridge block was skipped
+    sb_log = max(SONIC_SIMILAR_LIMIT, len(final_ordered_tracks)) 
+    write_transition_log(final_ordered_tracks, similarity_cache, meta_cache, limit=sb_log)
 
     # Step 5: Playlist Update
     print_status(90, "Creating/Updating playlist...")
