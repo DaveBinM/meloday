@@ -147,6 +147,49 @@ plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
 # --- 4. CORE FUNCTIONS ---
 
+def validate_environment():
+    """Checks for configuration errors and connectivity before the script runs."""
+    m_print("--- Pre-flight Environment Check ---")
+    errors = []
+
+    # 1. Check Plex Connection & Library
+    try:
+        # Re-use global plex instance to verify connection
+        plex.get_token() 
+        music_section = plex.library.section(MUSIC_LIBRARY)
+    except Exception as e:
+        errors.append(f"Plex Connection/Library Error: {e}")
+
+    # 2. Check Directories & Fonts
+    if not os.path.isdir(COVER_IMAGE_DIR):
+        errors.append(f"Cover directory not found: {COVER_IMAGE_DIR}")
+    if not os.path.exists(FONT_MAIN_PATH):
+        errors.append(f"Main font file missing: {FONT_MAIN_PATH}")
+    if not os.path.exists(FONT_MELODAY_PATH):
+        errors.append(f"Branding font file missing: {FONT_MELODAY_PATH}")
+
+    # 3. Check Essentia Path
+    if ESSENTIA_ENABLED:
+        cache_dir = os.path.dirname(ESSENTIA_CACHE_PATH)
+        if not os.path.exists(cache_dir):
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+            except Exception as e:
+                errors.append(f"Essentia cache directory cannot be created: {e}")
+
+    # 4. Check Seasonal Logic
+    if XMAS_START_MONTH > 12 or XMAS_END_MONTH > 12:
+        errors.append("Invalid seasonal month in config.yml (Must be 1-12)")
+
+    if errors:
+        m_print("[CRITICAL ERROR] Environment validation failed:")
+        for err in errors:
+            m_print(f"  - {err}")
+        return False
+
+    m_print("[OK] Environment validated. Proceeding to generation.")
+    return True
+
 def load_essentia_cache():
     global _essentia_cache
     if os.path.exists(ESSENTIA_CACHE_PATH):
@@ -1501,6 +1544,11 @@ def main():
         f.truncate(0)
 
     log_text("=== MELODAY RUN STARTED ===") #
+
+    # NEW: Run environment validation
+    if not validate_environment():
+        log_text("=== MELODAY ABORTED DUE TO VALIDATION ERRORS ===")
+        return
 
     # Step 0% - Start
     print_status(0, "Starting track selection...")
