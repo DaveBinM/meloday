@@ -155,8 +155,8 @@ def validate_environment():
     # 1. Check Plex Connection & Library
     try:
         # Re-use global plex instance to verify connection
-        plex.get_token() 
         music_section = plex.library.section(MUSIC_LIBRARY)
+        m_print(f"[OK] Connected to Plex: {plex.friendlyName}")
     except Exception as e:
         errors.append(f"Plex Connection/Library Error: {e}")
 
@@ -1516,7 +1516,7 @@ def create_or_update_playlist(name, tracks, description, cover_file):
         playlist_obj = plex.createPlaylist(name, items=valid_tracks)
         playlist_obj.editSummary(description)
 
-    m_print(f"[OK] Playlist updated: {name} | items: {playlist_obj.leafCount}")
+    m_print(f"[OK] Playlist updated: {name} | items: {len(valid_tracks)}")
 
     cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
     if os.path.exists(cover_path):
@@ -1597,21 +1597,40 @@ def main():
 
     if middle and first and last:
         if ESSENTIA_ENABLED:
-            print_status(60, "Performing parallel deep sonic analysis...")
+            print_status(60, "Syncing metadata and analyzing new tracks...")
             load_essentia_cache()
             
-            # TRUE MULTIPROCESSING: Parallelizes audio analysis across all CPU cores
-            # Uses ProcessPoolExecutor with max_tasks_per_child to manage memory bloat
-            tracks_to_analyze = [first, last] + middle
-            with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
-                # Passing IDs instead of Plex objects to allow for pickling across processes
-                results = list(executor.map(analysis_worker, [t.ratingKey for t in tracks_to_analyze]))
-                # Merge results back into the main memory cache
-                for tid, data in results:
-                    if data:
-                        _essentia_cache[str(tid)] = data
+            all_tracks = [first, last] + middle
+            now_ts = datetime.now().timestamp()
+            to_analyze = []
+
+            # PRE-FILTER: Check against your specific re-analyze logic
+            for t in all_tracks:
+                rk = str(t.ratingKey)
+                file_path = get_local_path(t)
                 
-            save_essentia_cache()
+                if rk in _essentia_cache:
+                    data = _essentia_cache[rk]
+                    last_sync = data.get("last_synced", 0)
+                    
+                    # LOGIC: Skip only if path is identical AND synced within last 7 days
+                    if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
+                        continue 
+                
+                # If we are here, the track is missing or needs a fresh look
+                to_analyze.append(t.ratingKey)
+
+            if to_analyze:
+                log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
+                with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
+                    # analysis_worker calls analyze_track_essentia internally
+                    results = list(executor.map(analysis_worker, to_analyze))
+                    for tid, data in results:
+                        if data:
+                            _essentia_cache[str(tid)] = data
+                save_essentia_cache()
+            else:
+                log_text("[OK] All tracks are cached and up-to-date.")
 
         print_status(70, "Double-ended 2-opt sonic refinement...")
         # Ensure sorting breadth covers the tracks in the list
