@@ -90,7 +90,7 @@ EXCLUDE_LABEL_NAME = config["plex"]["exclude_label"]
 EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
 HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
-SONIC_SIMILAR_LIMIT = config["playlist"]["sonic_similar_limit"]
+SONIC_SIMILAR_LIMIT = max(config["playlist"].get("sonic_similar_limit", 50), MAX_TRACKS)
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
@@ -1101,10 +1101,11 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
 
 # --- OPTIMIZED SONIC SORTING LOGIC ---
-def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
+def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT):
     """
     Calculates a normalized distance between 0.0 and 1.0.
     0.0 = Identical | 1.0 = Completely Dissimilar
+    Uses an exponential penalty for attribute jumps to maximize flow.
     """
     # 1. Check for raw sonic distance in global cache first
     base_dist = _global_sonic_cache.get(ka, {}).get(kb, None)
@@ -1142,20 +1143,20 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
     if ESSENTIA_ENABLED:
         ea, eb = _essentia_cache.get(str(ka)), _essentia_cache.get(str(kb))
         if ea and eb and "energy" in ea and "energy" in eb:
-            # Tempo & Key
-            dist += (get_bpm_distance(ea["bpm"], eb["bpm"]) * BPM_WEIGHT)
-            dist += (get_harmonic_distance(ea["key"], eb["key"]) * KEY_WEIGHT)
+            # Tempo & Key - Squaring the distance to penalize "jumps" over "flows"
+            dist += ((get_bpm_distance(ea["bpm"], eb["bpm"]) ** 2) * BPM_WEIGHT)
+            dist += ((get_harmonic_distance(ea["key"], eb["key"]) ** 2) * KEY_WEIGHT)
 
-            # Energy/Loudness Jump Penalty
+            # Energy/Loudness Jump Penalty - Using an exponent to punish volume clashes
             energy_diff = abs(ea["energy"] - eb["energy"])
             energy_dist = min(energy_diff / 10.0, 1.0) # 10dB diff = max penalty
-            dist += (energy_dist * ENERGY_WEIGHT)
+            dist += ((energy_dist ** 2) * ENERGY_WEIGHT)
             
-            # Era/Decade Jump Penalty
+            # Era/Decade Jump Penalty - Squaring ensures decade jumps are much costlier than 2-3 year shifts
             if ea["year"] and eb["year"]:
                 year_diff = abs(ea["year"] - eb["year"])
                 year_dist = min(year_diff / 50.0, 1.0) # Penalty scales up to 50 years
-                dist += (year_dist * ERA_WEIGHT)
+                dist += ((year_dist ** 2) * ERA_WEIGHT)
 
     # 3. Artist Clustering Penalty (Strict)
     if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
@@ -1163,7 +1164,7 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=20):
 
     return min(dist, 1.0)
 
-def write_transition_log(full_path, similarity_cache, meta_cache, limit=20):
+def write_transition_log(full_path, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT):
     """Generates a log detailing the transition quality between tracks."""
     try:
         log_path = resolve_path("logs/transition_log.txt", BASE_DIR)
@@ -1178,7 +1179,7 @@ def write_transition_log(full_path, similarity_cache, meta_cache, limit=20):
     except Exception as e:
         m_print(f"[WARN] Failed to write transition log: {e}")
 
-def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=20):
+def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONIC_SIMILAR_LIMIT):
     """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
     if not tracks:
         return []
