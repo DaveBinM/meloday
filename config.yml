@@ -9,7 +9,7 @@ essentia:
   enabled: false
   cache_path: "assets/essentia_cache.json"
   bpm_weight: 0.15                                  # Influence of tempo on track distance
-  key_weight: 0.10                                  # Influence of harmonic compatibility on track distance
+  key_weight: 0.15                                  # Influence of harmonic compatibility on track distance
   energy_weight: 0.10                               # Influence of loudness consistency
   era_weight: 0.05                                  # Influence of production era (year)
   path_mapping: {}                                  # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
@@ -22,7 +22,7 @@ playlist:
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
   history_lookback_days: 60                         # How many days of listening history to analyze for playlist generation
   max_tracks: 50                                    # The maximum number of tracks allowed in a single playlist
-  sonic_similar_limit: 20                           # Number of sonically similar tracks to fetch for each track during sorting
+  sonic_similar_limit: 100                          # Number of sonically similar tracks to fetch for each track during sorting. Recommended is 2x max tracks, the minimum is the max tracks value
   
   historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
   sonic_similarity_limit: 100                       # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; default is 2x max tracks)
