@@ -25,6 +25,7 @@ playlist:
   sonic_similar_limit: 100                          # Number of sonically similar tracks to fetch for each track during sorting. Recommended is 2x max tracks, the minimum is the max tracks value
   
   historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
+  genre_ratio: 0.12                                 # The max % of tracks from a single genre that are pulled from the historical tracks
   sonic_similarity_limit: 100                       # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; default is 2x max tracks)
   sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter matching). The max value is 0.25
 

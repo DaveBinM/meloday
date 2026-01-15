@@ -92,6 +92,7 @@ HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = max(config["playlist"].get("sonic_similar_limit", 50), MAX_TRACKS)
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
+GENRE_RATIO = config["playlist"].get("genre_ratio", 0.15)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
@@ -878,7 +879,7 @@ def fetch_historical_tracks(period):
 
     if genre_count:
         most_common_genre, most_common_count = genre_count.most_common(1)[0]
-        max_genre_limit = int(MAX_TRACKS * 0.25)
+        max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
         if most_common_count > max_genre_limit:
             log_text(f"[SELECTION] Balancing '{most_common_genre}' (Limit: {max_genre_limit}) to prevent over-saturation.") #
             def _has_genre(track, genre_str):
@@ -1157,6 +1158,12 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
                 year_diff = abs(ea["year"] - eb["year"])
                 year_dist = min(year_diff / 50.0, 1.0) # Penalty scales up to 50 years
                 dist += ((year_dist ** 2) * ERA_WEIGHT)
+
+            # Bridge Bonus Logic: Reward sonic compatibility across different genres
+            ma, mb = meta_cache[ka], meta_cache[kb]
+            if ma["genres"] != mb["genres"]:
+                if abs(ea["bpm"] - eb["bpm"]) < 1.0 and get_harmonic_distance(ea["key"], eb["key"]) < 0.1:
+                    dist -= 0.08
 
     # 3. Artist Clustering Penalty (Strict)
     if meta_cache[ka]["artist"] == meta_cache[kb]["artist"]:
