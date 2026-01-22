@@ -1,4 +1,3 @@
-import yaml
 import os
 import sys
 import statistics
@@ -10,6 +9,7 @@ from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
 from tqdm import tqdm
+from ruamel.yaml import YAML
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -57,9 +57,21 @@ def get_track_data(track, cache_data):
         similar = track.sonicallySimilar(limit=500)
         technical = cache_data.get(rk, {})
         
+        buckets = {"ultra": 0, "strong": 0, "logical": 0, "loose": 0}
+        distances = []
+        for s in similar:
+            dist = getattr(s, 'distance', 0.25)
+            distances.append(dist)
+            if dist <= 0.10: buckets["ultra"] += 1
+            elif dist <= 0.15: buckets["strong"] += 1
+            elif dist <= 0.20: buckets["logical"] += 1
+            else: buckets["loose"] += 1
+        
         return {
             "neighbors": len(similar),
-            "distances": [getattr(s, 'distance', 0.25) for s in similar if hasattr(s, 'distance')],
+            "usable_neighbors": buckets["ultra"] + buckets["strong"] + buckets["logical"],
+            "buckets": buckets,
+            "distances": distances,
             "genres": [g.tag for g in track.genres],
             "bpm": technical.get("bpm"),
             "energy": technical.get("energy"),
@@ -69,36 +81,28 @@ def get_track_data(track, cache_data):
     except Exception: return None
 
 def run_optimizer():
+    # Initialize the YAML handler for RoundTrip (Comment preservation)
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(base_dir, "config.yml")
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-
-    plex = PlexServer(config["plex"]["url"], config["plex"]["token"])
-    music = plex.library.section(config["plex"]["music_library"])
-    ess_cfg = config.get("essentia", {})
     
-    # Load Cache
-    cache_path = os.path.join(base_dir, ess_cfg.get("cache_path", "assets/essentia_cache.json"))
+    with open(config_path, 'r', encoding='utf-8') as f:
+        # ruamel.yaml.load preserves the structure and comments
+        config = yaml.load(f)
+
+    plex = PlexServer(config['plex']['url'], config['plex']['token'])
+    music = plex.library.section(config['plex']['music_library'])
+    
+    ess_cfg = config.get('essentia', {})
+    cache_path = os.path.join(base_dir, ess_cfg.get('cache_path', 'assets/essentia_cache.json'))
+    
     cache_data = {}
     if os.path.exists(cache_path):
-        with open(cache_path, 'r') as f: cache_data = json.load(f)
-
-    # --- BEHAVIORAL AUDIT ---
-    history = music.history(mindate=datetime.now() - timedelta(days=90))
-    unique_played = {entry.ratingKey for entry in history}
-    total_library = music.totalViewSize()
-    
-    velocity = len(unique_played) / 90
-    play_ratio = len(unique_played) / max(1, total_library)
-    
-    if play_ratio > 0.15: rec_exclude = 7
-    elif play_ratio > 0.05: rec_exclude = 3
-    else: rec_exclude = 1 
-    
-    if velocity < 2: rec_lookback = 120 
-    elif velocity < 5: rec_lookback = 90
-    else: rec_lookback = 60
+        with open(cache_path, 'r') as f:
+            cache_data = json.load(f)
 
     sample_size = get_args()
     all_tracks = music.searchTracks()
@@ -115,20 +119,18 @@ def run_optimizer():
             res = future.result()
             if res: results.append(res)
 
-    # --- CACHE WARNING ---
-    essentia_hits = sum(1 for r in results if r['has_essentia'])
-    hit_rate = (essentia_hits / len(results)) * 100
-    if hit_rate < 80 and ess_cfg.get("enabled", False):
-        log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
-        log_msg(f"    Recommendation: Run your analysis script before finalizing weights.")
+    if not results:
+        log_msg("No data collected. Check Plex connection.", level="error")
+        return
 
-    # Diversity & Density
+    # --- DIVERSITY & DENSITY ---
     all_genres = [g for r in results for g in r['genres']]
     N = len(all_genres)
     diversity = 1 - (sum(n * (n - 1) for n in Counter(all_genres).values()) / (N * (N - 1))) if N > 1 else 0
 
-    neighbor_counts = [r['neighbors'] for r in results if r['neighbors'] > 0]
-    rec_limit = int(statistics.quantiles(neighbor_counts, n=100)[84]) if neighbor_counts else 150
+    # Bucket-aware density logic (targeting usable pool)
+    usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
+    rec_limit = int(statistics.quantiles(usable_counts, n=100)[84]) if usable_counts else 150
     rec_dist = min(round(statistics.median([d for r in results for d in r['distances']]) if results else 0.20, 2), 0.25)
 
     def get_weight(data_list, base_val):
@@ -141,17 +143,59 @@ def run_optimizer():
     rec_genre_ratio = round(max(0.10, 0.05 + (diversity * 0.15)), 2)
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
-    # Output Recommendations
-    log_msg(f"\n" + "="*50 + "\n RECOMMENDED CONFIGURATION\n" + "="*50)
-    log_msg(f"playlist:")
+    # --- BEHAVIORAL AUDIT ---
+    history = music.history(mindate=datetime.now() - timedelta(days=90))
+    unique_played = {entry.ratingKey for entry in history}
+    
+    # Play Ratio: The % of your library explored in 3 months.
+    # This is the "Universal Metric" that works from 5k to 150k tracks.
+    play_ratio = len(unique_played) / max(1, total_count)
+    
+    # 1. BEST EXCLUSION TIME (The FLOW Guard)
+    # Every 4% of depth adds 1 day. 
+    # Capped at 4 days to keep "Sonic Twins" available.
+    rec_exclude = min(4, max(1, round(play_ratio * 25)))
+    
+    # 2. BEST LOOKBACK TIME (The SEED Net)
+    # Scales smoothly from 120 days (low depth) down to 30 days (high depth).
+    # Logic: The more you listen, the faster your "vibe" changes, 
+    # so we need a shorter lookback to find relevant seeds.
+    rec_lookback = max(30, min(120, round(120 - (play_ratio * 300))))
+
+    # --- CACHE WARNING ---
+    essentia_hits = sum(1 for r in results if r['has_essentia'])
+    hit_rate = (essentia_hits / len(results)) * 100
+    if hit_rate < 80 and ess_cfg.get("enabled", False):
+        log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
+        log_msg(f"    Recommendation: Run your analysis script before finalizing weights.")
+
+    # Summing bucket totals for distribution log
+    sum_ultra = sum(r['buckets']['ultra'] for r in results)
+    sum_strong = sum(r['buckets']['strong'] for r in results)
+    sum_logical = sum(r['buckets']['logical'] for r in results)
+    sum_loose = sum(r['buckets']['loose'] for r in results)
+
+    # --- OUTPUT ---
+    log_msg("\n" + "="*50, log_only=True)
+    log_msg(" GLOBAL SIMILARITY DISTRIBUTION (Audit Data):", log_only=True)
+    log_msg(f"  Ultra-Tight (0.10): {sum_ultra}", log_only=True)
+    log_msg(f"  Strong Flow (0.15): {sum_strong}", log_only=True)
+    log_msg(f"  Logical     (0.20): {sum_logical}", log_only=True)
+    log_msg(f"  Loose       (0.25): {sum_loose}", log_only=True)
+
+    log_msg("\n" + "="*50)
+    log_msg(" RECOMMENDED CONFIGURATION")
+    log_msg("="*50)
+    log_msg("playlist:")
     log_msg(f"  exclude_played_days: {rec_exclude}")
     log_msg(f"  history_lookback_days: {rec_lookback}")
     log_msg(f"  sonic_similar_limit: {rec_limit}")
     log_msg(f"  historical_ratio: {rec_hist_ratio}")
     log_msg(f"  genre_ratio: {rec_genre_ratio}")
-    log_msg(f"  sonic_similarity_distance: {rec_dist:.2f}")
-    if ess_cfg.get("enabled", False):
-        log_msg(f"\nessentia:")
+    log_msg(f"  sonic_similarity_distance: {rec_dist}")
+    
+    if any(r['has_essentia'] for r in results):
+        log_msg("\nessentia:")
         log_msg(f"  bpm_weight: {get_weight([r['bpm'] for r in results], 0.12):.2f}")
         log_msg(f"  key_weight: {rec_key_weight:.2f}")
         log_msg(f"  energy_weight: {get_weight([abs(r['energy']) for r in results if r['energy']], 0.08):.2f}")
@@ -174,8 +218,9 @@ def run_optimizer():
             config['essentia']['era_weight'] = get_weight([r['year'] for r in results if r['year']], 0.03)
 
         with open(config_path, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-        log_msg(f"\n[INFO] Optimized values applied to {config_path}")
+            # Saving with the YAML object preserves comments
+            yaml.dump(config, f)
+        log_msg("\n[INFO] Optimized values applied to config.yml (Comments preserved)")
 
 if __name__ == "__main__":
     run_optimizer()
