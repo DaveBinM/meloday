@@ -3,12 +3,34 @@ import time
 import json
 import portalocker
 import concurrent.futures
+import logging
 from datetime import timedelta, datetime
 from meloday import (
     PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia, 
     save_essentia_cache, ESSENTIA_ENABLED, 
-    ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer
+    ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR
 )
+
+# --- LOGGING SETUP ---
+LOG_FILE = os.path.join(BASE_DIR, "logs", "pre_analyze.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# Use 'a' (append) mode. The shell-level '>' in cron will handle the wipe.
+file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+logger = logging.getLogger("PreAnalyze")
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+def log_msg(msg, level="info", log_only=False):
+    """Filters for printable characters to ensure a clean, plain-text log."""
+    if not msg: return
+    clean_msg = "".join(ch for ch in str(msg) if ch.isprintable() or ch in ("\n", "\r", "\t"))
+    clean_msg = clean_msg.replace('\x00', '')
+    if not log_only: print(msg)
+    if level == "error": logger.error(clean_msg)
+    else: logger.info(clean_msg)
 
 # --- 1. CACHE UTILITIES ---
 
@@ -47,10 +69,10 @@ def analysis_worker(track_id):
 def bulk_analyze():
     """Iterates through the entire library to perform deep acoustic analysis."""
     if not ESSENTIA_ENABLED:
-        print("[ERROR] Essentia is not installed or enabled. Analysis cannot proceed.")
+        log_msg("[ERROR] Essentia is not installed or enabled. Analysis cannot proceed.")
         return
 
-    print(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
+    log_msg(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
     
     # Pre-load cache to filter processing list
     current_cache = load_essentia_cache_exclusive()
@@ -59,7 +81,7 @@ def bulk_analyze():
     # Fetch all tracks as a flat list
     local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
     music_section = local_plex_main.library.section(MUSIC_LIBRARY)
-    print("Fetching tracks from Plex... (This may take a minute)")
+    log_msg("Fetching tracks from Plex... (This may take a minute)")
     all_tracks = music_section.search(libtype='track') 
     
     # 1. Filter the processing list to avoid redundant work
@@ -84,10 +106,10 @@ def bulk_analyze():
 
     num_to_process = len(to_process)
     if num_to_process == 0:
-        print("--- Success! All tracks are analyzed and metadata is up to date. ---")
+        log_msg("--- Success! All tracks are analyzed and metadata is up to date. ---")
         return
 
-    print(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
+    log_msg(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
 
     start_time = time.time()
     batch_size = 50
@@ -110,7 +132,7 @@ def bulk_analyze():
             elapsed = time.time() - start_time
             avg = elapsed / completed
             est = timedelta(seconds=int((num_to_process - completed) * avg))
-            print(f"Progress: [{completed}/{num_to_process}] | Est: {est} | In Cache: {len(_essentia_cache)} ", end='\r')
+            log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | In Cache: {len(_essentia_cache)} ", end='\r')
         
             # 3. Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
             disk_cache = load_essentia_cache_exclusive()
@@ -120,8 +142,8 @@ def bulk_analyze():
 
     # Final persistent save
     save_essentia_cache()
-    print(f"\n--- Success! Analysis and Sync complete. ---")
-    print(f"Total tracks in cache: {len(_essentia_cache)}")
+    log_msg(f"\n--- Success! Analysis and Sync complete. ---")
+    log_msg(f"Total tracks in cache: {len(_essentia_cache)}")
 
 # --- 4. EXECUTION ---
 
