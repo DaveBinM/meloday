@@ -5,10 +5,41 @@ import statistics
 import random
 import concurrent.futures
 import json
+import logging
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
 from tqdm import tqdm
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- LOGGING SETUP ---
+LOG_FILE = os.path.join(BASE_DIR, "logs", "optimizer.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# Use 'a' (append) mode. The shell-level '>' in cron will handle the wipe.
+file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+logger = logging.getLogger("Optimizer")
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+def log_msg(msg, level="info", log_only=False):
+    """Filters for printable characters to ensure a clean, plain-text log."""
+    if not msg: return
+    
+    # Remove non-printable characters and NUL bytes
+    clean_msg = "".join(ch for ch in str(msg) if ch.isprintable() or ch in ("\n", "\r", "\t"))
+    clean_msg = clean_msg.replace('\x00', '')
+    
+    if not log_only: 
+        print(msg)  # Standard print for console
+        
+    if level == "error": 
+        logger.error(clean_msg)
+    else: 
+        logger.info(clean_msg)
 
 # --- DEFAULTS ---
 DEFAULT_SAMPLE_SIZE = 2000
@@ -74,8 +105,8 @@ def run_optimizer():
     total_count = len(all_tracks)
     target_tracks = all_tracks if (sample_size is None or sample_size >= total_count) else random.sample(all_tracks, sample_size)
 
-    print(f"\n--- Meloday Universal Optimizer ---")
-    print(f"MODE: {'FULL AUDIT' if sample_size is None else f'SAMPLING {sample_size}'}")
+    log_msg(f"\n--- Meloday Universal Optimizer ---")
+    log_msg(f"MODE: {'FULL AUDIT' if sample_size is None else f'SAMPLING {sample_size}'}")
 
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
@@ -88,8 +119,8 @@ def run_optimizer():
     essentia_hits = sum(1 for r in results if r['has_essentia'])
     hit_rate = (essentia_hits / len(results)) * 100
     if hit_rate < 80 and ess_cfg.get("enabled", False):
-        print(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
-        print(f"    Recommendation: Run your analysis script before finalizing weights.")
+        log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
+        log_msg(f"    Recommendation: Run your analysis script before finalizing weights.")
 
     # Diversity & Density
     all_genres = [g for r in results for g in r['genres']]
@@ -111,21 +142,21 @@ def run_optimizer():
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
     # Output Recommendations
-    print(f"\n" + "="*50 + "\n RECOMMENDED CONFIGURATION\n" + "="*50)
-    print(f"playlist:")
-    print(f"  exclude_played_days: {rec_exclude}")
-    print(f"  history_lookback_days: {rec_lookback}")
-    print(f"  sonic_similar_limit: {rec_limit}")
-    print(f"  historical_ratio: {rec_hist_ratio}")
-    print(f"  genre_ratio: {rec_genre_ratio}")
-    print(f"  sonic_similarity_distance: {rec_dist:.2f}")
+    log_msg(f"\n" + "="*50 + "\n RECOMMENDED CONFIGURATION\n" + "="*50)
+    log_msg(f"playlist:")
+    log_msg(f"  exclude_played_days: {rec_exclude}")
+    log_msg(f"  history_lookback_days: {rec_lookback}")
+    log_msg(f"  sonic_similar_limit: {rec_limit}")
+    log_msg(f"  historical_ratio: {rec_hist_ratio}")
+    log_msg(f"  genre_ratio: {rec_genre_ratio}")
+    log_msg(f"  sonic_similarity_distance: {rec_dist:.2f}")
     if ess_cfg.get("enabled", False):
-        print(f"\nessentia:")
-        print(f"  bpm_weight: {get_weight([r['bpm'] for r in results], 0.12):.2f}")
-        print(f"  key_weight: {rec_key_weight:.2f}")
-        print(f"  energy_weight: {get_weight([abs(r['energy']) for r in results if r['energy']], 0.08):.2f}")
-        print(f"  era_weight: {get_weight([r['year'] for r in results if r['year']], 0.03):.2f}")
-    print("="*50)
+        log_msg(f"\nessentia:")
+        log_msg(f"  bpm_weight: {get_weight([r['bpm'] for r in results], 0.12):.2f}")
+        log_msg(f"  key_weight: {rec_key_weight:.2f}")
+        log_msg(f"  energy_weight: {get_weight([abs(r['energy']) for r in results if r['energy']], 0.08):.2f}")
+        log_msg(f"  era_weight: {get_weight([r['year'] for r in results if r['year']], 0.03):.2f}")
+    log_msg("="*50)
 
     # --- AUTO-APPLY LOGIC ---
     if config['playlist'].get('auto_apply_optimization', False):
@@ -144,7 +175,7 @@ def run_optimizer():
 
         with open(config_path, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-        print(f"\n[INFO] Optimized values applied to {config_path}")
+        log_msg(f"\n[INFO] Optimized values applied to {config_path}")
 
 if __name__ == "__main__":
     run_optimizer()
