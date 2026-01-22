@@ -19,6 +19,7 @@ bridging:
   smart_truncation: false                           # Set to true to ensure max_tracks isn't exceeded. Set to false to ensure the best sonic flow
 
 playlist:
+  auto_apply_optimization: false                    # Set to true to automatically update this file with values from the optimizer
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
   history_lookback_days: 60                         # How many days of listening history to analyze for playlist generation
   max_tracks: 50                                    # The maximum number of tracks allowed in a single playlist
