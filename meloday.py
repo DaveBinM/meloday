@@ -1326,42 +1326,46 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
                 found_bridge = False
                 for bridge in potential_bridges:
-                    # Check identity instead of just ratingKey to prevent cross-album duplicates
+                    # 1. FAST IDENTITY CHECK (Local memory)
                     b_identity = (norm_text(clean_title(bridge.title)), norm_text(primary_artist(track_artist_name(bridge))))
-                    
-                    # Dedupe on ratingKey first, and then use track and artist name as a fallback
                     if bridge.ratingKey in existing_keys or b_identity in existing_identities:
-                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")#
+                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
                         
+                    # 2. FAST RECENCY CHECK (Plex metadata already in 'bridge' object)
                     last_p = getattr(bridge, "lastViewedAt", None)
                     if last_p and last_p >= exclude_start:
-                        log_text(f"  [!] Skipping '{bridge.title}': Recently played.")#
+                        log_text(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     
-                    # Filter against labels, seasonal exclusions, and low ratings
+                    # 3. FAST EXCLUSION CHECK (Uses the pre-fetched set we just added)
                     if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
-                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")#
+                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
-                    # Trigger quick analysis for bridge candidates if needed
+                    # 4. METADATA & DISTANCE CHECK (Plex API call)
+                    # We do this BEFORE Essentia. If the sonic distance is bad, we skip analysis.
+                    bm = get_track_meta(bridge)
+                    b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
+                    
+                    if b_dist >= 0.5:
+                        log_text(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                        continue
+
+                    # 5. DEEP AUDIO ANALYSIS (The Bottleneck)
+                    # This now only runs for the ONE track that actually passed all tests.
                     if ESSENTIA_ENABLED:
                         analyze_track_essentia(bridge)
 
-                    bm = get_track_meta(bridge)
-                    # Check bridge compatibility with second song
-                    b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
-                    if b_dist < 0.5:
-                        log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}).") #
-                        log_text(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")#
-                        log_text(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")#
-                        final_path.append(bridge)
-                        existing_identities.add(b_identity) 
-                        existing_keys.add(bridge.ratingKey)
-                        found_bridge = True
-                        break
-                    else:
-                        log_text(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")#
+                    # 6. SELECTION
+                    log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}).") 
+                    log_text(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
+                    log_text(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
+                    final_path.append(bridge)
+                    existing_identities.add(b_identity) 
+                    existing_keys.add(bridge.ratingKey)
+                    found_bridge = True
+                    break
                 
                 if not found_bridge:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
