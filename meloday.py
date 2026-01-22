@@ -142,7 +142,7 @@ _album_meta_cache = {}
 _album_obj_cache = {}
 _artist_obj_cache = {}
 _global_sonic_cache = {}
-# plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+_christmas_album_keys = set()
 plex = None
 
 # --- 4. CORE FUNCTIONS ---
@@ -189,6 +189,21 @@ def validate_environment():
 
     m_print("[OK] Environment validated. Proceeding to generation.")
     return True
+
+def prefetch_seasonal_exclusions():
+    """Populates a set of album ratingKeys that belong to the Christmas collection."""
+    global _christmas_album_keys
+    if not _in_christmas_window(datetime.now()):
+        try:
+            music_library = plex.library.section(MUSIC_LIBRARY)
+            # Fetch the collection object
+            collections = music_library.collections(title=CHRISTMAS_COLLECTION_NAME)
+            if collections:
+                # Get all album ratingKeys in this collection
+                _christmas_album_keys = {str(album.ratingKey) for album in collections[0].items()}
+                m_print(f"[OK] Pre-fetched {len(_christmas_album_keys)} Christmas albums for exclusion.")
+        except Exception as e:
+            m_print(f"[WARN] Failed to pre-fetch seasonal exclusions: {e}")
 
 def load_essentia_cache():
     global _essentia_cache
@@ -394,7 +409,7 @@ def _album_in_collection(album, collection_name: str) -> bool:
         return False
 
 def filter_excluded_tracks(tracks, now=None):
-    """Apply 'noshare' + seasonal Christmas collection exclusions to a list of Plex Track objects."""
+    """Apply 'noshare' + pre-fetched seasonal Christmas collection exclusions."""
     if not tracks:
         return []
     now = now or datetime.now()
@@ -402,28 +417,30 @@ def filter_excluded_tracks(tracks, now=None):
 
     cleaned = []
     for t in tracks:
-        # Track-level label exclusion
+        # 1. Track-level label exclusion
         if has_label(t, EXCLUDE_LABEL_NAME):
-            log_text(f"[EXCLUSION] Track '{t.title}' ({t.ratingKey}) skipped: Label '{EXCLUDE_LABEL_NAME}' found.") #
+            log_text(f"[EXCLUSION] Track '{t.title}' ({t.ratingKey}) skipped: Label '{EXCLUDE_LABEL_NAME}' found.")
             continue
 
-        # Album-level checks (cached)
+        # 2. Album-level checks
+        parent_key = str(getattr(t, "parentRatingKey", ""))
+        
+        # Check pre-fetched Christmas set first (very fast)
+        if not in_xmas and parent_key in _christmas_album_keys:
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Seasonal filtering (Pre-fetched Christmas list).")
+            continue
+
+        # Check 'noshare' label on album (uses existing caching logic)
         album = None
-        parent_key = getattr(t, "parentRatingKey", None)
         if parent_key:
             if parent_key in _album_obj_cache:
                 album = _album_obj_cache[parent_key]
             else:
-                # This will populate _album_obj_cache with lean dict via album_meta
                 album_meta(t)
                 album = _album_obj_cache.get(parent_key)
 
         if album and has_label(album, EXCLUDE_LABEL_NAME):
-            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Album '{album.get('title')}' has Label '{EXCLUDE_LABEL_NAME}'.") #
-            continue
-
-        if (not in_xmas) and album and _album_in_collection(album, CHRISTMAS_COLLECTION_NAME):
-            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Seasonal filtering (Christmas collection).") #
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Album '{album.get('title')}' has Label '{EXCLUDE_LABEL_NAME}'.")
             continue
 
         cleaned.append(t)
@@ -1555,6 +1572,8 @@ def main():
     plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
     log_text("=== MELODAY RUN STARTED ===") #
+
+    prefetch_seasonal_exclusions()
 
     # NEW: Run environment validation
     if not validate_environment():
