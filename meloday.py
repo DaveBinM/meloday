@@ -67,8 +67,6 @@ def m_print(msg):
     print(msg)
     log_text(msg)
 
-log_text("=== MELODAY RUN STARTED ===") #
-
 def resolve_path(path, base):
     return path if os.path.isabs(path) else os.path.join(base, path)
 
@@ -144,7 +142,8 @@ _album_meta_cache = {}
 _album_obj_cache = {}
 _artist_obj_cache = {}
 _global_sonic_cache = {}
-plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+# plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+plex = None
 
 # --- 4. CORE FUNCTIONS ---
 
@@ -1550,6 +1549,10 @@ def main():
     # Force log truncation once at the start of the main process
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         f.truncate(0)
+
+    # NEW: Initialize global plex connection only here
+    global plex
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
     log_text("=== MELODAY RUN STARTED ===") #
 
