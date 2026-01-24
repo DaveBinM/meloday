@@ -1313,11 +1313,17 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
     
     # Safety and Deduplication Logic
     # Track identity by (Normalized Title, Normalized Artist) to catch duplicates across different albums
+    # Safety and Deduplication Logic
     existing_identities = {
         (norm_text(clean_title(t.title)), norm_text(primary_artist(track_artist_name(t)))) 
         for t in path
     }
     existing_keys = {t.ratingKey for t in path}
+    
+    # NEW: Track artist counts to respect global limits (matching process_tracks logic)
+    artist_counts = Counter([norm_text(primary_artist(track_artist_name(t))) for t in path])
+    artist_limit = round(MAX_TRACKS * 0.05) 
+    
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
     
@@ -1337,25 +1343,40 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
                 found_bridge = False
                 for bridge in potential_bridges:
-                    # 1. FAST IDENTITY CHECK (Local memory)
-                    b_identity = (norm_text(clean_title(bridge.title)), norm_text(primary_artist(track_artist_name(bridge))))
+                    # A. FAST ARTIST & IDENTITY CHECK
+                    b_artist_raw = track_artist_name(bridge)
+                    b_artist_norm = norm_text(primary_artist(b_artist_raw))
+                    b_identity = (norm_text(clean_title(bridge.title)), b_artist_norm)
+                    
+                    # Dedupe check
                     if bridge.ratingKey in existing_keys or b_identity in existing_identities:
                         log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
+                    
+                    # NEW: Back-to-back check (prevents bridge matching t1 OR t2 artists)
+                    t1_artist_norm = norm_text(primary_artist(track_artist_name(t1)))
+                    t2_artist_norm = norm_text(primary_artist(track_artist_name(t2)))
+                    if b_artist_norm == t1_artist_norm or b_artist_norm == t2_artist_norm:
+                        log_text(f"  [!] Skipping '{bridge.title}': Artist back-to-back clash.")
+                        continue
                         
-                    # 2. FAST RECENCY CHECK (Plex metadata already in 'bridge' object)
+                    # NEW: Global artist limit check
+                    if artist_counts[b_artist_norm] >= artist_limit:
+                        log_text(f"  [!] Skipping '{bridge.title}': Artist '{b_artist_raw}' saturated ({artist_counts[b_artist_norm]}).")
+                        continue
+
+                    # B. FAST RECENCY CHECK
                     last_p = getattr(bridge, "lastViewedAt", None)
                     if last_p and last_p >= exclude_start:
                         log_text(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     
-                    # 3. FAST EXCLUSION CHECK (Uses the pre-fetched set we just added)
+                    # C. FAST EXCLUSION CHECK
                     if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
                         log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
-                    # 4. METADATA & DISTANCE CHECK (Plex API call)
-                    # We do this BEFORE Essentia. If the sonic distance is bad, we skip analysis.
+                    # D. METADATA & DISTANCE CHECK
                     bm = get_track_meta(bridge)
                     b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
                     
@@ -1363,18 +1384,21 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                         log_text(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
                         continue
 
-                    # 5. DEEP AUDIO ANALYSIS (The Bottleneck)
-                    # This now only runs for the ONE track that actually passed all tests.
+                    # E. AUDIO ANALYSIS (Only for the winner)
                     if ESSENTIA_ENABLED:
                         analyze_track_essentia(bridge)
 
-                    # 6. SELECTION
+                    # F. SELECTION
                     log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}).") 
                     log_text(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
                     log_text(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
                     final_path.append(bridge)
+                    
+                    # NEW: Update tracking sets and the artist counter
                     existing_identities.add(b_identity) 
                     existing_keys.add(bridge.ratingKey)
+                    artist_counts[b_artist_norm] += 1
+                    
                     found_bridge = True
                     break
                 
