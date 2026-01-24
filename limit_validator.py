@@ -14,7 +14,7 @@ with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
 PLEX_URL = config["plex"]["url"]
 PLEX_TOKEN = config["plex"]["token"]
 MUSIC_LIBRARY = config["plex"]["music_library"]
-CURRENT_LIMIT = config["playlist"]["sonic_similar_limit"] 
+CURRENT_LIMIT = config["playlist"]["sonic_similarity_limit"] 
 
 plex = PlexServer(PLEX_URL, PLEX_TOKEN)
 music = plex.library.section(MUSIC_LIBRARY)
@@ -98,7 +98,7 @@ def run_audit():
     print("\n" + "="*50)
     print(f" MELODAY RECOMMENDATION")
     print("="*50)
-    print(f"Suggested SONIC_SIMILAR_LIMIT: {recommended_limit}")
+    print(f"Suggested sonic_similarity_limit: {recommended_limit}")
     
     # Advice based on the "Usable Pool"
     if recommended_limit > CURRENT_LIMIT:

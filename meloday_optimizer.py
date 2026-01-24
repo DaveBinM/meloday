@@ -188,7 +188,7 @@ def run_optimizer():
     log_msg("playlist:")
     log_msg(f"  exclude_played_days: {rec_exclude}")
     log_msg(f"  history_lookback_days: {rec_lookback}")
-    log_msg(f"  sonic_similar_limit: {rec_limit}")
+    log_msg(f"  sonic_similarity_limit: {rec_limit}")
     log_msg(f"  historical_ratio: {rec_hist_ratio}")
     log_msg(f"  genre_ratio: {rec_genre_ratio}")
     log_msg(f"  sonic_similarity_distance: {rec_dist}")
@@ -205,7 +205,7 @@ def run_optimizer():
     if config['playlist'].get('auto_apply_optimization', False):
         config['playlist']['exclude_played_days'] = rec_exclude
         config['playlist']['history_lookback_days'] = rec_lookback
-        config['playlist']['sonic_similar_limit'] = rec_limit
+        config['playlist']['sonic_similarity_limit'] = rec_limit
         config['playlist']['historical_ratio'] = rec_hist_ratio
         config['playlist']['genre_ratio'] = rec_genre_ratio
         config['playlist']['sonic_similarity_distance'] = rec_dist
