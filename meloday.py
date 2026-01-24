@@ -1612,13 +1612,13 @@ def main():
 
     log_text("=== MELODAY RUN STARTED ===") #
 
-    prefetch_seasonal_exclusions()
-    prefetch_label_exclusions()
-
     # NEW: Run environment validation
     if not validate_environment():
         log_text("=== MELODAY ABORTED DUE TO VALIDATION ERRORS ===")
         return
+
+    prefetch_seasonal_exclusions()
+    prefetch_label_exclusions()
 
     # Step 0% - Start
     print_status(0, "Starting track selection...")
