@@ -17,8 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(BASE_DIR, "logs", "optimizer.log")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
-# Use 'a' (append) mode. The shell-level '>' in cron will handle the wipe.
-file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler = logging.FileHandler(LOG_FILE, mode='w', encoding='utf-8')
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 logger = logging.getLogger("Optimizer")
