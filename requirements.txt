@@ -3,3 +3,4 @@ Pillow
 pyyaml
 essentia
 portalocker
+ruamel.yaml
