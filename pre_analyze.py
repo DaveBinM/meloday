@@ -1,4 +1,5 @@
 import os
+import multiprocessing
 import time
 import json
 import portalocker
@@ -30,6 +31,50 @@ def log_msg(msg, level="info", log_only=False):
     if not log_only: print(msg)
     if level == "error": logger.error(clean_msg)
     else: logger.info(clean_msg)
+
+# --- 0. OPTIMISE WORKER COUNT ---
+
+def get_optimal_workers(task_type="cpu"):
+    try:
+        # Detect logical threads (2, 22, or 24 on your specific CPUs)
+        logical = os.cpu_count() or 1
+        tier_reason = "Fallback"
+        assigned = 4
+        
+        if task_type == "cpu":
+            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
+            if logical <= 4:
+                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
+                assigned = 2
+            
+            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
+            elif 16 < logical <= 22:
+                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
+                assigned = logical - 8
+                
+            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
+            else:
+                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
+                assigned = logical - 2
+
+        elif task_type == "io":
+            tier_reason = "I/O Optimized (Network/Disk Bound)"
+            assigned = min(32, logical + 4)
+        
+        else:
+            # Catch-all for typos in the task_type parameter
+            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
+            assigned = 4
+
+        # Final diagnostic print
+        log_msg(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
+        log_msg(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
+        
+        return assigned
+
+    except Exception as e:
+        log_msg(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
+        return 2
 
 # --- 1. CACHE UTILITIES ---
 
@@ -116,7 +161,8 @@ def bulk_analyze():
 
     # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
     # Workers restart after every 5 tracks to prevent memory bloat from accumulating
-    with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
+    workers = get_optimal_workers(task_type="cpu")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=5) as executor:
         for i in range(0, num_to_process, batch_size):
             batch_ids = to_process[i:i + batch_size]
             future_to_track = {executor.submit(analysis_worker, tid): tid for tid in batch_ids}
