@@ -11,6 +11,7 @@ import unicodedata
 import portalocker
 import traceback
 import concurrent.futures
+import multiprocessing
 import logging 
 from datetime import datetime, timedelta
 from collections import Counter
@@ -147,6 +148,48 @@ _excluded_album_keys = set()
 plex = None
 
 # --- 4. CORE FUNCTIONS ---
+
+def get_optimal_workers(task_type="cpu"):
+    try:
+        # Detect logical threads (2, 22, or 24 on your specific CPUs)
+        logical = os.cpu_count() or 1
+        tier_reason = "Fallback"
+        assigned = 4
+        
+        if task_type == "cpu":
+            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
+            if logical <= 4:
+                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
+                assigned = 2
+            
+            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
+            elif 16 < logical <= 22:
+                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
+                assigned = logical - 8
+                
+            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
+            else:
+                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
+                assigned = logical - 2
+
+        elif task_type == "io":
+            tier_reason = "I/O Optimized (Network/Disk Bound)"
+            assigned = min(32, logical + 4)
+        
+        else:
+            # Catch-all for typos in the task_type parameter
+            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
+            assigned = 4
+
+        # Final diagnostic print
+        log_text(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
+        log_text(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
+        
+        return assigned
+
+    except Exception as e:
+        log_text(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
+        return 2
 
 def validate_environment():
     """Checks for configuration errors and connectivity before the script runs."""
@@ -866,7 +909,8 @@ def fetch_historical_tracks(period):
             return None
 
     # This is now 4-5x faster because we resolve ~150 tracks instead of 695
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    io_workers = get_optimal_workers(task_type="io")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
         resolved_list = list(executor.map(resolve_unique_track, unique_keys))
     
     # 3. Create a map for lightning-fast reconstruction
@@ -1692,7 +1736,8 @@ def main():
 
             if to_analyze:
                 log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
-                with concurrent.futures.ProcessPoolExecutor(max_tasks_per_child=5) as executor:
+                cpu_workers = get_optimal_workers(task_type="cpu")
+                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=5) as executor:
                     # analysis_worker calls analyze_track_essentia internally
                     results = list(executor.map(analysis_worker, to_analyze))
                     for tid, data in results:
