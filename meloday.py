@@ -1380,30 +1380,37 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
         dist = get_adj_dist(t1.ratingKey, t2.ratingKey, {}, m_cache, limit)
         
         if dist > 0.5:
-            log_text(f"[BRIDGE] Attempting bridge: '{t1.title}' -> '{t2.title}' (Gap: {dist:.3f}).") #
-            log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} ({dist:.3f}). Searching for candidate...")#
+            log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} (Gap: {dist:.3f}). Searching for candidate...")#
+
+            t1_artist_norm = norm_text(primary_artist(track_artist_name(t1)))
+            t2_artist_norm = norm_text(primary_artist(track_artist_name(t2)))
+
             try:
                 # Search Plex for tracks similar to the first song
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
                 found_bridge = False
                 for bridge in potential_bridges:
+
+
                     # A. FAST ARTIST & IDENTITY CHECK
+                    if bridge.ratingKey in existing_keys:
+                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        continue
+
+                    # C. FAST EXCLUSION CHECK
+                    if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
+                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                        continue
+
                     b_artist_raw = track_artist_name(bridge)
                     b_artist_norm = norm_text(primary_artist(b_artist_raw))
                     b_identity = (norm_text(clean_title(bridge.title)), b_artist_norm)
                     
                     # Dedupe check
-                    if bridge.ratingKey in existing_keys or b_identity in existing_identities:
+                    if b_identity in existing_identities:
                         log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
-                    
-                    # NEW: Back-to-back check (prevents bridge matching t1 OR t2 artists)
-                    t1_artist_norm = norm_text(primary_artist(track_artist_name(t1)))
-                    t2_artist_norm = norm_text(primary_artist(track_artist_name(t2)))
-                    if b_artist_norm == t1_artist_norm or b_artist_norm == t2_artist_norm:
-                        log_text(f"  [!] Skipping '{bridge.title}': Artist back-to-back clash.")
-                        continue
-                        
+
                     # NEW: Global artist limit check
                     if artist_counts[b_artist_norm] >= artist_limit:
                         log_text(f"  [!] Skipping '{bridge.title}': Artist '{b_artist_raw}' saturated ({artist_counts[b_artist_norm]}).")
@@ -1415,9 +1422,9 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                         log_text(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     
-                    # C. FAST EXCLUSION CHECK
-                    if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
-                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                    # NEW: Back-to-back check (prevents bridge matching t1 OR t2 artists)
+                    if b_artist_norm == t1_artist_norm or b_artist_norm == t2_artist_norm:
+                        log_text(f"  [!] Skipping '{bridge.title}': Artist back-to-back clash.")
                         continue
 
                     # D. METADATA & DISTANCE CHECK
@@ -1737,7 +1744,7 @@ def main():
             if to_analyze:
                 log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
                 cpu_workers = get_optimal_workers(task_type="cpu")
-                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=5) as executor:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
                     # analysis_worker calls analyze_track_essentia internally
                     results = list(executor.map(analysis_worker, to_analyze))
                     for tid, data in results:
