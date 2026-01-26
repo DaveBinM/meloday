@@ -23,14 +23,19 @@ logger = logging.getLogger("PreAnalyze")
 logger.setLevel(logging.INFO)
 logger.addHandler(file_handler)
 
-def log_msg(msg, level="info", log_only=False):
-    """Filters for printable characters to ensure a clean, plain-text log."""
+def log_msg(msg, level="info", log_only=False, **kwargs):
+    """Filters for printable characters and supports standard print kwargs."""
     if not msg: return
     clean_msg = "".join(ch for ch in str(msg) if ch.isprintable() or ch in ("\n", "\r", "\t"))
     clean_msg = clean_msg.replace('\x00', '')
-    if not log_only: print(msg)
-    if level == "error": logger.error(clean_msg)
-    else: logger.info(clean_msg)
+    
+    if not log_only: 
+        print(msg, **kwargs) # This now accepts end='\r'
+        
+    if level == "error": 
+        logger.error(clean_msg)
+    else: 
+        logger.info(clean_msg)
 
 # --- 0. OPTIMISE WORKER COUNT ---
 
@@ -162,7 +167,7 @@ def bulk_analyze():
     # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
     # Workers restart after every 5 tracks to prevent memory bloat from accumulating
     workers = get_optimal_workers(task_type="cpu")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=5) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=10) as executor:
         for i in range(0, num_to_process, batch_size):
             batch_ids = to_process[i:i + batch_size]
             future_to_track = {executor.submit(analysis_worker, tid): tid for tid in batch_ids}
