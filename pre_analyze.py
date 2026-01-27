@@ -23,6 +23,15 @@ logger = logging.getLogger("PreAnalyze")
 logger.setLevel(logging.INFO)
 logger.addHandler(file_handler)
 
+# --- GLOBAL FOR WORKERS ---
+# This will be initialized once per worker process to avoid connection overhead
+worker_plex = None
+
+def init_worker():
+    """Initializes a single Plex session per worker process."""
+    global worker_plex
+    worker_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
+
 def log_msg(msg, level="info", log_only=False, **kwargs):
     """Filters for printable characters and supports standard print kwargs."""
     if not msg: return
@@ -101,17 +110,16 @@ def analysis_worker(track_id):
     RatingKey is passed instead of the object to minimize pickling overhead.
     Utilizes a local Plex session to ensure stability across multiple processes.
     """
+    global worker_plex
     try:
-        # Initialize a new local connection session for process isolation
-        local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
-        track = local_plex.fetchItem(track_id)
+        # Breadcrumb log to identify the file if the process hard-crashes
+        logger.info(f"Attempting analysis on Track ID: {track_id}")
         
-        # This call now handles metadata syncing for cached tracks 
-        # and full analysis for new tracks.
+        track = worker_plex.fetchItem(track_id)
         result = analyze_track_essentia(track)
-        return str(track_id), result
-    except Exception:
-        return str(track_id), None
+        return str(track_id), result, None
+    except Exception as e:
+        return str(track_id), None, str(e)
 
 # --- 3. CORE ANALYSIS LOGIC ---
 
@@ -166,29 +174,70 @@ def bulk_analyze():
 
     # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
     # Workers restart after every 5 tracks to prevent memory bloat from accumulating
+    # 2. Maximize workers while managing memory via sliding window submission
     workers = get_optimal_workers(task_type="cpu")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=10) as executor:
-        for i in range(0, num_to_process, batch_size):
-            batch_ids = to_process[i:i + batch_size]
-            future_to_track = {executor.submit(analysis_worker, tid): tid for tid in batch_ids}
-            
-            for future in concurrent.futures.as_completed(future_to_track):
-                rk, data = future.result()
-                if data:
-                    _essentia_cache[rk] = data
-                completed += 1
+    to_process_iter = iter(to_process)
+    future_to_track = {}
 
-            # Periodic status updates with time estimation
-            elapsed = time.time() - start_time
-            avg = elapsed / completed
-            est = timedelta(seconds=int((num_to_process - completed) * avg))
-            log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | In Cache: {len(_essentia_cache)} ", end='\r')
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=workers, 
+        max_tasks_per_child=50, # Increased to reduce worker restart overhead
+        initializer=init_worker 
+    ) as executor:
         
-            # 3. Atomic Save: Merge memory with disk every 50 tracks to prevent data loss
-            disk_cache = load_essentia_cache_exclusive()
-            disk_cache.update(_essentia_cache)
-            with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
-                json.dump(disk_cache, f)
+        # Prime the pump: Submit an initial batch (workers * 2)
+        for _ in range(min(len(to_process), workers * 2)):
+            tid = next(to_process_iter)
+            future_to_track[executor.submit(analysis_worker, tid)] = tid
+
+        # Process as they complete and refill the window
+        while future_to_track:
+            # Wait for at least one future to finish
+            done, _ = concurrent.futures.wait(
+                future_to_track.keys(), 
+                return_when=concurrent.futures.FIRST_COMPLETED
+            )
+
+            for future in done:
+                track_id = future_to_track.pop(future)
+                try:
+                    # Retrieve result with existing timeout
+                    rk, data, error = future.result(timeout=90)
+                    
+                    if data:
+                        _essentia_cache[rk] = data
+                        completed += 1
+                    elif error:
+                        log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
+                        completed += 1
+                    
+                except concurrent.futures.TimeoutError:
+                    log_msg(f"\n[TIMEOUT] Track {track_id} took too long. Skipping.", level="error")
+                    completed += 1
+                except Exception as e:
+                    log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
+                    completed += 1
+
+                # IMMEDIATELY SUBMIT NEXT TASK to keep workers busy
+                try:
+                    next_tid = next(to_process_iter)
+                    future_to_track[executor.submit(analysis_worker, next_tid)] = next_tid
+                except StopIteration:
+                    pass
+
+                # Atomic Save: Reduced frequency to 100 to prevent disk-lock congestion
+                if completed % 100 == 0:
+                    disk_cache = load_essentia_cache_exclusive()
+                    disk_cache.update(_essentia_cache)
+                    with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=30) as f:
+                        json.dump(disk_cache, f)
+
+                # Update Progress UI (Identical to original)
+                elapsed = time.time() - start_time
+                avg = elapsed / max(1, completed)
+                est = timedelta(seconds=int((num_to_process - completed) * avg))
+                log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
+            
 
     # Final persistent save
     save_essentia_cache()
