@@ -12,7 +12,8 @@ import portalocker
 import traceback
 import concurrent.futures
 import multiprocessing
-import logging 
+import logging
+import argparse
 from datetime import datetime, timedelta
 from collections import Counter
 from plexapi.server import PlexServer
@@ -33,6 +34,13 @@ except ImportError:
     ESSENTIA_AVAILABLE = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- ARGUMENT PARSING ---
+parser = argparse.ArgumentParser(description="Meloday Playlist Generator")
+parser.add_argument('--debug', action='store_true', help="Enable verbose debug logging")
+args, unknown = parser.parse_known_args()
+
+DEBUG_MODE = args.debug
 
 # --- LOGGING INITIALIZATION ---
 LOG_FILE = os.path.join(BASE_DIR, "logs", "meloday_run.log")
@@ -67,6 +75,14 @@ def log_text(msg):
 def m_print(msg):
     print(msg)
     log_text(msg)
+
+def d_print(msg):
+    """Prints and logs only if DEBUG_MODE is True."""
+    if DEBUG_MODE:
+        # We use a prefix to make these easy to filter in the log file
+        debug_msg = f"[DEBUG] {msg}"
+        print(debug_msg)
+        log_text(debug_msg)
 
 def resolve_path(path, base):
     return path if os.path.isabs(path) else os.path.join(base, path)
@@ -732,7 +748,7 @@ def better_copy(a, b):
     b_dist = getattr(b, "sonic_distance", 0.00)
     if abs(a_dist - b_dist) > 0.08:
         winner = a if a_dist < b_dist else b
-        log_text(f"[DEDUPE] Sonic Priority: Kept '{winner.title}' ({winner.ratingKey}) due to distance ({min(a_dist, b_dist):.3f}).") #
+        d_print(f"[DEDUPE] Sonic Priority: Kept '{winner.title}' ({winner.ratingKey}) due to distance ({min(a_dist, b_dist):.3f}).") #
         return winner
 
     # 1) Prefer studio albums
@@ -740,7 +756,7 @@ def better_copy(a, b):
     b_studio = is_studio_album(b)
     if a_studio != b_studio:
         winner = a if a_studio else b
-        log_text(f"[DEDUPE] Format Priority: Kept '{winner.title}' (Studio Album preferred).") #
+        d_print(f"[DEDUPE] Format Priority: Kept '{winner.title}' (Studio Album preferred).") #
         return winner
 
     # 2) Prefer the "plain/original" title within the same dedupe key
@@ -748,7 +764,7 @@ def better_copy(a, b):
     b_rank = title_variant_rank(b)
     if a_rank != b_rank:
         winner = a if a_rank < b_rank else b
-        log_text(f"[DEDUPE] Variant Priority: Kept '{winner.title}' (Original title preferred over edit/remix).") #
+        d_print(f"[DEDUPE] Variant Priority: Kept '{winner.title}' (Original title preferred over edit/remix).") #
         return winner
 
     # 3) Prefer non-remix album titles (e.g., 'Changa' over 'Go Bang (Remixes) - EP')
@@ -756,7 +772,7 @@ def better_copy(a, b):
     b_pen = remix_album_penalty(b)
     if a_pen != b_pen:
         winner = a if a_pen < b_pen else b
-        log_text(f"[DEDUPE] Album Penalty Priority: Kept '{winner.title}' (Non-remix collection preferred).") #
+        d_print(f"[DEDUPE] Album Penalty Priority: Kept '{winner.title}' (Non-remix collection preferred).") #
         return winner
 
     # Pre-fetch meta once
@@ -1000,13 +1016,13 @@ def filter_low_rated_tracks(tracks):
             track_rating = getattr(track, "userRating", None)
 
             if artist_rating is not None and artist_rating <= 4:
-                log_text(f"[EXCLUSION] Track '{track.title}' skipped: Artist rating is low ({artist_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Artist rating is low ({artist_rating}).") #
                 continue
             if album_rating is not None and album_rating <= 4:
-                log_text(f"[EXCLUSION] Track '{track.title}' skipped: Album rating is low ({album_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Album rating is low ({album_rating}).") #
                 continue
             if track_rating is not None and track_rating <= 4:
-                log_text(f"[EXCLUSION] Track '{track.title}' skipped: User rating is low ({track_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: User rating is low ({track_rating}).") #
                 continue
 
             filtered.append(track)
@@ -1150,12 +1166,12 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
                 # Exclude if it was played recently
                 if last_played and last_played >= exclude_start:
-                    log_text(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
+                    d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
                     continue
 
                 # Exclude if it's already in the excluded keys
                 if excluded_keys and s.ratingKey in excluded_keys:
-                    log_text(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
+                    d_print(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
                     continue
 
                 filtered_similars.append(s)
@@ -1394,12 +1410,12 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
 
                     # A. FAST ARTIST & IDENTITY CHECK
                     if bridge.ratingKey in existing_keys:
-                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        d_print(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
 
                     # C. FAST EXCLUSION CHECK
                     if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
-                        log_text(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
+                        d_print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
                     b_artist_raw = track_artist_name(bridge)
@@ -1408,23 +1424,23 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                     
                     # Dedupe check
                     if b_identity in existing_identities:
-                        log_text(f"  [!] Skipping '{bridge.title}': Already in selection.")
+                        d_print(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
 
                     # NEW: Global artist limit check
                     if artist_counts[b_artist_norm] >= artist_limit:
-                        log_text(f"  [!] Skipping '{bridge.title}': Artist '{b_artist_raw}' saturated ({artist_counts[b_artist_norm]}).")
+                        d_print(f"  [!] Skipping '{bridge.title}': Artist '{b_artist_raw}' saturated ({artist_counts[b_artist_norm]}).")
                         continue
 
                     # B. FAST RECENCY CHECK
                     last_p = getattr(bridge, "lastViewedAt", None)
                     if last_p and last_p >= exclude_start:
-                        log_text(f"  [!] Skipping '{bridge.title}': Recently played.")
+                        d_print(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     
                     # NEW: Back-to-back check (prevents bridge matching t1 OR t2 artists)
                     if b_artist_norm == t1_artist_norm or b_artist_norm == t2_artist_norm:
-                        log_text(f"  [!] Skipping '{bridge.title}': Artist back-to-back clash.")
+                        d_print(f"  [!] Skipping '{bridge.title}': Artist back-to-back clash.")
                         continue
 
                     # D. METADATA & DISTANCE CHECK
@@ -1432,7 +1448,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                     b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
                     
                     if b_dist >= 0.5:
-                        log_text(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
+                        d_print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
                         continue
 
                     # E. AUDIO ANALYSIS (Only for the winner)
@@ -1440,9 +1456,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                         analyze_track_essentia(bridge)
 
                     # F. SELECTION
-                    log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}).") 
-                    log_text(f"  [OK] Found bridge: '{bridge.title}' (Dist: {b_dist:.3f}). Inserting.")
-                    log_text(f"[BRIDGE] Inserting '{bridge.title}' to smooth transition.")
+                    log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}). Inserting.") 
                     final_path.append(bridge)
                     
                     # NEW: Update tracking sets and the artist counter
@@ -1455,7 +1469,6 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
                 
                 if not found_bridge:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
-                    log_text(f"  [X] No suitable bridge found between {t1.title} and {t2.title}.")
             except Exception as e: 
                 m_print(f"  [ERR] Bridge error: {e}")
                 pass
