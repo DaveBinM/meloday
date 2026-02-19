@@ -1366,8 +1366,9 @@ def get_track_meta(track):
     }
 
 # Bridge Pass [Smarter Bridge Track Selection]
-def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
+def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=None):
     """Identifies jumps > 0.5 and attempts to insert a bridge track from the library while strictly respecting MAX_TRACKS."""
+    if similarity_cache is None: similarity_cache = {} # Safety fallback
     if not path or len(path) < 2: return path
     final_path = []
     
@@ -1393,7 +1394,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
         
         # Check distance between the two songs
         m_cache = {t1.ratingKey: get_track_meta(t1), t2.ratingKey: get_track_meta(t2)}
-        dist = get_adj_dist(t1.ratingKey, t2.ratingKey, {}, m_cache, limit)
+        dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, m_cache, limit)
         
         if dist > 0.5:
             log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} (Gap: {dist:.3f}). Searching for candidate...")#
@@ -1404,9 +1405,8 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
             try:
                 # Search Plex for tracks similar to the first song
                 potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
-                found_bridge = False
+                candidates = [] # Collector for Best-Fit
                 for bridge in potential_bridges:
-
 
                     # A. FAST ARTIST & IDENTITY CHECK
                     if bridge.ratingKey in existing_keys:
@@ -1445,29 +1445,32 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT):
 
                     # D. METADATA & DISTANCE CHECK
                     bm = get_track_meta(bridge)
-                    b_dist = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
+                    # Evaluate distance to both sides of the gap to find the best "middle ground"
+                    d1 = get_adj_dist(t1.ratingKey, bridge.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
+                    d2 = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
                     
-                    if b_dist >= 0.5:
-                        d_print(f"  [!] Skipping '{bridge.title}': Sonic clash with target ({b_dist:.3f}).")
-                        continue
+                    # Logic: If both legs of the new path are better than the single original jump, it is a net improvement for the "flow."
+                    if d1 < dist and d2 < dist:
+                        candidates.append((d1 + d2, bridge, b_identity, b_artist_norm))
+
+                # F. SELECTION
+                if candidates:
+                    # Pick the candidate with the lowest combined detour score
+                    candidates.sort(key=lambda x: x[0])
+                    best_score, best_bridge, b_identity, b_artist_norm = candidates[0]
 
                     # E. AUDIO ANALYSIS (Only for the winner)
                     if ESSENTIA_ENABLED:
-                        analyze_track_essentia(bridge)
+                        analyze_track_essentia(best_bridge)
 
-                    # F. SELECTION
-                    log_text(f"[BRIDGE] Selected: '{bridge.title}' (Compatibility Dist: {b_dist:.3f}). Inserting.") 
-                    final_path.append(bridge)
+                    log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting.") 
+                    final_path.append(best_bridge)
                     
                     # NEW: Update tracking sets and the artist counter
                     existing_identities.add(b_identity) 
-                    existing_keys.add(bridge.ratingKey)
+                    existing_keys.add(best_bridge.ratingKey)
                     artist_counts[b_artist_norm] += 1
-                    
-                    found_bridge = True
-                    break
-                
-                if not found_bridge:
+                else:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
             except Exception as e: 
                 m_print(f"  [ERR] Bridge error: {e}")
@@ -1779,7 +1782,7 @@ def main():
         # Step 4.5: Smooth technical gaps between vibe-compatible tracks.
         print_status(80, "Creating Sonic Bridges...")
         sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
-        final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb)
+        final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb, similarity_cache=similarity_cache)
 
         # Final Log Update after bridging and smart truncation
         # Refresh meta_cache for any newly added bridge tracks
