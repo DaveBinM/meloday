@@ -7,7 +7,7 @@ plex:
 
 essentia:
   enabled: false
-  cache_path: "assets/essentia_cache.json"
+  cache_path: "assets/essentia_cache.db"
   bpm_weight: 0.15                                  # Influence of tempo on track distance
   key_weight: 0.15                                  # Influence of harmonic compatibility on track distance
   energy_weight: 0.10                               # Influence of loudness consistency

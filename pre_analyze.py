@@ -2,14 +2,15 @@ import os
 import multiprocessing
 import time
 import json
-import portalocker
+import sqlite3
 import concurrent.futures
 import logging
 from datetime import timedelta, datetime
 from meloday import (
-    PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia, 
-    save_essentia_cache, ESSENTIA_ENABLED, 
-    ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR
+    PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia,
+    save_essentia_cache, ESSENTIA_ENABLED,
+    ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
+    get_local_path, _migrate_json_to_sqlite
 )
 
 # --- LOGGING SETUP ---
@@ -93,14 +94,51 @@ def get_optimal_workers(task_type="cpu"):
 # --- 1. CACHE UTILITIES ---
 
 def load_essentia_cache_exclusive():
-    """Reads the current cache from disk using a shared lock to ensure multi-process safety."""
-    if os.path.exists(ESSENTIA_CACHE_PATH):
-        try:
-            with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='r', timeout=10) as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+    """Reads all entries from the SQLite cache into a dict."""
+    _migrate_json_to_sqlite()
+    if not os.path.exists(ESSENTIA_CACHE_PATH):
+        return {}
+    try:
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        rows = conn.execute(
+            "SELECT rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced "
+            "FROM essentia_cache"
+        ).fetchall()
+        conn.close()
+        result = {}
+        for rk, bpm, key, energy, year, artist, genres_j, moods_j, file_path, last_synced in rows:
+            result[rk] = {
+                "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
+                "genres": json.loads(genres_j) if genres_j else [],
+                "moods": json.loads(moods_j) if moods_j else [],
+                "file_path": file_path, "last_synced": last_synced
+            }
+        return result
+    except Exception:
+        return {}
+
+def upsert_essentia_cache_entries(entries):
+    """Batch-upserts a dict of {rk: data} into the SQLite database."""
+    if not entries:
+        return
+    try:
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.executemany("""
+            INSERT OR REPLACE INTO essentia_cache
+            (rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
+             d.get("artist"), json.dumps(d.get("genres") or []),
+             json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
+            for rk, d in entries.items()
+        ])
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        log_msg(f"[ERROR] Cache upsert failed: {e}", level="error")
 
 # --- 2. WORKER WRAPPER ---
 
@@ -146,18 +184,13 @@ def bulk_analyze():
     to_process = []
     for t in all_tracks:
         rk = str(t.ratingKey)
+        cached_data = _essentia_cache.get(rk)
         # Only process if not in cache, or if the metadata sync is older than 7 days
-        if rk not in _essentia_cache:
+        if cached_data is None:
             to_process.append(t.ratingKey)
         else:
-            cached_data = _essentia_cache[rk]
             last_sync = cached_data.get("last_synced", 0)
-            
-            # Check if path has changed or if time limit has expired
-            # get_local_path is imported via meloday (used in analyze_track_essentia logic)
-            from meloday import get_local_path
             current_path = get_local_path(t)
-            
             if cached_data.get("file_path") != current_path or (now_ts - last_sync) > 604800:
                 to_process.append(t.ratingKey)
 
@@ -169,7 +202,6 @@ def bulk_analyze():
     log_msg(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
 
     start_time = time.time()
-    batch_size = 50
     completed = 0
 
     # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
@@ -185,8 +217,8 @@ def bulk_analyze():
         initializer=init_worker 
     ) as executor:
         
-        # Prime the pump: Submit an initial batch (workers * 2)
-        for _ in range(min(len(to_process), workers * 2)):
+        # Prime the pump: Submit an initial batch (workers * 4)
+        for _ in range(min(len(to_process), workers * 4)):
             tid = next(to_process_iter)
             future_to_track[executor.submit(analysis_worker, tid)] = tid
 
@@ -225,12 +257,9 @@ def bulk_analyze():
                 except StopIteration:
                     pass
 
-                # Atomic Save: Reduced frequency to 100 to prevent disk-lock congestion
+                # Periodic Save: Upsert in-memory cache to SQLite every 100 completions
                 if completed % 100 == 0:
-                    disk_cache = load_essentia_cache_exclusive()
-                    disk_cache.update(_essentia_cache)
-                    with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=30) as f:
-                        json.dump(disk_cache, f)
+                    upsert_essentia_cache_entries(_essentia_cache)
 
                 # Update Progress UI (Identical to original)
                 elapsed = time.time() - start_time

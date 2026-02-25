@@ -8,7 +8,7 @@ import re
 import random
 import json
 import unicodedata
-import portalocker
+import sqlite3
 import traceback
 import concurrent.futures
 import multiprocessing
@@ -114,7 +114,10 @@ SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 
 # Essentia Logic & Weights
 ess_cfg = config.get("essentia", {})
 ESSENTIA_ENABLED = ess_cfg.get("enabled", True) and ESSENTIA_AVAILABLE
-ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.json"), BASE_DIR)
+ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_cache.db"), BASE_DIR)
+# Auto-upgrade: if config still references the old .json path, silently redirect to .db
+if ESSENTIA_CACHE_PATH.endswith('.json'):
+    ESSENTIA_CACHE_PATH = ESSENTIA_CACHE_PATH[:-5] + '.db'
 BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
 KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
 ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
@@ -277,24 +280,87 @@ def prefetch_label_exclusions():
     except Exception as e:
         m_print(f"[WARN] Failed pre-fetching label exclusions: {e}")
 
+# --- SQLite cache helpers ---
+
+_UPSERT_SQL = """
+    INSERT OR REPLACE INTO essentia_cache
+    (rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+def _ensure_db_schema(conn):
+    """Creates the essentia_cache table and sets optimal WAL pragmas."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS essentia_cache (
+            rating_key TEXT PRIMARY KEY NOT NULL,
+            bpm REAL, key TEXT, energy REAL, year INTEGER,
+            artist TEXT, genres TEXT, moods TEXT,
+            file_path TEXT, last_synced REAL
+        )
+    """)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+
+def _entry_to_row(rk, d):
+    return (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
+            d.get("artist"), json.dumps(d.get("genres") or []),
+            json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
+
+def _row_to_entry(row):
+    rk, bpm, key, energy, year, artist, genres_j, moods_j, file_path, last_synced = row
+    return rk, {
+        "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
+        "genres": json.loads(genres_j) if genres_j else [],
+        "moods": json.loads(moods_j) if moods_j else [],
+        "file_path": file_path, "last_synced": last_synced
+    }
+
+def _migrate_json_to_sqlite():
+    """One-time migration: imports the legacy JSON cache into the SQLite database."""
+    json_path = ESSENTIA_CACHE_PATH[:-3] + '.json'
+    if not os.path.exists(json_path):
+        return
+    m_print("[INFO] Migrating legacy JSON cache to SQLite — this runs once.")
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            old_data = json.load(f)
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+        _ensure_db_schema(conn)
+        conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in old_data.items() if isinstance(d, dict)])
+        conn.commit()
+        conn.close()
+        os.rename(json_path, json_path + ".bak")
+        m_print(f"[INFO] Migration complete. {len(old_data)} entries moved. Old file renamed to .json.bak")
+    except Exception as e:
+        m_print(f"[WARN] JSON migration failed: {e}")
+
 def load_essentia_cache():
     global _essentia_cache
-    if os.path.exists(ESSENTIA_CACHE_PATH):
-        try:
-            # Open with a shared lock for reading
-            with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='r', timeout=10) as f:
-                _essentia_cache = json.load(f)
-        except Exception as e:
-            m_print(f"[WARN] Could not load Essentia cache: {e}")
-            _essentia_cache = {}
+    _migrate_json_to_sqlite()
+    if not os.path.exists(ESSENTIA_CACHE_PATH):
+        _essentia_cache = {}
+        return
+    try:
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
+        _ensure_db_schema(conn)
+        rows = conn.execute(
+            "SELECT rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced "
+            "FROM essentia_cache"
+        ).fetchall()
+        conn.close()
+        _essentia_cache = {rk: entry for rk, entry in (_row_to_entry(r) for r in rows)}
+    except Exception as e:
+        m_print(f"[WARN] Could not load Essentia cache: {e}")
+        _essentia_cache = {}
 
 def save_essentia_cache():
     os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
     try:
-        # Open with an exclusive lock for writing
-        # This prevents the other script from reading/writing until this is done
-        with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='w', timeout=60) as f:
-            json.dump(_essentia_cache, f)
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        _ensure_db_schema(conn)
+        conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in _essentia_cache.items()])
+        conn.commit()
+        conn.close()
     except Exception as e:
         m_print(f"[ERROR] Could not save Essentia cache safely: {e}")
 
