@@ -4,7 +4,7 @@ import sys
 import statistics
 import random
 import concurrent.futures
-import json
+import sqlite3
 import logging
 from datetime import datetime, timedelta
 from collections import Counter
@@ -139,12 +139,20 @@ def run_optimizer():
     music = plex.library.section(config['plex']['music_library'])
     
     ess_cfg = config.get('essentia', {})
-    cache_path = os.path.join(base_dir, ess_cfg.get('cache_path', 'assets/essentia_cache.json'))
-    
+    cache_path = os.path.join(base_dir, ess_cfg.get('cache_path', 'assets/essentia_cache.db'))
+    if cache_path.endswith('.json'):
+        cache_path = cache_path[:-5] + '.db'
+
     cache_data = {}
     if os.path.exists(cache_path):
-        with open(cache_path, 'r') as f:
-            cache_data = json.load(f)
+        try:
+            conn = sqlite3.connect(cache_path, timeout=10)
+            for row in conn.execute("SELECT rating_key, bpm, energy, year FROM essentia_cache"):
+                rk, bpm, energy, year = row
+                cache_data[rk] = {"bpm": bpm, "energy": energy, "year": year}
+            conn.close()
+        except Exception:
+            pass
 
     sample_size = get_args()
     all_tracks = music.searchTracks()

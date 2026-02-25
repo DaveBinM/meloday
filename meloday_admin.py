@@ -1,6 +1,5 @@
 import os
-import json
-import portalocker
+import sqlite3
 import logging
 from datetime import datetime
 from plexapi.server import PlexServer
@@ -48,65 +47,61 @@ def log_admin(msg, level="info"):
 def run_maintenance():
     """
     Performs full maintenance on the Essentia cache:
-    1. Database Integrity: Validates JSON structure and required keys.
-    2. Orphan Cleanup: Removes entries for tracks no longer in Plex.
+    1. Orphan Cleanup: Removes entries for tracks no longer in Plex.
+    2. Integrity Check: Removes entries missing required fields.
+    3. VACUUM: Reclaims freed disk space.
     """
     if not os.path.exists(ESSENTIA_CACHE_PATH):
         log_admin(f"Cache file not found at {ESSENTIA_CACHE_PATH}", "error")
         return
 
     log_admin(f"=== Starting Meloday Cache Maintenance: {MUSIC_LIBRARY} ===")
-    
+
     try:
-        # 1. Connect to Plex (Safe fail point if Plex is down)
+        # 1. Connect to Plex (safe fail point if Plex is down)
         plex = PlexServer(PLEX_URL, PLEX_TOKEN)
         music = plex.library.section(MUSIC_LIBRARY)
-        
+
         log_admin("Fetching current library state from Plex...")
         current_library_keys = {str(t.ratingKey) for t in music.search(libtype='track')}
-        
-        # 2. Safety Check for unmounted drives/empty library
+
+        # Safety check for unmounted drives / empty library
         if not current_library_keys:
             log_admin("Plex returned 0 tracks. Skipping cleanup to prevent data loss.", "warn")
             return
 
-        # 3. Open and Lock for maintenance
-        with portalocker.Lock(ESSENTIA_CACHE_PATH, mode='r+', timeout=60) as f:
-            try:
-                cache = json.load(f)
-            except json.JSONDecodeError:
-                log_admin("Cache file is corrupted and could not be read.", "error")
-                return
+        # 2. Open SQLite and perform maintenance
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        conn.execute("PRAGMA journal_mode=WAL")
 
-            original_count = len(cache)
-            orphans_removed = 0
-            corrupt_removed = 0
-            
-            # Required keys for a valid entry
-            required_keys = {"bpm", "key", "energy", "file_path"}
-            
-            keys_to_check = list(cache.keys())
-            for rk in keys_to_check:
-                if rk not in current_library_keys:
-                    del cache[rk]
-                    orphans_removed += 1
-                    continue
-                
-                entry = cache[rk]
-                if not isinstance(entry, dict) or not required_keys.issubset(entry.keys()):
-                    del cache[rk]
-                    corrupt_removed += 1
+        original_count = conn.execute("SELECT COUNT(*) FROM essentia_cache").fetchone()[0]
 
-            # 4. Save (Minified - no indents)
-            f.seek(0)
-            json.dump(cache, f, separators=(',', ':')) 
-            f.truncate()
-            
-            log_admin("Maintenance Complete")
-            log_admin(f"Total Entries Scanned: {original_count}")
-            log_admin(f"Orphaned Tracks Removed: {orphans_removed}")
-            log_admin(f"Corrupt/Invalid Entries Removed: {corrupt_removed}")
-            log_admin(f"Final Optimized Cache Size: {len(cache)}")
+        # Orphan cleanup: entries whose rating_key is no longer in Plex
+        db_keys = {row[0] for row in conn.execute("SELECT rating_key FROM essentia_cache")}
+        orphan_keys = db_keys - current_library_keys
+        if orphan_keys:
+            conn.executemany(
+                "DELETE FROM essentia_cache WHERE rating_key = ?",
+                [(k,) for k in orphan_keys]
+            )
+        orphans_removed = len(orphan_keys)
+
+        # Integrity cleanup: entries missing required fields
+        cursor = conn.execute(
+            "DELETE FROM essentia_cache WHERE bpm IS NULL OR key IS NULL OR energy IS NULL OR file_path IS NULL"
+        )
+        corrupt_removed = cursor.rowcount
+
+        conn.commit()
+        # Reclaim freed pages left by deletions
+        conn.execute("VACUUM")
+        conn.close()
+
+        log_admin("Maintenance Complete")
+        log_admin(f"Total Entries Scanned: {original_count}")
+        log_admin(f"Orphaned Tracks Removed: {orphans_removed}")
+        log_admin(f"Corrupt/Invalid Entries Removed: {corrupt_removed}")
+        log_admin(f"Final Optimized Cache Size: {original_count - orphans_removed - corrupt_removed}")
 
     except Exception as e:
         log_admin(f"Maintenance failed: {e}", "error")
