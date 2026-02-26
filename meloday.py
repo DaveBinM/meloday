@@ -1104,20 +1104,9 @@ def fetch_historical_tracks(period):
     # (Uses the optimized set-based logic)
     filtered_tracks = filter_excluded_tracks(resolved_tracks, now=now)
 
-    # Style (primary) + genre (fallback) balancing data.
-    # Genre is only counted for tracks that carry no styles at all.
     track_play_counts = Counter()
-    genre_count = Counter()
-    style_count = Counter()
     for track in filtered_tracks:
         track_play_counts[track] += 1
-        resolved_styles = _resolve_tags(track, "styles")
-        if resolved_styles:
-            for style in resolved_styles:
-                style_count[style] += 1
-        else:
-            for genre in _resolve_tags(track, "genres"):
-                genre_count[genre] += 1
 
     sorted_tracks = sorted(filtered_tracks, key=lambda t: track_play_counts[t], reverse=True)
     split_index = max(1, len(sorted_tracks) // 4)
@@ -1129,31 +1118,36 @@ def fetch_historical_tracks(period):
         + random.sample(popular_tracks, min(len(popular_tracks), int(MAX_TRACKS * HISTORICAL_RATIO)))
     )
 
-    # Apply style balancing first (primary axis), then genre balancing for tracks without styles (fallback).
-    if style_count:
-        most_common_style, most_common_style_count = style_count.most_common(1)[0]
-        max_style_limit = int(MAX_TRACKS * STYLE_RATIO)
-        if most_common_style_count > max_style_limit:
-            log_text(f"[SELECTION] Balancing style '{most_common_style}' (Limit: {max_style_limit}) to prevent over-saturation.")
-            def _has_resolved_style(track, style_str):
-                return style_str in _resolve_tags(track, "styles")
-            balanced_selection = (
-                [t for t in balanced_selection if not _has_resolved_style(t, most_common_style)]
-                + [t for t in balanced_selection if _has_resolved_style(t, most_common_style)][:max_style_limit]
-            )
+    # Shuffle so rare and popular tracks compete fairly for style/genre slots.
+    # Without this, rare tracks (always first in the list) would claim all quota slots
+    # before popular tracks of the same style get a chance.
+    random.shuffle(balanced_selection)
 
-    if genre_count:
-        most_common_genre, most_common_count = genre_count.most_common(1)[0]
-        max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
-        if most_common_count > max_genre_limit:
-            log_text(f"[SELECTION] Balancing genre '{most_common_genre}' (Limit: {max_genre_limit}) to prevent over-saturation.")
-            def _has_genre_no_style(track, genre_str):
-                # Genre balancing only applies to tracks that have no styles
-                return not _resolve_tags(track, "styles") and genre_str in _resolve_tags(track, "genres")
-            balanced_selection = (
-                [t for t in balanced_selection if not _has_genre_no_style(t, most_common_genre)]
-                + [t for t in balanced_selection if _has_genre_no_style(t, most_common_genre)][:max_genre_limit]
-            )
+    # Single-pass style/genre cap — mirrors process_tracks() exactly:
+    # primary style is the diversity axis; genre is the fallback for untagged tracks only.
+    max_style_limit = int(MAX_TRACKS * STYLE_RATIO)
+    max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
+    running_style = Counter()
+    running_genre = Counter()
+    capped = []
+    for track in balanced_selection:
+        t_styles = _resolve_tags(track, "styles")
+        if t_styles:
+            ps = t_styles[0]
+            if running_style[ps] >= max_style_limit:
+                continue
+            running_style[ps] += 1
+        else:
+            t_genres = _resolve_tags(track, "genres")
+            if t_genres:
+                pg = t_genres[0]
+                if running_genre[pg] >= max_genre_limit:
+                    continue
+                running_genre[pg] += 1
+        capped.append(track)
+    if len(capped) < len(balanced_selection):
+        log_text(f"[SELECTION] Style/genre balancing trimmed {len(balanced_selection) - len(capped)} tracks from history pool.")
+    balanced_selection = capped
 
     return balanced_selection, excluded_keys
 
@@ -1577,9 +1571,23 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     }
     existing_keys = {t.ratingKey for t in path}
     
-    # NEW: Track artist counts to respect global limits (matching process_tracks logic)
+    # Track artist counts to respect global limits (matching process_tracks logic)
     artist_counts = Counter([norm_text(primary_artist(track_artist_name(t))) for t in path])
-    artist_limit = round(MAX_TRACKS * 0.05) 
+    artist_limit = round(MAX_TRACKS * 0.05)
+
+    # Track style/genre counts for soft diversity preference during bridge selection
+    style_counts = Counter()
+    genre_counts = Counter()
+    for _t in path:
+        _t_styles = _resolve_tags(_t, "styles")
+        if _t_styles:
+            style_counts[_t_styles[0]] += 1
+        else:
+            _t_genres = _resolve_tags(_t, "genres")
+            if _t_genres:
+                genre_counts[_t_genres[0]] += 1
+    style_limit = int(MAX_TRACKS * STYLE_RATIO)
+    genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
     
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
@@ -1650,25 +1658,42 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                     
                     # Logic: If both legs of the new path are better than the single original jump, it is a net improvement for the "flow."
                     if d1 < dist and d2 < dist:
-                        candidates.append((d1 + d2, bridge, b_identity, b_artist_norm))
+                        b_styles = _resolve_tags(bridge, "styles")
+                        b_genres = _resolve_tags(bridge, "genres")
+                        if b_styles:
+                            over_limit = style_counts[b_styles[0]] >= style_limit
+                        elif b_genres:
+                            over_limit = genre_counts[b_genres[0]] >= genre_limit
+                        else:
+                            over_limit = False
+                        # Tuple sorts within-limits first (0), over-limits second (1), then by flow score
+                        candidates.append((int(over_limit), d1 + d2, bridge, b_identity, b_artist_norm, b_styles, b_genres))
 
                 # F. SELECTION
                 if candidates:
-                    # Pick the candidate with the lowest combined detour score
-                    candidates.sort(key=lambda x: x[0])
-                    best_score, best_bridge, b_identity, b_artist_norm = candidates[0]
+                    # Within-limits candidates sort first (flag=0), over-limits second (flag=1);
+                    # within each group, lowest combined flow score wins.
+                    candidates.sort()
+                    over_limit_flag, best_score, best_bridge, b_identity, b_artist_norm, b_styles, b_genres = candidates[0]
 
                     # E. AUDIO ANALYSIS (Only for the winner)
                     if ESSENTIA_ENABLED:
                         analyze_track_essentia(best_bridge)
 
-                    log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting.") 
+                    if over_limit_flag:
+                        log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting (style/genre limit exceeded — no within-limit option).")
+                    else:
+                        log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting.")
                     final_path.append(best_bridge)
-                    
-                    # NEW: Update tracking sets and the artist counter
-                    existing_identities.add(b_identity) 
+
+                    # Update tracking sets, artist counter, and style/genre counts
+                    existing_identities.add(b_identity)
                     existing_keys.add(best_bridge.ratingKey)
                     artist_counts[b_artist_norm] += 1
+                    if b_styles:
+                        style_counts[b_styles[0]] += 1
+                    elif b_genres:
+                        genre_counts[b_genres[0]] += 1
                 else:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
             except Exception as e: 
@@ -1925,6 +1950,11 @@ def main():
         prev_len = len(final_tracks)
         final_tracks = process_tracks(final_tracks + more_h_sample + more_s)[:MAX_TRACKS]
         if len(final_tracks) == prev_len: break
+
+    if len(final_tracks) < MAX_TRACKS // 2:
+        log_text(f"[WARN] Playlist is significantly short ({len(final_tracks)}/{MAX_TRACKS} tracks). "
+                 f"Diversity caps may be too tight for the available candidate pool. "
+                 f"Try running the optimizer, or increase style_ratio/genre_ratio in config.yml.")
 
     print_status(50, "Finding first & last historical tracks...")
     first, last = find_first_and_last_tracks(final_tracks[:MAX_TRACKS], period)

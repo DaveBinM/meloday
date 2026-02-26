@@ -150,10 +150,17 @@ def run_optimizer():
     sample_size = get_args()
     all_tracks = music.searchTracks()
     total_count = len(all_tracks)
+
+    # Scale the default sample to at least 5% of the library.
+    # On a 5k library this stays at 2000 (40%); on a 300k library it grows to 15000 (5%).
+    # Explicitly-passed values (including "ALL") are always respected as-is.
+    if sample_size == DEFAULT_SAMPLE_SIZE:
+        sample_size = max(DEFAULT_SAMPLE_SIZE, int(total_count * 0.05))
+
     target_tracks = all_tracks if (sample_size is None or sample_size >= total_count) else random.sample(all_tracks, sample_size)
 
     log_msg(f"\n--- Meloday Universal Optimizer ---")
-    log_msg(f"MODE: {'FULL AUDIT' if sample_size is None else f'SAMPLING {sample_size}'}")
+    log_msg(f"MODE: {'FULL AUDIT' if sample_size is None else f'SAMPLING {sample_size} of {total_count}'}")
 
     results = []
     io_workers = get_optimal_workers(task_type="io")
@@ -207,7 +214,20 @@ def run_optimizer():
     rec_genre_ratio = round(max(0.10, 0.05 + (diversity * 0.15)), 2)
     # Style ratio: low style diversity → tighter cap to force variety;
     # high style diversity → more permissive (natural variety already present).
-    rec_style_ratio = round(max(0.15, 0.10 + (style_diversity * 0.15)), 2)
+    # Wider range (0.10–0.25) vs old (0.15–0.25) gives more room on homogeneous libraries.
+    rec_style_ratio = round(max(0.10, 0.05 + (style_diversity * 0.20)), 2)
+
+    # Anti-starvation floor: if the library has few distinct styles, the ratio must be
+    # permissive enough that a full playlist can be assembled from the available styles.
+    # 1.5× headroom buffer prevents the cap from being so tight it starves the playlist.
+    # Only ever raises rec_style_ratio — never lowers it.
+    num_distinct_styles = len(style_counter)
+    if num_distinct_styles > 0:
+        starvation_floor = round(min(1.5 / num_distinct_styles, 0.25), 2)
+        if starvation_floor > rec_style_ratio:
+            rec_style_ratio = starvation_floor
+            log_msg(f" [NOTE] style_ratio raised to {rec_style_ratio} (anti-starvation: only {num_distinct_styles} distinct styles detected).", log_only=True)
+
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
     # Pre-compute Essentia weights once — used in both output and auto-apply sections
