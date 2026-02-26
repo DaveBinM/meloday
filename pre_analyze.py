@@ -58,15 +58,16 @@ def load_essentia_cache_exclusive():
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
         result = {}
-        for rk, bpm, key, energy, year, artist, genres_j, moods_j, file_path, last_synced in rows:
+        for rk, bpm, key, energy, year, artist, genres_j, styles_j, moods_j, file_path, last_synced in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
                 "genres": json.loads(genres_j) if genres_j else [],
+                "styles": json.loads(styles_j) if styles_j else [],
                 "moods": json.loads(moods_j) if moods_j else [],
                 "file_path": file_path, "last_synced": last_synced
             }
@@ -83,11 +84,12 @@ def upsert_essentia_cache_entries(entries):
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executemany("""
             INSERT OR REPLACE INTO essentia_cache
-            (rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
+             json.dumps(d.get("styles") or []),
              json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
             for rk, d in entries.items()
         ])

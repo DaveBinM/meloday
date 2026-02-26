@@ -23,12 +23,12 @@ playlist:
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats
   history_lookback_days: 60                         # How many days of listening history to analyze for playlist generation
   max_tracks: 50                                    # The maximum number of tracks allowed in a single playlist
-  sonic_similar_limit: 50                           # Number of sonically similar tracks to fetch for each track during sorting. Recommended is the max tracks value.
-  
+
   historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
-  genre_ratio: 0.12                                 # The max % of tracks from a single genre that are pulled from the historical tracks
-  sonic_similarity_limit: 100                       # Number of tracks to check for sonic similarity per reference track (higher number is more accurate but takes longer; default is 2x max tracks)
-  sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter matching). The max value is 0.25
+  style_ratio: 0.20                                 # The max % of tracks from a single style (e.g. "Emo", "Indie Rock") in the final playlist. Primary diversity axis.
+  genre_ratio: 0.12                                 # Fallback cap: only applies to tracks that carry no style tags at all
+  sonic_similarity_limit: 100                       # Candidate pool size per seed track — higher is more accurate but slower. Optimizer tunes this to your library density. Floor is 2× max_tracks.
+  sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter). The Plex max is 0.25; 0.20 excludes the loosest "loose" matches.
 
 seasonal:
   christmas:

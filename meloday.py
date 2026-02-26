@@ -106,9 +106,10 @@ EXCLUDE_LABEL_NAME = config["plex"]["exclude_label"]
 EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
 HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
-SONIC_SIMILAR_LIMIT = config["playlist"].get("sonic_similar_limit", MAX_TRACKS)
+SONIC_SIMILAR_LIMIT = MAX_TRACKS   # Sorting breadth always tracks playlist size; not user-configurable
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
 GENRE_RATIO = config["playlist"].get("genre_ratio", 0.15)
+STYLE_RATIO = config["playlist"].get("style_ratio", 0.20)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
@@ -162,6 +163,7 @@ _essentia_cache = {}
 _album_meta_cache = {}
 _album_obj_cache = {}
 _artist_obj_cache = {}
+_metadata_tag_cache = {}   # {('album'|'artist', ratingKey, attr): [tag_strings]}
 _global_sonic_cache = {}
 _christmas_album_keys = set()
 _excluded_album_keys = set()
@@ -283,8 +285,8 @@ def prefetch_label_exclusions():
 
 _UPSERT_SQL = """
     INSERT OR REPLACE INTO essentia_cache
-    (rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 def _ensure_db_schema(conn):
@@ -293,23 +295,30 @@ def _ensure_db_schema(conn):
         CREATE TABLE IF NOT EXISTS essentia_cache (
             rating_key TEXT PRIMARY KEY NOT NULL,
             bpm REAL, key TEXT, energy REAL, year INTEGER,
-            artist TEXT, genres TEXT, moods TEXT,
+            artist TEXT, genres TEXT, styles TEXT, moods TEXT,
             file_path TEXT, last_synced REAL
         )
     """)
+    # Migrate existing databases that pre-date the styles column
+    try:
+        conn.execute("ALTER TABLE essentia_cache ADD COLUMN styles TEXT")
+    except Exception:
+        pass  # Column already exists
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
 
 def _entry_to_row(rk, d):
     return (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
             d.get("artist"), json.dumps(d.get("genres") or []),
+            json.dumps(d.get("styles") or []),
             json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
 
 def _row_to_entry(row):
-    rk, bpm, key, energy, year, artist, genres_j, moods_j, file_path, last_synced = row
+    rk, bpm, key, energy, year, artist, genres_j, styles_j, moods_j, file_path, last_synced = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
         "genres": json.loads(genres_j) if genres_j else [],
+        "styles": json.loads(styles_j) if styles_j else [],
         "moods": json.loads(moods_j) if moods_j else [],
         "file_path": file_path, "last_synced": last_synced
     }
@@ -343,7 +352,7 @@ def load_essentia_cache():
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         _ensure_db_schema(conn)
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, year, artist, genres, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -413,15 +422,19 @@ def analyze_track_essentia(track):
         
         # Check if the file path has changed (e.g., quality upgrade) while keeping same ratingKey
         if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
+            # Backfill styles for cache entries that pre-date the styles column
+            if "styles" not in data:
+                data["styles"] = _resolve_tags(track, "styles")
             return data
 
         data["artist"] = norm_text(primary_artist(track_artist_name(track)))
-        data["genres"] = list(str(g) for g in (getattr(track, "genres", None) or []))
-        data["moods"] = list(str(m) for m in (getattr(track, "moods", None) or []))
+        data["genres"] = _resolve_tags(track, "genres")
+        data["styles"] = _resolve_tags(track, "styles")
+        data["moods"]  = _resolve_tags(track, "moods")
         # Update year if it was previously null
         if data.get("year") is None:
             data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
-        
+
         # If path is still the same, we just update text metadata and return
         if data.get("file_path") == file_path:
             data["last_synced"] = now_ts
@@ -455,15 +468,16 @@ def analyze_track_essentia(track):
 
         # Comprehensive Metadata Caching
         data = {
-            "bpm": round(bpm, 2), 
+            "bpm": round(bpm, 2),
             "key": camelot,
             "energy": round(integrated_loudness, 2),
             "year": track_year,
             "artist": norm_text(primary_artist(track_artist_name(track))),
-            "genres": list(str(g) for g in (getattr(track, "genres", None) or [])),
-            "moods": list(str(m) for m in (getattr(track, "moods", None) or [])),
+            "genres": _resolve_tags(track, "genres"),
+            "styles": _resolve_tags(track, "styles"),
+            "moods":  _resolve_tags(track, "moods"),
             "file_path": file_path,
-            "last_synced": now_ts # Added for throttling
+            "last_synced": now_ts
         }
         _essentia_cache[rk] = data
         return data
@@ -743,7 +757,10 @@ def album_meta(track) -> dict:
                         "subtype": meta["album_subtype"],
                         "userRating": getattr(album, "userRating", None),
                         "labels": [l.tag for l in getattr(album, "labels", [])],
-                        "collections": [c.tag for c in getattr(album, "collections", [])]
+                        "collections": [c.tag for c in getattr(album, "collections", [])],
+                        "genres": [str(g) for g in getattr(album, "genres", [])],
+                        "styles": [str(s) for s in getattr(album, "styles", [])],
+                        "moods":  [str(m) for m in getattr(album, "moods",  [])],
                     }
     except Exception as e:
         m_print(f"[WARN] Error fetching metadata for {track.title}: {e}")
@@ -751,6 +768,44 @@ def album_meta(track) -> dict:
 
     _album_meta_cache[cache_key] = meta
     return meta
+
+def _resolve_tags(track, attr):
+    """Return tag list for attr with track → album → artist fallback, caching each level."""
+    # 1. Track level — cheapest, no API call
+    tags = [str(t) for t in (getattr(track, attr, None) or [])]
+    if tags:
+        return tags
+
+    # 2. Album level — album_meta() is cached; only fetches once per album per run
+    album_key = getattr(track, "parentRatingKey", None)
+    if album_key:
+        album_cache_key = ("album", album_key, attr)
+        if album_cache_key not in _metadata_tag_cache:
+            try:
+                # album_meta() populates _album_obj_cache with genres/styles/moods
+                album_meta(track)
+                _metadata_tag_cache[album_cache_key] = _album_obj_cache.get(album_key, {}).get(attr) or []
+            except Exception:
+                _metadata_tag_cache[album_cache_key] = []
+        tags = _metadata_tag_cache[album_cache_key]
+        if tags:
+            return tags
+
+    # 3. Artist level — fetched and cached on first miss per artist
+    artist_key = getattr(track, "grandparentRatingKey", None)
+    if artist_key:
+        artist_cache_key = ("artist", artist_key, attr)
+        if artist_cache_key not in _metadata_tag_cache:
+            try:
+                artist = track.artist() if callable(getattr(track, "artist", None)) else None
+                _metadata_tag_cache[artist_cache_key] = [str(t) for t in (getattr(artist, attr, None) or [])] if artist else []
+            except Exception:
+                _metadata_tag_cache[artist_cache_key] = []
+        tags = _metadata_tag_cache[artist_cache_key]
+        if tags:
+            return tags
+
+    return []
 
 _COMPILATION_TITLE_RE = re.compile(
     r"\b("
@@ -1048,13 +1103,20 @@ def fetch_historical_tracks(period):
     # (Uses the optimized set-based logic)
     filtered_tracks = filter_excluded_tracks(resolved_tracks, now=now)
 
-    # Genre balancing
+    # Style (primary) + genre (fallback) balancing data.
+    # Genre is only counted for tracks that carry no styles at all.
     track_play_counts = Counter()
     genre_count = Counter()
+    style_count = Counter()
     for track in filtered_tracks:
         track_play_counts[track] += 1
-        for genre in (getattr(track, "genres", None) or []):
-            genre_count[str(genre)] += 1
+        resolved_styles = _resolve_tags(track, "styles")
+        if resolved_styles:
+            for style in resolved_styles:
+                style_count[style] += 1
+        else:
+            for genre in _resolve_tags(track, "genres"):
+                genre_count[genre] += 1
 
     sorted_tracks = sorted(filtered_tracks, key=lambda t: track_play_counts[t], reverse=True)
     split_index = max(1, len(sorted_tracks) // 4)
@@ -1066,16 +1128,30 @@ def fetch_historical_tracks(period):
         + random.sample(popular_tracks, min(len(popular_tracks), int(MAX_TRACKS * HISTORICAL_RATIO)))
     )
 
+    # Apply style balancing first (primary axis), then genre balancing for tracks without styles (fallback).
+    if style_count:
+        most_common_style, most_common_style_count = style_count.most_common(1)[0]
+        max_style_limit = int(MAX_TRACKS * STYLE_RATIO)
+        if most_common_style_count > max_style_limit:
+            log_text(f"[SELECTION] Balancing style '{most_common_style}' (Limit: {max_style_limit}) to prevent over-saturation.")
+            def _has_resolved_style(track, style_str):
+                return style_str in _resolve_tags(track, "styles")
+            balanced_selection = (
+                [t for t in balanced_selection if not _has_resolved_style(t, most_common_style)]
+                + [t for t in balanced_selection if _has_resolved_style(t, most_common_style)][:max_style_limit]
+            )
+
     if genre_count:
         most_common_genre, most_common_count = genre_count.most_common(1)[0]
         max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
         if most_common_count > max_genre_limit:
-            log_text(f"[SELECTION] Balancing '{most_common_genre}' (Limit: {max_genre_limit}) to prevent over-saturation.") #
-            def _has_genre(track, genre_str):
-                return any(str(g) == genre_str for g in (getattr(track, "genres", None) or []))
+            log_text(f"[SELECTION] Balancing genre '{most_common_genre}' (Limit: {max_genre_limit}) to prevent over-saturation.")
+            def _has_genre_no_style(track, genre_str):
+                # Genre balancing only applies to tracks that have no styles
+                return not _resolve_tags(track, "styles") and genre_str in _resolve_tags(track, "genres")
             balanced_selection = (
-                [t for t in balanced_selection if not _has_genre(t, most_common_genre)][:max_genre_limit]
-                + [t for t in balanced_selection if _has_genre(t, most_common_genre)][:max_genre_limit]
+                [t for t in balanced_selection if not _has_genre_no_style(t, most_common_genre)]
+                + [t for t in balanced_selection if _has_genre_no_style(t, most_common_genre)][:max_genre_limit]
             )
 
     return balanced_selection, excluded_keys
@@ -1194,11 +1270,14 @@ def process_tracks(tracks):
 
     deduped_tracks = [best_by_key[k] for k in key_order]
 
-    # Phase 2: enforce artist + genre balance
+    # Phase 2: enforce artist + style (primary) / genre (fallback) balance
     unique_tracks = []
     artist_count = Counter()
     genre_count = Counter()
+    style_count = Counter()
     artist_limit = round(MAX_TRACKS * 0.05)
+    style_limit  = int(MAX_TRACKS * STYLE_RATIO)
+    genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
 
     for track in deduped_tracks:
         try:
@@ -1206,12 +1285,23 @@ def process_tracks(tracks):
             if artist_count[artist_name] >= artist_limit:
                 continue
 
-            track_genre = track.genres[0] if getattr(track, "genres", None) else "Unknown"
-            if genre_count[track_genre] >= int(MAX_TRACKS * 0.15):
-                continue
+            # Styles are the primary diversity axis (more granular than genres).
+            # Genre is the fallback only when a track carries no styles at all.
+            track_styles = _resolve_tags(track, "styles")
+            track_genres = _resolve_tags(track, "genres")
+
+            if track_styles:
+                primary_style = track_styles[0]
+                if style_count[primary_style] >= style_limit:
+                    continue
+                style_count[primary_style] += 1
+            elif track_genres:
+                primary_genre = track_genres[0]
+                if genre_count[primary_genre] >= genre_limit:
+                    continue
+                genre_count[primary_genre] += 1
 
             artist_count[artist_name] += 1
-            genre_count[track_genre] += 1
             unique_tracks.append(track)
         except Exception as e:
             m_print(f"[WARN] Error enforcing limits for {track.title}: {e}")
@@ -1296,11 +1386,14 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
         ma, mb = meta_cache[ka], meta_cache[kb]
         score = 0.8  # Start with high dissimilarity
         
-        # Mood is the strongest indicator of "tonal shift"
+        # Mood is the strongest tonal signal; style (e.g. "Emo", "Indie Rock") is
+        # more specific than genre, so it ranks between moods and genres.
         shared_moods = ma["moods"] & mb["moods"]
         if shared_moods:
             score -= 0.4
-        elif ma["genres"] & mb["genres"]: # Genre is secondary
+        elif ma["styles"] & mb["styles"]:  # Style is more specific than genre
+            score -= 0.3
+        elif ma["genres"] & mb["genres"]:  # Genre is the coarsest fallback
             score -= 0.2
             
         # Era/Decade similarity prevents "time-travel" jumps
@@ -1371,14 +1464,15 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
     similarity_cache = {}
     meta_cache = {}
 
-    # Pre-calculate metadata (fast, no network)
+    # Pre-calculate metadata (fast; _resolve_tags uses caching so album/artist fallback is O(1) after first hit)
     for track in all_involved:
         t_key = track.ratingKey
         ec = _essentia_cache.get(str(t_key), {})
         meta_cache[t_key] = {
             "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
-            "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
-            "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
+            "genres": set(ec.get("genres") or _resolve_tags(track, "genres")),
+            "moods":  set(ec.get("moods")  or _resolve_tags(track, "moods")),
+            "styles": set(ec.get("styles") or _resolve_tags(track, "styles")),
             "year": ec.get("year") or getattr(track, "year", None)
         }
 
@@ -1460,8 +1554,9 @@ def get_track_meta(track):
     ec = _essentia_cache.get(str(rk), {})
     return {
         "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
-        "genres": set(ec.get("genres") or (str(g) for g in (getattr(track, "genres", None) or []))),
-        "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
+        "genres": set(ec.get("genres") or _resolve_tags(track, "genres")),
+        "moods":  set(ec.get("moods")  or _resolve_tags(track, "moods")),
+        "styles": set(ec.get("styles") or _resolve_tags(track, "styles")),
         "year": ec.get("year") or getattr(track, "year", None)
     }
 

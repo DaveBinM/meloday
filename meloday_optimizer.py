@@ -107,6 +107,7 @@ def get_track_data(track, cache_data):
             "buckets": buckets,
             "distances": distances,
             "genres": [g.tag for g in track.genres],
+            "styles": [s.tag for s in getattr(track, "styles", [])],
             "bpm": technical.get("bpm"),
             "energy": technical.get("energy"),
             "year": technical.get("year") or track.year,
@@ -182,9 +183,13 @@ def run_optimizer():
     N = len(all_genres)
     diversity = 1 - (sum(n * (n - 1) for n in Counter(all_genres).values()) / (N * (N - 1))) if N > 1 else 0
 
+    all_styles = [s for r in results for s in r['styles']]
+    M = len(all_styles)
+    style_diversity = 1 - (sum(n * (n - 1) for n in Counter(all_styles).values()) / (M * (M - 1))) if M > 1 else 0
+
     # Bucket-aware density logic (targeting usable pool)
     usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
-    rec_limit = int(statistics.quantiles(usable_counts, n=100)[84]) if usable_counts else 150
+    rec_limit = min(int(statistics.quantiles(usable_counts, n=100)[84]), 500) if usable_counts else 150
     rec_dist = min(round(statistics.median([d for r in results for d in r['distances']]) if results else 0.20, 2), 0.25)
 
     def get_weight(data_list, base_val):
@@ -195,6 +200,9 @@ def run_optimizer():
     # Values for output/saving
     rec_hist_ratio = round(max(0.15, 0.40 - (diversity * 0.25)), 2)
     rec_genre_ratio = round(max(0.10, 0.05 + (diversity * 0.15)), 2)
+    # Style ratio: low style diversity → tighter cap to force variety;
+    # high style diversity → more permissive (natural variety already present).
+    rec_style_ratio = round(max(0.15, 0.10 + (style_diversity * 0.15)), 2)
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
     # Pre-compute Essentia weights once — used in both output and auto-apply sections
@@ -233,6 +241,10 @@ def run_optimizer():
     sum_logical = sum(r['buckets']['logical'] for r in results)
     sum_loose = sum(r['buckets']['loose'] for r in results)
 
+    # Top styles for audit log
+    style_counter = Counter(all_styles)
+    top_styles = style_counter.most_common(5)
+
     # --- OUTPUT ---
     log_msg("\n" + "="*50, log_only=True)
     log_msg(" GLOBAL SIMILARITY DISTRIBUTION (Audit Data):", log_only=True)
@@ -240,6 +252,15 @@ def run_optimizer():
     log_msg(f"  Strong Flow (0.15): {sum_strong}", log_only=True)
     log_msg(f"  Logical     (0.20): {sum_logical}", log_only=True)
     log_msg(f"  Loose       (0.25): {sum_loose}", log_only=True)
+
+    log_msg("\n" + "="*50, log_only=True)
+    log_msg(f" STYLE DIVERSITY: {style_diversity:.3f} (Genre Diversity: {diversity:.3f})", log_only=True)
+    if top_styles:
+        log_msg(" Top Styles in Library:", log_only=True)
+        for style, count in top_styles:
+            log_msg(f"  {style}: {count}", log_only=True)
+    else:
+        log_msg("  (No style tags found — consider tagging your library)", log_only=True)
 
     log_msg("\n" + "="*50)
     log_msg(" RECOMMENDED CONFIGURATION")
@@ -250,6 +271,7 @@ def run_optimizer():
     log_msg(f"  sonic_similarity_limit: {rec_limit}")
     log_msg(f"  historical_ratio: {rec_hist_ratio}")
     log_msg(f"  genre_ratio: {rec_genre_ratio}")
+    log_msg(f"  style_ratio: {rec_style_ratio}")
     log_msg(f"  sonic_similarity_distance: {rec_dist}")
     
     if essentia_results_exist:
@@ -267,6 +289,7 @@ def run_optimizer():
         config['playlist']['sonic_similarity_limit'] = rec_limit
         config['playlist']['historical_ratio'] = rec_hist_ratio
         config['playlist']['genre_ratio'] = rec_genre_ratio
+        config['playlist']['style_ratio'] = rec_style_ratio
         config['playlist']['sonic_similarity_distance'] = rec_dist
 
         if ess_cfg.get("enabled", False) and essentia_results_exist:
