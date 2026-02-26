@@ -2,5 +2,6 @@ plexapi
 Pillow
 pyyaml
 essentia
-portalocker
 ruamel.yaml
+psutil
+tqdm

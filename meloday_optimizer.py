@@ -1,5 +1,6 @@
 import os
 import multiprocessing
+import functools
 import sys
 import statistics
 import random
@@ -41,46 +42,37 @@ def log_msg(msg, level="info", log_only=False):
     else: 
         logger.info(clean_msg)
 
+@functools.lru_cache(maxsize=None)
 def get_optimal_workers(task_type="cpu"):
     try:
-        # Detect logical threads (2, 22, or 24 on your specific CPUs)
         logical = os.cpu_count() or 1
-        tier_reason = "Fallback"
-        assigned = 4
-        
+
         if task_type == "cpu":
-            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
-            if logical <= 4:
-                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
-                assigned = 2
-            
-            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
-            elif 16 < logical <= 22:
-                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
-                assigned = logical - 8
-                
-            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
-            else:
-                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
-                assigned = logical - 2
+            try:
+                import psutil
+                physical = psutil.cpu_count(logical=False) or logical
+                source = "psutil"
+            except ImportError:
+                physical = max(1, logical // 2) if logical > 2 else logical
+                source = "estimated"
+            assigned = max(1, physical - 1)
+            tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
+            assigned = min(16, logical + 4)
             tier_reason = "I/O Optimized (Network/Disk Bound)"
-            assigned = min(32, logical + 4)
-        
-        else:
-            # Catch-all for typos in the task_type parameter
-            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
-            assigned = 4
 
-        # Final diagnostic print
+        else:
+            tier_reason = f"Unknown task_type '{task_type}' — using default fallback"
+            assigned = max(1, logical // 2)
+
         log_msg(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
         log_msg(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
-        
+
         return assigned
 
     except Exception as e:
-        log_msg(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
+        log_msg(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe fallback (2 workers).")
         return 2
 
 # --- DEFAULTS ---
@@ -165,10 +157,21 @@ def run_optimizer():
     results = []
     io_workers = get_optimal_workers(task_type="io")
     with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
+        # Start history fetch immediately so it runs concurrently with track analysis.
+        # On large libraries, fetching 90 days of history can take 10-30 seconds —
+        # overlapping it with the sonicallySimilar calls gives it for free.
+        history_future = executor.submit(
+            music.history, mindate=datetime.now() - timedelta(days=90)
+        )
+
         futures = {executor.submit(get_track_data, t, cache_data): t for t in target_tracks}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(target_tracks), desc="Analyzing"):
             res = future.result()
             if res: results.append(res)
+
+        history = history_future.result()
+
+    unique_played = {entry.ratingKey for entry in history}
 
     if not results:
         log_msg("No data collected. Check Plex connection.", level="error")
@@ -194,9 +197,13 @@ def run_optimizer():
     rec_genre_ratio = round(max(0.10, 0.05 + (diversity * 0.15)), 2)
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
-    # --- BEHAVIORAL AUDIT ---
-    history = music.history(mindate=datetime.now() - timedelta(days=90))
-    unique_played = {entry.ratingKey for entry in history}
+    # Pre-compute Essentia weights once — used in both output and auto-apply sections
+    # to avoid rebuilding the same list comprehensions and re-running stdev/mean twice.
+    essentia_results_exist = any(r['has_essentia'] for r in results)
+    if essentia_results_exist:
+        w_bpm    = get_weight([r['bpm'] for r in results], 0.12)
+        w_energy = get_weight([abs(r['energy']) for r in results if r['energy']], 0.08)
+        w_era    = get_weight([r['year'] for r in results if r['year']], 0.03)
     
     # Play Ratio: The % of your library explored in 3 months.
     # This is the "Universal Metric" that works from 5k to 150k tracks.
@@ -245,12 +252,12 @@ def run_optimizer():
     log_msg(f"  genre_ratio: {rec_genre_ratio}")
     log_msg(f"  sonic_similarity_distance: {rec_dist}")
     
-    if any(r['has_essentia'] for r in results):
+    if essentia_results_exist:
         log_msg("\nessentia:")
-        log_msg(f"  bpm_weight: {get_weight([r['bpm'] for r in results], 0.12):.2f}")
+        log_msg(f"  bpm_weight: {w_bpm:.2f}")
         log_msg(f"  key_weight: {rec_key_weight:.2f}")
-        log_msg(f"  energy_weight: {get_weight([abs(r['energy']) for r in results if r['energy']], 0.08):.2f}")
-        log_msg(f"  era_weight: {get_weight([r['year'] for r in results if r['year']], 0.03):.2f}")
+        log_msg(f"  energy_weight: {w_energy:.2f}")
+        log_msg(f"  era_weight: {w_era:.2f}")
     log_msg("="*50)
 
     # --- AUTO-APPLY LOGIC ---
@@ -262,11 +269,11 @@ def run_optimizer():
         config['playlist']['genre_ratio'] = rec_genre_ratio
         config['playlist']['sonic_similarity_distance'] = rec_dist
 
-        if ess_cfg.get("enabled", False):
-            config['essentia']['bpm_weight'] = get_weight([r['bpm'] for r in results], 0.12)
+        if ess_cfg.get("enabled", False) and essentia_results_exist:
+            config['essentia']['bpm_weight'] = w_bpm
             config['essentia']['key_weight'] = rec_key_weight
-            config['essentia']['energy_weight'] = get_weight([abs(r['energy']) for r in results if r['energy']], 0.08)
-            config['essentia']['era_weight'] = get_weight([r['year'] for r in results if r['year']], 0.03)
+            config['essentia']['energy_weight'] = w_energy
+            config['essentia']['era_weight'] = w_era
 
         with open(config_path, 'w', encoding='utf-8') as f:
             # Saving with the YAML object preserves comments

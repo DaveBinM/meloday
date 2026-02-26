@@ -7,6 +7,7 @@ os.environ['ESSENTIA_LOG_LEVEL'] = '1'
 import re
 import random
 import json
+import functools
 import unicodedata
 import sqlite3
 import traceback
@@ -168,46 +169,44 @@ plex = None
 
 # --- 4. CORE FUNCTIONS ---
 
+@functools.lru_cache(maxsize=None)
 def get_optimal_workers(task_type="cpu"):
     try:
-        # Detect logical threads (2, 22, or 24 on your specific CPUs)
         logical = os.cpu_count() or 1
-        tier_reason = "Fallback"
-        assigned = 4
-        
+
         if task_type == "cpu":
-            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
-            if logical <= 4:
-                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
-                assigned = 2
-            
-            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
-            elif 16 < logical <= 22:
-                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
-                assigned = logical - 8
-                
-            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
-            else:
-                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
-                assigned = logical - 2
+            # Use physical cores for CPU-bound tasks — hyperthreading gives little benefit
+            # for compute-intensive work like Essentia audio analysis.
+            try:
+                import psutil
+                physical = psutil.cpu_count(logical=False) or logical
+                source = "psutil"
+            except ImportError:
+                # Approximate: assume 2 threads per core (x86 hyperthreading).
+                # Slightly conservative for non-HT chips (ARM NAS, some AMD), but always safe.
+                physical = max(1, logical // 2) if logical > 2 else logical
+                source = "estimated"
+            # Leave 1 physical core free for the OS and Plex server.
+            assigned = max(1, physical - 1)
+            tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
+            # Cap at 16 — additional threads won't speed up Plex API responses,
+            # and too many concurrent requests can overwhelm a co-hosted Plex server.
+            assigned = min(16, logical + 4)
             tier_reason = "I/O Optimized (Network/Disk Bound)"
-            assigned = min(32, logical + 4)
-        
-        else:
-            # Catch-all for typos in the task_type parameter
-            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
-            assigned = 4
 
-        # Final diagnostic print
+        else:
+            tier_reason = f"Unknown task_type '{task_type}' — using default fallback"
+            assigned = max(1, (logical) // 2)
+
         log_text(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
         log_text(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
-        
+
         return assigned
 
     except Exception as e:
-        log_text(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
+        log_text(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe fallback (2 workers).")
         return 2
 
 def validate_environment():
@@ -363,6 +362,20 @@ def save_essentia_cache():
         conn.close()
     except Exception as e:
         m_print(f"[ERROR] Could not save Essentia cache safely: {e}")
+
+def _upsert_cache_entries(entries):
+    """Writes only the specified {rk: data} subset to SQLite, without touching the rest of the cache."""
+    if not entries:
+        return
+    os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
+    try:
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        _ensure_db_schema(conn)
+        conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in entries.items()])
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        m_print(f"[ERROR] Could not save Essentia cache entries: {e}")
 
 def get_local_path(track):
     if not track.locations: return None
@@ -587,15 +600,16 @@ def remix_album_penalty(track) -> int:
     return 0
 
 
+@functools.lru_cache(maxsize=None)
 def norm_text(s: str) -> str:
     if not s:
         return ""
-    
+
     s = unicodedata.normalize("NFKC", s)
     s = s.casefold()
     s = re.sub(r"[^\w\s]", "", s)
     s = re.sub(r"\s+", " ", s).strip()
-    
+
     return s
 
 def track_artist_name(track) -> str:
@@ -656,6 +670,7 @@ def track_artist_name(track) -> str:
 # --- Dedup helpers: prefer studio albums over compilations/soundtracks ---
 _FEAT_SPLIT_RE = re.compile(r"\s*(?:feat\.?|ft\.?|featuring)\s+.*$", re.IGNORECASE)
 
+@functools.lru_cache(maxsize=None)
 def primary_artist(name: str) -> str:
     """Return the primary artist portion (strip 'feat./ft./featuring ...')."""
     if not name:
@@ -751,6 +766,27 @@ _COMPILATION_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 _LIVE_TITLE_RE = re.compile(r"\blive\b|unplugged|concert", re.IGNORECASE)
+
+# Pre-compiled constants for clean_title — built once at import, not on every call
+_VERSION_KEYWORDS_SORTED = sorted([
+    "extended", "deluxe", "remaster", "remastered", "live", "acoustic", "edit",
+    "version", "anniversary", "special edition", "radio edit", "album version",
+    "original mix", "remix", "mix", "dub", "instrumental", "karaoke", "cover",
+    "rework", "re-edit", "bootleg", "vip", "session", "alternate", "take",
+    "mix cut", "cut", "dj mix"
+], key=len, reverse=True)
+_FEATURING_RES = [re.compile(p, re.IGNORECASE) for p in [
+    r"\(feat\.?.*?\)", r"\[feat\.?.*?\]", r"\(ft\.?.*?\)", r"\[ft\.?.*?\]",
+    r"\bfeat\.?\s+\w+", r"\bfeaturing\s+\w+", r"\bft\.?\s+\w+",
+    r" - .*mix$", r" - .*dub$", r" - .*remix$", r" - .*edit$", r" - .*version$",
+]]
+_KW_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _VERSION_KEYWORDS_SORTED)
+_PAREN_KW_RE   = re.compile(rf"\(\s*[^)]*(?:{_KW_ALT})[^)]*\)\s*", re.IGNORECASE)
+_BRACKET_KW_RE = re.compile(rf"\[\s*[^\]]*(?:{_KW_ALT})[^\]]*\]\s*", re.IGNORECASE)
+_KW_RES        = [re.compile(rf"\b{re.escape(k)}\b", re.IGNORECASE) for k in _VERSION_KEYWORDS_SORTED]
+_EMPTY_PAREN_RE   = re.compile(r"\(\s*\)")
+_EMPTY_BRACKET_RE = re.compile(r"\[\s*\]")
+_TRAIL_DASH_RE    = re.compile(r"[\s-]+$")
 
 def is_studio_album(track) -> bool:
     """Best-effort: treat compilations/soundtracks/live as non-studio; everything else as studio."""
@@ -951,26 +987,26 @@ def fetch_historical_tracks(period):
 
     log_text(f"[SELECTION] Scanning history for period '{period}' (Lookback: {HISTORY_LOOKBACK_DAYS} days).") #
 
-    history_entries = [
-        entry for entry in music_section.history(mindate=history_start)
-        if entry.viewedAt and entry.viewedAt.hour in period_hours
-    ]
-    excluded_entries = [
-        entry for entry in music_section.history(mindate=exclude_start)
-        if entry.viewedAt
-    ]
+    all_history = list(music_section.history(mindate=history_start))
 
-    excluded_keys = {entry.ratingKey for entry in excluded_entries}
-    filtered_entries = [
-        entry for entry in history_entries
-        if entry.ratingKey not in excluded_keys
-    ]
+    # Single pass: build excluded_keys and filtered_entries simultaneously.
+    # An entry that is recent (>= exclude_start) goes into excluded_keys only;
+    # an entry that is in the right period but not recent goes into filtered_entries.
+    excluded_keys = set()
+    filtered_entries = []
+    for entry in all_history:
+        if not entry.viewedAt:
+            continue
+        if entry.viewedAt >= exclude_start:
+            excluded_keys.add(entry.ratingKey)
+        elif entry.viewedAt.hour in period_hours:
+            filtered_entries.append(entry)
 
     # If no historical tracks found, fallback
     if not filtered_entries:
         log_text("[SELECTION] No direct daypart matches found. Attempting generic history fallback.") #
         fallback_entries = [
-            entry for entry in music_section.history(mindate=history_start)
+            entry for entry in all_history
             if entry.ratingKey not in excluded_keys
         ]
         if fallback_entries:
@@ -1097,46 +1133,27 @@ def filter_low_rated_tracks(tracks):
             pass
     return filtered
 
+@functools.lru_cache(maxsize=None)
 def clean_title(title):
-    version_keywords = [
-        "extended", "deluxe", "remaster", "remastered", "live", "acoustic", "edit",
-        "version", "anniversary", "special edition", "radio edit", "album version",
-        "original mix", "remix", "mix", "dub", "instrumental", "karaoke", "cover",
-        "rework", "re-edit", "bootleg", "vip", "session", "alternate", "take",
-        "mix cut", "cut", "dj mix"
-    ]
-
-    featuring_patterns = [
-        r"\(feat\.?.*?\)", r"\[feat\.?.*?\]", r"\(ft\.?.*?\)", r"\[ft\.?.*?\]",
-        r"\bfeat\.?\s+\w+", r"\bfeaturing\s+\w+", r"\bft\.?\s+\w+",
-        r" - .*mix$", r" - .*dub$", r" - .*remix$", r" - .*edit$", r" - .*version$"
-    ]
-
     title_clean = title.casefold().strip()
 
     # 1) Remove feat/ft patterns and dash-suffix patterns first
-    for pattern in featuring_patterns:
-        title_clean = re.sub(pattern, "", title_clean, flags=re.IGNORECASE).strip()
-
-    # Build a regex that matches any version keyword
-    kw_alt = "|".join(
-        re.escape(k).replace(r"\ ", r"\s+")
-        for k in sorted(version_keywords, key=len, reverse=True)
-    )
+    for pat in _FEATURING_RES:
+        title_clean = pat.sub("", title_clean).strip()
 
     # 2) Remove parenthetical/bracketed chunks that contain version keywords
-    title_clean = re.sub(rf"\(\s*[^)]*(?:{kw_alt})[^)]*\)\s*", " ", title_clean, flags=re.IGNORECASE)
-    title_clean = re.sub(rf"\[\s*[^\]]*(?:{kw_alt})[^\]]*\]\s*", " ", title_clean, flags=re.IGNORECASE)
+    title_clean = _PAREN_KW_RE.sub(" ", title_clean)
+    title_clean = _BRACKET_KW_RE.sub(" ", title_clean)
 
     # 3) Remove remaining standalone version keywords (not in brackets)
-    for keyword in sorted(version_keywords, key=len, reverse=True):
-        title_clean = re.sub(rf"\b{re.escape(keyword)}\b", " ", title_clean, flags=re.IGNORECASE).strip()
+    for pat in _KW_RES:
+        title_clean = pat.sub(" ", title_clean).strip()
 
     # 4) Cleanup
-    title_clean = re.sub(r"\(\s*\)", "", title_clean)   # remove empty ()
-    title_clean = re.sub(r"\[\s*\]", "", title_clean)   # remove empty []
+    title_clean = _EMPTY_PAREN_RE.sub("", title_clean)    # remove empty ()
+    title_clean = _EMPTY_BRACKET_RE.sub("", title_clean)  # remove empty []
     title_clean = re.sub(r"\s+", " ", title_clean).strip()
-    title_clean = re.sub(r"[\s-]+$", "", title_clean)   # trim trailing spaces or hyphens
+    title_clean = _TRAIL_DASH_RE.sub("", title_clean)     # trim trailing spaces or hyphens
 
     return title_clean
 
@@ -1211,45 +1228,51 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
     log_text(f"[SONIC] Searching similarities for {len(reference_tracks)} seed tracks.") #
 
-    for track in reference_tracks:
+    def _fetch_one(track):
         try:
-            similars = track.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT, maxDistance=SONIC_SIMILARITY_DISTANCE)
-            filtered_similars = []
-
-            # Global Sonic Caching
-            # Capture distance data now so the sorting algorithm doesn't have to call Plex again.
-            rk_a = track.ratingKey
-            if rk_a not in _global_sonic_cache:
-                _global_sonic_cache[rk_a] = {}
-
-            for s in similars:
-                # Capture and reuse distance data
-                dist = getattr(s, 'distance', SONIC_SIMILARITY_DISTANCE)
-                _global_sonic_cache[rk_a][s.ratingKey] = dist
-                s.sonic_distance = dist
-
-                last_played = getattr(s, "lastViewedAt", None)
-
-                # Exclude if it was played recently
-                if last_played and last_played >= exclude_start:
-                    d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
-                    continue
-
-                # Exclude if it's already in the excluded keys
-                if excluded_keys and s.ratingKey in excluded_keys:
-                    d_print(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
-                    continue
-
-                filtered_similars.append(s)
-
-            # Run deduplication before adding similar tracks
-            filtered_similars = filter_excluded_tracks(filtered_similars, now=now)
-            final_similars = process_tracks(filter_low_rated_tracks(filtered_similars))
-            similar_tracks.extend(final_similars)
-
+            sims = track.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT, maxDistance=SONIC_SIMILARITY_DISTANCE)
+            return track, sims
         except Exception as e:
             m_print(f"Error fetching sonically similar tracks: {e}")
-            pass
+            return track, []
+
+    io_workers = get_optimal_workers(task_type="io")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
+        fetched = list(executor.map(_fetch_one, reference_tracks))
+
+    for track, similars in fetched:
+        filtered_similars = []
+
+        # Global Sonic Caching
+        # Capture distance data now so the sorting algorithm doesn't have to call Plex again.
+        rk_a = track.ratingKey
+        if rk_a not in _global_sonic_cache:
+            _global_sonic_cache[rk_a] = {}
+
+        for s in similars:
+            # Capture and reuse distance data
+            dist = getattr(s, 'distance', SONIC_SIMILARITY_DISTANCE)
+            _global_sonic_cache[rk_a][s.ratingKey] = dist
+            s.sonic_distance = dist
+
+            last_played = getattr(s, "lastViewedAt", None)
+
+            # Exclude if it was played recently
+            if last_played and last_played >= exclude_start:
+                d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
+                continue
+
+            # Exclude if it's already in the excluded keys
+            if excluded_keys and s.ratingKey in excluded_keys:
+                d_print(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
+                continue
+
+            filtered_similars.append(s)
+
+        # Run deduplication before adding similar tracks
+        filtered_similars = filter_excluded_tracks(filtered_similars, now=now)
+        final_similars = process_tracks(filter_low_rated_tracks(filtered_similars))
+        similar_tracks.extend(final_similars)
 
     return similar_tracks
 
@@ -1348,12 +1371,9 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
     similarity_cache = {}
     meta_cache = {}
 
-    # Pre-calculate metadata and fetch similarities
+    # Pre-calculate metadata (fast, no network)
     for track in all_involved:
         t_key = track.ratingKey
-        
-        # Unified Metadata Caching
-        # Use stored metadata if available to eliminate hits to Plex API.
         ec = _essentia_cache.get(str(t_key), {})
         meta_cache[t_key] = {
             "artist": ec.get("artist") or norm_text(primary_artist(track_artist_name(track))),
@@ -1361,19 +1381,32 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
             "moods": set(ec.get("moods") or (str(m) for m in (getattr(track, "moods", None) or []))),
             "year": ec.get("year") or getattr(track, "year", None)
         }
-        
-        # Only query Plex if the similarity data isn't in our global reuse cache
-        if t_key not in _global_sonic_cache:
-            try:
-                sims = track.sonicallySimilar(limit=limit)
-                similarity_cache[t_key] = {
-                    s.ratingKey: getattr(s, 'distance', i) 
-                    for i, s in enumerate(sims)
-                }
-            except Exception:
-                similarity_cache[t_key] = {}
+
+    # Fetch sonicallySimilar in parallel for tracks not already in the global cache
+    tracks_needing_fetch = [t for t in all_involved if t.ratingKey not in _global_sonic_cache]
+
+    def _fetch_similar(track):
+        try:
+            sims = track.sonicallySimilar(limit=limit)
+            return track.ratingKey, {s.ratingKey: getattr(s, 'distance', i) for i, s in enumerate(sims)}
+        except Exception:
+            return track.ratingKey, {}
+
+    if tracks_needing_fetch:
+        io_workers = get_optimal_workers(task_type="io")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
+            for t_key, sims in executor.map(_fetch_similar, tracks_needing_fetch):
+                similarity_cache[t_key] = sims
 
     # --- 1. BI-DIRECTIONAL GREEDY INITIALIZATION ---
+    _dist_cache = {}
+
+    def _adj(ka, kb):
+        key = (ka, kb)
+        if key not in _dist_cache:
+            _dist_cache[key] = get_adj_dist(ka, kb, similarity_cache, meta_cache, limit)
+        return _dist_cache[key]
+
     remaining = list(tracks)
     path = []
     current_key = first_track.ratingKey
@@ -1383,39 +1416,40 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
 
     while remaining:
         # Score = Distance from Current + (Distance to End * 0.3)
-        best_track = min(
-            remaining,
-            key=lambda t: get_adj_dist(current_key, t.ratingKey, similarity_cache, meta_cache, limit) + 
-                          (get_adj_dist(t.ratingKey, end_key, similarity_cache, meta_cache, limit) * 0.3)
+        best_idx, best_track = min(
+            enumerate(remaining),
+            key=lambda x: _adj(current_key, x[1].ratingKey) +
+                          (_adj(x[1].ratingKey, end_key) * 0.3)
         )
         path.append(best_track)
-        remaining.remove(best_track)
+        remaining[best_idx] = remaining[-1]
+        remaining.pop()
         current_key = best_track.ratingKey
 
     # --- 2. 2-OPT REFINEMENT WITH JUMP PENALTY ---
+    def edge_cost(ka, kb):
+        d = _adj(ka, kb)
+        return (d ** 3) * 20 if d > 0.4 else d
+
     def total_cost(p):
-        d = 0
         full_path = [first_track] + p + [last_track]
-        for i in range(len(full_path) - 1):
-            step_dist = get_adj_dist(full_path[i].ratingKey, full_path[i+1].ratingKey, similarity_cache, meta_cache, limit)
-            # Non-linear "Jarring Transition" penalty to prioritize local smoothness
-            if step_dist > 0.4:
-                d += (step_dist ** 3) * 20 
-            else:
-                d += step_dist
-        return d
+        return sum(edge_cost(full_path[i].ratingKey, full_path[i+1].ratingKey) for i in range(len(full_path) - 1))
 
     start_cost = total_cost(path) #
+    n = len(path)
     improved = True
     while improved:
         improved = False
-        for i in range(len(path) - 1):
-            for j in range(i + 1, len(path)):
-                new_path = path[:i] + path[i:j+1][::-1] + path[j+1:]
-                if total_cost(new_path) < total_cost(path):
-                    path = new_path
+        for i in range(n - 1):
+            prev_i = first_track.ratingKey if i == 0 else path[i - 1].ratingKey
+            for j in range(i + 1, n):
+                next_j = last_track.ratingKey if j == n - 1 else path[j + 1].ratingKey
+                old = edge_cost(prev_i, path[i].ratingKey) + edge_cost(path[j].ratingKey, next_j)
+                new = edge_cost(prev_i, path[j].ratingKey) + edge_cost(path[i].ratingKey, next_j)
+                if new < old:
+                    path[i:j + 1] = path[i:j + 1][::-1]
                     improved = True
-    
+
     end_cost = total_cost(path) #
     log_text(f"[ORDERING] 2-opt refinement complete. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.") #
     
@@ -1432,8 +1466,8 @@ def get_track_meta(track):
     }
 
 # Bridge Pass [Smarter Bridge Track Selection]
-def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=None):
-    """Identifies jumps > 0.5 and attempts to insert a bridge track from the library while strictly respecting MAX_TRACKS."""
+def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=None, meta_cache=None):
+    """Identifies jumps > 0.4 and attempts to insert a bridge track from the library."""
     if similarity_cache is None: similarity_cache = {} # Safety fallback
     if not path or len(path) < 2: return path
     final_path = []
@@ -1458,11 +1492,14 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
         t1, t2 = path[i], path[i+1]
         final_path.append(t1)
         
-        # Check distance between the two songs
-        m_cache = {t1.ratingKey: get_track_meta(t1), t2.ratingKey: get_track_meta(t2)}
+        # Check distance between the two songs — reuse pre-computed metadata where available
+        m_cache = {
+            t1.ratingKey: (meta_cache.get(t1.ratingKey) if meta_cache else None) or get_track_meta(t1),
+            t2.ratingKey: (meta_cache.get(t2.ratingKey) if meta_cache else None) or get_track_meta(t2),
+        }
         dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, m_cache, limit)
         
-        if dist > 0.5:
+        if dist > 0.4:
             log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} (Gap: {dist:.3f}). Searching for candidate...")#
 
             t1_artist_norm = norm_text(primary_artist(track_artist_name(t1)))
@@ -1547,7 +1584,10 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     # Smart Truncation Logic to stay within MAX_TRACKS
     if SMART_TRUNCATION_ENABLED and len(final_path) > MAX_TRACKS:
         m_print(f"[BRIDGE] Smart Truncating playlist from {len(final_path)} to {MAX_TRACKS}...")
-        
+
+        # Pre-compute metadata for every track once — it doesn't change during removal
+        trunc_meta = {t.ratingKey: get_track_meta(t) for t in final_path}
+
         while len(final_path) > MAX_TRACKS:
             best_remove_idx = -1
             min_added_distance = float('inf')
@@ -1556,20 +1596,20 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
             for i in range(1, len(final_path) - 1):
                 t_prev = final_path[i-1]
                 t_next = final_path[i+1]
-                
-                # Metadata for neighbor distance calculation
+
+                # Metadata for neighbor distance calculation (reuse pre-computed dict)
                 m_cache = {
-                    t_prev.ratingKey: get_track_meta(t_prev),
-                    t_next.ratingKey: get_track_meta(t_next)
+                    t_prev.ratingKey: trunc_meta[t_prev.ratingKey],
+                    t_next.ratingKey: trunc_meta[t_next.ratingKey],
                 }
-                
+
                 # Calculate what the new jump would be if we removed final_path[i]
                 new_dist = get_adj_dist(t_prev.ratingKey, t_next.ratingKey, {}, m_cache, limit)
-                
+
                 if new_dist < min_added_distance:
                     min_added_distance = new_dist
                     best_remove_idx = i
-            
+
             # Remove the "least essential" track for sonic flow
             if best_remove_idx != -1:
                 removed_track = final_path[best_remove_idx] #
@@ -1785,9 +1825,10 @@ def main():
         more_h, more_e = fetch_historical_tracks(period)
         excluded_keys |= more_e
         more_s = fetch_sonically_similar_tracks(final_tracks, excluded_keys=excluded_keys)
-        additional = process_tracks(random.sample(more_h, min(MAX_TRACKS - len(final_tracks), len(more_h))) + more_s)
-        final_tracks = process_tracks(final_tracks + additional)[:MAX_TRACKS]
-        if not additional: break
+        more_h_sample = random.sample(more_h, min(MAX_TRACKS - len(final_tracks), len(more_h)))
+        prev_len = len(final_tracks)
+        final_tracks = process_tracks(final_tracks + more_h_sample + more_s)[:MAX_TRACKS]
+        if len(final_tracks) == prev_len: break
 
     print_status(50, "Finding first & last historical tracks...")
     first, last = find_first_and_last_tracks(final_tracks[:MAX_TRACKS], period)
@@ -1801,8 +1842,6 @@ def main():
     if middle and first and last:
         if ESSENTIA_ENABLED:
             print_status(60, "Syncing metadata and analyzing new tracks...")
-            load_essentia_cache()
-            
             all_tracks = [first, last] + middle
             now_ts = datetime.now().timestamp()
             to_analyze = []
@@ -1829,10 +1868,12 @@ def main():
                 with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
                     # analysis_worker calls analyze_track_essentia internally
                     results = list(executor.map(analysis_worker, to_analyze))
-                    for tid, data in results:
-                        if data:
-                            _essentia_cache[str(tid)] = data
-                save_essentia_cache()
+                new_entries = {}
+                for tid, data in results:
+                    if data:
+                        _essentia_cache[str(tid)] = data
+                        new_entries[str(tid)] = data
+                _upsert_cache_entries(new_entries)
             else:
                 log_text("[OK] All tracks are cached and up-to-date.")
 
@@ -1848,16 +1889,18 @@ def main():
         # Step 4.5: Smooth technical gaps between vibe-compatible tracks.
         print_status(80, "Creating Sonic Bridges...")
         sb = max(SONIC_SIMILAR_LIMIT, len(middle) + 2) if middle else 20
-        final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb, similarity_cache=similarity_cache)
+        cache_keys_before_bridge = set(_essentia_cache.keys())
+        final_ordered_tracks = fill_sonic_gaps(final_ordered_tracks, limit=sb, similarity_cache=similarity_cache, meta_cache=meta_cache)
 
         # Final Log Update after bridging and smart truncation
         # Refresh meta_cache for any newly added bridge tracks
         for t in final_ordered_tracks:
             if t.ratingKey not in meta_cache:
                 meta_cache[t.ratingKey] = get_track_meta(t)
-        
+
         if ESSENTIA_ENABLED:
-            save_essentia_cache()
+            new_bridge_entries = {rk: _essentia_cache[rk] for rk in _essentia_cache if rk not in cache_keys_before_bridge}
+            _upsert_cache_entries(new_bridge_entries)
 
     # Define a default sb (sort breadth) in case the bridge block was skipped
     sb_log = max(SONIC_SIMILAR_LIMIT, len(final_ordered_tracks)) 
