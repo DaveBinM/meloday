@@ -59,7 +59,10 @@ def get_optimal_workers(task_type="cpu"):
             tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
-            assigned = min(16, logical + 4)
+            # Threads release the GIL during network waits, so we can run far more than
+            # the physical core count. Cap at 32 — enough to saturate Plex API throughput
+            # without risking overwhelming a co-hosted server.
+            assigned = min(32, logical + 4)
             tier_reason = "I/O Optimized (Network/Disk Bound)"
 
         else:
