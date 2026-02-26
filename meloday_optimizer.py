@@ -170,7 +170,11 @@ def run_optimizer():
             res = future.result()
             if res: results.append(res)
 
-        history = history_future.result()
+        try:
+            history = history_future.result(timeout=120)
+        except Exception:
+            log_msg("[WARN] History fetch timed out or failed. Play-ratio metrics will be unavailable.")
+            history = []
 
     unique_played = {entry.ratingKey for entry in history}
 
@@ -179,13 +183,14 @@ def run_optimizer():
         return
 
     # --- DIVERSITY & DENSITY ---
-    all_genres = [g for r in results for g in r['genres']]
-    N = len(all_genres)
-    diversity = 1 - (sum(n * (n - 1) for n in Counter(all_genres).values()) / (N * (N - 1))) if N > 1 else 0
+    # Build Counters directly from generators — avoids allocating intermediate flat lists.
+    genre_counter = Counter(g for r in results for g in r['genres'])
+    N = sum(genre_counter.values())
+    diversity = 1 - (sum(n * (n - 1) for n in genre_counter.values()) / (N * (N - 1))) if N > 1 else 0
 
-    all_styles = [s for r in results for s in r['styles']]
-    M = len(all_styles)
-    style_diversity = 1 - (sum(n * (n - 1) for n in Counter(all_styles).values()) / (M * (M - 1))) if M > 1 else 0
+    style_counter = Counter(s for r in results for s in r['styles'])
+    M = sum(style_counter.values())
+    style_diversity = 1 - (sum(n * (n - 1) for n in style_counter.values()) / (M * (M - 1))) if M > 1 else 0
 
     # Bucket-aware density logic (targeting usable pool)
     usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
@@ -207,7 +212,9 @@ def run_optimizer():
 
     # Pre-compute Essentia weights once — used in both output and auto-apply sections
     # to avoid rebuilding the same list comprehensions and re-running stdev/mean twice.
-    essentia_results_exist = any(r['has_essentia'] for r in results)
+    # essentia_hits is also needed for the cache warning below; compute both here.
+    essentia_hits = sum(1 for r in results if r['has_essentia'])
+    essentia_results_exist = essentia_hits > 0
     if essentia_results_exist:
         w_bpm    = get_weight([r['bpm'] for r in results], 0.12)
         w_energy = get_weight([abs(r['energy']) for r in results if r['energy']], 0.08)
@@ -217,32 +224,38 @@ def run_optimizer():
     # This is the "Universal Metric" that works from 5k to 150k tracks.
     play_ratio = len(unique_played) / max(1, total_count)
     
-    # 1. BEST EXCLUSION TIME (The FLOW Guard)
-    # Every 4% of depth adds 1 day. 
-    # Capped at 4 days to keep "Sonic Twins" available.
-    rec_exclude = min(4, max(1, round(play_ratio * 25)))
-    
-    # 2. BEST LOOKBACK TIME (The SEED Net)
-    # Scales smoothly from 120 days (low depth) down to 30 days (high depth).
-    # Logic: The more you listen, the faster your "vibe" changes, 
-    # so we need a shorter lookback to find relevant seeds.
-    rec_lookback = max(30, min(120, round(120 - (play_ratio * 300))))
+    if unique_played:
+        # 1. BEST EXCLUSION TIME (The FLOW Guard)
+        # Every 4% of depth adds 1 day.
+        # Capped at 4 days to keep "Sonic Twins" available.
+        rec_exclude = min(4, max(1, round(play_ratio * 25)))
+
+        # 2. BEST LOOKBACK TIME (The SEED Net)
+        # Scales smoothly from 120 days (low depth) down to 30 days (high depth).
+        # Logic: The more you listen, the faster your "vibe" changes,
+        # so we need a shorter lookback to find relevant seeds.
+        rec_lookback = max(30, min(120, round(120 - (play_ratio * 300))))
+    else:
+        # History unavailable — fall back to config.yml defaults
+        rec_exclude  = 3
+        rec_lookback = 60
 
     # --- CACHE WARNING ---
-    essentia_hits = sum(1 for r in results if r['has_essentia'])
     hit_rate = (essentia_hits / len(results)) * 100
     if hit_rate < 80 and ess_cfg.get("enabled", False):
         log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
         log_msg(f"    Recommendation: Run your analysis script before finalizing weights.")
 
-    # Summing bucket totals for distribution log
-    sum_ultra = sum(r['buckets']['ultra'] for r in results)
-    sum_strong = sum(r['buckets']['strong'] for r in results)
-    sum_logical = sum(r['buckets']['logical'] for r in results)
-    sum_loose = sum(r['buckets']['loose'] for r in results)
+    # Single-pass bucket summation
+    sum_ultra = sum_strong = sum_logical = sum_loose = 0
+    for r in results:
+        b = r['buckets']
+        sum_ultra   += b['ultra']
+        sum_strong  += b['strong']
+        sum_logical += b['logical']
+        sum_loose   += b['loose']
 
-    # Top styles for audit log
-    style_counter = Counter(all_styles)
+    # Top styles for audit log — reuse the Counter already built above
     top_styles = style_counter.most_common(5)
 
     # --- OUTPUT ---

@@ -188,8 +188,9 @@ def get_optimal_workers(task_type="cpu"):
                 # Slightly conservative for non-HT chips (ARM NAS, some AMD), but always safe.
                 physical = max(1, logical // 2) if logical > 2 else logical
                 source = "estimated"
-            # Leave 1 physical core free for the OS and Plex server.
-            assigned = max(1, physical - 1)
+            # Use all physical cores — the main process is idle (blocked on executor.map/as_completed)
+            # while workers run, so there is nothing to reserve a core for.
+            assigned = max(1, physical)
             tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
