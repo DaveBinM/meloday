@@ -163,73 +163,57 @@ def bulk_analyze():
     log_msg(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
 
     start_time = time.time()
+    last_save = start_time
     completed = 0
     # Accumulates only newly completed entries — avoids writing the entire cache
     # (which may contain hundreds of thousands of pre-existing entries) on each periodic save.
     pending_saves = {}
 
-    # 2. Maximize workers while managing memory via sliding window submission
+    # 2. Submit ALL tasks upfront — the executor's internal queue keeps workers busy
+    # without the overhead of a manual sliding-window refill loop.
     workers = get_optimal_workers(task_type="cpu")
-    to_process_iter = iter(to_process)
-    future_to_track = {}
 
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=workers,
-        max_tasks_per_child=50, # Increased to reduce worker restart overhead
+        max_tasks_per_child=100,  # Halves worker restart overhead vs the previous 50
         initializer=init_worker
     ) as executor:
+        futures = {executor.submit(analysis_worker, tid): tid for tid in to_process}
 
-        # Prime the pump: Submit an initial batch (workers * 4)
-        for _ in range(min(len(to_process), workers * 4)):
-            tid = next(to_process_iter)
-            future_to_track[executor.submit(analysis_worker, tid)] = tid
+        for future in concurrent.futures.as_completed(futures):
+            track_id = futures[future]
+            try:
+                rk, data, error = future.result(timeout=90)
 
-        # Process as they complete and refill the window
-        while future_to_track:
-            # Wait for at least one future to finish
-            done, _ = concurrent.futures.wait(
-                future_to_track.keys(),
-                return_when=concurrent.futures.FIRST_COMPLETED
-            )
-
-            for future in done:
-                track_id = future_to_track.pop(future)
-                try:
-                    # Retrieve result with existing timeout
-                    rk, data, error = future.result(timeout=90)
-
-                    if data:
-                        _essentia_cache[rk] = data
-                        pending_saves[rk] = data
-                        completed += 1
-                    elif error:
-                        log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
-                        completed += 1
-
-                except concurrent.futures.TimeoutError:
-                    log_msg(f"\n[TIMEOUT] Track {track_id} took too long. Skipping.", level="error")
+                if data:
+                    _essentia_cache[rk] = data
+                    pending_saves[rk] = data
                     completed += 1
-                except Exception as e:
-                    log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
+                elif error:
+                    log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
                     completed += 1
 
-                # IMMEDIATELY SUBMIT NEXT TASK to keep workers busy
-                try:
-                    next_tid = next(to_process_iter)
-                    future_to_track[executor.submit(analysis_worker, next_tid)] = next_tid
-                except StopIteration:
-                    pass
+            except concurrent.futures.TimeoutError:
+                log_msg(f"\n[TIMEOUT] Track {track_id} took too long. Skipping.", level="error")
+                completed += 1
+            except Exception as e:
+                log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
+                completed += 1
 
-                # Periodic Save: Upsert only newly completed entries every 100 completions
-                if completed % 100 == 0 and pending_saves:
-                    upsert_essentia_cache_entries(pending_saves)
-                    pending_saves.clear()
+            # Periodic Save: time-based (every 2 min) with a size cap safety valve.
+            # This is robust whether tasks complete in milliseconds (metadata sync)
+            # or minutes (full acoustic analysis).
+            now = time.time()
+            if pending_saves and (now - last_save >= 120 or len(pending_saves) >= 500):
+                upsert_essentia_cache_entries(pending_saves)
+                pending_saves.clear()
+                last_save = now
 
-                # Update Progress UI (Identical to original)
-                elapsed = time.time() - start_time
-                avg = elapsed / max(1, completed)
-                est = timedelta(seconds=int((num_to_process - completed) * avg))
-                log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
+            # Update Progress UI
+            elapsed = now - start_time
+            avg = elapsed / max(1, completed)
+            est = timedelta(seconds=int((num_to_process - completed) * avg))
+            log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
 
 
     # Final persistent save: flush any entries not yet written by a periodic save
