@@ -1,6 +1,7 @@
 import yaml
 import os
 import multiprocessing
+import functools
 import csv
 import statistics
 from plexapi.server import PlexServer
@@ -20,46 +21,37 @@ CURRENT_LIMIT = config["playlist"]["sonic_similarity_limit"]
 plex = PlexServer(PLEX_URL, PLEX_TOKEN)
 music = plex.library.section(MUSIC_LIBRARY)
 
+@functools.lru_cache(maxsize=None)
 def get_optimal_workers(task_type="cpu"):
     try:
-        # Detect logical threads (2, 22, or 24 on your specific CPUs)
         logical = os.cpu_count() or 1
-        tier_reason = "Fallback"
-        assigned = 4
-        
+
         if task_type == "cpu":
-            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
-            if logical <= 4:
-                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
-                assigned = 2
-            
-            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
-            elif 16 < logical <= 22:
-                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
-                assigned = logical - 8
-                
-            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
-            else:
-                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
-                assigned = logical - 2
+            try:
+                import psutil
+                physical = psutil.cpu_count(logical=False) or logical
+                source = "psutil"
+            except ImportError:
+                physical = max(1, logical // 2) if logical > 2 else logical
+                source = "estimated"
+            assigned = max(1, physical - 1)
+            tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
+            assigned = min(16, logical + 4)
             tier_reason = "I/O Optimized (Network/Disk Bound)"
-            assigned = min(32, logical + 4)
-        
-        else:
-            # Catch-all for typos in the task_type parameter
-            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
-            assigned = 4
 
-        # Final diagnostic print
+        else:
+            tier_reason = f"Unknown task_type '{task_type}' — using default fallback"
+            assigned = max(1, logical // 2)
+
         print(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
         print(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
-        
+
         return assigned
 
     except Exception as e:
-        print(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
+        print(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe fallback (2 workers).")
         return 2
 
 def check_track_neighborhood(track):

@@ -10,7 +10,7 @@ from meloday import (
     PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia,
     save_essentia_cache, ESSENTIA_ENABLED,
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
-    get_local_path, _migrate_json_to_sqlite
+    get_local_path, _migrate_json_to_sqlite, get_optimal_workers
 )
 
 # --- LOGGING SETUP ---
@@ -38,58 +38,14 @@ def log_msg(msg, level="info", log_only=False, **kwargs):
     if not msg: return
     clean_msg = "".join(ch for ch in str(msg) if ch.isprintable() or ch in ("\n", "\r", "\t"))
     clean_msg = clean_msg.replace('\x00', '')
-    
-    if not log_only: 
+
+    if not log_only:
         print(msg, **kwargs) # This now accepts end='\r'
-        
-    if level == "error": 
+
+    if level == "error":
         logger.error(clean_msg)
-    else: 
+    else:
         logger.info(clean_msg)
-
-# --- 0. OPTIMISE WORKER COUNT ---
-
-def get_optimal_workers(task_type="cpu"):
-    try:
-        # Detect logical threads (2, 22, or 24 on your specific CPUs)
-        logical = os.cpu_count() or 1
-        tier_reason = "Fallback"
-        assigned = 4
-        
-        if task_type == "cpu":
-            # --- TIER 1: Low-Power / Older (e.g., Atom C2338) ---
-            if logical <= 4:
-                tier_reason = "Tier 1: Low-Power / NAS (Limited cores)"
-                assigned = 2
-            
-            # --- TIER 2: High-End / Hybrid (e.g., Ultra 7 155H) ---
-            elif 16 < logical <= 22:
-                tier_reason = "Tier 2: Hybrid Architecture (Skipping LP cores)"
-                assigned = logical - 8
-                
-            # --- TIER 3: Flagship Desktop (e.g., Ultra 9 285K) ---
-            else:
-                tier_reason = "Tier 3: Standard / Flagship Desktop (High core count)"
-                assigned = logical - 2
-
-        elif task_type == "io":
-            tier_reason = "I/O Optimized (Network/Disk Bound)"
-            assigned = min(32, logical + 4)
-        
-        else:
-            # Catch-all for typos in the task_type parameter
-            tier_reason = f"Unknown task_type '{task_type}' - using default fallback"
-            assigned = 4
-
-        # Final diagnostic print
-        log_msg(f"[WORKER CONFIG] Mode: {task_type.upper()} | {tier_reason}")
-        log_msg(f"                Threads Detected: {logical} -> Assigned Workers: {assigned}")
-        
-        return assigned
-
-    except Exception as e:
-        log_msg(f"[WORKER CONFIG] ERROR: {e}. Defaulting to safe NAS fallback (2 workers).")
-        return 2
 
 # --- 1. CACHE UTILITIES ---
 
@@ -152,7 +108,7 @@ def analysis_worker(track_id):
     try:
         # Breadcrumb log to identify the file if the process hard-crashes
         logger.info(f"Attempting analysis on Track ID: {track_id}")
-        
+
         track = worker_plex.fetchItem(track_id)
         result = analyze_track_essentia(track)
         return str(track_id), result, None
@@ -168,17 +124,17 @@ def bulk_analyze():
         return
 
     log_msg(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
-    
+
     # Pre-load cache to filter processing list
     current_cache = load_essentia_cache_exclusive()
     _essentia_cache.update(current_cache)
-    
+
     # Fetch all tracks as a flat list
     local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
     music_section = local_plex_main.library.section(MUSIC_LIBRARY)
     log_msg("Fetching tracks from Plex... (This may take a minute)")
-    all_tracks = music_section.search(libtype='track') 
-    
+    all_tracks = music_section.search(libtype='track')
+
     # 1. Filter the processing list to avoid redundant work
     now_ts = datetime.now().timestamp()
     to_process = []
@@ -190,8 +146,11 @@ def bulk_analyze():
             to_process.append(t.ratingKey)
         else:
             last_sync = cached_data.get("last_synced", 0)
-            current_path = get_local_path(t)
-            if cached_data.get("file_path") != current_path or (now_ts - last_sync) > 604800:
+            # Check staleness first — stale tracks are reprocessed regardless of path,
+            # so we can skip the get_local_path() call entirely for them.
+            if (now_ts - last_sync) > 604800:
+                to_process.append(t.ratingKey)
+            elif cached_data.get("file_path") != get_local_path(t):
                 to_process.append(t.ratingKey)
 
     num_to_process = len(to_process)
@@ -203,20 +162,21 @@ def bulk_analyze():
 
     start_time = time.time()
     completed = 0
+    # Accumulates only newly completed entries — avoids writing the entire cache
+    # (which may contain hundreds of thousands of pre-existing entries) on each periodic save.
+    pending_saves = {}
 
-    # 2. Maximize workers while managing memory via worker-restarting (Python 3.11+)
-    # Workers restart after every 5 tracks to prevent memory bloat from accumulating
     # 2. Maximize workers while managing memory via sliding window submission
     workers = get_optimal_workers(task_type="cpu")
     to_process_iter = iter(to_process)
     future_to_track = {}
 
     with concurrent.futures.ProcessPoolExecutor(
-        max_workers=workers, 
+        max_workers=workers,
         max_tasks_per_child=50, # Increased to reduce worker restart overhead
-        initializer=init_worker 
+        initializer=init_worker
     ) as executor:
-        
+
         # Prime the pump: Submit an initial batch (workers * 4)
         for _ in range(min(len(to_process), workers * 4)):
             tid = next(to_process_iter)
@@ -226,7 +186,7 @@ def bulk_analyze():
         while future_to_track:
             # Wait for at least one future to finish
             done, _ = concurrent.futures.wait(
-                future_to_track.keys(), 
+                future_to_track.keys(),
                 return_when=concurrent.futures.FIRST_COMPLETED
             )
 
@@ -235,14 +195,15 @@ def bulk_analyze():
                 try:
                     # Retrieve result with existing timeout
                     rk, data, error = future.result(timeout=90)
-                    
+
                     if data:
                         _essentia_cache[rk] = data
+                        pending_saves[rk] = data
                         completed += 1
                     elif error:
                         log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
                         completed += 1
-                    
+
                 except concurrent.futures.TimeoutError:
                     log_msg(f"\n[TIMEOUT] Track {track_id} took too long. Skipping.", level="error")
                     completed += 1
@@ -257,19 +218,21 @@ def bulk_analyze():
                 except StopIteration:
                     pass
 
-                # Periodic Save: Upsert in-memory cache to SQLite every 100 completions
-                if completed % 100 == 0:
-                    upsert_essentia_cache_entries(_essentia_cache)
+                # Periodic Save: Upsert only newly completed entries every 100 completions
+                if completed % 100 == 0 and pending_saves:
+                    upsert_essentia_cache_entries(pending_saves)
+                    pending_saves.clear()
 
                 # Update Progress UI (Identical to original)
                 elapsed = time.time() - start_time
                 avg = elapsed / max(1, completed)
                 est = timedelta(seconds=int((num_to_process - completed) * avg))
                 log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
-            
 
-    # Final persistent save
-    save_essentia_cache()
+
+    # Final persistent save: flush any entries not yet written by a periodic save
+    if pending_saves:
+        upsert_essentia_cache_entries(pending_saves)
     log_msg(f"\n--- Success! Analysis and Sync complete. ---")
     log_msg(f"Total tracks in cache: {len(_essentia_cache)}")
 
