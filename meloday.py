@@ -110,6 +110,8 @@ SONIC_SIMILAR_LIMIT = MAX_TRACKS   # Sorting breadth always tracks playlist size
 HISTORICAL_RATIO = config["playlist"].get("historical_ratio", 0.3)
 GENRE_RATIO = config["playlist"].get("genre_ratio", 0.15)
 STYLE_RATIO = config["playlist"].get("style_ratio", 0.20)
+STYLE_TAG_DEPTH = config["playlist"].get("style_tag_depth", 1)  # How many style slots to check per track; set by optimizer
+ARTIST_RATIO = config["playlist"].get("artist_ratio", 0.05)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
@@ -424,9 +426,19 @@ def analyze_track_essentia(track):
         
         # Check if the file path has changed (e.g., quality upgrade) while keeping same ratingKey
         if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
-            # Backfill styles for cache entries that pre-date the styles column
-            if "styles" not in data:
+            # Backfill any tags missing or empty due to older cache entries.
+            # "styles" not in data won't catch entries where styles=[] (loaded from NULL),
+            # so check for falsy instead. Same applies to genres — older code used
+            # track.genres directly without the album/artist fallback.
+            backfilled = False
+            if not data.get("styles"):
                 data["styles"] = _resolve_tags(track, "styles")
+                backfilled = True
+            if not data.get("genres"):
+                data["genres"] = _resolve_tags(track, "genres")
+                backfilled = True
+            if backfilled:
+                data["last_synced"] = now_ts
             return data
 
         data["artist"] = norm_text(primary_artist(track_artist_name(track)))
@@ -1120,20 +1132,22 @@ def fetch_historical_tracks(period):
     # before popular tracks of the same style get a chance.
     random.shuffle(balanced_selection)
 
-    # Single-pass style/genre cap — mirrors process_tracks() exactly:
-    # primary style is the diversity axis; genre is the fallback for untagged tracks only.
+    # Single-pass style/genre cap — mirrors process_tracks() exactly.
+    # Checks up to STYLE_TAG_DEPTH style slots per track; rejects only if all checked
+    # styles are full; counts against all checked styles when accepted.
+    # Genre is the fallback for tracks with no style tags at all.
     max_style_limit = int(MAX_TRACKS * STYLE_RATIO)
     max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
     running_style = Counter()
     running_genre = Counter()
     capped = []
     for track in balanced_selection:
-        t_styles = _resolve_tags(track, "styles")
+        t_styles = _resolve_tags(track, "styles")[:STYLE_TAG_DEPTH]
         if t_styles:
-            ps = t_styles[0]
-            if running_style[ps] >= max_style_limit:
+            if any(running_style[s] >= max_style_limit for s in t_styles):
                 continue
-            running_style[ps] += 1
+            for s in t_styles:
+                running_style[s] += 1
         else:
             t_genres = _resolve_tags(track, "genres")
             if t_genres:
@@ -1266,7 +1280,7 @@ def process_tracks(tracks):
     artist_count = Counter()
     genre_count = Counter()
     style_count = Counter()
-    artist_limit = round(MAX_TRACKS * 0.05)
+    artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
     style_limit  = int(MAX_TRACKS * STYLE_RATIO)
     genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
 
@@ -1277,15 +1291,18 @@ def process_tracks(tracks):
                 continue
 
             # Styles are the primary diversity axis (more granular than genres).
+            # Check up to STYLE_TAG_DEPTH style slots per track — a track is rejected if
+            # ANY of its checked styles is already at the limit, giving a hard diversity cap.
+            # When accepted, counts against ALL checked styles so load spreads across buckets.
             # Genre is the fallback only when a track carries no styles at all.
-            track_styles = _resolve_tags(track, "styles")
+            track_styles = _resolve_tags(track, "styles")[:STYLE_TAG_DEPTH]
             track_genres = _resolve_tags(track, "genres")
 
             if track_styles:
-                primary_style = track_styles[0]
-                if style_count[primary_style] >= style_limit:
+                if any(style_count[s] >= style_limit for s in track_styles):
                     continue
-                style_count[primary_style] += 1
+                for s in track_styles:
+                    style_count[s] += 1
             elif track_genres:
                 primary_genre = track_genres[0]
                 if genre_count[primary_genre] >= genre_limit:
@@ -1605,15 +1622,18 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     
     # Track artist counts to respect global limits (matching process_tracks logic)
     artist_counts = Counter([norm_text(primary_artist(track_artist_name(t))) for t in path])
-    artist_limit = round(MAX_TRACKS * 0.05)
+    artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
 
-    # Track style/genre counts for soft diversity preference during bridge selection
+    # Track style/genre counts for soft diversity preference during bridge selection.
+    # Uses the same multi-depth logic as process_tracks(): count against all STYLE_TAG_DEPTH
+    # style slots per track so the over_limit check reflects true style saturation.
     style_counts = Counter()
     genre_counts = Counter()
     for _t in path:
-        _t_styles = _resolve_tags(_t, "styles")
+        _t_styles = _resolve_tags(_t, "styles")[:STYLE_TAG_DEPTH]
         if _t_styles:
-            style_counts[_t_styles[0]] += 1
+            for _s in _t_styles:
+                style_counts[_s] += 1
         else:
             _t_genres = _resolve_tags(_t, "genres")
             if _t_genres:
@@ -1690,10 +1710,11 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                     
                     # Logic: If both legs of the new path are better than the single original jump, it is a net improvement for the "flow."
                     if d1 < dist and d2 < dist:
-                        b_styles = _resolve_tags(bridge, "styles")
+                        b_styles = _resolve_tags(bridge, "styles")[:STYLE_TAG_DEPTH]
                         b_genres = _resolve_tags(bridge, "genres")
                         if b_styles:
-                            over_limit = style_counts[b_styles[0]] >= style_limit
+                            # over_limit if ANY checked style slot is saturated (hard cap)
+                            over_limit = any(style_counts[s] >= style_limit for s in b_styles)
                         elif b_genres:
                             over_limit = genre_counts[b_genres[0]] >= genre_limit
                         else:
@@ -1723,7 +1744,8 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                     existing_keys.add(best_bridge.ratingKey)
                     artist_counts[b_artist_norm] += 1
                     if b_styles:
-                        style_counts[b_styles[0]] += 1
+                        for _s in b_styles:
+                            style_counts[_s] += 1
                     elif b_genres:
                         genre_counts[b_genres[0]] += 1
                 else:
