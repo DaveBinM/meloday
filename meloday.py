@@ -112,6 +112,7 @@ GENRE_RATIO = config["playlist"].get("genre_ratio", 0.15)
 STYLE_RATIO = config["playlist"].get("style_ratio", 0.20)
 STYLE_TAG_DEPTH = config["playlist"].get("style_tag_depth", 1)  # How many style slots to check per track; set by optimizer
 ARTIST_RATIO = config["playlist"].get("artist_ratio", 0.05)
+MOOD_RATIO = config["playlist"].get("mood_ratio", 0.35)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
 SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
 
@@ -1067,15 +1068,32 @@ def fetch_historical_tracks(period):
         elif entry.viewedAt.hour in period_hours:
             filtered_entries.append(entry)
 
-    # If no historical tracks found, fallback
+    # If no historical tracks found, try adjacent periods before falling back to all history
     if not filtered_entries:
-        log_text("[SELECTION] No direct daypart matches found. Attempting generic history fallback.")
-        fallback_entries = [
+        all_periods = list(time_periods.keys())
+        period_idx = all_periods.index(period)
+        prev_idx = (period_idx - 1) % len(all_periods)
+        next_idx = (period_idx + 1) % len(all_periods)
+        adjacent_hours = (
+            set(time_periods[all_periods[prev_idx]]["hours"]) |
+            set(time_periods[all_periods[next_idx]]["hours"])
+        )
+        adjacent_entries = [
             entry for entry in all_history
             if entry.ratingKey not in excluded_keys
+            and entry.viewedAt.hour in adjacent_hours
         ]
-        if fallback_entries:
-            filtered_entries = fallback_entries
+        if adjacent_entries:
+            log_text("[SELECTION] No direct daypart matches. Using adjacent-period history fallback.")
+            filtered_entries = adjacent_entries
+        else:
+            log_text("[SELECTION] No daypart/adjacent matches found. Attempting generic history fallback.")
+            fallback_entries = [
+                entry for entry in all_history
+                if entry.ratingKey not in excluded_keys
+            ]
+            if fallback_entries:
+                filtered_entries = fallback_entries
 
     # --- OPTIMIZED BULK METADATA RESOLUTION ---
     # 1. Identify unique ratingKeys to avoid redundant API hits
@@ -1132,16 +1150,22 @@ def fetch_historical_tracks(period):
     # before popular tracks of the same style get a chance.
     random.shuffle(balanced_selection)
 
-    # Single-pass style/genre cap — mirrors process_tracks() exactly.
-    # Checks up to STYLE_TAG_DEPTH style slots per track; rejects only if all checked
-    # styles are full; counts against all checked styles when accepted.
+    # Single-pass mood/style/genre cap — mirrors process_tracks() exactly.
+    # Mood is checked first (primary vibe consistency axis); style and genre follow.
+    # Checks up to STYLE_TAG_DEPTH style slots per track; rejects only if any checked
+    # style is full; counts against all checked styles when accepted.
     # Genre is the fallback for tracks with no style tags at all.
+    max_mood_limit  = int(MAX_TRACKS * MOOD_RATIO)
     max_style_limit = int(MAX_TRACKS * STYLE_RATIO)
     max_genre_limit = int(MAX_TRACKS * GENRE_RATIO)
+    running_mood  = Counter()
     running_style = Counter()
     running_genre = Counter()
     capped = []
     for track in balanced_selection:
+        t_moods = _resolve_tags(track, "moods")
+        if t_moods and running_mood[t_moods[0]] >= max_mood_limit:
+            continue
         t_styles = _resolve_tags(track, "styles")[:STYLE_TAG_DEPTH]
         if t_styles:
             if any(running_style[s] >= max_style_limit for s in t_styles):
@@ -1155,6 +1179,8 @@ def fetch_historical_tracks(period):
                 if running_genre[pg] >= max_genre_limit:
                     continue
                 running_genre[pg] += 1
+        if t_moods:
+            running_mood[t_moods[0]] += 1
         capped.append(track)
     if len(capped) < len(balanced_selection):
         log_text(f"[SELECTION] Style/genre balancing trimmed {len(balanced_selection) - len(capped)} tracks from history pool.")
@@ -1275,12 +1301,14 @@ def process_tracks(tracks):
 
     deduped_tracks = [best_by_key[k] for k in key_order]
 
-    # Phase 2: enforce artist + style (primary) / genre (fallback) balance
+    # Phase 2: enforce artist + mood (vibe) + style (primary) / genre (fallback) balance
     unique_tracks = []
     artist_count = Counter()
-    genre_count = Counter()
-    style_count = Counter()
+    mood_count   = Counter()
+    genre_count  = Counter()
+    style_count  = Counter()
     artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
+    mood_limit   = int(MAX_TRACKS * MOOD_RATIO)
     style_limit  = int(MAX_TRACKS * STYLE_RATIO)
     genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
 
@@ -1288,6 +1316,12 @@ def process_tracks(tracks):
         try:
             artist_name = norm_text(primary_artist(track_artist_name(track)))
             if artist_count[artist_name] >= artist_limit:
+                continue
+
+            # Mood is the vibe-consistency axis — checked before style/genre so no single
+            # mood dominates the playlist. Primary mood only (depth=1).
+            track_moods = _resolve_tags(track, "moods")
+            if track_moods and mood_count[track_moods[0]] >= mood_limit:
                 continue
 
             # Styles are the primary diversity axis (more granular than genres).
@@ -1309,6 +1343,8 @@ def process_tracks(tracks):
                     continue
                 genre_count[primary_genre] += 1
 
+            if track_moods:
+                mood_count[track_moods[0]] += 1
             artist_count[artist_name] += 1
             unique_tracks.append(track)
         except Exception as e:
@@ -1624,12 +1660,16 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     artist_counts = Counter([norm_text(primary_artist(track_artist_name(t))) for t in path])
     artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
 
-    # Track style/genre counts for soft diversity preference during bridge selection.
+    # Track mood/style/genre counts for soft diversity preference during bridge selection.
     # Uses the same multi-depth logic as process_tracks(): count against all STYLE_TAG_DEPTH
     # style slots per track so the over_limit check reflects true style saturation.
+    mood_counts  = Counter()
     style_counts = Counter()
     genre_counts = Counter()
     for _t in path:
+        _t_moods = _resolve_tags(_t, "moods")
+        if _t_moods:
+            mood_counts[_t_moods[0]] += 1
         _t_styles = _resolve_tags(_t, "styles")[:STYLE_TAG_DEPTH]
         if _t_styles:
             for _s in _t_styles:
@@ -1638,7 +1678,8 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
             _t_genres = _resolve_tags(_t, "genres")
             if _t_genres:
                 genre_counts[_t_genres[0]] += 1
-    style_limit = int(MAX_TRACKS * STYLE_RATIO)
+    mood_limit   = int(MAX_TRACKS * MOOD_RATIO)
+    style_limit  = int(MAX_TRACKS * STYLE_RATIO)
     genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
     
     now = datetime.now()
@@ -1719,6 +1760,10 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                             over_limit = genre_counts[b_genres[0]] >= genre_limit
                         else:
                             over_limit = False
+                        # Also apply mood soft preference: deprioritise bridges that push a mood over limit
+                        b_moods = _resolve_tags(bridge, "moods")
+                        if b_moods and mood_counts[b_moods[0]] >= mood_limit:
+                            over_limit = True
                         # Tuple sorts within-limits first (0), over-limits second (1), then by flow score
                         candidates.append((int(over_limit), d1 + d2, bridge, b_identity, b_artist_norm, b_styles, b_genres))
 
