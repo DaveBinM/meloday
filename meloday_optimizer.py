@@ -150,14 +150,15 @@ def run_optimizer():
     if os.path.exists(cache_path):
         try:
             conn = sqlite3.connect(cache_path, timeout=10)
-            for row in conn.execute("SELECT rating_key, bpm, energy, year, styles, genres FROM essentia_cache"):
-                rk, bpm, energy, year, styles_json, genres_json = row
+            for row in conn.execute("SELECT rating_key, bpm, energy, year, styles, genres, moods FROM essentia_cache"):
+                rk, bpm, energy, year, styles_json, genres_json, moods_json = row
                 cache_data[rk] = {
                     "bpm":    bpm,
                     "energy": energy,
                     "year":   year,
-                    "styles": json.loads(styles_json)  if styles_json  else [],
-                    "genres": json.loads(genres_json)  if genres_json  else [],
+                    "styles": json.loads(styles_json) if styles_json else [],
+                    "genres": json.loads(genres_json) if genres_json else [],
+                    "moods":  json.loads(moods_json)  if moods_json  else [],
                 }
             conn.close()
         except Exception:
@@ -183,6 +184,23 @@ def run_optimizer():
                 style_tag_counts.append(n_genres)
 
     style_median_per_track = statistics.median(style_tag_counts) if style_tag_counts else 4
+
+    # --- MOOD METRICS FROM CACHE ---
+    # Count mood tags per track (tracks with no moods are excluded — they bypass mood caps).
+    # mood_counter drives diversity, distinct count, and the anti-starvation floor.
+    # mood_coverage_pct tells us how much of the library the mood cap will actually affect.
+    mood_tag_counts = []
+    mood_counter = Counter()
+    for entry in cache_data.values():
+        track_moods = entry.get("moods", [])
+        if track_moods:
+            mood_tag_counts.append(len(track_moods))
+            for m in track_moods:
+                mood_counter[m] += 1
+
+    mood_median_per_track = statistics.median(mood_tag_counts) if mood_tag_counts else 3
+    mood_tagged = sum(1 for entry in cache_data.values() if entry.get("moods"))
+    mood_coverage_pct = (mood_tagged / max(1, len(cache_data))) * 100
 
     sample_size = get_args()
     all_tracks = music.searchTracks()
@@ -286,6 +304,21 @@ def run_optimizer():
     # Capped at 0.10 — a playlist shouldn't lean heavily on one artist even if the library is small.
     rec_artist_ratio = round(min(0.10, max(2.0 / MAX_TRACKS_CFG, 0.04)), 2)
 
+    # MOOD RATIO: caps any single primary mood to prevent vibe monotony.
+    # n_moods = expected distinct mood slots needed, anchored to median mood tags per track.
+    # Capped at MAX_TRACKS_CFG // 4 so the limit stays meaningful on small playlists.
+    n_moods = max(3, min(round(mood_median_per_track * 2), MAX_TRACKS_CFG // 4))
+    rec_mood_ratio = round(max(0.20, 1.0 / n_moods), 2)
+
+    # Anti-starvation floor: if very few distinct moods exist, the cap can't be so tight
+    # it prevents a full playlist from being built. 1.5× headroom, ceiling at 0.50.
+    num_distinct_moods = len(mood_counter)
+    if num_distinct_moods > 0:
+        mood_starvation_floor = round(min(1.5 / num_distinct_moods, 0.50), 2)
+        if mood_starvation_floor > rec_mood_ratio:
+            rec_mood_ratio = mood_starvation_floor
+            log_msg(f" [NOTE] mood_ratio raised to {rec_mood_ratio} (anti-starvation: only {num_distinct_moods} distinct moods detected).", log_only=True)
+
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
     # Pre-compute Essentia weights once — used in both output and auto-apply sections
@@ -357,6 +390,14 @@ def run_optimizer():
         log_msg(f"\n[NOTE] {bpm_doubles} tracks have BPM ≥ 250 — likely Essentia tempo-doubling artefacts.")
         log_msg(f"       These may skew bpm_weight slightly. Re-analyze affected tracks to correct.")
 
+    # Mood coverage: if very few cached tracks have mood tags, mood enforcement will only
+    # apply to that fraction of the playlist. Warn when coverage is low so users understand
+    # that mood_ratio will have limited impact until pre_analyze.py populates more moods.
+    if ess_cfg.get("enabled", False) and mood_coverage_pct < 20:
+        log_msg(f"\n[NOTE] Only {mood_coverage_pct:.1f}% of cached tracks have mood tags.")
+        log_msg(f"       mood_ratio enforcement will only affect this portion of the playlist.")
+        log_msg(f"       Re-run pre_analyze.py to improve mood coverage.")
+
 
     # Single-pass bucket summation
     sum_ultra = sum_strong = sum_logical = sum_loose = 0
@@ -388,6 +429,17 @@ def run_optimizer():
     else:
         log_msg("  (No style tags found — consider tagging your library)", log_only=True)
 
+    top_moods = mood_counter.most_common(5)
+    log_msg("\n" + "="*50, log_only=True)
+    log_msg(f" MOOD COVERAGE: {mood_coverage_pct:.1f}% ({mood_tagged} of {len(cache_data)} cached tracks)", log_only=True)
+    log_msg(f" Distinct moods: {num_distinct_moods} | Median mood tags per track: {mood_median_per_track:.1f} → n_moods target: {n_moods}", log_only=True)
+    if top_moods:
+        log_msg(" Top Moods in Library:", log_only=True)
+        for mood, count in top_moods:
+            log_msg(f"  {mood}: {count}", log_only=True)
+    else:
+        log_msg("  (No mood tags found — re-run pre_analyze.py to populate)", log_only=True)
+
     log_msg("\n" + "="*50)
     log_msg(" RECOMMENDED CONFIGURATION")
     log_msg("="*50)
@@ -400,6 +452,7 @@ def run_optimizer():
     log_msg(f"  style_tag_depth: {rec_style_tag_depth}         (check this many style slots per track; based on median {style_median_per_track:.1f} styles/track)")
     log_msg(f"  genre_ratio: {rec_genre_ratio}       (fallback only — applies to tracks with no style tags)")
     log_msg(f"  artist_ratio: {rec_artist_ratio}      (≤{round(MAX_TRACKS_CFG * rec_artist_ratio)} of {MAX_TRACKS_CFG} tracks per artist)")
+    log_msg(f"  mood_ratio: {rec_mood_ratio}         (≤{round(MAX_TRACKS_CFG * rec_mood_ratio)} of {MAX_TRACKS_CFG} tracks per mood; {mood_coverage_pct:.0f}% coverage)")
     log_msg(f"  sonic_similarity_distance: {rec_dist}")
 
     if essentia_results_exist:
@@ -420,6 +473,7 @@ def run_optimizer():
         config['playlist']['style_ratio'] = rec_style_ratio
         config['playlist']['style_tag_depth'] = rec_style_tag_depth
         config['playlist']['artist_ratio'] = rec_artist_ratio
+        config['playlist']['mood_ratio'] = rec_mood_ratio
         config['playlist']['sonic_similarity_distance'] = rec_dist
 
         if ess_cfg.get("enabled", False) and essentia_results_exist:
