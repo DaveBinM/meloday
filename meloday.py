@@ -567,7 +567,6 @@ def _album_in_collection(album, collection_name: str) -> bool:
                 album.reload()
             except Exception as e:
                 m_print(f"[WARN] Error reloading album {album.title}: {e}")
-                pass
         
         tags = album.get("collections") if isinstance(album, dict) else getattr(album, "collections", None)
         return _tag_list_contains(tags, collection_name)
@@ -674,7 +673,6 @@ def track_artist_name(track) -> str:
             return at.strip()
     except Exception as e:
         m_print(f"[WARN] Error resolving artist for track {track.title}: {e}")
-        pass
 
     # If we still can't tell, return whatever grandparentTitle we had (even if VA), or 'unknown'.
     if isinstance(gp, str) and gp.strip():
@@ -748,7 +746,6 @@ def album_meta(track) -> dict:
                             meta["album_subtype"] = tag.strip()
                     except Exception as e:
                         m_print(f"[WARN] Failed to query raw XML for album subtype ({track.title}): {e}")
-                        pass
                 
                 # Store only what we need in a lean dict for both caches
                 if album_key:
@@ -766,7 +763,6 @@ def album_meta(track) -> dict:
                     }
     except Exception as e:
         m_print(f"[WARN] Error fetching metadata for {track.title}: {e}")
-        pass
 
     _album_meta_cache[cache_key] = meta
     return meta
@@ -817,7 +813,7 @@ _COMPILATION_TITLE_RE = re.compile(
     r"music\s+from\s+the\s+(?:motion\s+picture|film)|"
     r"various\s+artists|"
     r"greatest\s+hits|best\s+of|"
-    r"anthology|compilation"
+    r"anthology|compilation|"
     r"triple\s*j"
     r")\b",
     re.IGNORECASE,
@@ -907,7 +903,7 @@ def better_copy(a, b):
     b_dist = getattr(b, "sonic_distance", 0.00)
     if abs(a_dist - b_dist) > 0.08:
         winner = a if a_dist < b_dist else b
-        d_print(f"[DEDUPE] Sonic Priority: Kept '{winner.title}' ({winner.ratingKey}) due to distance ({min(a_dist, b_dist):.3f}).") #
+        d_print(f"[DEDUPE] Sonic Priority: Kept '{winner.title}' ({winner.ratingKey}) due to distance ({min(a_dist, b_dist):.3f}).")
         return winner
 
     # 1) Prefer studio albums
@@ -915,7 +911,7 @@ def better_copy(a, b):
     b_studio = is_studio_album(b)
     if a_studio != b_studio:
         winner = a if a_studio else b
-        d_print(f"[DEDUPE] Format Priority: Kept '{winner.title}' (Studio Album preferred).") #
+        d_print(f"[DEDUPE] Format Priority: Kept '{winner.title}' (Studio Album preferred).")
         return winner
 
     # 2) Prefer the "plain/original" title within the same dedupe key
@@ -923,7 +919,7 @@ def better_copy(a, b):
     b_rank = title_variant_rank(b)
     if a_rank != b_rank:
         winner = a if a_rank < b_rank else b
-        d_print(f"[DEDUPE] Variant Priority: Kept '{winner.title}' (Original title preferred over edit/remix).") #
+        d_print(f"[DEDUPE] Variant Priority: Kept '{winner.title}' (Original title preferred over edit/remix).")
         return winner
 
     # 3) Prefer non-remix album titles (e.g., 'Changa' over 'Go Bang (Remixes) - EP')
@@ -931,7 +927,7 @@ def better_copy(a, b):
     b_pen = remix_album_penalty(b)
     if a_pen != b_pen:
         winner = a if a_pen < b_pen else b
-        d_print(f"[DEDUPE] Album Penalty Priority: Kept '{winner.title}' (Non-remix collection preferred).") #
+        d_print(f"[DEDUPE] Album Penalty Priority: Kept '{winner.title}' (Non-remix collection preferred).")
         return winner
 
     # Pre-fetch meta once
@@ -1042,7 +1038,7 @@ def fetch_historical_tracks(period):
     history_start = now - timedelta(days=HISTORY_LOOKBACK_DAYS)
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
 
-    log_text(f"[SELECTION] Scanning history for period '{period}' (Lookback: {HISTORY_LOOKBACK_DAYS} days).") #
+    log_text(f"[SELECTION] Scanning history for period '{period}' (Lookback: {HISTORY_LOOKBACK_DAYS} days).")
 
     all_history = list(music_section.history(mindate=history_start))
 
@@ -1061,7 +1057,7 @@ def fetch_historical_tracks(period):
 
     # If no historical tracks found, fallback
     if not filtered_entries:
-        log_text("[SELECTION] No direct daypart matches found. Attempting generic history fallback.") #
+        log_text("[SELECTION] No direct daypart matches found. Attempting generic history fallback.")
         fallback_entries = [
             entry for entry in all_history
             if entry.ratingKey not in excluded_keys
@@ -1190,19 +1186,18 @@ def filter_low_rated_tracks(tracks):
             track_rating = getattr(track, "userRating", None)
 
             if artist_rating is not None and artist_rating <= 4:
-                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Artist rating is low ({artist_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Artist rating is low ({artist_rating}).")
                 continue
             if album_rating is not None and album_rating <= 4:
-                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Album rating is low ({album_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: Album rating is low ({album_rating}).")
                 continue
             if track_rating is not None and track_rating <= 4:
-                d_print(f"[EXCLUSION] Track '{track.title}' skipped: User rating is low ({track_rating}).") #
+                d_print(f"[EXCLUSION] Track '{track.title}' skipped: User rating is low ({track_rating}).")
                 continue
 
             filtered.append(track)
         except Exception as e:
             m_print(f"  [!] Warning: Could not check rating for '{track.title}' - {e}. Skipping filter.")
-            pass
     return filtered
 
 @functools.lru_cache(maxsize=None)
@@ -1303,16 +1298,22 @@ def process_tracks(tracks):
             m_print(f"[WARN] Error enforcing limits for {track.title}: {e}")
             continue
 
-    log_text(f"[DEDUPE] Pool processed. Kept {len(unique_tracks)} unique tracks after deduplication and balance checks.") #
+    log_text(f"[DEDUPE] Pool processed. Kept {len(unique_tracks)} unique tracks after deduplication and balance checks.")
     return unique_tracks
 
 def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
-    """Fetch sonically similar tracks while ensuring recently played tracks are removed."""
+    """
+    Fetches Plex sonicallySimilar candidates for each seed track in parallel,
+    populates the global sonic distance cache, then filters out recently played,
+    excluded, low-rated, and already-selected tracks.
+
+    Returns a deduplicated list of candidate tracks ready for process_tracks().
+    """
     similar_tracks = []
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
 
-    log_text(f"[SONIC] Searching similarities for {len(reference_tracks)} seed tracks.") #
+    log_text(f"[SONIC] Searching similarities for {len(reference_tracks)} seed tracks.")
 
     def _fetch_one(track):
         try:
@@ -1345,12 +1346,12 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
             # Exclude if it was played recently
             if last_played and last_played >= exclude_start:
-                d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).") #
+                d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).")
                 continue
 
             # Exclude if it's already in the excluded keys
             if excluded_keys and s.ratingKey in excluded_keys:
-                d_print(f"[SONIC] Skipping '{s.title}': Already in selection/history list.") #
+                d_print(f"[SONIC] Skipping '{s.title}': Already in selection/history list.")
                 continue
 
             filtered_similars.append(s)
@@ -1366,10 +1367,22 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 # --- OPTIMIZED SONIC SORTING LOGIC ---
 def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT):
     """
-    Calculates a normalized distance between 0.0 and 1.0.
-    0.0 = Identical | 1.0 = Completely Dissimilar
-    Uses an exponential penalty for attribute jumps to maximize flow.
+    Calculates a normalized distance between two tracks, 0.0 (identical) to 1.0 (dissimilar).
+
+    Distance sources in priority order:
+      1. Global sonic cache (_global_sonic_cache) — pre-computed Plex distances
+      2. Local similarity_cache — built during the current sort pass
+      3. Synthetic fallback — estimated from shared moods/styles/genres/era
+
+    Essentia weights (BPM, key, energy, era) are added on top using squared penalties,
+    which makes large jumps disproportionately costly compared to small drifts.
+    A 'bridge bonus' (-0.08) rewards BPM/key-compatible cross-genre transitions.
+    An artist penalty (+0.5) enforces hard separation between same-artist tracks.
     """
+    # Safety: if either key is absent from meta_cache, return a neutral distance
+    if ka not in meta_cache or kb not in meta_cache:
+        return 0.20
+
     # 1. Check for raw sonic distance in global cache first
     base_dist = _global_sonic_cache.get(ka, {}).get(kb, None)
     
@@ -1452,15 +1465,29 @@ def write_transition_log(full_path, similarity_cache, meta_cache, limit=SONIC_SI
         m_print(f"[WARN] Failed to write transition log: {e}")
 
 def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONIC_SIMILAR_LIMIT):
-    """Combines Double-Ended Greedy + 2-opt refinement with metadata fallbacks for blind spots."""
+    """
+    Orders `tracks` into the smoothest possible sonic path between first_track and last_track.
+
+    Algorithm (two phases):
+      1. Double-ended greedy: at each step, picks the remaining track whose combined
+         'distance from current' + 'lookahead distance to end' is lowest.
+         The 0.3 lookahead weight nudges the path toward the intended endpoint without
+         being so strong that it pulls every track toward the end too early.
+      2. 2-opt refinement: repeatedly reverses sub-sequences of the path when doing so
+         reduces total cost. Uses a cubic penalty (d**3 * 20) for any edge > 0.4 distance
+         so the optimizer strongly prefers eliminating hard jumps over minor smoothing.
+
+    Returns (ordered_path, similarity_cache, meta_cache) — always a 3-tuple.
+    """
     if not tracks:
-        return []
+        return [], {}, {}  # Always return a 3-tuple so callers can unpack safely
 
     all_involved = tracks + [first_track, last_track]
     similarity_cache = {}
     meta_cache = {}
 
-    # Pre-calculate metadata (fast; _resolve_tags uses caching so album/artist fallback is O(1) after first hit)
+    # Pre-compute metadata for all tracks once. _resolve_tags is cached, so
+    # album/artist fallback calls are O(1) on subsequent tracks from the same album/artist.
     for track in all_involved:
         t_key = track.ratingKey
         ec = _essentia_cache.get(str(t_key), {})
@@ -1502,10 +1529,12 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
     current_key = first_track.ratingKey
     end_key = last_track.ratingKey
 
-    log_text(f"[ORDERING] Initializing Greedy path (Start: '{first_track.title}', End: '{last_track.title}').") #
+    log_text(f"[ORDERING] Initializing Greedy path (Start: '{first_track.title}', End: '{last_track.title}').")
 
     while remaining:
-        # Score = Distance from Current + (Distance to End * 0.3)
+        # Greedy score = distance from current + (0.3 × distance to end).
+        # The lookahead nudges the path toward the endpoint without fully committing
+        # every step to it — pure greedy would tunnel straight to the end too early.
         best_idx, best_track = min(
             enumerate(remaining),
             key=lambda x: _adj(current_key, x[1].ratingKey) +
@@ -1519,13 +1548,15 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
     # --- 2. 2-OPT REFINEMENT WITH JUMP PENALTY ---
     def edge_cost(ka, kb):
         d = _adj(ka, kb)
+        # Cubic penalty makes hard jumps (>0.4) catastrophically expensive,
+        # so the optimizer aggressively eliminates them over minor smoothing gains.
         return (d ** 3) * 20 if d > 0.4 else d
 
     def total_cost(p):
         full_path = [first_track] + p + [last_track]
         return sum(edge_cost(full_path[i].ratingKey, full_path[i+1].ratingKey) for i in range(len(full_path) - 1))
 
-    start_cost = total_cost(path) #
+    start_cost = total_cost(path)
     n = len(path)
     improved = True
     while improved:
@@ -1540,8 +1571,8 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
                     path[i:j + 1] = path[i:j + 1][::-1]
                     improved = True
 
-    end_cost = total_cost(path) #
-    log_text(f"[ORDERING] 2-opt refinement complete. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.") #
+    end_cost = total_cost(path)
+    log_text(f"[ORDERING] 2-opt refinement complete. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.")
     
     return path, similarity_cache, meta_cache
 
@@ -1696,10 +1727,9 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                     elif b_genres:
                         genre_counts[b_genres[0]] += 1
                 else:
-                    log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.") #
+                    log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.")
             except Exception as e: 
                 m_print(f"  [ERR] Bridge error: {e}")
-                pass
                 
     final_path.append(path[-1])
 
@@ -1734,8 +1764,8 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
             # Remove the "least essential" track for sonic flow
             if best_remove_idx != -1:
-                removed_track = final_path[best_remove_idx] #
-                log_text(f"[BRIDGE] Removed '{removed_track.title}' to minimize sonic impact during truncation.") #
+                removed_track = final_path[best_remove_idx]
+                log_text(f"[BRIDGE] Removed '{removed_track.title}' to minimize sonic impact during truncation.")
                 final_path.pop(best_remove_idx)
 
         m_print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
@@ -1884,7 +1914,7 @@ def create_or_update_playlist(name, tracks, description, cover_file):
             m_print(f"[OK] Uploaded poster: {new_cover}")
         except Exception as e:
             m_print("[WARN] Poster upload failed (playlist still created):")
-            log_text(f"[WARN] Poster upload failed: {str(e)}") #
+            log_text(f"[WARN] Poster upload failed: {str(e)}")
     else:
         m_print(f"[WARN] Cover file not found: {cover_path}")
 
@@ -1905,7 +1935,7 @@ def main():
     global plex
     plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
 
-    log_text("=== MELODAY RUN STARTED ===") #
+    log_text("=== MELODAY RUN STARTED ===")
 
     # NEW: Run environment validation
     if not validate_environment():
@@ -2038,7 +2068,7 @@ def main():
     title, desc = generate_playlist_title_and_description(period, final_ordered_tracks)
     create_or_update_playlist(title, final_ordered_tracks, desc, time_periods[period]['cover'])
     print_status(100, "Playlist creation/update complete!")
-    log_text("=== MELODAY RUN COMPLETED SUCCESSFULLY ===") #
+    log_text("=== MELODAY RUN COMPLETED SUCCESSFULLY ===")
 
 if __name__ == "__main__":
     main()
