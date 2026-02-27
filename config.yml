@@ -26,7 +26,9 @@ playlist:
 
   historical_ratio: 0.40                            # The max % of tracks sourced from listening history for each playlist
   style_ratio: 0.20                                 # The max % of tracks from a single style (e.g. "Emo", "Indie Rock") in the final playlist. Primary diversity axis.
+  style_tag_depth: 1                                # How many of a track's style tags to check against the cap. 1 = primary style only; higher = multi-dimensional balancing. Optimizer sets this from your library's median style count.
   genre_ratio: 0.12                                 # Fallback cap: only applies to tracks that carry no style tags at all
+  artist_ratio: 0.05                                # The max % of tracks from a single artist. Ensures no artist dominates the playlist.
   sonic_similarity_limit: 100                       # Candidate pool size per seed track — higher is more accurate but slower. Optimizer tunes this to your library density. Floor is 2× max_tracks.
   sonic_similarity_distance: 0.20                   # Maximum similarity distance for sonic matching (lower = stricter). The Plex max is 0.25; 0.20 excludes the loosest "loose" matches.
 
