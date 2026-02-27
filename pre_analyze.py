@@ -17,7 +17,11 @@ from meloday import (
 LOG_FILE = os.path.join(BASE_DIR, "logs", "pre_analyze.log")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
-file_handler = logging.FileHandler(LOG_FILE, mode='w', encoding='utf-8')
+# Spawned worker processes re-import this module from scratch. Using mode='w' in a
+# worker would truncate the log file. Main process uses 'w' (fresh log each run);
+# all other processes use 'a' so worker breadcrumb entries are preserved.
+_log_mode = 'w' if multiprocessing.current_process().name == 'MainProcess' else 'a'
+file_handler = logging.FileHandler(LOG_FILE, mode=_log_mode, encoding='utf-8')
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 logger = logging.getLogger("PreAnalyze")
@@ -31,6 +35,24 @@ worker_plex = None
 def init_worker():
     """Initializes a single Plex session per worker process."""
     global worker_plex
+    # Raise the soft FD limit to the hard limit. Essentia's native C++ decoders can leak
+    # file descriptors during audio analysis. On Linux the default soft limit (1024) can
+    # be exhausted after several hundred tracks per worker, causing the result pipe write
+    # to block and hanging the future with no visible error.
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if soft < hard:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+    except Exception:
+        pass
+    # Pre-load the Essentia cache into this worker's memory. Spawned workers start clean
+    # and do NOT inherit _essentia_cache from the parent. Without this,
+    # analyze_track_essentia() always falls through to full acoustic analysis
+    # (MonoLoader + RhythmExtractor2013 etc.) even for tracks that only need a fast
+    # metadata backfill — turning a ~1 s tag update into a ~60 s C++ analysis.
+    current_cache = load_essentia_cache_exclusive()
+    _essentia_cache.update(current_cache)
     worker_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
 
 def log_msg(msg, level="info", log_only=False, **kwargs):
@@ -100,6 +122,9 @@ def upsert_essentia_cache_entries(entries):
 
 # --- 2. WORKER WRAPPER ---
 
+def _sigalrm_handler(signum, frame):
+    raise TimeoutError("Essentia analysis exceeded per-track time limit")
+
 def analysis_worker(track_id):
     """
     Worker function to fetch and analyze a single track.
@@ -112,7 +137,22 @@ def analysis_worker(track_id):
         logger.info(f"Attempting analysis on Track ID: {track_id}")
 
         track = worker_plex.fetchItem(track_id)
-        result = analyze_track_essentia(track)
+
+        # Per-track timeout: Essentia's C++ decoders and os.path.exists() on stalled
+        # network mounts can block indefinitely without raising an exception. SIGALRM
+        # fires in this worker's main thread and converts the hang into a catchable
+        # TimeoutError, skipping just this track rather than freezing the whole pool
+        # until the pool-level HANG_TIMEOUT fires. SIGALRM is Unix-only; on other
+        # platforms the pool-level HANG_TIMEOUT remains the backstop.
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, _sigalrm_handler)
+            signal.alarm(90)
+        try:
+            result = analyze_track_essentia(track)
+        finally:
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+
         return str(track_id), result, None
     except Exception as e:
         return str(track_id), None, str(e)
@@ -172,6 +212,12 @@ def bulk_analyze():
 
     log_msg(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
 
+    # Pre-build a ratingKey → local file path map for the tracks we're about to process.
+    # Used only for diagnostic logging when a hung worker is detected — avoids needing
+    # Plex API calls at the point of failure.
+    to_process_set = set(to_process)
+    track_path_map = {t.ratingKey: get_local_path(t) for t in all_tracks if t.ratingKey in to_process_set}
+
     start_time = time.time()
     last_save = start_time
     completed = 0
@@ -183,47 +229,89 @@ def bulk_analyze():
     # without the overhead of a manual sliding-window refill loop.
     workers = get_optimal_workers(task_type="cpu")
 
-    with concurrent.futures.ProcessPoolExecutor(
+    # HANG DETECTION: as_completed() blocks indefinitely if a worker is stuck in native
+    # Essentia C++ code (e.g. a malformed audio file). The per-future result(timeout=90)
+    # never fires because as_completed() never yields a future that hasn't completed yet.
+    # Replacing with wait() + a pool-level timeout lets us detect and escape a hung pool.
+    # We also avoid the `with` context manager so __exit__ doesn't block on hung workers.
+    HANG_TIMEOUT = 120  # seconds without ANY completion before declaring the pool hung
+
+    # CROSS-PLATFORM PROCESS ISOLATION: 'spawn' starts each worker as a clean Python
+    # interpreter on all platforms (Windows, macOS, Linux). It avoids the fork-after-
+    # threads deadlock that Linux's default 'fork' method can cause when forking from a
+    # multi-threaded parent. Workers pre-load the Essentia cache in init_worker() since
+    # spawned processes do not inherit the parent's in-memory state.
+    mp_ctx = multiprocessing.get_context('spawn')
+
+    # max_tasks_per_child is intentionally omitted. With uniform-duration tasks (e.g.
+    # metadata backfill completing in ~1-2 s each), all N workers hit their per-child
+    # limit at exactly the same time (N × limit completions), causing a simultaneous
+    # restart stall that HANG_TIMEOUT misidentifies as a hang. Workers live for the
+    # full run; memory growth is negligible for the fast backfill path.
+    executor = concurrent.futures.ProcessPoolExecutor(
         max_workers=workers,
-        max_tasks_per_child=100,  # Halves worker restart overhead vs the previous 50
-        initializer=init_worker
-    ) as executor:
+        initializer=init_worker,
+        mp_context=mp_ctx
+    )
+    try:
         futures = {executor.submit(analysis_worker, tid): tid for tid in to_process}
 
-        for future in concurrent.futures.as_completed(futures):
-            track_id = futures[future]
-            try:
-                rk, data, error = future.result(timeout=90)
+        pending = set(futures.keys())
+        while pending:
+            done, pending = concurrent.futures.wait(
+                pending, timeout=HANG_TIMEOUT,
+                return_when=concurrent.futures.FIRST_COMPLETED
+            )
 
-                if data:
-                    _essentia_cache[rk] = data
-                    pending_saves[rk] = data
+            if not done:
+                # No future completed within HANG_TIMEOUT — all remaining workers are hung.
+                stuck_ids = [futures[f] for f in pending]
+                log_msg(
+                    f"\n[HUNG] No progress for {HANG_TIMEOUT}s. "
+                    f"Skipping {len(stuck_ids)} stuck track(s). "
+                    f"Check pre_analyze.log for file details.",
+                    level="error"
+                )
+                for stuck_id in stuck_ids:
+                    path = track_path_map.get(stuck_id, "path unknown")
+                    logger.error(f"[HUNG] Stuck: Track ID={stuck_id} | File={path}")
+                completed += len(stuck_ids)
+                break
+
+            for future in done:
+                track_id = futures[future]
+                try:
+                    rk, data, error = future.result()  # already done — returns immediately
+
+                    if data:
+                        _essentia_cache[rk] = data
+                        pending_saves[rk] = data
+                        completed += 1
+                    elif error:
+                        log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
+                        completed += 1
+
+                except Exception as e:
+                    log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
                     completed += 1
-                elif error:
-                    log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
-                    completed += 1
 
-            except concurrent.futures.TimeoutError:
-                log_msg(f"\n[TIMEOUT] Track {track_id} took too long. Skipping.", level="error")
-                completed += 1
-            except Exception as e:
-                log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
-                completed += 1
+                # Periodic Save: time-based (every 2 min) with a size cap safety valve.
+                now = time.time()
+                if pending_saves and (now - last_save >= 120 or len(pending_saves) >= 500):
+                    upsert_essentia_cache_entries(pending_saves)
+                    pending_saves.clear()
+                    last_save = now
 
-            # Periodic Save: time-based (every 2 min) with a size cap safety valve.
-            # This is robust whether tasks complete in milliseconds (metadata sync)
-            # or minutes (full acoustic analysis).
-            now = time.time()
-            if pending_saves and (now - last_save >= 120 or len(pending_saves) >= 500):
-                upsert_essentia_cache_entries(pending_saves)
-                pending_saves.clear()
-                last_save = now
+                # Update Progress UI
+                elapsed = now - start_time
+                avg = elapsed / max(1, completed)
+                est = timedelta(seconds=int((num_to_process - completed) * avg))
+                log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
 
-            # Update Progress UI
-            elapsed = now - start_time
-            avg = elapsed / max(1, completed)
-            est = timedelta(seconds=int((num_to_process - completed) * avg))
-            log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
+    finally:
+        # wait=False: don't block on any workers that may still be running (e.g. hung ones).
+        # The worker processes are children of this process and will be cleaned up on exit.
+        executor.shutdown(wait=False)
 
 
     # Final persistent save: flush any entries not yet written by a periodic save
