@@ -120,7 +120,17 @@ def analysis_worker(track_id):
 # --- 3. CORE ANALYSIS LOGIC ---
 
 def bulk_analyze():
-    """Iterates through the entire library to perform deep acoustic analysis."""
+    """
+    Scans the full Plex library and runs Essentia acoustic analysis on every unanalysed
+    or stale track. Staleness is defined as either:
+      - Not present in the cache at all, or
+      - last_synced is more than 7 days ago (metadata may have changed), or
+      - file_path has changed (track was moved/remounted).
+
+    Uses a ProcessPoolExecutor so Essentia's CPU-bound analysis runs in true parallel.
+    Results are saved periodically (every 2 min or 500 entries) to limit data loss
+    if the process is interrupted.
+    """
     if not ESSENTIA_ENABLED:
         log_msg("[ERROR] Essentia is not installed or enabled. Analysis cannot proceed.")
         return

@@ -55,7 +55,7 @@ def get_optimal_workers(task_type="cpu"):
             except ImportError:
                 physical = max(1, logical // 2) if logical > 2 else logical
                 source = "estimated"
-            assigned = max(1, physical - 1)
+            assigned = max(1, physical)
             tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
 
         elif task_type == "io":
@@ -89,6 +89,12 @@ def get_args():
     except ValueError: return DEFAULT_SAMPLE_SIZE
 
 def get_track_data(track, cache_data):
+    """
+    Collects sonic neighbourhood data for a single track — called in parallel across the sample.
+    Fetches up to 500 sonic neighbours from Plex, buckets them by distance, and merges
+    any available Essentia acoustic data (BPM, energy, year) from the local cache.
+    Returns None on any failure so the caller can safely skip it.
+    """
     try:
         rk = str(track.ratingKey)
         similar = track.sonicallySimilar(limit=500)
