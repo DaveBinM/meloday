@@ -1684,29 +1684,71 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
-    
+
+    # Cross-gap rejection cache: tracks that failed a static filter (exclusion label,
+    # seasonal, low rating) are skipped immediately in subsequent gap searches without
+    # re-running any API calls. Context-dependent checks (already in playlist, artist
+    # count, recency) are intentionally NOT cached since they change as bridges are added.
+    bridge_rejected_rks = set()
+
+    # Phase 1: Pre-scan all adjacent pairs to identify gaps and cache per-pair metadata.
+    # get_adj_dist() uses only local lookups; this cheap pass lets us submit bridge
+    # pre-fetches for exact gap positions before entering the evaluation loop.
+    pre_dist   = {}
+    pre_m_cache = {}
+    gap_order  = []
+    for _i in range(len(path) - 1):
+        _t1, _t2 = path[_i], path[_i + 1]
+        _mc = {
+            _t1.ratingKey: (meta_cache.get(_t1.ratingKey) if meta_cache else None) or get_track_meta(_t1),
+            _t2.ratingKey: (meta_cache.get(_t2.ratingKey) if meta_cache else None) or get_track_meta(_t2),
+        }
+        _d = get_adj_dist(_t1.ratingKey, _t2.ratingKey, similarity_cache, _mc, limit)
+        pre_dist[_i]    = _d
+        pre_m_cache[_i] = _mc
+        if _d > 0.4:
+            gap_order.append(_i)
+
+    # Phase 2 — 1-ahead bridge pre-fetch with a single background thread.
+    #
+    # A single worker submits sonicallySimilar() calls to Plex back-to-back (one at
+    # a time — same server load as sequential).  Because the executor starts the next
+    # fetch immediately when the previous one completes, the fetch latency for gap i+1
+    # overlaps with our candidate-evaluation work for gap i.
+    #
+    # Unlike fully-parallel pre-fetch (which overwhelms Plex, seen in testing),
+    # this keeps at most ONE sonicallySimilar() request in-flight at any moment.
+    # Savings ≈ min(T_eval, T_fetch) per gap — typically 15–30 s for a 15-gap playlist.
+    _gap_futures: dict = {}
+    _bridge_exe = concurrent.futures.ThreadPoolExecutor(max_workers=1) if gap_order else None
+    if _bridge_exe:
+        for _gidx in gap_order:
+            _gap_futures[_gidx] = _bridge_exe.submit(
+            )
+
     for i in range(len(path) - 1):
         t1, t2 = path[i], path[i+1]
         final_path.append(t1)
-        
-        # Check distance between the two songs — reuse pre-computed metadata where available
-        m_cache = {
-            t1.ratingKey: (meta_cache.get(t1.ratingKey) if meta_cache else None) or get_track_meta(t1),
-            t2.ratingKey: (meta_cache.get(t2.ratingKey) if meta_cache else None) or get_track_meta(t2),
-        }
-        dist = get_adj_dist(t1.ratingKey, t2.ratingKey, similarity_cache, m_cache, limit)
-        
+
+        m_cache = pre_m_cache[i]
+        dist    = pre_dist[i]
+
         if dist > 0.4:
-            log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} (Gap: {dist:.3f}). Searching for candidate...")#
+            log_text(f"[BRIDGE] Gap detected: {t1.title} -> {t2.title} (Gap: {dist:.3f}). Searching for candidate...")
 
             t1_artist_norm = norm_text(primary_artist(track_artist_name(t1)))
             t2_artist_norm = norm_text(primary_artist(track_artist_name(t2)))
 
             try:
-                # Search Plex for tracks similar to the first song
-                potential_bridges = t1.sonicallySimilar(limit=SONIC_SIMILARITY_SEARCH_LIMIT)
+                # Retrieve pre-fetched results from the background thread.
+                # .result() blocks only if the fetch isn't done yet (rare for later gaps).
+                potential_bridges = _gap_futures[i].result()
                 candidates = [] # Collector for Best-Fit
                 for bridge in potential_bridges:
+
+                    # A0. CROSS-GAP REJECTION CACHE — cheapest possible check
+                    if bridge.ratingKey in bridge_rejected_rks:
+                        continue
 
                     # A. FAST ARTIST & IDENTITY CHECK
                     if bridge.ratingKey in existing_keys:
@@ -1714,7 +1756,12 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         continue
 
                     # C. FAST EXCLUSION CHECK
-                    if not filter_excluded_tracks(filter_low_rated_tracks([bridge])):
+                    # Order matters: filter_excluded_tracks is O(1) set lookup (no API calls).
+                    # filter_low_rated_tracks makes track.artist() API calls on cache misses.
+                    # Running the fast check first means excluded tracks (noshare, seasonal)
+                    # are dropped before any network round-trip is ever made.
+                    if not filter_low_rated_tracks(filter_excluded_tracks([bridge])):
+                        bridge_rejected_rks.add(bridge.ratingKey)
                         d_print(f"  [!] Skipping '{bridge.title}': Failed exclusion/rating filters.")
                         continue
 
@@ -1795,9 +1842,14 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         genre_counts[b_genres[0]] += 1
                 else:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.")
-            except Exception as e: 
+            except Exception as e:
                 m_print(f"  [ERR] Bridge error: {e}")
-                
+
+    # Shut down the 1-ahead pre-fetch executor now that all gaps have been evaluated.
+    # wait=False: any in-flight requests (shouldn't be any) finish in the background.
+    if _bridge_exe is not None:
+        _bridge_exe.shutdown(wait=False)
+
     final_path.append(path[-1])
 
     # Smart Truncation Logic to stay within MAX_TRACKS
