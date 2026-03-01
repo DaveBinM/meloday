@@ -1724,6 +1724,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     if _bridge_exe:
         for _gidx in gap_order:
             _gap_futures[_gidx] = _bridge_exe.submit(
+                path[_gidx].sonicallySimilar, SONIC_SIMILARITY_SEARCH_LIMIT
             )
 
     for i in range(len(path) - 1):
