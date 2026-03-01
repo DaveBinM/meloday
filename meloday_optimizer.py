@@ -256,7 +256,7 @@ def run_optimizer():
 
     # Bucket-aware density logic (targeting usable pool)
     usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
-    rec_limit = min(int(statistics.quantiles(usable_counts, n=100)[84]), 500) if usable_counts else 150
+    rec_limit = min(int(statistics.quantiles(usable_counts, n=100)[84]), 500, int(4.5 * MAX_TRACKS_CFG)) if usable_counts else min(150, int(4.5 * MAX_TRACKS_CFG))
     rec_dist = min(round(statistics.median([d for r in results for d in r['distances']]) if results else 0.20, 2), 0.25)
 
     def get_weight(data_list, base_val):
@@ -269,8 +269,12 @@ def run_optimizer():
     # HISTORICAL RATIO: how much of the playlist can come from listening history.
     # Shorter playlists benefit from more history to feel personal; longer ones need
     # fresh sonic exploration to avoid repetition.
-    # Scales from ~0.45 (small playlist) down to ~0.20 (large playlist).
-    rec_hist_ratio = round(max(0.15, 0.50 - (MAX_TRACKS_CFG * 0.005) - (diversity * 0.10)), 2)
+    # Scales from ~0.45 (small playlist) down to a hard floor of 0.30 (large playlist).
+    # Floor raised from 0.15 → 0.30: at least 30% of tracks must come from actual listening
+    # history to preserve temporal personalisation (the core Daylist-like signal) at all sizes.
+    # In large libraries (100k–300k tracks) where even heavy listeners cover <5% of content,
+    # the history pool per daypart is still comfortably deep enough to fill this floor.
+    rec_hist_ratio = round(max(0.30, 0.50 - (MAX_TRACKS_CFG * 0.005) - (diversity * 0.10)), 2)
 
     # GENRE RATIO: genres are now purely a fallback for tracks with no style tags.
     # Fixed at 0.10 — no need to tune based on diversity; the style cap does that work.
@@ -307,8 +311,11 @@ def run_optimizer():
     # MOOD RATIO: caps any single primary mood to prevent vibe monotony.
     # n_moods = expected distinct mood slots needed, anchored to median mood tags per track.
     # Capped at MAX_TRACKS_CFG // 4 so the limit stays meaningful on small playlists.
+    # Floor raised from 0.20 → 0.33: allows one mood to run through ~1/3 of the playlist,
+    # matching Daylist's "one dominant vibe" character. At 0.20, the cap forced distribution
+    # across 5+ moods regardless of playlist size — working against temporal coherence.
     n_moods = max(3, min(round(mood_median_per_track * 2), MAX_TRACKS_CFG // 4))
-    rec_mood_ratio = round(max(0.20, 1.0 / n_moods), 2)
+    rec_mood_ratio = round(max(0.33, 1.0 / n_moods), 2)
 
     # Anti-starvation floor: if very few distinct moods exist, the cap can't be so tight
     # it prevents a full playlist from being built. 1.5× headroom, ceiling at 0.50.
@@ -335,21 +342,35 @@ def run_optimizer():
         # Centering gives a meaningful CoV: e.g. stdev=12, mean_from_1950=61 → CoV=0.20.
         w_era    = get_weight([r['year'] - 1950 for r in results if r['year']], 0.03)
     
-    # Play Ratio: The % of your library explored in 3 months.
-    # This is the "Universal Metric" that works from 5k to 150k tracks.
-    play_ratio = len(unique_played) / max(1, total_count)
-    
+    # Two signals used for exclusion and lookback recommendations:
+    #   play_ratio   — coverage: % of library explored in 3 months.
+    #                  Used for lookback: small/active libraries need a shorter window
+    #                  so the playlist reflects current taste, not stale history.
+    #   daily_unique — frequency: average unique tracks played per day.
+    #                  Scale-independent; provides an uplift for heavy listeners.
+    play_ratio   = len(unique_played) / max(1, total_count)
+    daily_unique = len(unique_played) / 90
+
     if unique_played:
         # 1. BEST EXCLUSION TIME (The FLOW Guard)
-        # Every 4% of depth adds 1 day.
-        # Capped at 4 days to keep "Sonic Twins" available.
-        rec_exclude = min(4, max(1, round(play_ratio * 25)))
+        # Scaled directly from rec_limit — the actual sonic neighbour count.
+        # A higher rec_limit means more bridge/sonic candidates are available, so a
+        # longer exclusion window is safe (more variety, less repetition).
+        # A lower rec_limit means fewer candidates, so exclusion stays short to avoid
+        # starving bridging and sonic similarity searches.
+        # 1 + round(rec_limit / 75) maps the typical 50–225 candidate range to 2–4 days.
+        # Floor of 2: minimum freshness — no track on consecutive days.
+        # Cap of 5: beyond this, sparse daypart pools risk running low.
+        rec_exclude = min(7, max(2, 1 + round(rec_limit / 75)))
 
         # 2. BEST LOOKBACK TIME (The SEED Net)
-        # Scales smoothly from 120 days (low depth) down to 30 days (high depth).
-        # Logic: The more you listen, the faster your "vibe" changes,
-        # so we need a shorter lookback to find relevant seeds.
-        rec_lookback = max(30, min(120, round(120 - (play_ratio * 300))))
+        # Scales from 90 days (sparse/large library needs full depth) down to 30 days
+        # (small/active library: recent taste matters more than long history).
+        # Takes the stronger penalty from either signal so both large-library heavy
+        # listeners and small-library active listeners get an appropriately short window.
+        # Capped at 90 to match the optimizer's own history fetch window — recommending
+        # more than 90 days would be inconsistent with the data actually analysed.
+        rec_lookback = max(30, min(90, round(90 - max(play_ratio * 300, daily_unique * 0.5))))
     else:
         # History unavailable — fall back to config.yml defaults
         rec_exclude  = 3
