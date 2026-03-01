@@ -172,21 +172,13 @@ def run_optimizer():
     MAX_TRACKS_CFG = config['playlist'].get('max_tracks', 50)
 
     # --- STYLE MEDIAN FROM CACHE ---
-    # For every cached track, count how many style tags it has.
-    # If a track has no styles, backfill with its genre count instead.
-    # Tracks with neither styles nor genres are ignored — they carry no diversity signal.
-    # The median of this distribution becomes the anchor for rec_style_ratio:
-    # a higher median means listeners already see diverse styles → we can afford a tighter cap.
-    style_tag_counts = []
-    for entry in cache_data.values():
-        n_styles = len(entry.get("styles", []))
-        if n_styles > 0:
-            style_tag_counts.append(n_styles)
-        else:
-            n_genres = len(entry.get("genres", []))
-            if n_genres > 0:
-                style_tag_counts.append(n_genres)
-
+    # Count style tags only for tracks that actually have styles.
+    # Genre counts are intentionally excluded — genres (typically 1–2 per track) and styles
+    # (typically 4–10 per track) are different tag systems with different distributions.
+    # Mixing them would drag the median down and cause rec_style_tag_depth and rec_style_ratio
+    # to understate how many style slots styled tracks actually carry.
+    # If no styled tracks exist in the cache, the default of 4 is used as a safe fallback.
+    style_tag_counts = [len(entry["styles"]) for entry in cache_data.values() if entry.get("styles")]
     style_median_per_track = statistics.median(style_tag_counts) if style_tag_counts else 4
 
     # --- GENRE AND STYLE DIVERSITY FROM CACHE ---
