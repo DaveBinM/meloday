@@ -89,16 +89,16 @@ def get_args():
     try: return int(arg)
     except ValueError: return DEFAULT_SAMPLE_SIZE
 
-def get_track_data(track, cache_data):
+def get_track_data(track, cache_data, limit=500):
     """
     Collects sonic neighbourhood data for a single track — called in parallel across the sample.
-    Fetches up to 500 sonic neighbours from Plex, buckets them by distance, and merges
+    Fetches up to `limit` sonic neighbours from Plex, buckets them by distance, and merges
     any available Essentia acoustic data (BPM, energy, year) from the local cache.
     Returns None on any failure so the caller can safely skip it.
     """
     try:
         rk = str(track.ratingKey)
-        similar = track.sonicallySimilar(limit=500)
+        similar = track.sonicallySimilar(limit=limit)
         technical = cache_data.get(rk, {})
         
         buckets = {"ultra": 0, "strong": 0, "logical": 0, "loose": 0}
@@ -116,11 +116,15 @@ def get_track_data(track, cache_data):
             "usable_neighbors": buckets["ultra"] + buckets["strong"] + buckets["logical"],
             "buckets": buckets,
             "distances": distances,
-            "genres": [g.tag for g in track.genres],
-            "styles": [s.tag for s in getattr(track, "styles", [])],
-            "bpm": technical.get("bpm"),
+            # Prefer cache for all metadata — it's already in memory and avoids
+            # redundant attribute access on Plex objects. Fall back to the Plex
+            # track object for tracks not yet in the Essentia cache.
+            "genres": technical.get("genres") or [g.tag for g in track.genres],
+            "styles": technical.get("styles") or [s.tag for s in getattr(track, "styles", [])],
+            "moods":  technical.get("moods",  []),
+            "bpm":    technical.get("bpm"),
             "energy": technical.get("energy"),
-            "year": technical.get("year") or track.year,
+            "year":   technical.get("year") or track.year,
             "has_essentia": rk in cache_data
         }
     except Exception: return None
@@ -185,6 +189,19 @@ def run_optimizer():
 
     style_median_per_track = statistics.median(style_tag_counts) if style_tag_counts else 4
 
+    # --- GENRE AND STYLE DIVERSITY FROM CACHE ---
+    # Built from ALL cached tracks for maximum accuracy — not just the sonic sample.
+    # These Counters drive global diversity scoring, anti-starvation floors, and
+    # the audit log output. style_tag_counts (above) drives the per-track median logic.
+    genre_counter = Counter(g for entry in cache_data.values() for g in entry.get("genres", []))
+    style_counter = Counter(s for entry in cache_data.values() for s in entry.get("styles", []))
+
+    N = sum(genre_counter.values())
+    diversity = 1 - (sum(n * (n - 1) for n in genre_counter.values()) / (N * (N - 1))) if N > 1 else 0
+
+    M = sum(style_counter.values())
+    style_diversity = 1 - (sum(n * (n - 1) for n in style_counter.values()) / (M * (M - 1))) if M > 1 else 0
+
     # --- MOOD METRICS FROM CACHE ---
     # Count mood tags per track (tracks with no moods are excluded — they bypass mood caps).
     # mood_counter drives diversity, distinct count, and the anti-starvation floor.
@@ -227,7 +244,8 @@ def run_optimizer():
             music.history, mindate=datetime.now() - timedelta(days=90)
         )
 
-        futures = {executor.submit(get_track_data, t, cache_data): t for t in target_tracks}
+        sonic_sample_limit = int(4.5 * MAX_TRACKS_CFG)
+        futures = {executor.submit(get_track_data, t, cache_data, sonic_sample_limit): t for t in target_tracks}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(target_tracks), desc="Analyzing"):
             res = future.result()
             if res: results.append(res)
@@ -244,16 +262,7 @@ def run_optimizer():
         log_msg("No data collected. Check Plex connection.", level="error")
         return
 
-    # --- DIVERSITY & DENSITY ---
-    # Build Counters directly from generators — avoids allocating intermediate flat lists.
-    genre_counter = Counter(g for r in results for g in r['genres'])
-    N = sum(genre_counter.values())
-    diversity = 1 - (sum(n * (n - 1) for n in genre_counter.values()) / (N * (N - 1))) if N > 1 else 0
-
-    style_counter = Counter(s for r in results for s in r['styles'])
-    M = sum(style_counter.values())
-    style_diversity = 1 - (sum(n * (n - 1) for n in style_counter.values()) / (M * (M - 1))) if M > 1 else 0
-
+    # --- SONIC DENSITY ---
     # Bucket-aware density logic (targeting usable pool)
     usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
     rec_limit = min(int(statistics.quantiles(usable_counts, n=100)[84]), 500, int(4.5 * MAX_TRACKS_CFG)) if usable_counts else min(150, int(4.5 * MAX_TRACKS_CFG))
@@ -328,19 +337,20 @@ def run_optimizer():
 
     rec_key_weight = 0.20 if diversity < 0.4 else 0.15
 
-    # Pre-compute Essentia weights once — used in both output and auto-apply sections
-    # to avoid rebuilding the same list comprehensions and re-running stdev/mean twice.
-    # essentia_hits is also needed for the cache warning below; compute both here.
+    # Pre-compute Essentia weights from the full cache — more stable than a random sample
+    # because BPM/energy/era variation is a library-wide property, not a sample property.
+    # A biased sample could easily under-represent certain BPM ranges or eras and skew CoV.
+    # essentia_hits remains sample-based — it's only used for the hit_rate diagnostic below.
     essentia_hits = sum(1 for r in results if r['has_essentia'])
-    essentia_results_exist = essentia_hits > 0
+    essentia_results_exist = any(entry.get('bpm') for entry in cache_data.values())
     if essentia_results_exist:
-        w_bpm    = get_weight([r['bpm'] for r in results], 0.12)
-        w_energy = get_weight([abs(r['energy']) for r in results if r['energy']], 0.08)
+        w_bpm    = get_weight([entry['bpm']    for entry in cache_data.values() if entry.get('bpm')],    0.12)
+        w_energy = get_weight([abs(entry['energy']) for entry in cache_data.values() if entry.get('energy')], 0.08)
         # Centre years around 1950 before computing CoV.
         # Raw years (mean ≈ 2011) give CoV ≈ 0.006 — nearly zero — so the formula
         # would always return the base value of 0.03 regardless of era spread.
         # Centering gives a meaningful CoV: e.g. stdev=12, mean_from_1950=61 → CoV=0.20.
-        w_era    = get_weight([r['year'] - 1950 for r in results if r['year']], 0.03)
+        w_era    = get_weight([entry['year'] - 1950 for entry in cache_data.values() if entry.get('year')], 0.03)
     
     # Two signals used for exclusion and lookback recommendations:
     #   play_ratio   — coverage: % of library explored in 3 months.
@@ -360,7 +370,7 @@ def run_optimizer():
         # starving bridging and sonic similarity searches.
         # 1 + round(rec_limit / 75) maps the typical 50–225 candidate range to 2–4 days.
         # Floor of 2: minimum freshness — no track on consecutive days.
-        # Cap of 5: beyond this, sparse daypart pools risk running low.
+        # Cap of 7: beyond this, sparse daypart pools risk running low.
         rec_exclude = min(7, max(2, 1 + round(rec_limit / 75)))
 
         # 2. BEST LOOKBACK TIME (The SEED Net)
@@ -377,38 +387,45 @@ def run_optimizer():
         rec_lookback = 60
 
     # --- CACHE WARNINGS ---
+    # hit_rate: % of the sonic sample covered by the Essentia cache.
+    # Low coverage means sonicallySimilar() results are being evaluated with less acoustic context,
+    # which may reduce the accuracy of rec_limit and rec_dist recommendations.
     hit_rate = (essentia_hits / len(results)) * 100
     if hit_rate < 80 and ess_cfg.get("enabled", False):
-        log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of tracks are analyzed. Weights may be inaccurate.")
-        log_msg(f"    Recommendation: Run your analysis script before finalizing weights.")
+        log_msg(f"\n[!] WARNING: Only {hit_rate:.1f}% of the sonic sample is in the Essentia cache.")
+        log_msg(f"    rec_limit and rec_dist may be less reliable. Run pre_analyze.py to improve coverage.")
 
     # Style coverage: if the styles column is unpopulated, the style diversity system
     # is entirely non-functional — every track falls through to the genre fallback.
     # This happens when pre_analyze.py was run before the styles column was added.
-    style_hit_rate = (sum(1 for r in results if r.get('styles')) / len(results)) * 100
+    # Computed from the full cache (not the sample) to match style_counter and diversity,
+    # and to avoid false positives from the Plex-object fallback in get_track_data().
+    style_hit_rate = (sum(1 for entry in cache_data.values() if entry.get('styles')) / max(1, len(cache_data))) * 100
     if style_hit_rate == 0:
-        log_msg(f"\n[!] WARNING: 0% of sampled tracks have style tags in the Essentia cache.")
+        log_msg(f"\n[!] WARNING: 0% of cached tracks have style tags in the Essentia cache.")
         log_msg(f"    Style diversity is using genre as a fallback for every track.")
         log_msg(f"    Re-run pre_analyze.py to populate style tags and unlock multi-dimensional diversity.")
     elif style_hit_rate < 50:
-        log_msg(f"\n[!] WARNING: Only {style_hit_rate:.1f}% of sampled tracks have style tags.")
+        log_msg(f"\n[!] WARNING: Only {style_hit_rate:.1f}% of cached tracks have style tags.")
         log_msg(f"    Style diversity will be unreliable. Consider re-running pre_analyze.py.")
 
     # Untagged track rate: tracks with neither style nor genre bypass all diversity caps.
     # A high untagged rate means the playlist could be dominated by untagged content
     # (e.g. film/game scores) regardless of the style/genre ratios set.
-    untagged = sum(1 for r in results if not r.get('styles') and not r.get('genres'))
-    untagged_pct = (untagged / len(results)) * 100
+    # Computed from the full cache — matches the coverage of genre_counter/style_counter.
+    untagged = sum(1 for entry in cache_data.values() if not entry.get('styles') and not entry.get('genres'))
+    untagged_pct = (untagged / max(1, len(cache_data))) * 100
     if untagged_pct > 30:
-        log_msg(f"\n[NOTE] {untagged_pct:.1f}% of sampled tracks have no style or genre tags.")
+        log_msg(f"\n[NOTE] {untagged_pct:.1f}% of cached tracks have no style or genre tags.")
         log_msg(f"       These tracks bypass all diversity caps. Consider tagging your library,")
         log_msg(f"       or increasing style_ratio/genre_ratio to compensate.")
 
     # BPM doubles: Essentia sometimes detects tempo at 2× the true value for slow tracks.
     # These inflate the BPM distribution and skew bpm_weight calculations.
-    bpm_doubles = sum(1 for r in results if r.get('bpm') and r['bpm'] >= 250)
+    # Computed from the full cache for a complete picture of the artefact rate.
+    bpm_doubles = sum(1 for entry in cache_data.values() if entry.get('bpm') and entry['bpm'] >= 250)
     if bpm_doubles > 0:
-        log_msg(f"\n[NOTE] {bpm_doubles} tracks have BPM ≥ 250 — likely Essentia tempo-doubling artefacts.")
+        log_msg(f"\n[NOTE] {bpm_doubles} cached tracks have BPM ≥ 250 — likely Essentia tempo-doubling artefacts.")
         log_msg(f"       These may skew bpm_weight slightly. Re-analyze affected tracks to correct.")
 
     # Mood coverage: if very few cached tracks have mood tags, mood enforcement will only
