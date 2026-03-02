@@ -1821,15 +1821,26 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         continue
 
                     # D. METADATA & DISTANCE CHECK
-                    bm = get_track_meta(bridge)
+                    # Resolve tags once — fast path via _essentia_cache, API fallback via _resolve_tags.
+                    # This avoids the 3 duplicate _resolve_tags() calls that get_track_meta() + the
+                    # diversity-check block would otherwise make for the same bridge candidate.
+                    ec_b = _essentia_cache.get(str(bridge.ratingKey), {})
+                    b_styles = list(ec_b.get("styles") or _resolve_tags(bridge, "styles"))[:STYLE_TAG_DEPTH]
+                    b_genres = list(ec_b.get("genres") or _resolve_tags(bridge, "genres"))
+                    b_moods  = list(ec_b.get("moods")  or _resolve_tags(bridge, "moods"))
+                    bm = {
+                        "artist": ec_b.get("artist") or norm_text(primary_artist(track_artist_name(bridge))),
+                        "genres": set(b_genres),
+                        "moods":  set(b_moods),
+                        "styles": set(b_styles),
+                        "year":   ec_b.get("year") or getattr(bridge, "year", None),
+                    }
                     # Evaluate distance to both sides of the gap to find the best "middle ground"
                     d1 = get_adj_dist(t1.ratingKey, bridge.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
                     d2 = get_adj_dist(bridge.ratingKey, t2.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
-                    
+
                     # Logic: If both legs of the new path are better than the single original jump, it is a net improvement for the "flow."
                     if d1 < dist and d2 < dist:
-                        b_styles = _resolve_tags(bridge, "styles")[:STYLE_TAG_DEPTH]
-                        b_genres = _resolve_tags(bridge, "genres")
                         if b_styles:
                             # over_limit if ANY checked style slot is saturated (hard cap)
                             over_limit = any(style_counts[s] >= style_limit for s in b_styles)
@@ -1838,7 +1849,6 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         else:
                             over_limit = False
                         # Also apply mood soft preference: deprioritise bridges that push a mood over limit
-                        b_moods = _resolve_tags(bridge, "moods")
                         if b_moods and mood_counts[b_moods[0]] >= mood_limit:
                             over_limit = True
                         # Era penalty: prefer bridges whose production era is close to both neighbours.
@@ -2150,7 +2160,10 @@ def main():
         more_s = fetch_sonically_similar_tracks(final_tracks, excluded_keys=excluded_keys)
         more_h_sample = random.sample(more_h, min(MAX_TRACKS - len(final_tracks), len(more_h)))
         prev_len = len(final_tracks)
-        final_tracks = process_tracks(final_tracks + more_h_sample + more_s)[:MAX_TRACKS]
+        # Pre-filter new candidates to avoid re-processing tracks already accepted.
+        existing_rks = {t.ratingKey for t in final_tracks}
+        new_candidates = [t for t in more_h_sample + more_s if t.ratingKey not in existing_rks]
+        final_tracks = process_tracks(final_tracks + new_candidates)[:MAX_TRACKS]
         if len(final_tracks) == prev_len: break
 
     hist_keys = {t.ratingKey for t in guaranteed}
@@ -2217,6 +2230,13 @@ def main():
         # Ensure sorting breadth covers the tracks in the list
         sort_breadth = max(SONIC_SIMILAR_LIMIT, len(middle) + 2)
         middle, similarity_cache, meta_cache = sort_by_sonic_similarity_refined(middle, first, last, limit=sort_breadth)
+        # Feed sort-pass distances back into the global cache. Tracks that weren't in
+        # _global_sonic_cache before the sort had their sonicallySimilar data stored
+        # only in the local similarity_cache. Merging here means get_adj_dist() hits
+        # the fast global-cache path (step 1) for all subsequent lookups in fill_sonic_gaps.
+        for _rk, _sims in similarity_cache.items():
+            if _rk not in _global_sonic_cache:
+                _global_sonic_cache[_rk] = _sims
 
     final_ordered_tracks = [first] + middle + [last] if first and last else final_tracks[:MAX_TRACKS]
 
