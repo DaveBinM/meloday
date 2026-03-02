@@ -88,9 +88,10 @@ def run_maintenance():
             )
         orphans_removed = len(orphan_keys)
 
-        # Integrity cleanup: entries missing required fields
+        # Integrity cleanup: entries with no file_path are unusable regardless of mode.
+        # Acoustic fields (bpm/key/energy) may be null for metadata-only entries — that's valid.
         cursor = conn.execute(
-            "DELETE FROM essentia_cache WHERE bpm IS NULL OR key IS NULL OR energy IS NULL OR file_path IS NULL"
+            "DELETE FROM essentia_cache WHERE file_path IS NULL"
         )
         corrupt_removed = cursor.rowcount
 
