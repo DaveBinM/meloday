@@ -2086,7 +2086,7 @@ def apply_text_to_cover(image_path, text):
 def create_or_update_playlist(name, tracks, description, cover_file):
     # Use server-side title filtering to avoid fetching all playlists on every run.
     # The Python filter is kept as a safeguard in case plexapi's match is broader than expected.
-    existing_playlist = next((pl for pl in plex.playlists(title="Meloday for") if str(getattr(pl, "title", "")).startswith("Meloday for ")), None)
+    existing_playlist = next((pl for pl in plex.playlists(title="Meloday") if str(getattr(pl, "title", "")).startswith("Meloday")), None)
     valid_tracks = [t for t in tracks if getattr(t, "ratingKey", None)]
     
     if not valid_tracks:
