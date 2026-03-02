@@ -456,8 +456,22 @@ def analyze_track_essentia(track):
             return data
         # If path changed, we fall through to perform new acoustic analysis
 
-    if not ESSENTIA_ENABLED: return None
-    
+    if not ESSENTIA_ENABLED:
+        # Populate metadata-only entry (styles/moods/genres/year from Plex; acoustics remain null).
+        # This lets pre_analyze.py and the optimizer work for users without Essentia.
+        data = {
+            "bpm": None, "key": None, "energy": None,
+            "year": getattr(track, "year", None) or album_meta(track).get("year"),
+            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "genres": _resolve_tags(track, "genres"),
+            "styles": _resolve_tags(track, "styles"),
+            "moods":  _resolve_tags(track, "moods"),
+            "file_path": get_local_path(track),
+            "last_synced": now_ts,
+        }
+        _essentia_cache[rk] = data
+        return data
+
     file_path = get_local_path(track)
     if not file_path: return None
 
@@ -2074,10 +2088,10 @@ def main():
     # Confirm Essentia Status
     if ESSENTIA_ENABLED:
         m_print(f"[DIAGNOSTIC] Essentia is ACTIVE. Analyzing keys and BPM.")
-        load_essentia_cache()
     else:
         reason = "Library not found" if not ESSENTIA_AVAILABLE else "Disabled in config"
         m_print(f"[DIAGNOSTIC] Essentia is INACTIVE ({reason}). Using standard sorting.")
+    load_essentia_cache()  # Always load — cached metadata (styles/moods/genres) benefits tag resolution even without acoustic data
 
     # Step 1: Fetch historical (Guarantee based on configured historical_ratio)
     print_status(20, "Fetching historical tracks...")

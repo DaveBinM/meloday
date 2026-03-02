@@ -117,26 +117,28 @@ Every playlist gets a unique name generated from the current listening mood, the
 
 ---
 
-## Optional Enhancement: Essentia Acoustic Analysis
+## The Metadata Cache
 
-Meloday includes optional integration with **[Essentia](https://essentia.upf.edu/)**, an open-source acoustic analysis library. When enabled, it enriches the sonic matching with real audio features:
+`pre_analyze.py` scans your Plex library and builds a local cache of track metadata — styles, moods, genres, and year — that Meloday and the optimiser use for diversity balancing and config recommendations. Running it is worthwhile for any library, regardless of whether you use Essentia.
+
+```bash
+python utilities/pre_analyze.py
+```
+
+The cache is incremental — tracks already analysed are skipped on subsequent runs. The first run may take a while on large libraries; subsequent runs only process new or changed tracks.
+
+### Optional Enhancement: Essentia Acoustic Analysis
+
+Meloday also integrates with **[Essentia](https://essentia.upf.edu/)**, an open-source acoustic analysis library. When enabled, it enriches the cache with real audio features that further improve sonic matching:
 
 - **BPM / Tempo** — matches tracks by their actual tempo
 - **Musical key** — favours harmonically compatible transitions
 - **Energy level** — maintains consistent loudness and intensity across the playlist
 - **Production era** — keeps the sonic palette coherent across decades
 
-### Running the Pre-Analyser
+To enable, set `essentia: enabled: true` in `config.yml` and re-run `pre_analyze.py`. It will upgrade existing metadata-only cache entries with acoustic data without re-fetching the Plex metadata.
 
-Before enabling Essentia, run `pre_analyze.py` to build the acoustic cache:
-
-```bash
-python utilities/pre_analyze.py
-```
-
-This scans your Plex library, analyses each track with Essentia, and writes the results to `assets/essentia_cache.db`. The cache is incremental — tracks already analysed are skipped on subsequent runs. The first run can take a while on large libraries; subsequent runs only process new or changed tracks.
-
-Once the cache has reasonable coverage, set `essentia: enabled: true` in `config.yml`.
+See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails on your platform.
 
 ### Maintaining the Cache
 
@@ -152,13 +154,13 @@ This removes entries for tracks that no longer exist in your Plex library (orpha
 
 ## Optimising Your Config
 
-`meloday_optimizer.py` analyses your library, Essentia cache, and listening history to recommend the best configuration values for your specific setup:
+`meloday_optimizer.py` analyses your library, metadata cache, and listening history to recommend the best configuration values for your specific setup:
 
 ```bash
 python utilities/meloday_optimizer.py
 ```
 
-By default it samples 2,000 tracks (or 5% of your library, whichever is larger) for the sonic neighbourhood analysis, but uses **all tracks in the Essentia cache** for diversity and acoustic weight calculations. You can pass a sample size or `ALL` to audit the full library:
+By default it samples 2,000 tracks (or 5% of your library, whichever is larger) for the sonic neighbourhood analysis, but uses **all tracks in the metadata cache** for diversity calculations. You can pass a sample size or `ALL` to audit the full library:
 
 ```bash
 python utilities/meloday_optimizer.py 5000
@@ -171,7 +173,7 @@ The optimiser recommends values for:
 - `historical_ratio`, `style_ratio`, `genre_ratio`, `artist_ratio`, `mood_ratio` — calibrated to your library's genre/style/mood diversity
 - `style_tag_depth` — set from the median number of style tags per track in your cache
 - `exclude_played_days`, `history_lookback_days` — balanced to your listening intensity and library size
-- `bpm_weight`, `key_weight`, `energy_weight`, `era_weight` — calibrated to the actual variation in your library
+- `bpm_weight`, `key_weight`, `energy_weight`, `era_weight` — calibrated to the actual variation in your library (requires Essentia cache)
 
 Set `auto_apply_optimization: true` in `config.yml` to have the optimiser write its recommendations directly to your config automatically.
 
@@ -207,8 +209,8 @@ Meloday works best with **larger, well-tagged music libraries**.
 - **Library size** — The more tracks you have, the more options Meloday has for sonic variety and bridging. It's been tested on libraries ranging from ~13,500 to significantly larger collections.
 - **Listening history** — The more consistently you play music through Plex, the stronger the time-of-day personalisation becomes.
 - **Track ratings** — Not required, but rating tracks (1–5 stars) lets Meloday filter out music you don't enjoy.
-- **Essentia cache** — Running `pre_analyze.py` on a significant portion of your library meaningfully improves sonic matching quality, bridging accuracy, and optimiser recommendations.
-- **Run the optimiser** — Default config values are conservative starting points. Running `meloday_optimizer.py` after building a reasonable Essentia cache will give you values tuned to your actual library.
+- **Metadata cache** — Running `pre_analyze.py` on your library improves diversity balancing and optimiser recommendations even without Essentia. With Essentia enabled it also improves sonic matching quality and bridging accuracy.
+- **Run the optimiser** — Default config values are conservative starting points. Running `meloday_optimizer.py` after building a reasonable cache will give you values tuned to your actual library.
 
 ---
 

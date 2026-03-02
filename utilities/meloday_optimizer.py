@@ -422,7 +422,7 @@ def run_optimizer():
     # Mood coverage: if very few cached tracks have mood tags, mood enforcement will only
     # apply to that fraction of the playlist. Warn when coverage is low so users understand
     # that mood_ratio will have limited impact until pre_analyze.py populates more moods.
-    if ess_cfg.get("enabled", False) and mood_coverage_pct < 20:
+    if mood_coverage_pct < 20:
         log_msg(f"\n[NOTE] Only {mood_coverage_pct:.1f}% of cached tracks have mood tags.")
         log_msg(f"       mood_ratio enforcement will only affect this portion of the playlist.")
         log_msg(f"       Re-run pre_analyze.py to improve mood coverage.")
@@ -489,6 +489,10 @@ def run_optimizer():
         log_msg(f"  key_weight: {rec_key_weight:.2f}")
         log_msg(f"  energy_weight: {w_energy:.2f}")
         log_msg(f"  era_weight: {w_era:.2f}")
+    else:
+        log_msg("\n[INFO] Acoustic weight recommendations (bpm_weight, key_weight, energy_weight, era_weight) skipped —")
+        log_msg("       no Essentia data found in cache. Set essentia: enabled: true in config.yml and")
+        log_msg("       run pre_analyze.py to unlock these recommendations.")
     log_msg("="*50)
 
     # --- AUTO-APPLY LOGIC ---

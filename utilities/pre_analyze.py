@@ -175,8 +175,8 @@ def bulk_analyze():
     if the process is interrupted.
     """
     if not ESSENTIA_ENABLED:
-        log_msg("[ERROR] Essentia is not installed or enabled. Analysis cannot proceed.")
-        return
+        log_msg("[INFO] Essentia is disabled. Running in metadata-only mode (styles, moods, genres, year).")
+        log_msg("[INFO] To enable acoustic analysis (BPM, key, energy), set essentia: enabled: true in config.yml.")
 
     log_msg(f"--- Starting Parallel Library Analysis & Metadata Sync: {MUSIC_LIBRARY} ---")
 
