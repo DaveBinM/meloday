@@ -131,7 +131,7 @@ Meloday includes optional integration with **[Essentia](https://essentia.upf.edu
 Before enabling Essentia, run `pre_analyze.py` to build the acoustic cache:
 
 ```bash
-python pre_analyze.py
+python utilities/pre_analyze.py
 ```
 
 This scans your Plex library, analyses each track with Essentia, and writes the results to `assets/essentia_cache.db`. The cache is incremental — tracks already analysed are skipped on subsequent runs. The first run can take a while on large libraries; subsequent runs only process new or changed tracks.
@@ -143,7 +143,7 @@ Once the cache has reasonable coverage, set `essentia: enabled: true` in `config
 Run `meloday_admin.py` periodically to keep the cache clean:
 
 ```bash
-python meloday_admin.py
+python utilities/meloday_admin.py
 ```
 
 This removes entries for tracks that no longer exist in your Plex library (orphan cleanup), removes any corrupt entries, and reclaims disk space.
@@ -155,14 +155,14 @@ This removes entries for tracks that no longer exist in your Plex library (orpha
 `meloday_optimizer.py` analyses your library, Essentia cache, and listening history to recommend the best configuration values for your specific setup:
 
 ```bash
-python meloday_optimizer.py
+python utilities/meloday_optimizer.py
 ```
 
 By default it samples 2,000 tracks (or 5% of your library, whichever is larger) for the sonic neighbourhood analysis, but uses **all tracks in the Essentia cache** for diversity and acoustic weight calculations. You can pass a sample size or `ALL` to audit the full library:
 
 ```bash
-python meloday_optimizer.py 5000
-python meloday_optimizer.py ALL
+python utilities/meloday_optimizer.py 5000
+python utilities/meloday_optimizer.py ALL
 ```
 
 The optimiser recommends values for:
@@ -180,10 +180,23 @@ Set `auto_apply_optimization: true` in `config.yml` to have the optimiser write 
 `limit_validator.py` provides a deeper audit of your `sonic_similarity_limit` setting, scanning the full library and producing a per-track CSV report showing how many sonic neighbours each track has at each distance bucket:
 
 ```bash
-python limit_validator.py
+python utilities/limit_validator.py
 ```
 
-Use this to identify "sonic islands" — tracks with very few neighbours — that may be harder to bridge.
+Use this to check whether raising your limit would actually yield more candidates, or whether most tracks are already returning everything Plex has.
+
+`sonic_islands.py` identifies your most sonically isolated **artists** — those whose tracks have the fewest sonic neighbours on average. It exports the top 5% most isolated to a CSV, which is useful for understanding which artists tend to resist bridging:
+
+```bash
+python utilities/sonic_islands.py
+```
+
+`sonic_similar.py` is a low-level inspector — it fetches and prints the raw sonic similarity results for a single track (including the numeric distance values Plex returns), which is useful for debugging why a specific track isn't getting good bridge candidates:
+
+```bash
+python utilities/sonic_similar.py --ratingkey=12345
+python utilities/sonic_similar.py --ratingkey=12345 --limit=100 --maxdistance=0.20
+```
 
 ---
 
@@ -207,7 +220,7 @@ Meloday works best with **larger, well-tagged music libraries**.
 pip install -r requirements.txt
 ```
 
-This installs: `plexapi`, `Pillow`, `pyyaml`, `ruamel.yaml`, `tqdm`, `psutil`
+This installs: `plexapi`, `Pillow`, `pyyaml`, `ruamel.yaml`, `tqdm`, `psutil`, `requests`
 
 **Essentia** (optional, for acoustic analysis) is listed in `requirements.txt` but may require a separate install step depending on your platform. See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails.
 
@@ -282,6 +295,7 @@ Your playlist will be created or updated in Plex.
 | `artist_ratio` | `0.05` | Maximum proportion of tracks from a single artist |
 | `mood_ratio` | `0.35` | Maximum proportion of tracks sharing the same primary mood |
 | `sonic_similarity_limit` | `100` | Candidate pool size per seed track for sonic matching. Set by the optimiser based on your library's density. |
+| `sonic_similarity_distance` | `0.20` | Maximum similarity distance for sonic matching (lower = stricter). Plex's maximum is `0.25`; the default of `0.20` excludes the loosest matches. |
 
 ### `seasonal:`
 
@@ -311,14 +325,14 @@ Here's an example cron setup (macOS/Linux):
 ```bash
 # --- DAILY MAINTENANCE ---
 # Analyse new tracks added to Plex (11:00 PM)
-0 23 * * * /path/to/.venv/bin/python /path/to/meloday/pre_analyze.py
+0 23 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/pre_analyze.py
 
 # Clean and compact the Essentia cache (12:30 AM)
-30 0 * * * /path/to/.venv/bin/python /path/to/meloday/meloday_admin.py
+30 0 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_admin.py
 
 # --- MONTHLY CALIBRATION ---
 # Recalibrate config values against the full library (1st of the month, 12:45 AM)
-45 0 1 * * /path/to/.venv/bin/python /path/to/meloday/meloday_optimizer.py ALL
+45 0 1 * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_optimizer.py ALL
 
 # --- PLAYLIST GENERATION ---
 # Refresh at the start of each time period (Dawn, Early Morning, Morning,

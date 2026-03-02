@@ -5,3 +5,4 @@ essentia
 ruamel.yaml
 psutil
 tqdm
+requests

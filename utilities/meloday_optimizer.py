@@ -14,7 +14,7 @@ from plexapi.server import PlexServer
 from tqdm import tqdm
 from ruamel.yaml import YAML
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # --- LOGGING SETUP ---
 LOG_FILE = os.path.join(BASE_DIR, "logs", "optimizer.log")
@@ -135,7 +135,7 @@ def run_optimizer():
     yaml.preserve_quotes = True
     yaml.indent(mapping=2, sequence=4, offset=2)
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config.yml")
     
     with open(config_path, 'r', encoding='utf-8') as f:
