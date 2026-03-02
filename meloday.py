@@ -695,11 +695,11 @@ def track_artist_name(track) -> str:
 
 
 # --- Dedup helpers: prefer studio albums over compilations/soundtracks ---
-_FEAT_SPLIT_RE = re.compile(r"\s*(?:feat\.?|ft\.?|featuring)\s+.*$", re.IGNORECASE)
+_FEAT_SPLIT_RE = re.compile(r"\s*(?:feat\.?|ft\.?|featuring)\s+.*$|\s+[&x]\s+.*$", re.IGNORECASE)
 
 @functools.lru_cache(maxsize=None)
 def primary_artist(name: str) -> str:
-    """Return the primary artist portion (strip 'feat./ft./featuring ...')."""
+    """Return the primary artist portion (strip 'feat./ft./featuring/& ...' collab suffixes)."""
     if not name:
         return ""
     s = name.strip()
@@ -1812,15 +1812,16 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         b_moods = _resolve_tags(bridge, "moods")
                         if b_moods and mood_counts[b_moods[0]] >= mood_limit:
                             over_limit = True
-                        # Tuple sorts within-limits first (0), over-limits second (1), then by flow score
-                        candidates.append((int(over_limit), d1 + d2, bridge, b_identity, b_artist_norm, b_styles, b_genres))
+                        # Tuple sorts within-limits first (0), over-limits second (1), then by flow score.
+                        # ratingKey is an int tiebreaker so Track objects are never compared directly.
+                        candidates.append((int(over_limit), d1 + d2, bridge.ratingKey, bridge, b_identity, b_artist_norm, b_styles, b_genres))
 
                 # F. SELECTION
                 if candidates:
                     # Within-limits candidates sort first (flag=0), over-limits second (flag=1);
                     # within each group, lowest combined flow score wins.
                     candidates.sort()
-                    over_limit_flag, best_score, best_bridge, b_identity, b_artist_norm, b_styles, b_genres = candidates[0]
+                    over_limit_flag, best_score, _, best_bridge, b_identity, b_artist_norm, b_styles, b_genres = candidates[0]
 
                     # E. AUDIO ANALYSIS (Only for the winner)
                     if ESSENTIA_ENABLED:
