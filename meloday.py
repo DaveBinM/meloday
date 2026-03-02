@@ -481,6 +481,14 @@ def analyze_track_essentia(track):
 
         # BPM & Key Extraction
         bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
+        if bpm >= 250:
+            # Likely a tempo-doubling artefact — retry with the degara method as a cross-check.
+            # If the second pass also returns >= 250, store None so it's excluded from
+            # bpm_weight CoV calculations in the optimizer (which already filters null values).
+            bpm_retry = es.RhythmExtractor2013(method="degara")(audio)[0]
+            bpm = bpm_retry if bpm_retry < 250 else None
+            if bpm is None:
+                log_text(f"[WARN] BPM >= 250 for '{track.title}' after retry — storing as null (excluded from weight calculations).")
         key_alg = es.KeyExtractor()(audio)
         camelot = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
 
@@ -1325,17 +1333,20 @@ def process_tracks(tracks):
     mood_limit   = int(MAX_TRACKS * MOOD_RATIO)
     style_limit  = int(MAX_TRACKS * STYLE_RATIO)
     genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
+    rejected_artist = rejected_mood = rejected_style = rejected_genre = 0
 
     for track in deduped_tracks:
         try:
             artist_name = norm_text(primary_artist(track_artist_name(track)))
             if artist_count[artist_name] >= artist_limit:
+                rejected_artist += 1
                 continue
 
             # Mood is the vibe-consistency axis — checked before style/genre so no single
             # mood dominates the playlist. Primary mood only (depth=1).
             track_moods = _resolve_tags(track, "moods")
             if track_moods and mood_count[track_moods[0]] >= mood_limit:
+                rejected_mood += 1
                 continue
 
             # Styles are the primary diversity axis (more granular than genres).
@@ -1348,12 +1359,14 @@ def process_tracks(tracks):
 
             if track_styles:
                 if any(style_count[s] >= style_limit for s in track_styles):
+                    rejected_style += 1
                     continue
                 for s in track_styles:
                     style_count[s] += 1
             elif track_genres:
                 primary_genre = track_genres[0]
                 if genre_count[primary_genre] >= genre_limit:
+                    rejected_genre += 1
                     continue
                 genre_count[primary_genre] += 1
 
@@ -1366,6 +1379,8 @@ def process_tracks(tracks):
             continue
 
     log_text(f"[DEDUPE] Pool processed. Kept {len(unique_tracks)} unique tracks after deduplication and balance checks.")
+    if rejected_artist or rejected_mood or rejected_style or rejected_genre:
+        log_text(f"[DEDUPE] Rejected — artist: {rejected_artist}, mood: {rejected_mood}, style: {rejected_style}, genre: {rejected_genre}")
     return unique_tracks
 
 def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
@@ -1826,9 +1841,23 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         b_moods = _resolve_tags(bridge, "moods")
                         if b_moods and mood_counts[b_moods[0]] >= mood_limit:
                             over_limit = True
+                        # Era penalty: prefer bridges whose production era is close to both neighbours.
+                        # Scaled so a 30-year gap adds ~0.10 to the score — small enough not to
+                        # override a strong sonic match, but enough to break ties in favour of
+                        # era-compatible candidates. Ignored when year data is unavailable.
+                        b_year = bm.get("year")
+                        t1_year = m_cache.get(t1.ratingKey, {}).get("year")
+                        t2_year = m_cache.get(t2.ratingKey, {}).get("year")
+                        era_penalty = 0.0
+                        if b_year:
+                            neighbour_years = [y for y in [t1_year, t2_year] if y]
+                            if neighbour_years:
+                                avg_neighbour_year = sum(neighbour_years) / len(neighbour_years)
+                                era_penalty = min(0.10, abs(b_year - avg_neighbour_year) / 300)
+
                         # Tuple sorts within-limits first (0), over-limits second (1), then by flow score.
                         # ratingKey is an int tiebreaker so Track objects are never compared directly.
-                        candidates.append((int(over_limit), d1 + d2, bridge.ratingKey, bridge, b_identity, b_artist_norm, b_styles, b_genres))
+                        candidates.append((int(over_limit), d1 + d2 + era_penalty, bridge.ratingKey, bridge, b_identity, b_artist_norm, b_styles, b_genres))
 
                 # F. SELECTION
                 if candidates:
@@ -2021,7 +2050,9 @@ def apply_text_to_cover(image_path, text):
         return image_path
 
 def create_or_update_playlist(name, tracks, description, cover_file):
-    existing_playlist = next((pl for pl in plex.playlists() if str(getattr(pl, "title", "")).startswith("Meloday for ")), None)
+    # Use server-side title filtering to avoid fetching all playlists on every run.
+    # The Python filter is kept as a safeguard in case plexapi's match is broader than expected.
+    existing_playlist = next((pl for pl in plex.playlists(title="Meloday for") if str(getattr(pl, "title", "")).startswith("Meloday for ")), None)
     valid_tracks = [t for t in tracks if getattr(t, "ratingKey", None)]
     
     if not valid_tracks:
@@ -2106,7 +2137,12 @@ def main():
     # Step 3: Ensure we reach MAX_TRACKS
     print_status(40, "Combining & processing tracks...")
     progress = 40
+    backfill_attempts = 0
     while len(final_tracks) < MAX_TRACKS:
+        backfill_attempts += 1
+        if backfill_attempts > 3:
+            log_text(f"[WARN] Backfill stopped after 3 attempts — diversity caps or library size may be limiting results.")
+            break
         progress += 5
         print_status(progress, "Attempting to add more tracks...")
         more_h, more_e = fetch_historical_tracks(period)
@@ -2116,6 +2152,10 @@ def main():
         prev_len = len(final_tracks)
         final_tracks = process_tracks(final_tracks + more_h_sample + more_s)[:MAX_TRACKS]
         if len(final_tracks) == prev_len: break
+
+    hist_keys = {t.ratingKey for t in guaranteed}
+    hist_in_final = sum(1 for t in final_tracks if t.ratingKey in hist_keys)
+    log_text(f"[COMPOSITION] {len(final_tracks)} tracks — {hist_in_final} from history, {len(final_tracks) - hist_in_final} from sonic discovery")
 
     if len(final_tracks) < MAX_TRACKS // 2:
         log_text(f"[WARN] Playlist is significantly short ({len(final_tracks)}/{MAX_TRACKS} tracks). "
@@ -2157,14 +2197,18 @@ def main():
             if to_analyze:
                 log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
                 cpu_workers = get_optimal_workers(task_type="cpu")
-                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
-                    # analysis_worker calls analyze_track_essentia internally
-                    results = list(executor.map(analysis_worker, to_analyze))
                 new_entries = {}
-                for tid, data in results:
-                    if data:
-                        _essentia_cache[str(tid)] = data
-                        new_entries[str(tid)] = data
+                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
+                    # Use submit/as_completed so one crashing worker doesn't abort the whole batch
+                    futures = {executor.submit(analysis_worker, tid): tid for tid in to_analyze}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            tid, data = future.result()
+                            if data:
+                                _essentia_cache[str(tid)] = data
+                                new_entries[str(tid)] = data
+                        except Exception as e:
+                            log_text(f"[WARN] Analysis worker failed for track {futures[future]}: {e}")
                 _upsert_cache_entries(new_entries)
             else:
                 log_text("[OK] All tracks are cached and up-to-date.")
