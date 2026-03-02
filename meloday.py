@@ -114,7 +114,7 @@ STYLE_TAG_DEPTH = config["playlist"].get("style_tag_depth", 1)  # How many style
 ARTIST_RATIO = config["playlist"].get("artist_ratio", 0.05)
 MOOD_RATIO = config["playlist"].get("mood_ratio", 0.35)
 SONIC_SIMILARITY_SEARCH_LIMIT = max(config["playlist"].get("sonic_similarity_limit", 100), MAX_TRACKS * 2)
-SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.25)
+SONIC_SIMILARITY_DISTANCE = config["playlist"].get("sonic_similarity_distance", 0.20)
 
 # Essentia Logic & Weights
 ess_cfg = config.get("essentia", {})

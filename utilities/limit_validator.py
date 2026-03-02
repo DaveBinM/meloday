@@ -22,7 +22,7 @@ from tqdm import tqdm
 import concurrent.futures
 
 # --- Setup & Config ---
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yml")
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yml")
 with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
     config = yaml.safe_load(f)
 
@@ -30,9 +30,7 @@ PLEX_URL = config["plex"]["url"]
 PLEX_TOKEN = config["plex"]["token"]
 MUSIC_LIBRARY = config["plex"]["music_library"]
 CURRENT_LIMIT = config["playlist"].get("sonic_similarity_limit", 100)
-
-plex = PlexServer(PLEX_URL, PLEX_TOKEN)
-music = plex.library.section(MUSIC_LIBRARY)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 @functools.lru_cache(maxsize=None)
 def get_optimal_workers(task_type="cpu"):
@@ -116,6 +114,9 @@ def check_track_neighborhood(track):
 
 def run_audit():
     print(f"--- Meloday Deep Density Audit ---")
+    print("Connecting to Plex...")
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN)
+    music = plex.library.section(MUSIC_LIBRARY)
     print("Fetching library tracks...")
     tracks = music.searchTracks()
     total = len(tracks)
@@ -130,6 +131,10 @@ def run_audit():
             res = future.result()
             if res:
                 results.append(res)
+
+    if not results:
+        print("[ERROR] No results collected. Check Plex connection or library.")
+        return
 
     # 2. Aggregation
     total_valid = len(results)
@@ -171,10 +176,12 @@ def run_audit():
         print(f"Advice: Your current limit is sufficient for your library density.")
 
     # CSV Export
-    with open("sonic_density_audit.csv", "w", newline="", encoding="utf-8") as f:
+    csv_path = os.path.join(_PROJECT_ROOT, "sonic_density_audit.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["title", "artist", "total_neighbors", "ultra_tight", "strong_flow", "logical", "loose", "is_placebo"])
         writer.writeheader()
         writer.writerows(results)
+    print(f"\nResults saved to: {csv_path}")
 
 if __name__ == "__main__":
     run_audit()
