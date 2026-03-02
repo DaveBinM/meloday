@@ -1043,7 +1043,7 @@ def load_descriptor_map(filepath):
         with open(filepath, "r", encoding="utf-8") as file:
             return json.load(file)
     except Exception as e:
-        m_print(f"Error loading descriptor dictionary: {e}")
+        m_print(f"Error loading descriptor map: {e}")
         return {}
 
 def wrap_text(text, font, draw, max_width):
@@ -1952,53 +1952,75 @@ def generate_playlist_title_and_description(period, tracks):
     descriptor_map = load_descriptor_map(MOOD_MAP_PATH)
     day_name = datetime.now().strftime("%A")
 
-    top_genres = [str(g) for t in tracks for g in (t.genres or [])]
-    top_moods = [str(m) for t in tracks for m in (t.moods or [])]
-    genre_counts = Counter(top_genres)
-    mood_counts = Counter(top_moods)
+    # Use _resolve_tags() — the same resolution path as playlist selection —
+    # so the title reflects what actually shaped the playlist, not just inline track tags.
+    # Count primary mood per track to match the diversity-cap logic in process_tracks().
+    style_counts = Counter()
+    genre_counts = Counter()
+    mood_counts  = Counter()
+    for t in tracks:
+        for s in _resolve_tags(t, "styles"):
+            style_counts[str(s)] += 1
+        for g in _resolve_tags(t, "genres"):
+            genre_counts[str(g)] += 1
+        moods = _resolve_tags(t, "moods")
+        if moods:
+            mood_counts[str(moods[0])] += 1
 
+    sorted_styles = [s for s, _ in style_counts.most_common()]
     sorted_genres = [g for g, _ in genre_counts.most_common()]
-    sorted_moods = [m for m, _ in mood_counts.most_common()]
+    sorted_moods  = [m for m, _ in mood_counts.most_common()]
 
-    most_common_genre = sorted_genres[0] if sorted_genres else "Eclectic"
-    most_common_mood = sorted_moods[0] if sorted_moods else "Vibes"
+    most_common_mood   = sorted_moods[0] if sorted_moods else "Vibrant"
     second_common_mood = sorted_moods[1] if len(sorted_moods) > 1 else None
 
-    descriptor = random.choice(descriptor_map.get(second_common_mood, ["Vibrant"]))
+    # Descriptor from the moodmap: a punchy/colloquial translation of the primary mood,
+    # used in the title. The formal mood name is then used in the description for clarity.
+    descriptor = random.choice(descriptor_map.get(most_common_mood, ["Vibrant"]))
+
+    # Two-tag phrase: prefer styles (primary diversity axis), fall back to genres.
+    # Two tags reflect Meloday's varied nature — it's a curated mix, not a single-vibe channel.
+    title_tags = sorted_styles[:2]
+    if len(title_tags) < 2:
+        title_tags += [g for g in sorted_genres if g not in title_tags][:2 - len(title_tags)]
+
+    if len(title_tags) >= 2:
+        tag_phrase = f"{title_tags[0]} & {title_tags[1]}"
+    elif len(title_tags) == 1:
+        tag_phrase = title_tags[0]
+    else:
+        tag_phrase = "Eclectic"
+
     period_phrase = get_period_phrase(period)
-    title = f"Meloday for {most_common_mood} {descriptor} {most_common_genre} {day_name} {period}"
+    title = f"Meloday • {descriptor} {tag_phrase} for {day_name} {period}"
 
-    max_styles = 6
-    highlight_styles = sorted_genres[:3] + sorted_moods[:3]
-    highlight_styles = [s for s in highlight_styles if s not in {most_common_genre, most_common_mood}]
-    highlight_styles = list(dict.fromkeys(highlight_styles))[:max_styles]
-    
-    # Ensure highlight styles are filled with whatever is available
-    additional = sorted_genres + sorted_moods
-    for s in additional:
-        if len(highlight_styles) >= max_styles:
+    # Highlight tags for the description: prefer styles, then genres, then secondary moods.
+    # Exclude whatever is already named in the title to avoid repetition.
+    used = set(title_tags)
+    highlight_tags = []
+    for tag in sorted_styles[:4] + sorted_genres[:3] + sorted_moods[1:3]:
+        if tag not in used and tag not in highlight_tags:
+            highlight_tags.append(tag)
+        if len(highlight_tags) >= 5:
             break
-        if s not in highlight_styles:
-            highlight_styles.append(s)
 
-    # Build the highlight phrase safely
-    if len(highlight_styles) > 1:
-        extra_info = f"Here's some {', '.join(highlight_styles[:-1])}, and {highlight_styles[-1]} tracks as well."
-    elif len(highlight_styles) == 1:
-        extra_info = f"Here's some {highlight_styles[0]} tracks as well."
+    if len(highlight_tags) > 1:
+        extra_info = f"Here's some {', '.join(highlight_tags[:-1])}, and {highlight_tags[-1]} tracks as well."
+    elif len(highlight_tags) == 1:
+        extra_info = f"Here's some {highlight_tags[0]} tracks as well."
     else:
         extra_info = "Enjoy this selection of your favorites."
 
+    # Use the formal mood name(s) in the description — no register clash with the slang title.
+    article = "An" if most_common_mood[0].lower() in "aeiou" else "A"
     if second_common_mood:
-        description = (
-            f"You listened to {most_common_mood} and {most_common_genre} tracks on {day_name} {period_phrase}. "
-            f"{extra_info}"
-        )
+        mood_phrase = f"{most_common_mood} and {second_common_mood}"
     else:
-        description = (
-            f"You listened to {most_common_genre} and {most_common_mood} tracks on {day_name} {period_phrase}. "
-            f"{extra_info}"
-        )
+        mood_phrase = most_common_mood
+    description = (
+        f"{article} {mood_phrase} mix of {tag_phrase} from your {day_name} {period_phrase} listening. "
+        f"{extra_info}"
+    )
 
     try:
         plex_account = plex.myPlexAccount()
@@ -2017,7 +2039,7 @@ def generate_playlist_title_and_description(period, tracks):
 
 def apply_text_to_cover(image_path, text):
     try:
-        prefix = "Meloday for "
+        prefix = "Meloday • "
         if text.startswith(prefix):
             text = text[len(prefix):]
 
