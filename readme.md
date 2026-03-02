@@ -71,7 +71,7 @@ Bridging can be disabled in `config.yml`, or set to **smart truncation** mode, w
 
 ### 5. Applies Exclusions
 
-**Label exclusion:** Any track or album carrying a configured Plex label (e.g. `noshare`) is excluded from the playlist entirely. Useful for keeping private, niche, or "not for this playlist" content out of rotation.
+**Label exclusion:** Any track or album carrying one of the configured Plex exclusion labels is excluded from the playlist entirely. Accepts a single label or a list of labels. Useful for keeping private, niche, or "not for this playlist" content out of rotation.
 
 **Seasonal rules:** If you keep holiday music in a named Plex collection (e.g. `Christmas Music`), Meloday will only include it during a configured date window — so it doesn't surface in July.
 
@@ -262,7 +262,7 @@ Your playlist will be created or updated in Plex.
 | `url` | URL of your Plex Media Server |
 | `token` | Your Plex API authentication token |
 | `music_library` | Name of your Plex music library section |
-| `exclude_label` | Plex label — tracks/albums with this label are excluded |
+| `exclude_label` | Plex label (or list of labels) — tracks/albums with any of these labels are excluded. Accepts a single string (`"noshare"`) or a list (`["noshare", "private"]`) |
 | `christmas_collection` | Plex collection name for seasonal holiday music |
 
 ### `essentia:`
