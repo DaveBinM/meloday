@@ -258,7 +258,6 @@ def run_optimizer():
     # Bucket-aware density logic (targeting usable pool)
     usable_counts = [r['usable_neighbors'] for r in results if r['usable_neighbors'] > 0]
     rec_limit = min(int(statistics.quantiles(usable_counts, n=100)[84]), 500, int(4.5 * MAX_TRACKS_CFG)) if usable_counts else min(150, int(4.5 * MAX_TRACKS_CFG))
-    rec_dist = min(round(statistics.median([d for r in results for d in r['distances']]) if results else 0.20, 2), 0.25)
 
     def get_weight(data_list, base_val):
         clean = [x for x in data_list if x is not None]
@@ -483,7 +482,6 @@ def run_optimizer():
     log_msg(f"  genre_ratio: {rec_genre_ratio}       (fallback only — applies to tracks with no style tags)")
     log_msg(f"  artist_ratio: {rec_artist_ratio}      (≤{round(MAX_TRACKS_CFG * rec_artist_ratio)} of {MAX_TRACKS_CFG} tracks per artist)")
     log_msg(f"  mood_ratio: {rec_mood_ratio}         (≤{round(MAX_TRACKS_CFG * rec_mood_ratio)} of {MAX_TRACKS_CFG} tracks per mood; {mood_coverage_pct:.0f}% coverage)")
-    log_msg(f"  sonic_similarity_distance: {rec_dist}")
 
     if essentia_results_exist:
         log_msg("\nessentia:")
@@ -504,7 +502,6 @@ def run_optimizer():
         config['playlist']['style_tag_depth'] = rec_style_tag_depth
         config['playlist']['artist_ratio'] = rec_artist_ratio
         config['playlist']['mood_ratio'] = rec_mood_ratio
-        config['playlist']['sonic_similarity_distance'] = rec_dist
 
         if ess_cfg.get("enabled", False) and essentia_results_exist:
             config['essentia']['bpm_weight'] = w_bpm
