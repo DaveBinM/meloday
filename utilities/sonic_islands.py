@@ -27,7 +27,7 @@ def analyze_and_export_isolation():
     meloday.prefetch_label_exclusions()
 
     music = meloday.plex.library.section(MUSIC_LIBRARY)
-    print(f"--- Analyzing Sonic Density (Excluding 'noshare' Albums) ---")
+    print(f"--- Analyzing Sonic Density (Excluding label-excluded albums) ---")
     print("Fetching all artists and tracks...")
 
     # Phase 1: Collect all eligible tracks and build the artist mapping.

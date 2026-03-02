@@ -100,7 +100,8 @@ PLEX_URL = config["plex"]["url"]
 PLEX_TOKEN = config["plex"]["token"]
 MUSIC_LIBRARY = config["plex"]["music_library"]
 CHRISTMAS_COLLECTION_NAME = config["plex"]["christmas_collection"]
-EXCLUDE_LABEL_NAME = config["plex"]["exclude_label"]
+_raw_exclude = config["plex"]["exclude_label"]
+EXCLUDE_LABEL_NAMES = [_raw_exclude] if isinstance(_raw_exclude, str) else list(_raw_exclude)
 
 # Playlist & Logic Rules
 EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
@@ -279,10 +280,11 @@ def prefetch_label_exclusions():
     global _excluded_album_keys
     try:
         music_library = plex.library.section(MUSIC_LIBRARY)
-        # One bulk API call to find everything with the exclusion label
-        excluded_albums = music_library.search(libtype='album', label=EXCLUDE_LABEL_NAME)
-        _excluded_album_keys = {str(a.ratingKey) for a in excluded_albums}
-        m_print(f"[OK] Pre-fetched {len(_excluded_album_keys)} albums with '{EXCLUDE_LABEL_NAME}' for exclusion.")
+        _excluded_album_keys = set()
+        for label in EXCLUDE_LABEL_NAMES:
+            excluded_albums = music_library.search(libtype='album', label=label)
+            _excluded_album_keys.update(str(a.ratingKey) for a in excluded_albums)
+        m_print(f"[OK] Pre-fetched {len(_excluded_album_keys)} excluded albums across {len(EXCLUDE_LABEL_NAMES)} label(s).")
     except Exception as e:
         m_print(f"[WARN] Failed pre-fetching label exclusions: {e}")
 
@@ -610,7 +612,7 @@ def _album_in_collection(album, collection_name: str) -> bool:
         return False
 
 def filter_excluded_tracks(tracks, now=None):
-    """Apply pre-fetched Christmas and 'noshare' exclusions."""
+    """Apply pre-fetched seasonal and label-based exclusions."""
     if not tracks:
         return []
     now = now or datetime.now()
@@ -625,9 +627,9 @@ def filter_excluded_tracks(tracks, now=None):
             log_text(f"[EXCLUSION] Track '{t.title}' skipped: Seasonal filtering.")
             continue
 
-        # Check pre-fetched 'noshare' set (Memory check)
+        # Check pre-fetched excluded label set (memory check)
         if parent_key in _excluded_album_keys:
-            log_text(f"[EXCLUSION] Track '{t.title}' skipped: Album has '{EXCLUDE_LABEL_NAME}' label.")
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: album has an exclusion label.")
             continue
 
         cleaned.append(t)
@@ -1788,7 +1790,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                     # C. FAST EXCLUSION CHECK
                     # Order matters: filter_excluded_tracks is O(1) set lookup (no API calls).
                     # filter_low_rated_tracks makes track.artist() API calls on cache misses.
-                    # Running the fast check first means excluded tracks (noshare, seasonal)
+                    # Running the fast check first means excluded tracks (label-excluded, seasonal)
                     # are dropped before any network round-trip is ever made.
                     if not filter_low_rated_tracks(filter_excluded_tracks([bridge])):
                         bridge_rejected_rks.add(bridge.ratingKey)
