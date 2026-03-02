@@ -20,7 +20,7 @@ Each update brings a **new cover, a new name, and a refreshed mix of tracks** th
 - **Balances variety** — Caps how much any single artist, style, genre, or mood can dominate the playlist
 - **Optional acoustic analysis** — Integrates Essentia to enhance sonic matching with BPM, musical key, energy level, and production era
 - **Automatically tunes itself** — An included optimiser analyses your library and listening history to recommend the best config settings
-- **Generates creative titles** — Pulls from a custom mood map for names like *Brash Vibrant Lo-Fi Study Wednesday Evening*
+- **Generates creative titles** — Pulls from a custom mood map for names like *Meloday • Nostalgic Lo-Fi & Indie Folk for Tuesday Morning*
 - **Applies custom covers and descriptions** — The playlist gets a new look every time it updates
 - **Runs unattended** — No manual curation needed; schedule it and forget about it
 
@@ -107,7 +107,9 @@ After ordering, it runs a **2-opt improvement pass** — testing pairwise swaps 
 
 ### 8. Creates a Title and Description
 
-Every playlist gets a unique name generated from the current listening mood, the time of day, and a custom mood map that expands common emotions into creative variations. "Cheerful" might become *Joyous*, *Sunny*, or *Jovial*. "Introspective" might become *Wistful*, *Pensive*, or *Contemplative*.
+Every playlist gets a unique name built from three elements: an informal descriptor drawn from the dominant mood via a custom mood map, the two most common style tags in the playlist, and the current day and time period. The format is `Meloday • {descriptor} {style1} & {style2} for {day} {period}` — for example, *Meloday • Nostalgic Lo-Fi & Indie Folk for Tuesday Morning*.
+
+The mood map translates mood labels into colloquial variations — "Cheerful" might become *Sunny* or *Jovial*, "Introspective" might become *Wistful* or *Pensive* — so the title reads naturally rather than sounding like a metadata dump. The description uses the formal mood name alongside the same style tags to give a more complete picture of the playlist's character.
 
 ### 9. Applies a Cover and Updates Plex
 
