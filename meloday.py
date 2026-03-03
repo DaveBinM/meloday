@@ -1952,7 +1952,9 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
 def generate_playlist_title_and_description(period, tracks):
     descriptor_map = load_descriptor_map(MOOD_MAP_PATH)
-    day_name = datetime.now().strftime("%A")
+    now = datetime.now()
+    dawn_start = time_periods.get("Dawn", {}).get("hours", [5])[0]
+    day_name = (now - timedelta(days=1) if now.hour < dawn_start else now).strftime("%A")
 
     # Use _resolve_tags() — the same resolution path as playlist selection —
     # so the title reflects what actually shaped the playlist, not just inline track tags.

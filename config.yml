@@ -52,26 +52,26 @@ fonts:
 
 
 time_periods:
-  Dawn: 
-    hours: [3, 4, 5]   
+  Dawn:
+    hours: [5, 6]
     cover: "dawn_blank.webp"
-  "Early Morning": 
-    hours: [6, 7, 8]
+  "Early Morning":
+    hours: [7, 8]
     cover: "early-morning_blank.webp"
-  Morning: 
+  Morning:
     hours: [9, 10, 11]
     cover: "morning_blank.webp"
-  Afternoon: 
-    hours: [12, 13, 14, 15]
+  Afternoon:
+    hours: [12, 13, 14, 15, 16]
     cover: "afternoon_blank.webp"
-  Evening: 
-    hours: [16, 17, 18]
+  Evening:
+    hours: [17, 18, 19, 20]
     cover: "evening_blank.webp"
-  Night: 
-    hours: [19, 20, 21]
+  Night:
+    hours: [21, 22, 23]
     cover: "night_blank.webp"
-  "Late Night": 
-    hours: [22, 23, 0, 1, 2]           
+  "Late Night":
+    hours: [0, 1, 2, 3, 4]
     cover: "late-night_blank.webp"
 
 files:
