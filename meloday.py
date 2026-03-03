@@ -2020,7 +2020,7 @@ def generate_playlist_title_and_description(period, tracks):
     else:
         mood_phrase = most_common_mood
     description = (
-        f"{article} {mood_phrase} mix of {tag_phrase} from your {day_name} {period_phrase} listening. "
+        f"{article} {mood_phrase.lower()} mix of {tag_phrase} from your {day_name} {period_phrase} listening. "
         f"{extra_info}"
     )
 
