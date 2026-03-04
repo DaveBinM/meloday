@@ -1853,10 +1853,9 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         # Also apply mood soft preference: deprioritise bridges that push a mood over limit
                         if b_moods and mood_counts[b_moods[0]] >= mood_limit:
                             over_limit = True
-                        # Era penalty: prefer bridges whose production era is close to both neighbours.
-                        # Scaled so a 30-year gap adds ~0.10 to the score — small enough not to
-                        # override a strong sonic match, but enough to break ties in favour of
-                        # era-compatible candidates. Ignored when year data is unavailable.
+                        # Era penalty: same squared curve as Essentia scoring — max 0.05 at 50+ years.
+                        # Era blending is intentional; sonic compatibility still dominates.
+                        # Ignored when year data is unavailable.
                         b_year = bm.get("year")
                         t1_year = m_cache.get(t1.ratingKey, {}).get("year")
                         t2_year = m_cache.get(t2.ratingKey, {}).get("year")
@@ -1865,7 +1864,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                             neighbour_years = [y for y in [t1_year, t2_year] if y]
                             if neighbour_years:
                                 avg_neighbour_year = sum(neighbour_years) / len(neighbour_years)
-                                era_penalty = min(0.10, abs(b_year - avg_neighbour_year) / 300)
+                                era_penalty = (min(abs(b_year - avg_neighbour_year) / 50.0, 1.0) ** 2) * ERA_WEIGHT
 
                         # Tuple sorts within-limits first (0), over-limits second (1), then by flow score.
                         # ratingKey is an int tiebreaker so Track objects are never compared directly.
