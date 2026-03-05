@@ -371,7 +371,7 @@ def load_essentia_cache():
 def save_essentia_cache():
     os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
     try:
-        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=120)
         _ensure_db_schema(conn)
         conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in _essentia_cache.items()])
         conn.commit()
@@ -385,7 +385,7 @@ def _upsert_cache_entries(entries):
         return
     os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
     try:
-        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=120)
         _ensure_db_schema(conn)
         conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in entries.items()])
         conn.commit()
@@ -534,7 +534,7 @@ def analysis_worker(track_id):
 
         # Process-Safe Plex Connection
         # Initialize a new local connection session for process isolation.
-        local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+        local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
         track = local_plex.fetchItem(track_id)
         return str(track_id), analyze_track_essentia(track)
     except Exception:
@@ -1136,7 +1136,13 @@ def fetch_historical_tracks(period):
     # This is now 4-5x faster because we resolve ~150 tracks instead of 695
     io_workers = get_optimal_workers(task_type="io")
     with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
-        resolved_list = list(executor.map(resolve_unique_track, unique_keys))
+        futures = {executor.submit(resolve_unique_track, rk): rk for rk in unique_keys}
+        resolved_list = []
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                resolved_list.append(future.result(timeout=120))
+            except Exception:
+                resolved_list.append(None)
     
     # 3. Create a map for lightning-fast reconstruction
     track_map = {t.ratingKey: t for t in resolved_list if t}
@@ -1409,7 +1415,14 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
 
     io_workers = get_optimal_workers(task_type="io")
     with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
-        fetched = list(executor.map(_fetch_one, reference_tracks))
+        futures = {executor.submit(_fetch_one, t): t for t in reference_tracks}
+        fetched = []
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                fetched.append(future.result(timeout=120))
+            except Exception as e:
+                m_print(f"Error fetching sonically similar tracks: {e}")
+                fetched.append((futures[future], []))
 
     for track, similars in fetched:
         filtered_similars = []
@@ -1596,8 +1609,13 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
     if tracks_needing_fetch:
         io_workers = get_optimal_workers(task_type="io")
         with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
-            for t_key, sims in executor.map(_fetch_similar, tracks_needing_fetch):
-                similarity_cache[t_key] = sims
+            futures = {executor.submit(_fetch_similar, t): t for t in tracks_needing_fetch}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    t_key, sims = future.result(timeout=120)
+                    similarity_cache[t_key] = sims
+                except Exception:
+                    pass
 
     # --- 1. BI-DIRECTIONAL GREEDY INITIALIZATION ---
     _dist_cache = {}
@@ -1781,7 +1799,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
             try:
                 # Retrieve pre-fetched results from the background thread.
                 # .result() blocks only if the fetch isn't done yet (rare for later gaps).
-                potential_bridges = _gap_futures[i].result()
+                potential_bridges = _gap_futures[i].result(timeout=30)
                 candidates = [] # Collector for Best-Fit
                 for bridge in potential_bridges:
 
@@ -1949,6 +1967,9 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                 removed_track = final_path[best_remove_idx]
                 log_text(f"[BRIDGE] Removed '{removed_track.title}' to minimize sonic impact during truncation.")
                 final_path.pop(best_remove_idx)
+            else:
+                log_text("[WARN] Smart truncation: no removable candidate found — stopping early.")
+                break
 
         m_print(f"[OK] Smart truncation complete. Playlist optimized at {MAX_TRACKS} tracks.")
 
@@ -2141,7 +2162,7 @@ def main():
 
     # NEW: Initialize global plex connection only here
     global plex
-    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
 
     log_text("=== MELODAY RUN STARTED ===")
 
@@ -2248,7 +2269,7 @@ def main():
                     futures = {executor.submit(analysis_worker, tid): tid for tid in to_analyze}
                     for future in concurrent.futures.as_completed(futures):
                         try:
-                            tid, data = future.result()
+                            tid, data = future.result(timeout=120)
                             if data:
                                 _essentia_cache[str(tid)] = data
                                 new_entries[str(tid)] = data

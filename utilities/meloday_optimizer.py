@@ -142,7 +142,7 @@ def run_optimizer():
         # ruamel.yaml.load preserves the structure and comments
         config = yaml.load(f)
 
-    plex = PlexServer(config['plex']['url'], config['plex']['token'])
+    plex = PlexServer(config['plex']['url'], config['plex']['token'], timeout=120)
     music = plex.library.section(config['plex']['music_library'])
     
     ess_cfg = config.get('essentia', {})
@@ -239,8 +239,11 @@ def run_optimizer():
         sonic_sample_limit = int(4.5 * MAX_TRACKS_CFG)
         futures = {executor.submit(get_track_data, t, cache_data, sonic_sample_limit): t for t in target_tracks}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(target_tracks), desc="Analyzing"):
-            res = future.result()
-            if res: results.append(res)
+            try:
+                res = future.result(timeout=120)
+                if res: results.append(res)
+            except Exception:
+                pass
 
         try:
             history = history_future.result(timeout=120)

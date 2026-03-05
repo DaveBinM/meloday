@@ -115,7 +115,7 @@ def check_track_neighborhood(track):
 def run_audit():
     print(f"--- Meloday Deep Density Audit ---")
     print("Connecting to Plex...")
-    plex = PlexServer(PLEX_URL, PLEX_TOKEN)
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
     music = plex.library.section(MUSIC_LIBRARY)
     print("Fetching library tracks...")
     tracks = music.searchTracks()
@@ -128,9 +128,12 @@ def run_audit():
     with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
         futures = {executor.submit(check_track_neighborhood, t): t for t in tracks}
         for future in tqdm(concurrent.futures.as_completed(futures), total=total, desc="Auditing"):
-            res = future.result()
-            if res:
-                results.append(res)
+            try:
+                res = future.result(timeout=120)
+                if res:
+                    results.append(res)
+            except Exception:
+                pass
 
     if not results:
         print("[ERROR] No results collected. Check Plex connection or library.")
