@@ -185,7 +185,7 @@ def bulk_analyze():
     _essentia_cache.update(current_cache)
 
     # Fetch all tracks as a flat list
-    local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=60)
+    local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
     music_section = local_plex_main.library.section(MUSIC_LIBRARY)
     log_msg("Fetching tracks from Plex... (This may take a minute)")
     all_tracks = music_section.search(libtype='track')
