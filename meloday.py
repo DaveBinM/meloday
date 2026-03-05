@@ -1642,9 +1642,12 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
 
     start_cost = total_cost(path)
     n = len(path)
+    max_passes = max(20, n)
     improved = True
-    while improved:
+    passes = 0
+    while improved and passes < max_passes:
         improved = False
+        passes += 1
         for i in range(n - 1):
             prev_i = first_track.ratingKey if i == 0 else path[i - 1].ratingKey
             for j in range(i + 1, n):
@@ -1654,9 +1657,13 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
                 if new < old:
                     path[i:j + 1] = path[i:j + 1][::-1]
                     improved = True
+                    break  # restart with correct edge values after path mutation
+            if improved:
+                break
 
     end_cost = total_cost(path)
-    log_text(f"[ORDERING] 2-opt refinement complete. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.")
+    capped = " (pass limit reached)" if passes >= max_passes else ""
+    log_text(f"[ORDERING] 2-opt refinement complete in {passes} pass(es){capped}. Sonic path cost reduced from {start_cost:.2f} to {end_cost:.2f}.")
     
     return path, similarity_cache, meta_cache
 
