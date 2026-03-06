@@ -160,6 +160,7 @@ CAMELOT_MAP = {
 
 # Daypart Logic
 PERIOD_PHRASES = config["period_phrases"]
+TITLE_PERIOD_NAMES = config.get("title_period_names", {})
 time_periods = config["time_periods"]
 
 # --- 3. SYSTEM INITIALIZATION ---
@@ -2022,8 +2023,20 @@ def generate_playlist_title_and_description(period, tracks):
     else:
         tag_phrase = "Eclectic"
 
-    period_phrase = get_period_phrase(period)
-    title = f"Meloday • {descriptor} {tag_phrase} for {day_name} {period}"
+    def _apply_day(template, day):
+        if "{day}" in template:
+            return template.replace("{day}", day)
+        return f"{day} {template}"
+
+    period_phrase = _apply_day(get_period_phrase(period), day_name)
+    title_period = _apply_day(TITLE_PERIOD_NAMES.get(period, get_period_phrase(period)), day_name)
+    _NOCAP = {"at", "in", "on", "of", "to", "and", "or", "but", "the", "a", "an"}
+    def _cover_case(s):
+        words = s.split()
+        return " ".join(w if w.lower() in _NOCAP else w.capitalize() for w in words)
+
+    title = f"Meloday • {descriptor} {tag_phrase} for {title_period}"
+    cover_title = f"Meloday • {descriptor} {tag_phrase} for {_cover_case(title_period)}"
 
     # Highlight tags for the description: prefer styles, then genres, then secondary moods.
     # Exclude whatever is already named in the title to avoid repetition.
@@ -2049,7 +2062,7 @@ def generate_playlist_title_and_description(period, tracks):
     else:
         mood_phrase = most_common_mood
     description = (
-        f"{article} {mood_phrase.lower()} mix of {tag_phrase} from your {day_name} {period_phrase} listening. "
+        f"{article} {mood_phrase.lower()} mix of {tag_phrase} from your {period_phrase} listening. "
         f"{extra_info}"
     )
 
@@ -2066,7 +2079,7 @@ def generate_playlist_title_and_description(period, tracks):
         next_update += timedelta(days=1)
 
     description += f"\n\nMade for {plex_user} • Next update at {next_update.strftime('%I:%M %p').lstrip('0')}."
-    return title, description
+    return title, cover_title, description
 
 def apply_text_to_cover(image_path, text):
     try:
@@ -2112,7 +2125,7 @@ def apply_text_to_cover(image_path, text):
         m_print(f"[WARN] apply_text_to_cover failed: {e}")
         return image_path
 
-def create_or_update_playlist(name, tracks, description, cover_file):
+def create_or_update_playlist(name, tracks, description, cover_file, cover_name=None):
     # Use server-side title filtering to avoid fetching all playlists on every run.
     # The Python filter is kept as a safeguard in case plexapi's match is broader than expected.
     existing_playlist = next((pl for pl in plex.playlists(title="Meloday") if str(getattr(pl, "title", "")).startswith("Meloday")), None)
@@ -2138,7 +2151,7 @@ def create_or_update_playlist(name, tracks, description, cover_file):
     cover_path = os.path.join(COVER_IMAGE_DIR, cover_file)
     if os.path.exists(cover_path):
         try:
-            new_cover = apply_text_to_cover(cover_path, name)
+            new_cover = apply_text_to_cover(cover_path, cover_name or name)
             playlist_obj.uploadPoster(filepath=new_cover)
             m_print(f"[OK] Uploaded poster: {new_cover}")
         except Exception as e:
@@ -2317,8 +2330,8 @@ def main():
 
     # Step 5: Playlist Update
     print_status(90, "Creating/Updating playlist...")
-    title, desc = generate_playlist_title_and_description(period, final_ordered_tracks)
-    create_or_update_playlist(title, final_ordered_tracks, desc, time_periods[period]['cover'])
+    title, cover_title, desc = generate_playlist_title_and_description(period, final_ordered_tracks)
+    create_or_update_playlist(title, final_ordered_tracks, desc, time_periods[period]['cover'], cover_name=cover_title)
     print_status(100, "Playlist creation/update complete!")
     log_text("=== MELODAY RUN COMPLETED SUCCESSFULLY ===")
 

@@ -78,10 +78,19 @@ files:
   mood_map: "assets/moodmap.json"             
 
 period_phrases:
-  Dawn: "dawn"
-  "Early Morning": "early morning"
+  Dawn: "at dawn"
+  "Early Morning": "early {day} morning"
   Morning: "morning"
   Afternoon: "afternoon"
   Evening: "evening"
   Night: "night"
-  "Late Night": "late-night"
+  "Late Night": "late {day} night"
+
+title_period_names:
+  Dawn: "at dawn"
+  "Early Morning": "early {day} morning"
+  Morning: "morning"
+  Afternoon: "afternoon"
+  Evening: "evening"
+  Night: "night"
+  "Late Night": "late {day} night"
