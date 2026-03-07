@@ -478,6 +478,28 @@ def analyze_track_essentia(track):
     file_path = get_local_path(track)
     if not file_path: return None
 
+    # RhythmExtractor2013 overflows its onset detection buffer on very long files
+    # (DJ mixes, continuous albums). Skip acoustic analysis for tracks over 30 minutes
+    # and cache metadata-only so the track can still appear in playlists.
+    duration_ms = getattr(track, "duration", 0) or 0
+    if duration_ms > 1_800_000:
+        track_year = getattr(track, "year", None)
+        if not track_year:
+            track_year = album_meta(track).get("year")
+        data = {
+            "bpm": None, "key": None, "energy": None,
+            "year": track_year,
+            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "genres": _resolve_tags(track, "genres"),
+            "styles": _resolve_tags(track, "styles"),
+            "moods":  _resolve_tags(track, "moods"),
+            "file_path": file_path,
+            "last_synced": now_ts,
+        }
+        log_text(f"[DIAGNOSTIC] Skipping Essentia for '{track.title}' ({duration_ms // 60000}m — too long for RhythmExtractor).")
+        _essentia_cache[rk] = data
+        return data
+
     try:
         loader = es.MonoLoader(filename=file_path)
         audio = loader()
