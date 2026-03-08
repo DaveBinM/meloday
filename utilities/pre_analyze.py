@@ -259,6 +259,11 @@ def bulk_analyze():
     try:
         futures = {executor.submit(analysis_worker, tid): tid for tid in to_process}
 
+        _CONN_ERROR_PHRASES = ("connection refused", "connection reset", "failed to establish", "connectionerror")
+        CONN_FAILURE_THRESHOLD = 5
+        consecutive_conn_failures = 0
+        aborted = False
+
         pending = set(futures.keys())
         while pending:
             done, pending = concurrent.futures.wait(
@@ -279,6 +284,14 @@ def bulk_analyze():
                     path = track_path_map.get(stuck_id, "path unknown")
                     logger.error(f"[HUNG] Stuck: Track ID={stuck_id} | File={path}")
                 completed += len(stuck_ids)
+                # Kill worker processes so they don't linger and print stale output
+                # after the main process has moved on. SIGALRM can't reliably interrupt
+                # C++ code in Essentia, so we forcefully terminate.
+                for proc in getattr(executor, "_processes", {}).values():
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
                 break
 
             for future in done:
@@ -287,16 +300,33 @@ def bulk_analyze():
                     rk, data, error = future.result()  # already done — returns immediately
 
                     if data:
+                        consecutive_conn_failures = 0
                         _essentia_cache[rk] = data
                         pending_saves[rk] = data
                         completed += 1
                     elif error:
                         log_msg(f"\n[SKIP] Track {track_id} failed: {error}", level="error")
                         completed += 1
+                        error_lower = str(error).lower()
+                        if any(p in error_lower for p in _CONN_ERROR_PHRASES):
+                            consecutive_conn_failures += 1
+                            if consecutive_conn_failures >= CONN_FAILURE_THRESHOLD:
+                                log_msg(
+                                    f"\n[ABORT] {CONN_FAILURE_THRESHOLD} consecutive connection failures — "
+                                    f"Plex appears to be down. Stopping early with {len(pending)} tracks remaining.",
+                                    level="error"
+                                )
+                                aborted = True
+                                break
+                        else:
+                            consecutive_conn_failures = 0
 
                 except Exception as e:
                     log_msg(f"\n[ERROR] Unexpected error on {track_id}: {e}", level="error")
                     completed += 1
+
+            if aborted:
+                break
 
                 # Periodic Save: time-based (every 2 min) with a size cap safety valve.
                 now = time.time()
