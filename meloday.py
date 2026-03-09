@@ -1754,27 +1754,6 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     artist_counts = Counter([norm_text(primary_artist(track_artist_name(t))) for t in path])
     artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
 
-    # Track mood/style/genre counts for soft diversity preference during bridge selection.
-    # Uses the same multi-depth logic as process_tracks(): count against all STYLE_TAG_DEPTH
-    # style slots per track so the over_limit check reflects true style saturation.
-    mood_counts  = Counter()
-    style_counts = Counter()
-    genre_counts = Counter()
-    for _t in path:
-        _t_moods = _resolve_tags(_t, "moods")
-        if _t_moods:
-            mood_counts[_t_moods[0]] += 1
-        _t_styles = _resolve_tags(_t, "styles")[:STYLE_TAG_DEPTH]
-        if _t_styles:
-            for _s in _t_styles:
-                style_counts[_s] += 1
-        else:
-            _t_genres = _resolve_tags(_t, "genres")
-            if _t_genres:
-                genre_counts[_t_genres[0]] += 1
-    mood_limit   = int(MAX_TRACKS * MOOD_RATIO)
-    style_limit  = int(MAX_TRACKS * STYLE_RATIO)
-    genre_limit  = int(MAX_TRACKS * GENRE_RATIO)
     
     now = datetime.now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
@@ -1906,16 +1885,6 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
                     # Logic: If both legs of the new path are better than the single original jump, it is a net improvement for the "flow."
                     if d1 < dist and d2 < dist:
-                        if b_styles:
-                            # over_limit if ANY checked style slot is saturated (hard cap)
-                            over_limit = any(style_counts[s] >= style_limit for s in b_styles)
-                        elif b_genres:
-                            over_limit = genre_counts[b_genres[0]] >= genre_limit
-                        else:
-                            over_limit = False
-                        # Also apply mood soft preference: deprioritise bridges that push a mood over limit
-                        if b_moods and mood_counts[b_moods[0]] >= mood_limit:
-                            over_limit = True
                         # Era penalty: same squared curve as Essentia scoring — max 0.05 at 50+ years.
                         # Era blending is intentional; sonic compatibility still dominates.
                         # Ignored when year data is unavailable.
@@ -1929,36 +1898,28 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                                 avg_neighbour_year = sum(neighbour_years) / len(neighbour_years)
                                 era_penalty = (min(abs(b_year - avg_neighbour_year) / 50.0, 1.0) ** 2) * ERA_WEIGHT
 
-                        # Tuple sorts within-limits first (0), over-limits second (1), then by flow score.
+                        # Sort by flow score alone — bridges are chosen for sonic fit, not diversity.
+                        # Style/genre balance is already enforced in process_tracks; applying it here
+                        # would sacrifice flow quality for marginal diversity gain on a handful of tracks.
                         # ratingKey is an int tiebreaker so Track objects are never compared directly.
-                        candidates.append((int(over_limit), d1 + d2 + era_penalty, bridge.ratingKey, bridge, b_identity, b_artist_norm, b_styles, b_genres))
+                        candidates.append((d1 + d2 + era_penalty, bridge.ratingKey, bridge, b_identity, b_artist_norm, b_styles, b_genres))
 
                 # F. SELECTION
                 if candidates:
-                    # Within-limits candidates sort first (flag=0), over-limits second (flag=1);
-                    # within each group, lowest combined flow score wins.
                     candidates.sort()
-                    over_limit_flag, best_score, _, best_bridge, b_identity, b_artist_norm, b_styles, b_genres = candidates[0]
+                    best_score, _, best_bridge, b_identity, b_artist_norm, b_styles, b_genres = candidates[0]
 
                     # E. AUDIO ANALYSIS (Only for the winner)
                     if ESSENTIA_ENABLED:
                         analyze_track_essentia(best_bridge)
 
-                    if over_limit_flag:
-                        log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting (style/genre limit exceeded — no within-limit option).")
-                    else:
-                        log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting.")
+                    log_text(f"[BRIDGE] Selected Best Fit: '{best_bridge.title}' (Combined Score: {best_score:.3f}). Inserting.")
                     final_path.append(best_bridge)
 
-                    # Update tracking sets, artist counter, and style/genre counts
+                    # Update tracking sets and artist counter
                     existing_identities.add(b_identity)
                     existing_keys.add(best_bridge.ratingKey)
                     artist_counts[b_artist_norm] += 1
-                    if b_styles:
-                        for _s in b_styles:
-                            style_counts[_s] += 1
-                    elif b_genres:
-                        genre_counts[b_genres[0]] += 1
                 else:
                     log_text(f"[BRIDGE] Failure: No suitable bridge found for {t1.title} -> {t2.title}.")
             except Exception as e:
