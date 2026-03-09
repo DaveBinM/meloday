@@ -61,11 +61,11 @@ def run_maintenance():
 
     try:
         # 1. Connect to Plex (safe fail point if Plex is down)
-        plex = PlexServer(PLEX_URL, PLEX_TOKEN)
+        plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
         music = plex.library.section(MUSIC_LIBRARY)
 
         log_admin("Fetching current library state from Plex...")
-        current_library_keys = {str(t.ratingKey) for t in music.search(libtype='track')}
+        current_library_keys = {str(t.ratingKey) for t in music.search(libtype='track', container_size=5000)}
 
         # Safety check for unmounted drives / empty library
         if not current_library_keys:
