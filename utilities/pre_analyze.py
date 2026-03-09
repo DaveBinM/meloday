@@ -328,18 +328,18 @@ def bulk_analyze():
             if aborted:
                 break
 
-                # Periodic Save: time-based (every 2 min) with a size cap safety valve.
-                now = time.time()
-                if pending_saves and (now - last_save >= 120 or len(pending_saves) >= 500):
-                    upsert_essentia_cache_entries(pending_saves)
-                    pending_saves.clear()
-                    last_save = now
+            # Periodic Save: time-based (every 2 min) with a size cap safety valve.
+            now = time.time()
+            if pending_saves and (now - last_save >= 120 or len(pending_saves) >= 500):
+                upsert_essentia_cache_entries(pending_saves)
+                pending_saves.clear()
+                last_save = now
 
-                # Update Progress UI
-                elapsed = now - start_time
-                avg = elapsed / max(1, completed)
-                est = timedelta(seconds=int((num_to_process - completed) * avg))
-                log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
+            # Update Progress UI
+            elapsed = now - start_time
+            avg = elapsed / max(1, completed)
+            est = timedelta(seconds=int((num_to_process - completed) * avg))
+            log_msg(f"Progress: [{completed}/{num_to_process}] | Est: {est} | Cache: {len(_essentia_cache)} ", end='\r')
 
     finally:
         # wait=False: don't block on any workers that may still be running (e.g. hung ones).
