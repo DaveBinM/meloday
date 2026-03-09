@@ -9,7 +9,7 @@ from plexapi.server import PlexServer
 from tqdm import tqdm
 import meloday
 from meloday import (
-    load_config, track_artist_name, primary_artist, get_optimal_workers
+    load_config, primary_artist, get_optimal_workers
 )
 
 # Load Meloday configuration
@@ -23,7 +23,7 @@ EXPORT_FILE = os.path.join(_PROJECT_ROOT, "isolated_artists_by_album.csv")
 
 def analyze_and_export_isolation():
     # 1. Initialize Plex and pre-fetch album-level exclusions
-    meloday.plex = PlexServer(PLEX_URL, PLEX_TOKEN)
+    meloday.plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
     meloday.prefetch_label_exclusions()
 
     music = meloday.plex.library.section(MUSIC_LIBRARY)
@@ -31,21 +31,24 @@ def analyze_and_export_isolation():
     print("Fetching all artists and tracks...")
 
     # Phase 1: Collect all eligible tracks and build the artist mapping.
-    # artist.tracks() calls are fast (metadata only) — keeping them sequential
-    # avoids hammering Plex with concurrent library API calls during collection.
+    # Fetching all tracks in bulk (container_size=5000) is far faster than fetching
+    # per-artist via artist.tracks() — the latter makes one API call per artist.
+    # grandparentTitle is the album artist, consistent with the previous artist-based approach.
     track_to_artist = {}   # ratingKey -> artist_name
     eligible_tracks = []
 
-    all_artists = music.search(libtype='artist')
-    for artist in tqdm(all_artists, desc="Collecting tracks"):
-        artist_name = primary_artist(artist.title)
-        for track in artist.tracks():
-            if str(track.parentRatingKey) in meloday._excluded_album_keys:
-                continue
-            track_to_artist[track.ratingKey] = artist_name
-            eligible_tracks.append(track)
+    print("Fetching tracks from Plex... (This may take a minute)")
+    all_tracks = music.search(libtype='track', container_size=5000)
+    artist_set = set()
+    for track in tqdm(all_tracks, desc="Collecting tracks"):
+        if str(track.parentRatingKey) in meloday._excluded_album_keys:
+            continue
+        artist_name = primary_artist(getattr(track, 'grandparentTitle', '') or '')
+        track_to_artist[track.ratingKey] = artist_name
+        eligible_tracks.append(track)
+        artist_set.add(artist_name)
 
-    print(f"Found {len(eligible_tracks)} eligible tracks across {len(all_artists)} artists.")
+    print(f"Found {len(eligible_tracks)} eligible tracks across {len(artist_set)} artists.")
 
     if not eligible_tracks:
         print("[ERROR] No eligible tracks found.")
@@ -65,7 +68,7 @@ def analyze_and_export_isolation():
     with concurrent.futures.ThreadPoolExecutor(max_workers=io_workers) as executor:
         futures = {executor.submit(check_track, t): t for t in eligible_tracks}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(eligible_tracks), desc="Analyzing"):
-            rk, count = future.result()
+            rk, count = future.result(timeout=120)
             artist_map[track_to_artist[rk]].append(count)
 
     # 3. Calculate averages for artists who have eligible (non-excluded) tracks
