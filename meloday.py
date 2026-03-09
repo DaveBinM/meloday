@@ -421,7 +421,7 @@ def analyze_track_essentia(track):
     # Metadata Update Handling
     # If the track is already in the cache, we refresh the text fields from Plex
     # to ensure changes to genres/moods/artist names are captured.
-    if rk in _essentia_cache and "energy" in _essentia_cache[rk]:
+    if rk in _essentia_cache and _essentia_cache[rk].get("energy") is not None:
         data = _essentia_cache[rk]
         
         # Throttled Metadata Syncing
@@ -570,7 +570,7 @@ def get_bpm_distance(bpm1, bpm2):
     return min(min(diffs) / 20.0, 1.0)
 
 def get_harmonic_distance(key1, key2):
-    if key1 == "0A" or key2 == "0A": return 0.5
+    if not key1 or not key2 or key1 == "0A" or key2 == "0A": return 0.5
     idx1, type1 = int(key1[:-1]), key1[-1]
     idx2, type2 = int(key2[:-1]), key2[-1]
     dist = abs(idx1 - idx2)
@@ -1556,7 +1556,7 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
     # 2. Add Essentia Logic for Tempo, Key, Energy, and Era
     if ESSENTIA_ENABLED:
         ea, eb = _essentia_cache.get(str(ka)), _essentia_cache.get(str(kb))
-        if ea and eb and "energy" in ea and "energy" in eb:
+        if ea and eb and ea.get("energy") is not None and eb.get("energy") is not None:
             # Tempo & Key - Squaring the distance to penalize "jumps" over "flows"
             dist += ((get_bpm_distance(ea["bpm"], eb["bpm"]) ** 2) * BPM_WEIGHT)
             dist += ((get_harmonic_distance(ea["key"], eb["key"]) ** 2) * KEY_WEIGHT)
