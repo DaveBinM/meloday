@@ -187,10 +187,15 @@ def bulk_analyze():
     # Fetch all tracks as a flat list.
     # Use a longer timeout here — fetching 50k+ tracks in a single response can take
     # several minutes, well beyond the 120s used for normal per-track API calls.
-    local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
-    music_section = local_plex_main.library.section(MUSIC_LIBRARY)
-    log_msg("Fetching tracks from Plex... (This may take a minute)")
-    all_tracks = music_section.search(libtype='track', container_size=5000)
+    try:
+        local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
+        music_section = local_plex_main.library.section(MUSIC_LIBRARY)
+        log_msg("Fetching tracks from Plex... (This may take a minute)")
+        all_tracks = music_section.search(libtype='track', container_size=5000)
+    except Exception as e:
+        log_msg(f"[ERROR] Failed to fetch tracks from Plex: {e}", level="error")
+        log_msg("[ERROR] Check that Plex is reachable and try again.", level="error")
+        return
 
     # 1. Filter the processing list to avoid redundant work
     now_ts = datetime.now().timestamp()
