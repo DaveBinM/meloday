@@ -1054,14 +1054,14 @@ def print_status(percent, message):
 
 # ---------------------------------------------------------------------
 def get_effective_now():
-    """Return the current time in the travel timezone if today falls within any
-    configured travel window, otherwise return local time. Stripping tzinfo after
-    conversion keeps all downstream code timezone-naive."""
-    today = date.today()
+    """Return the current time in the travel timezone if the destination's current
+    date falls within any configured travel window, otherwise return local time.
+    Stripping tzinfo after conversion keeps all downstream code timezone-naive."""
     for trip in config.get("travel", []):
         try:
-            if date.fromisoformat(trip["start"]) <= today <= date.fromisoformat(trip["end"]):
-                return datetime.now(tz=ZoneInfo(trip["timezone"])).replace(tzinfo=None)
+            dest_now = datetime.now(tz=ZoneInfo(trip["timezone"]))
+            if date.fromisoformat(trip["start"]) <= dest_now.date() <= date.fromisoformat(trip["end"]):
+                return dest_now.replace(tzinfo=None)
         except Exception:
             pass
     return datetime.now()
@@ -2109,7 +2109,7 @@ def generate_playlist_title_and_description(period, tracks):
     except Exception:
         plex_user = "you"
 
-    now = datetime.now()
+    now = get_effective_now()
     next_update_hour = (time_periods[period]["hours"][-1] + 1) % 24
     next_update = now.replace(hour=next_update_hour, minute=0, second=0)
     if next_update_hour < now.hour:
@@ -2215,6 +2215,22 @@ def main():
     plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
 
     log_text("=== MELODAY RUN STARTED ===")
+
+    # Log travel timezone if active
+    for trip in config.get("travel", []):
+        try:
+            dest_now = datetime.now(tz=ZoneInfo(trip["timezone"]))
+            if date.fromisoformat(trip["start"]) <= dest_now.date() <= date.fromisoformat(trip["end"]):
+                msg = (
+                    f"[TRAVEL] Timezone active: {trip['timezone']} "
+                    f"({dest_now.strftime('%A %d %B %Y, %H:%M')}) "
+                    f"[window: {trip['start']} → {trip['end']}]"
+                )
+                log_text(msg)
+                print(msg)
+                break
+        except Exception:
+            pass
 
     # NEW: Run environment validation
     if not validate_environment():
