@@ -41,13 +41,13 @@ Meloday divides the day into **seven named periods**, each mapped to a set of ho
 
 | Period | Hours |
 | --- | --- |
-| Dawn | 3 – 5 |
-| Early Morning | 6 – 8 |
+| Dawn | 5 – 6 |
+| Early Morning | 7 – 8 |
 | Morning | 9 – 11 |
-| Afternoon | 12 – 15 |
-| Evening | 16 – 18 |
-| Night | 19 – 21 |
-| Late Night | 22 – 2 |
+| Afternoon | 12 – 16 |
+| Evening | 17 – 20 |
+| Night | 21 – 23 |
+| Late Night | 0 – 4 |
 
 The periods and their hours are fully configurable in `config.yml`.
 
@@ -107,7 +107,9 @@ After ordering, it runs a **2-opt improvement pass** — testing pairwise swaps 
 
 ### 8. Creates a Title and Description
 
-Every playlist gets a unique name built from three elements: an informal descriptor drawn from the dominant mood via a custom mood map, the two most common style tags in the playlist, and the current day and time period. The format is `Meloday • {descriptor} {style1} & {style2} for {day} {period}` — for example, *Meloday • Nostalgic Lo-Fi & Indie Folk for Tuesday Morning*.
+Every playlist gets a unique name built from three elements: an informal descriptor drawn from the dominant mood via a custom mood map, the two most common style tags in the playlist, and the current day and time period. The format is `Meloday • {descriptor} {style1} & {style2} for {day} {period}` — for example, *Meloday • Nostalgic Lo-Fi & Indie Folk for Tuesday morning*.
+
+Period names use natural phrasing in the playlist title — e.g. *for Tuesday morning*, *for late Tuesday night*, *for Tuesday at dawn* — and are capitalised on the cover art. Both are configurable via `period_phrases` (used in the description) and `title_period_names` (used in the title and cover) in `config.yml`.
 
 The mood map translates mood labels into colloquial variations — "Cheerful" might become *Sunny* or *Jovial*, "Introspective" might become *Wistful* or *Pensive* — so the title reads naturally rather than sounding like a metadata dump. The description uses the formal mood name alongside the same style tags to give a more complete picture of the playlist's character.
 
@@ -139,6 +141,8 @@ Meloday also integrates with **[Essentia](https://essentia.upf.edu/)**, an open-
 - **Production era** — keeps the sonic palette coherent across decades
 
 To enable, set `essentia: enabled: true` in `config.yml` and re-run `pre_analyze.py`. It will upgrade existing metadata-only cache entries with acoustic data without re-fetching the Plex metadata.
+
+> **Note:** Tracks longer than 30 minutes (DJ mixes, continuous albums) are automatically skipped for acoustic analysis — Essentia's rhythm extractor can't process files of that length. They are still cached with metadata and can appear in playlists; they just won't contribute to BPM, key, or energy matching.
 
 See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails on your platform.
 
@@ -255,6 +259,22 @@ Your playlist will be created or updated in Plex.
 
 ## Configuration Reference
 
+### `travel:`
+
+An optional list of travel windows. When the current date falls within a window, Meloday uses the specified timezone for period detection and day naming instead of local server time. Handles DST automatically via IANA timezone names.
+
+```yaml
+travel:
+  - timezone: "Europe/London"   # IANA timezone name
+    start: "2025-12-10"         # First day away (YYYY-MM-DD)
+    end: "2026-01-11"           # Last day away (YYYY-MM-DD)
+  - timezone: "America/New_York"
+    start: "2026-05-10"
+    end: "2026-05-20"
+```
+
+Remove or leave empty when not travelling. Multiple trips can be listed and are matched in order.
+
 ### `plex:`
 
 | Key | Description |
@@ -318,6 +338,14 @@ seasonal:
 
 Seven named periods covering the full day. Each has a list of `hours` (0–23) and a `cover` image filename. Fully customisable — you can rename periods, change their hours, or add your own.
 
+### `period_phrases:`
+
+Controls how each period is referred to in the playlist **description** — e.g. `"from your late Thursday night listening"`. Supports a `{day}` placeholder for periods where the day name sits inside the phrase (e.g. `"late {day} night"`).
+
+### `title_period_names:`
+
+Controls how each period is referred to in the **playlist title** and **cover art**. Uses the same `{day}` placeholder convention as `period_phrases`. The title uses these values as-is (lowercase); the cover art capitalises them automatically.
+
 ---
 
 ## Automating
@@ -339,9 +367,9 @@ Here's an example cron setup (macOS/Linux):
 45 0 1 * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_optimizer.py ALL
 
 # --- PLAYLIST GENERATION ---
-# Refresh at the start of each time period (Dawn, Early Morning, Morning,
-# Afternoon, Evening, Night, Late Night)
-0 3,6,9,12,16,19,22 * * * /path/to/.venv/bin/python /path/to/meloday/meloday.py
+# Refresh at the start of each time period (Late Night, Dawn, Early Morning,
+# Morning, Afternoon, Evening, Night)
+0 0,5,7,9,12,17,21 * * * /path/to/.venv/bin/python /path/to/meloday/meloday.py
 ```
 
 On **Windows**, use Task Scheduler to create equivalent triggers for each of the above.
