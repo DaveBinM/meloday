@@ -1,3 +1,8 @@
+travel:
+  - timezone: "Europe/London"                       # IANA timezone name for travel period
+    start: "2025-12-10"                             # First day away (YYYY-MM-DD)
+    end: "2026-01-11"                               # Last day away (YYYY-MM-DD)
+
 plex:
   url: "http://localhost:32400"                     # The URL of your Plex Media Server
   token: "YOUR_PLEX_TOKEN"                          # Your Plex API authentication token

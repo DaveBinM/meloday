@@ -15,7 +15,8 @@ import concurrent.futures
 import multiprocessing
 import logging
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
 from collections import Counter
 from plexapi.server import PlexServer
 from plexapi.audio import Track
@@ -1052,9 +1053,23 @@ def print_status(percent, message):
     m_print(f"[{bar}] {percent:3d}%  {message}")
 
 # ---------------------------------------------------------------------
+def get_effective_now():
+    """Return the current time in the travel timezone if today falls within any
+    configured travel window, otherwise return local time. Stripping tzinfo after
+    conversion keeps all downstream code timezone-naive."""
+    today = date.today()
+    for trip in config.get("travel", []):
+        try:
+            if date.fromisoformat(trip["start"]) <= today <= date.fromisoformat(trip["end"]):
+                return datetime.now(tz=ZoneInfo(trip["timezone"])).replace(tzinfo=None)
+        except Exception:
+            pass
+    return datetime.now()
+
+# ---------------------------------------------------------------------
 def get_current_time_period():
     """Determine which daypart the current hour belongs to."""
-    current_hour = datetime.now().hour
+    current_hour = get_effective_now().hour
 
     for period, details in time_periods.items():
         if current_hour in details["hours"]:
@@ -2002,7 +2017,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
 def generate_playlist_title_and_description(period, tracks):
     descriptor_map = load_descriptor_map(MOOD_MAP_PATH)
-    now = datetime.now()
+    now = get_effective_now()
     dawn_start = time_periods.get("Dawn", {}).get("hours", [5])[0]
     day_name = (now - timedelta(days=1) if now.hour < dawn_start else now).strftime("%A")
 
