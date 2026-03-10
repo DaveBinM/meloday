@@ -891,7 +891,7 @@ _VERSION_KEYWORDS_SORTED = sorted([
 ], key=len, reverse=True)
 _FEATURING_RES = [re.compile(p, re.IGNORECASE) for p in [
     r"\(feat\.?.*?\)", r"\[feat\.?.*?\]", r"\(ft\.?.*?\)", r"\[ft\.?.*?\]",
-    r"\bfeat\.?\s+\w+", r"\bfeaturing\s+\w+", r"\bft\.?\s+\w+",
+    r"\bfeat\.?\s+\w+(?:\s+\w+)*", r"\bfeaturing\s+\w+(?:\s+\w+)*", r"\bft\.?\s+\w+(?:\s+\w+)*",
     r" - .*mix$", r" - .*dub$", r" - .*remix$", r" - .*edit$", r" - .*version$",
 ]]
 _KW_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _VERSION_KEYWORDS_SORTED)
@@ -1355,7 +1355,8 @@ def process_tracks(tracks):
                 continue
 
             title_key = norm_text(clean_title(track.title))
-            artist_key = norm_text(primary_artist(track_artist_name(track)))
+            orig = getattr(track, "originalTitle", None)
+            artist_key = norm_text(primary_artist(orig)) if orig else norm_text(primary_artist(track_artist_name(track)))
             track_key = (title_key, artist_key)
 
             if track_key in best_by_key:
@@ -1383,7 +1384,8 @@ def process_tracks(tracks):
 
     for track in deduped_tracks:
         try:
-            artist_name = norm_text(primary_artist(track_artist_name(track)))
+            orig = getattr(track, "originalTitle", None)
+            artist_name = norm_text(primary_artist(orig)) if orig else norm_text(primary_artist(track_artist_name(track)))
             if artist_count[artist_name] >= artist_limit:
                 rejected_artist += 1
                 continue
@@ -1742,12 +1744,18 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     final_path = []
     
     # Safety and Deduplication Logic
-    # Track identity by (Normalized Title, Normalized Artist) to catch duplicates across different albums
-    # Safety and Deduplication Logic
-    existing_identities = {
-        (norm_text(clean_title(t.title)), norm_text(primary_artist(track_artist_name(t)))) 
-        for t in path
-    }
+    # Track identity by (Normalized Title, Normalized Artist) to catch duplicates across different albums.
+    # We prefer originalTitle (track-level artist) over grandparentTitle (album artist) so that a track
+    # appearing in a DJ set (album artist = DJ, track artist = real artist) registers under the real
+    # artist rather than the DJ — preventing false positives when the DJ has their own unrelated song
+    # with the same title.
+    def _track_identity(t):
+        title_key = norm_text(clean_title(t.title))
+        orig = getattr(t, "originalTitle", None)
+        artist_key = norm_text(primary_artist(orig)) if orig else norm_text(primary_artist(track_artist_name(t)))
+        return title_key, artist_key
+
+    existing_identities = {_track_identity(t) for t in path}
     existing_keys = {t.ratingKey for t in path}
     
     # Track artist counts to respect global limits (matching process_tracks logic)
@@ -1841,10 +1849,13 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
                     b_artist_raw = track_artist_name(bridge)
                     b_artist_norm = norm_text(primary_artist(b_artist_raw))
-                    b_identity = (norm_text(clean_title(bridge.title)), b_artist_norm)
-                    
-                    # Dedupe check
-                    if b_identity in existing_identities:
+                    b_title_key = norm_text(clean_title(bridge.title))
+                    b_identity = (b_title_key, b_artist_norm)
+                    b_orig = getattr(bridge, "originalTitle", None)
+                    b_track_artist_norm = norm_text(primary_artist(b_orig)) if b_orig else b_artist_norm
+
+                    # Dedupe check: match on album artist identity OR track artist identity
+                    if b_identity in existing_identities or (b_title_key, b_track_artist_norm) in existing_identities:
                         d_print(f"  [!] Skipping '{bridge.title}': Already in selection.")
                         continue
 
@@ -1918,6 +1929,11 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
                     # Update tracking sets and artist counter
                     existing_identities.add(b_identity)
+                    best_b_orig = getattr(best_bridge, "originalTitle", None)
+                    if best_b_orig:
+                        best_b_track_artist = norm_text(primary_artist(best_b_orig))
+                        if best_b_track_artist != b_artist_norm:
+                            existing_identities.add((b_identity[0], best_b_track_artist))
                     existing_keys.add(best_bridge.ratingKey)
                     artist_counts[b_artist_norm] += 1
                 else:
