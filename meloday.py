@@ -188,16 +188,26 @@ def get_optimal_workers(task_type="cpu"):
             try:
                 import psutil
                 physical = psutil.cpu_count(logical=False) or logical
-                source = "psutil"
+
+                # Cap by available RAM — Essentia's MonoLoader decodes the full audio file
+                # into a float32 array in memory. Peak per-worker usage (Python process base
+                # + Essentia C++ buffers + decoded audio) is roughly 500 MB for typical tracks.
+                # Reserve 15% of available RAM (min 1 GB) as headroom for the OS and other
+                # processes that continue running during analysis.
+                available_bytes = psutil.virtual_memory().available
+                headroom = max(1024 ** 3, int(available_bytes * 0.15))
+                ram_workers = max(1, (available_bytes - headroom) // (500 * 1024 * 1024))
+                assigned = max(1, min(physical, ram_workers))
+                tier_reason = (
+                    f"CPU-bound | Physical cores: {physical} (psutil) | "
+                    f"RAM: {available_bytes / 1024 ** 3:.1f} GB available → cap {ram_workers} workers"
+                )
             except ImportError:
                 # Approximate: assume 2 threads per core (x86 hyperthreading).
                 # Slightly conservative for non-HT chips (ARM NAS, some AMD), but always safe.
                 physical = max(1, logical // 2) if logical > 2 else logical
-                source = "estimated"
-            # Use all physical cores — the main process is idle (blocked on executor.map/as_completed)
-            # while workers run, so there is nothing to reserve a core for.
-            assigned = max(1, physical)
-            tier_reason = f"CPU-bound | Physical cores: {physical} ({source})"
+                assigned = max(1, physical)
+                tier_reason = f"CPU-bound | Physical cores: {physical} (estimated)"
 
         elif task_type == "io":
             # Threads release the GIL during network waits, so we can run far more than
