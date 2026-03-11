@@ -17,6 +17,8 @@ essentia:
   key_weight: 0.15                                  # Influence of harmonic compatibility on track distance
   energy_weight: 0.10                               # Influence of loudness consistency
   era_weight: 0.05                                  # Influence of production era (year)
+  danceability_weight: 0.08                         # Influence of rhythmic danceability difference
+  brightness_weight: 0.06                           # Influence of spectral brightness (tonal darkness vs brightness)
   path_mapping: {}                                  # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
 
 bridging:

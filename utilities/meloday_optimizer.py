@@ -337,6 +337,11 @@ def run_optimizer():
     # essentia_hits remains sample-based — it's only used for the hit_rate diagnostic below.
     essentia_hits = sum(1 for r in results if r['has_essentia'])
     essentia_results_exist = any(entry.get('bpm') for entry in cache_data.values())
+    dance_tagged = sum(1 for entry in cache_data.values() if entry.get('danceability') is not None)
+    bright_tagged = sum(1 for entry in cache_data.values() if entry.get('brightness') is not None)
+    dance_coverage_pct = (dance_tagged / max(1, len(cache_data))) * 100
+    bright_coverage_pct = (bright_tagged / max(1, len(cache_data))) * 100
+
     if essentia_results_exist:
         w_bpm    = get_weight([entry['bpm']    for entry in cache_data.values() if entry.get('bpm')],    0.12)
         w_energy = get_weight([abs(entry['energy']) for entry in cache_data.values() if entry.get('energy')], 0.08)
@@ -344,7 +349,9 @@ def run_optimizer():
         # Raw years (mean ≈ 2011) give CoV ≈ 0.006 — nearly zero — so the formula
         # would always return the base value of 0.03 regardless of era spread.
         # Centering gives a meaningful CoV: e.g. stdev=12, mean_from_1950=61 → CoV=0.20.
-        w_era    = get_weight([entry['year'] - 1950 for entry in cache_data.values() if entry.get('year')], 0.03)
+        w_era          = get_weight([entry['year'] - 1950 for entry in cache_data.values() if entry.get('year')], 0.03)
+        w_danceability = get_weight([entry['danceability'] for entry in cache_data.values() if entry.get('danceability') is not None], 0.05)
+        w_brightness   = get_weight([entry['brightness']   for entry in cache_data.values() if entry.get('brightness')   is not None], 0.04)
     
     # Two signals used for exclusion and lookback recommendations:
     #   play_ratio   — coverage: % of library explored in 3 months.
@@ -492,6 +499,11 @@ def run_optimizer():
         log_msg(f"  key_weight: {rec_key_weight:.2f}")
         log_msg(f"  energy_weight: {w_energy:.2f}")
         log_msg(f"  era_weight: {w_era:.2f}")
+        log_msg(f"  danceability_weight: {w_danceability:.2f}  ({dance_coverage_pct:.0f}% coverage)")
+        log_msg(f"  brightness_weight: {w_brightness:.2f}      ({bright_coverage_pct:.0f}% coverage)")
+        if dance_coverage_pct < 50:
+            log_msg(f"\n[NOTE] Only {dance_coverage_pct:.1f}% of cached tracks have danceability/brightness data.")
+            log_msg(f"       Run pre_analyze.py to backfill — weights will be more accurate with higher coverage.")
     else:
         log_msg("\n[INFO] Acoustic weight recommendations (bpm_weight, key_weight, energy_weight, era_weight) skipped —")
         log_msg("       no Essentia data found in cache. Set essentia: enabled: true in config.yml and")
@@ -515,6 +527,8 @@ def run_optimizer():
             config['essentia']['key_weight'] = rec_key_weight
             config['essentia']['energy_weight'] = w_energy
             config['essentia']['era_weight'] = w_era
+            config['essentia']['danceability_weight'] = w_danceability
+            config['essentia']['brightness_weight'] = w_brightness
 
         with open(config_path, 'w', encoding='utf-8') as f:
             # Saving with the YAML object preserves comments

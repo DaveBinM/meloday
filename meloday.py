@@ -10,6 +10,7 @@ import json
 import functools
 import unicodedata
 import sqlite3
+import shutil
 import traceback
 import concurrent.futures
 import multiprocessing
@@ -129,6 +130,8 @@ BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
 KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
 ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
 ERA_WEIGHT = ess_cfg.get("era_weight", 0.05)
+DANCEABILITY_WEIGHT = ess_cfg.get("danceability_weight", 0.08)
+BRIGHTNESS_WEIGHT = ess_cfg.get("brightness_weight", 0.06)
 PATH_MAPPING = ess_cfg.get("path_mapping", {})
 
 # Bridging Configuration
@@ -304,25 +307,63 @@ def prefetch_label_exclusions():
 
 _UPSERT_SQL = """
     INSERT OR REPLACE INTO essentia_cache
-    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced, danceability, brightness)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
+_CANONICAL_COLUMNS = (
+    "rating_key TEXT PRIMARY KEY NOT NULL, "
+    "bpm REAL, key TEXT, energy REAL, danceability REAL, brightness REAL, "
+    "year INTEGER, artist TEXT, genres TEXT, styles TEXT, moods TEXT, "
+    "file_path TEXT, last_synced REAL"
+)
+
 def _ensure_db_schema(conn):
-    """Creates the essentia_cache table and sets optimal WAL pragmas."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS essentia_cache (
-            rating_key TEXT PRIMARY KEY NOT NULL,
-            bpm REAL, key TEXT, energy REAL, year INTEGER,
-            artist TEXT, genres TEXT, styles TEXT, moods TEXT,
-            file_path TEXT, last_synced REAL
-        )
-    """)
-    # Migrate existing databases that pre-date the styles column
-    try:
-        conn.execute("ALTER TABLE essentia_cache ADD COLUMN styles TEXT")
-    except Exception:
-        pass  # Column already exists
+    """Creates or migrates the essentia_cache table to the canonical schema."""
+    conn.execute(f"CREATE TABLE IF NOT EXISTS essentia_cache ({_CANONICAL_COLUMNS})")
+    conn.execute("PRAGMA journal_mode=WAL")
+
+    # Step 1: Add any columns missing from older databases
+    for col_name, col_def in (("styles", "styles TEXT"), ("danceability", "danceability REAL"), ("brightness", "brightness REAL")):
+        try:
+            conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
+            m_print(f"[INFO] DB migration: added column '{col_name}' to essentia_cache.")
+        except Exception:
+            pass  # Column already exists
+
+    # Step 2: Migrate column order if danceability/brightness were appended via ALTER TABLE
+    # rather than created in the canonical position (after energy, before year).
+    col_names = [row[1] for row in conn.execute("PRAGMA table_info(essentia_cache)").fetchall()]
+    if "danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1:
+        m_print("[INFO] DB migration: column order out of canonical sequence — reordering table...")
+        # Back up the database file before any destructive schema reorder
+        try:
+            db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+            backup_path = db_path + ".pre_reorder.bak"
+            if db_path and not os.path.exists(backup_path):
+                shutil.copy2(db_path, backup_path)
+                m_print(f"[INFO] DB migration: database backed up to {os.path.basename(backup_path)}.")
+            elif os.path.exists(backup_path):
+                m_print(f"[INFO] DB migration: backup already exists, skipping backup.")
+        except Exception as backup_err:
+            m_print(f"[WARN] DB migration: could not back up database: {backup_err}")
+        try:
+            conn.execute("DROP TABLE IF EXISTS essentia_cache_reordered")
+            conn.execute(f"CREATE TABLE essentia_cache_reordered ({_CANONICAL_COLUMNS})")
+            conn.execute("""
+                INSERT INTO essentia_cache_reordered
+                SELECT rating_key, bpm, key, energy, danceability, brightness,
+                       year, artist, genres, styles, moods, file_path, last_synced
+                FROM essentia_cache
+            """)
+            conn.commit()
+            conn.execute("DROP TABLE essentia_cache")
+            conn.execute("ALTER TABLE essentia_cache_reordered RENAME TO essentia_cache")
+            conn.commit()
+            m_print("[INFO] DB migration: column reorder complete.")
+        except Exception as reorder_err:
+            m_print(f"[ERROR] DB migration: column reorder failed: {reorder_err}")
+
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
 
@@ -330,16 +371,18 @@ def _entry_to_row(rk, d):
     return (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
             d.get("artist"), json.dumps(d.get("genres") or []),
             json.dumps(d.get("styles") or []),
-            json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
+            json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"),
+            d.get("danceability"), d.get("brightness"))
 
 def _row_to_entry(row):
-    rk, bpm, key, energy, year, artist, genres_j, styles_j, moods_j, file_path, last_synced = row
+    rk, bpm, key, energy, danceability, brightness, year, artist, genres_j, styles_j, moods_j, file_path, last_synced = row
     return rk, {
-        "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
+        "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
+        "year": year, "artist": artist,
         "genres": json.loads(genres_j) if genres_j else [],
         "styles": json.loads(styles_j) if styles_j else [],
         "moods": json.loads(moods_j) if moods_j else [],
-        "file_path": file_path, "last_synced": last_synced
+        "file_path": file_path, "last_synced": last_synced,
     }
 
 def _migrate_json_to_sqlite():
@@ -371,7 +414,7 @@ def load_essentia_cache():
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         _ensure_db_schema(conn)
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, last_synced "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -419,6 +462,53 @@ def get_local_path(track):
         m_print(f"[DIAGNOSTIC] File not found: {path}")
         return None
 
+def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
+    """Compute any missing acoustic fields in data in-place.
+    Loads audio from file_path only if at least one field needs computing.
+    If audio is already loaded (full analysis path), pass it to avoid a second decode.
+    Only runs the algorithms required for the missing fields."""
+    needs_bpm        = data.get("bpm") is None
+    needs_key        = data.get("key") is None
+    needs_energy     = data.get("energy") is None
+    needs_dance      = data.get("danceability") is None
+    needs_brightness = data.get("brightness") is None
+
+    if not any([needs_bpm, needs_key, needs_energy, needs_dance, needs_brightness]):
+        return
+
+    if audio is None:
+        audio = es.MonoLoader(filename=file_path)()
+
+    if needs_bpm:
+        bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
+        if bpm >= 250:
+            bpm_retry = es.RhythmExtractor2013(method="degara")(audio)[0]
+            bpm = bpm_retry if bpm_retry < 250 else None
+            if bpm is None and track_title:
+                log_text(f"[WARN] BPM >= 250 for '{track_title}' after retry — storing as null (excluded from weight calculations).")
+        data["bpm"] = round(bpm, 2) if bpm is not None else None
+
+    if needs_key:
+        key_alg = es.KeyExtractor()(audio)
+        data["key"] = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
+
+    if needs_energy:
+        audio_stereo = es.StereoMuxer()(audio, audio)
+        data["energy"] = round(es.LoudnessEBUR128()(audio_stereo)[2], 2)
+
+    if needs_dance:
+        data["danceability"] = round(min(float(es.Danceability()(audio)[0]) / 3.0, 1.0), 4)
+
+    if needs_brightness:
+        _w = es.Windowing(type='hann')
+        _spec = es.Spectrum()
+        _centroid = es.Centroid(range=1.0)
+        brightness_frames = [
+            _centroid(_spec(_w(frame)))
+            for frame in es.FrameGenerator(audio, frameSize=2048, hopSize=1024, startFromZero=True)
+        ]
+        data["brightness"] = round(float(sum(brightness_frames) / len(brightness_frames)), 4) if brightness_frames else 0.0
+
 def analyze_track_essentia(track):
     rk = str(track.ratingKey)
     now_ts = datetime.now().timestamp()
@@ -441,19 +531,22 @@ def analyze_track_essentia(track):
         
         # Check if the file path has changed (e.g., quality upgrade) while keeping same ratingKey
         if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
-            # Backfill any tags missing or empty due to older cache entries.
+            # Backfill any text tags missing from older cache entries.
             # "styles" not in data won't catch entries where styles=[] (loaded from NULL),
             # so check for falsy instead. Same applies to genres — older code used
             # track.genres directly without the album/artist fallback.
-            backfilled = False
             if not data.get("styles"):
                 data["styles"] = _resolve_tags(track, "styles")
-                backfilled = True
             if not data.get("genres"):
                 data["genres"] = _resolve_tags(track, "genres")
-                backfilled = True
-            if backfilled:
-                data["last_synced"] = now_ts
+            # Backfill any missing acoustic fields without re-running the full pipeline.
+            # Do NOT update last_synced here — no Plex metadata was re-synced, and preserving
+            # the original timestamp ensures the 7-day staleness check fires correctly next run.
+            if ESSENTIA_ENABLED and file_path:
+                try:
+                    _fill_missing_acoustic(data, file_path)
+                except Exception:
+                    pass
             return data
 
         data["artist"] = norm_text(primary_artist(track_artist_name(track)))
@@ -464,8 +557,13 @@ def analyze_track_essentia(track):
         if data.get("year") is None:
             data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
 
-        # If path is still the same, we just update text metadata and return
+        # Same path but stale: sync text metadata, backfill any missing acoustic fields.
         if data.get("file_path") == file_path:
+            if ESSENTIA_ENABLED:
+                try:
+                    _fill_missing_acoustic(data, file_path)
+                except Exception:
+                    pass
             data["last_synced"] = now_ts
             return data
         # If path changed, we fall through to perform new acoustic analysis
@@ -475,6 +573,7 @@ def analyze_track_essentia(track):
         # This lets pre_analyze.py and the optimizer work for users without Essentia.
         data = {
             "bpm": None, "key": None, "energy": None,
+            "danceability": None, "brightness": None,
             "year": getattr(track, "year", None) or album_meta(track).get("year"),
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": _resolve_tags(track, "genres"),
@@ -499,6 +598,7 @@ def analyze_track_essentia(track):
             track_year = album_meta(track).get("year")
         data = {
             "bpm": None, "key": None, "energy": None,
+            "danceability": None, "brightness": None,
             "year": track_year,
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": _resolve_tags(track, "genres"),
@@ -515,35 +615,16 @@ def analyze_track_essentia(track):
         loader = es.MonoLoader(filename=file_path)
         audio = loader()
 
-        # BPM & Key Extraction
-        bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
-        if bpm >= 250:
-            # Likely a tempo-doubling artefact — retry with the degara method as a cross-check.
-            # If the second pass also returns >= 250, store None so it's excluded from
-            # bpm_weight CoV calculations in the optimizer (which already filters null values).
-            bpm_retry = es.RhythmExtractor2013(method="degara")(audio)[0]
-            bpm = bpm_retry if bpm_retry < 250 else None
-            if bpm is None:
-                log_text(f"[WARN] BPM >= 250 for '{track.title}' after retry — storing as null (excluded from weight calculations).")
-        key_alg = es.KeyExtractor()(audio)
-        camelot = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
-
-        # Energy/Intensity via Integrated Loudness (EBU R128)
-        # Mux mono signal to pseudo-stereo for loudness analyzer compatibility
-        audio_stereo = es.StereoMuxer()(audio, audio)
-        loudness_stats = es.LoudnessEBUR128()(audio_stereo)
-        integrated_loudness = loudness_stats[2]
-
         # Year Fallback: Check track first, then album
         track_year = getattr(track, "year", None)
         if not track_year:
             track_year = album_meta(track).get("year")
 
-        # Comprehensive Metadata Caching
+        # Build entry with all non-acoustic fields, then compute acoustics via the shared helper.
+        # Passing audio avoids a second MonoLoader decode — all algorithms reuse the same buffer.
         data = {
-            "bpm": round(bpm, 2),
-            "key": camelot,
-            "energy": round(integrated_loudness, 2),
+            "bpm": None, "key": None, "energy": None,
+            "danceability": None, "brightness": None,
             "year": track_year,
             "artist": norm_text(primary_artist(track_artist_name(track))),
             "genres": _resolve_tags(track, "genres"),
@@ -552,6 +633,7 @@ def analyze_track_essentia(track):
             "file_path": file_path,
             "last_synced": now_ts
         }
+        _fill_missing_acoustic(data, file_path, audio=audio, track_title=track.title)
         _essentia_cache[rk] = data
         return data
     except Exception as e:
@@ -1583,6 +1665,16 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
                 year_diff = abs(ea["year"] - eb["year"])
                 year_dist = min(year_diff / 50.0, 1.0) # Penalty scales up to 50 years
                 dist += ((year_dist ** 2) * ERA_WEIGHT)
+
+            # Danceability Jump Penalty — punishes transitions between danceable and non-danceable tracks
+            if ea.get("danceability") is not None and eb.get("danceability") is not None:
+                dance_diff = abs(ea["danceability"] - eb["danceability"])
+                dist += (dance_diff ** 2) * DANCEABILITY_WEIGHT
+
+            # Brightness Jump Penalty — punishes jarring shifts between bright/trebly and dark/warm timbres
+            if ea.get("brightness") is not None and eb.get("brightness") is not None:
+                bright_diff = abs(ea["brightness"] - eb["brightness"])
+                dist += (bright_diff ** 2) * BRIGHTNESS_WEIGHT
 
             # Bridge Bonus Logic: Reward sonic compatibility across different genres
             ma, mb = meta_cache[ka], meta_cache[kb]
