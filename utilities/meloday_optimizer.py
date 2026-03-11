@@ -154,15 +154,20 @@ def run_optimizer():
     if os.path.exists(cache_path):
         try:
             conn = sqlite3.connect(cache_path, timeout=10)
-            for row in conn.execute("SELECT rating_key, bpm, energy, year, styles, genres, moods FROM essentia_cache"):
-                rk, bpm, energy, year, styles_json, genres_json, moods_json = row
+            for row in conn.execute(
+                "SELECT rating_key, bpm, energy, year, styles, genres, moods, danceability, brightness "
+                "FROM essentia_cache"
+            ):
+                rk, bpm, energy, year, styles_json, genres_json, moods_json, danceability, brightness = row
                 cache_data[rk] = {
-                    "bpm":    bpm,
-                    "energy": energy,
-                    "year":   year,
-                    "styles": json.loads(styles_json) if styles_json else [],
-                    "genres": json.loads(genres_json) if genres_json else [],
-                    "moods":  json.loads(moods_json)  if moods_json  else [],
+                    "bpm":          bpm,
+                    "energy":       energy,
+                    "year":         year,
+                    "styles":       json.loads(styles_json) if styles_json else [],
+                    "genres":       json.loads(genres_json) if genres_json else [],
+                    "moods":        json.loads(moods_json)  if moods_json  else [],
+                    "danceability": danceability,
+                    "brightness":   brightness,
                 }
             conn.close()
         except Exception:
