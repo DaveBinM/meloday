@@ -84,19 +84,25 @@ def load_essentia_cache_exclusive():
         conn.execute("PRAGMA journal_mode=WAL")
         _ensure_db_schema(conn)
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
+            "track_updated_at, album_updated_at, artist_updated_at "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
         result = {}
-        for rk, bpm, key, energy, danceability, brightness, year, artist, genres_j, styles_j, moods_j, file_path, last_synced in rows:
+        for rk, bpm, key, energy, danceability, brightness, year, artist, \
+                genres_j, styles_j, moods_j, file_path, \
+                track_updated_at, album_updated_at, artist_updated_at in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
                 "genres": json.loads(genres_j) if genres_j else [],
                 "styles": json.loads(styles_j) if styles_j else [],
-                "moods": json.loads(moods_j) if moods_j else [],
-                "file_path": file_path, "last_synced": last_synced,
+                "moods":  json.loads(moods_j) if moods_j else [],
+                "file_path": file_path,
+                "track_updated_at": track_updated_at,
+                "album_updated_at": album_updated_at,
+                "artist_updated_at": artist_updated_at,
             }
         return result
     except Exception:
@@ -112,13 +118,15 @@ def upsert_essentia_cache_entries(entries):
         _ensure_db_schema(conn)
         conn.executemany("""
             INSERT OR REPLACE INTO essentia_cache
-            (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced, danceability, brightness)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
+             track_updated_at, album_updated_at, artist_updated_at, danceability, brightness)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
              json.dumps(d.get("styles") or []),
-             json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"),
+             json.dumps(d.get("moods") or []), d.get("file_path"),
+             d.get("track_updated_at"), d.get("album_updated_at"), d.get("artist_updated_at"),
              d.get("danceability"), d.get("brightness"))
             for rk, d in entries.items()
         ])
@@ -132,11 +140,13 @@ def upsert_essentia_cache_entries(entries):
 def _sigalrm_handler(signum, frame):
     raise TimeoutError("Essentia analysis exceeded per-track time limit")
 
-def analysis_worker(track_id):
+def analysis_worker(track_id, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
     """
     Worker function to fetch and analyze a single track.
     RatingKey is passed instead of the object to minimize pickling overhead.
     Utilizes a local Plex session to ensure stability across multiple processes.
+    The three Plex timestamps are passed in from the main process (built from bulk
+    album/artist fetches) so workers don't need extra per-track API calls.
     """
     global worker_plex
     try:
@@ -155,7 +165,7 @@ def analysis_worker(track_id):
             signal.signal(signal.SIGALRM, _sigalrm_handler)
             signal.alarm(90)
         try:
-            result = analyze_track_essentia(track)
+            result = analyze_track_essentia(track, plex_track_ts, plex_album_ts, plex_artist_ts)
         finally:
             if hasattr(signal, 'SIGALRM'):
                 signal.alarm(0)
@@ -195,47 +205,103 @@ def bulk_analyze():
         local_plex_main = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
         music_section = local_plex_main.library.section(MUSIC_LIBRARY)
         log_msg("Fetching tracks from Plex... (This may take a minute)")
-        all_tracks = music_section.search(libtype='track', container_size=5000)
+        _raw_tracks = music_section.search(libtype='track', container_size=5000)
     except Exception as e:
         log_msg(f"[ERROR] Failed to fetch tracks from Plex: {e}", level="error")
         log_msg("[ERROR] Check that Plex is reachable and try again.", level="error")
         return
 
-    # 1. Filter the processing list to avoid redundant work
-    now_ts = datetime.now().timestamp()
+    # Extract only the fields we need from each track object, then release the full
+    # PlexAPI objects. At 280k+ tracks they can consume 1GB+ of memory; the slim
+    # dicts below are ~50MB for the same library size.
+    track_infos = [
+        {
+            "ratingKey":            t.ratingKey,
+            "updatedAt":            t.updatedAt.timestamp() if getattr(t, "updatedAt", None) else None,
+            "parentRatingKey":      str(t.parentRatingKey),
+            "grandparentRatingKey": str(t.grandparentRatingKey),
+            "localPath":            get_local_path(t),
+        }
+        for t in _raw_tracks
+    ]
+    total_tracks = len(track_infos)
+    del _raw_tracks  # release ~1GB of PlexAPI objects
+
+    # Fetch albums and artists to get their updatedAt timestamps.
+    # These are not available on the track object directly, so we build lookup dicts
+    # keyed by ratingKey and pass the relevant timestamps into each worker.
+    log_msg("Fetching album and artist timestamps from Plex...")
+    try:
+        _raw_albums  = music_section.search(libtype='album',  container_size=5000)
+        _raw_artists = music_section.search(libtype='artist', container_size=5000)
+        album_updated_map  = {
+            str(a.ratingKey): a.updatedAt.timestamp() if getattr(a, "updatedAt", None) else None
+            for a in _raw_albums
+        }
+        artist_updated_map = {
+            str(a.ratingKey): a.updatedAt.timestamp() if getattr(a, "updatedAt", None) else None
+            for a in _raw_artists
+        }
+        del _raw_albums, _raw_artists
+    except Exception as e:
+        log_msg(f"[WARN] Could not fetch album/artist timestamps: {e}. Album/artist staleness detection disabled.")
+        album_updated_map  = {}
+        artist_updated_map = {}
+
+    # 1. Filter the processing list to avoid redundant work.
+    # Re-process a track only if Plex reports a change at the track, album, or artist
+    # level (via updatedAt comparison), the file path changed, or acoustic fields are null.
     to_process = []
-    for t in all_tracks:
-        rk = str(t.ratingKey)
+    ts_map = {}  # ratingKey → (plex_track_ts, plex_album_ts, plex_artist_ts)
+
+    for info in track_infos:
+        rk = str(info["ratingKey"])
         cached_data = _essentia_cache.get(rk)
-        # Only process if not in cache, or if the metadata sync is older than 7 days
+
+        plex_track_ts  = info["updatedAt"]
+        plex_album_ts  = album_updated_map.get(info["parentRatingKey"])
+        plex_artist_ts = artist_updated_map.get(info["grandparentRatingKey"])
+
         if cached_data is None:
-            to_process.append(t.ratingKey)
+            to_process.append(info["ratingKey"])
+            ts_map[info["ratingKey"]] = (plex_track_ts, plex_album_ts, plex_artist_ts)
         else:
-            last_sync = cached_data.get("last_synced", 0)
-            # Check staleness first — stale tracks are reprocessed regardless of path,
-            # so we can skip the get_local_path() call entirely for them.
-            if (now_ts - last_sync) > 604800:
-                to_process.append(t.ratingKey)
-            elif cached_data.get("file_path") != get_local_path(t):
-                to_process.append(t.ratingKey)
+            timestamps_changed = (
+                cached_data.get("track_updated_at")  != plex_track_ts  or
+                cached_data.get("album_updated_at")  != plex_album_ts  or
+                cached_data.get("artist_updated_at") != plex_artist_ts
+            )
+            if timestamps_changed:
+                to_process.append(info["ratingKey"])
+                ts_map[info["ratingKey"]] = (plex_track_ts, plex_album_ts, plex_artist_ts)
+            elif cached_data.get("file_path") != info["localPath"]:
+                to_process.append(info["ratingKey"])
+                ts_map[info["ratingKey"]] = (plex_track_ts, plex_album_ts, plex_artist_ts)
             elif cached_data.get("energy") is not None and any(
                 cached_data.get(f) is None for f in ("danceability", "brightness")
             ):
-                # Backfill: re-analyse tracks missing any acoustic feature added after initial analysis
-                to_process.append(t.ratingKey)
+                # Backfill: re-analyse tracks missing acoustic fields added after initial analysis.
+                # Timestamps are intentionally preserved — this is not a metadata re-sync.
+                to_process.append(info["ratingKey"])
+                ts_map[info["ratingKey"]] = (
+                    cached_data.get("track_updated_at"),
+                    cached_data.get("album_updated_at"),
+                    cached_data.get("artist_updated_at"),
+                )
 
     num_to_process = len(to_process)
     if num_to_process == 0:
         log_msg("--- Success! All tracks are analyzed and metadata is up to date. ---")
         return
 
-    log_msg(f"Found {len(all_tracks)} total tracks. Processing {num_to_process} for analysis/sync...")
+    log_msg(f"Found {total_tracks} total tracks. Processing {num_to_process} for analysis/sync...")
 
     # Pre-build a ratingKey → local file path map for the tracks we're about to process.
     # Used only for diagnostic logging when a hung worker is detected — avoids needing
     # Plex API calls at the point of failure.
     to_process_set = set(to_process)
-    track_path_map = {t.ratingKey: get_local_path(t) for t in all_tracks if t.ratingKey in to_process_set}
+    track_path_map = {info["ratingKey"]: info["localPath"] for info in track_infos if info["ratingKey"] in to_process_set}
+    del track_infos  # no longer needed — everything is in to_process, ts_map, track_path_map
 
     start_time = time.time()
     last_save = start_time
@@ -273,7 +339,7 @@ def bulk_analyze():
         mp_context=mp_ctx
     )
     try:
-        futures = {executor.submit(analysis_worker, tid): tid for tid in to_process}
+        futures = {executor.submit(analysis_worker, tid, *ts_map[tid]): tid for tid in to_process}
 
         _CONN_ERROR_PHRASES = ("connection refused", "connection reset", "failed to establish", "connectionerror")
         CONN_FAILURE_THRESHOLD = 5

@@ -307,15 +307,16 @@ def prefetch_label_exclusions():
 
 _UPSERT_SQL = """
     INSERT OR REPLACE INTO essentia_cache
-    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced, danceability, brightness)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
+     track_updated_at, album_updated_at, artist_updated_at, danceability, brightness)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
     "rating_key TEXT PRIMARY KEY NOT NULL, "
     "bpm REAL, key TEXT, energy REAL, danceability REAL, brightness REAL, "
     "year INTEGER, artist TEXT, genres TEXT, styles TEXT, moods TEXT, "
-    "file_path TEXT, last_synced REAL"
+    "file_path TEXT, track_updated_at REAL, album_updated_at REAL, artist_updated_at REAL"
 )
 
 def _ensure_db_schema(conn):
@@ -324,45 +325,69 @@ def _ensure_db_schema(conn):
     conn.execute("PRAGMA journal_mode=WAL")
 
     # Step 1: Add any columns missing from older databases
-    for col_name, col_def in (("styles", "styles TEXT"), ("danceability", "danceability REAL"), ("brightness", "brightness REAL")):
+    for col_name, col_def in (
+        ("styles",             "styles TEXT"),
+        ("danceability",       "danceability REAL"),
+        ("brightness",         "brightness REAL"),
+        ("track_updated_at",   "track_updated_at REAL"),
+        ("album_updated_at",   "album_updated_at REAL"),
+        ("artist_updated_at",  "artist_updated_at REAL"),
+    ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
             m_print(f"[INFO] DB migration: added column '{col_name}' to essentia_cache.")
         except Exception:
             pass  # Column already exists
 
-    # Step 2: Migrate column order if danceability/brightness were appended via ALTER TABLE
-    # rather than created in the canonical position (after energy, before year).
+    # Step 2: Reorder table to canonical column sequence if needed.
+    # Triggered when:
+    #   - track_updated_at is missing (pre-migration DB still has last_synced)
+    #   - last_synced still exists (needs to be removed from schema)
+    #   - danceability is not immediately after energy (ALTER TABLE appended it at the tail)
     col_names = [row[1] for row in conn.execute("PRAGMA table_info(essentia_cache)").fetchall()]
-    if "danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1:
-        m_print("[INFO] DB migration: column order out of canonical sequence — reordering table...")
-        # Back up the database file before any destructive schema reorder
+    needs_reorder = (
+        "track_updated_at" not in col_names or
+        "last_synced" in col_names or
+        ("danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1)
+    )
+    if needs_reorder:
+        m_print("[INFO] DB migration: reordering table to canonical schema...")
         try:
             db_path = conn.execute("PRAGMA database_list").fetchone()[2]
-            backup_path = db_path + ".pre_reorder.bak"
-            if db_path and not os.path.exists(backup_path):
+            # Use a timestamped backup name so each migration run gets its own backup,
+            # regardless of whether a previous backup file already exists.
+            import time as _time
+            backup_path = db_path + f".pre_reorder_{int(_time.time())}.bak"
+            if db_path:
                 shutil.copy2(db_path, backup_path)
                 m_print(f"[INFO] DB migration: database backed up to {os.path.basename(backup_path)}.")
-            elif os.path.exists(backup_path):
-                m_print(f"[INFO] DB migration: backup already exists, skipping backup.")
         except Exception as backup_err:
             m_print(f"[WARN] DB migration: could not back up database: {backup_err}")
         try:
+            # Map last_synced → track_updated_at for backward compat; album/artist default to NULL.
+            has_last_synced = "last_synced" in col_names
+            has_dance       = "danceability" in col_names
+            has_bright      = "brightness" in col_names
             conn.execute("DROP TABLE IF EXISTS essentia_cache_reordered")
             conn.execute(f"CREATE TABLE essentia_cache_reordered ({_CANONICAL_COLUMNS})")
-            conn.execute("""
+            conn.execute(f"""
                 INSERT INTO essentia_cache_reordered
-                SELECT rating_key, bpm, key, energy, danceability, brightness,
-                       year, artist, genres, styles, moods, file_path, last_synced
+                SELECT rating_key, bpm, key, energy,
+                       {'danceability' if has_dance else 'NULL'},
+                       {'brightness'   if has_bright else 'NULL'},
+                       year, artist, genres, styles, moods, file_path,
+                       {'last_synced' if has_last_synced else 'NULL'} AS track_updated_at,
+                       NULL AS album_updated_at,
+                       NULL AS artist_updated_at
                 FROM essentia_cache
             """)
             conn.commit()
             conn.execute("DROP TABLE essentia_cache")
             conn.execute("ALTER TABLE essentia_cache_reordered RENAME TO essentia_cache")
             conn.commit()
-            m_print("[INFO] DB migration: column reorder complete.")
+            m_print("[INFO] DB migration: schema reorder complete.")
         except Exception as reorder_err:
-            m_print(f"[ERROR] DB migration: column reorder failed: {reorder_err}")
+            m_print(f"[ERROR] DB migration: schema reorder failed: {reorder_err}")
 
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
@@ -371,18 +396,24 @@ def _entry_to_row(rk, d):
     return (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
             d.get("artist"), json.dumps(d.get("genres") or []),
             json.dumps(d.get("styles") or []),
-            json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"),
+            json.dumps(d.get("moods") or []), d.get("file_path"),
+            d.get("track_updated_at"), d.get("album_updated_at"), d.get("artist_updated_at"),
             d.get("danceability"), d.get("brightness"))
 
 def _row_to_entry(row):
-    rk, bpm, key, energy, danceability, brightness, year, artist, genres_j, styles_j, moods_j, file_path, last_synced = row
+    rk, bpm, key, energy, danceability, brightness, year, artist, \
+        genres_j, styles_j, moods_j, file_path, \
+        track_updated_at, album_updated_at, artist_updated_at = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
         "genres": json.loads(genres_j) if genres_j else [],
         "styles": json.loads(styles_j) if styles_j else [],
-        "moods": json.loads(moods_j) if moods_j else [],
-        "file_path": file_path, "last_synced": last_synced,
+        "moods":  json.loads(moods_j) if moods_j else [],
+        "file_path": file_path,
+        "track_updated_at": track_updated_at,
+        "album_updated_at": album_updated_at,
+        "artist_updated_at": artist_updated_at,
     }
 
 def _migrate_json_to_sqlite():
@@ -414,7 +445,8 @@ def load_essentia_cache():
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         _ensure_db_schema(conn)
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
+            "track_updated_at, album_updated_at, artist_updated_at "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -509,28 +541,39 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
         ]
         data["brightness"] = round(float(sum(brightness_frames) / len(brightness_frames)), 4) if brightness_frames else 0.0
 
-def analyze_track_essentia(track):
+def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
     rk = str(track.ratingKey)
-    now_ts = datetime.now().timestamp()
 
     # Re-silence inside sub-processes to handle parallel worker logs
     if ESSENTIA_AVAILABLE:
         essentia.log.infoActive = False
         essentia.log.warningActive = False
-    
+
+    def _timestamps_changed(data):
+        """True if any Plex-sourced timestamp differs from the cached value."""
+        return (
+            data.get("track_updated_at")  != plex_track_ts  or
+            data.get("album_updated_at")  != plex_album_ts  or
+            data.get("artist_updated_at") != plex_artist_ts
+        )
+
+    def _apply_timestamps(data):
+        """Write the three Plex timestamps into a cache entry after a full metadata sync."""
+        data["track_updated_at"]  = plex_track_ts
+        data["album_updated_at"]  = plex_album_ts
+        data["artist_updated_at"] = plex_artist_ts
+
     # Metadata Update Handling
     # If the track is already in the cache, we refresh the text fields from Plex
     # to ensure changes to genres/moods/artist names are captured.
     if rk in _essentia_cache and _essentia_cache[rk].get("energy") is not None:
         data = _essentia_cache[rk]
-        
-        # Throttled Metadata Syncing
-        # Only call Plex to update text metadata if the entry is older than 7 days (604800s).
-        last_sync = data.get("last_synced", 0)
         file_path = get_local_path(track)
-        
-        # Check if the file path has changed (e.g., quality upgrade) while keeping same ratingKey
-        if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
+
+        # Re-sync only if Plex reports a change at the track, album, or artist level.
+        # If all timestamps match (or are unavailable), skip metadata re-sync and
+        # only backfill any missing acoustic/text fields — without touching timestamps.
+        if data.get("file_path") == file_path and not _timestamps_changed(data):
             # Backfill any text tags missing from older cache entries.
             # "styles" not in data won't catch entries where styles=[] (loaded from NULL),
             # so check for falsy instead. Same applies to genres — older code used
@@ -540,8 +583,7 @@ def analyze_track_essentia(track):
             if not data.get("genres"):
                 data["genres"] = _resolve_tags(track, "genres")
             # Backfill any missing acoustic fields without re-running the full pipeline.
-            # Do NOT update last_synced here — no Plex metadata was re-synced, and preserving
-            # the original timestamp ensures the 7-day staleness check fires correctly next run.
+            # Timestamps are intentionally not updated — no Plex metadata was re-synced.
             if ESSENTIA_ENABLED and file_path:
                 try:
                     _fill_missing_acoustic(data, file_path)
@@ -557,16 +599,17 @@ def analyze_track_essentia(track):
         if data.get("year") is None:
             data["year"] = getattr(track, "year", None) or album_meta(track).get("year")
 
-        # Same path but stale: sync text metadata, backfill any missing acoustic fields.
+        # Same path but timestamps changed: sync text metadata, backfill missing acoustics,
+        # then record the new Plex timestamps.
         if data.get("file_path") == file_path:
             if ESSENTIA_ENABLED:
                 try:
                     _fill_missing_acoustic(data, file_path)
                 except Exception:
                     pass
-            data["last_synced"] = now_ts
+            _apply_timestamps(data)
             return data
-        # If path changed, we fall through to perform new acoustic analysis
+        # If path changed, fall through to perform new acoustic analysis
 
     if not ESSENTIA_ENABLED:
         # Populate metadata-only entry (styles/moods/genres/year from Plex; acoustics remain null).
@@ -580,7 +623,9 @@ def analyze_track_essentia(track):
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
             "file_path": get_local_path(track),
-            "last_synced": now_ts,
+            "track_updated_at": plex_track_ts,
+            "album_updated_at": plex_album_ts,
+            "artist_updated_at": plex_artist_ts,
         }
         _essentia_cache[rk] = data
         return data
@@ -605,7 +650,9 @@ def analyze_track_essentia(track):
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
             "file_path": file_path,
-            "last_synced": now_ts,
+            "track_updated_at": plex_track_ts,
+            "album_updated_at": plex_album_ts,
+            "artist_updated_at": plex_artist_ts,
         }
         log_text(f"[DIAGNOSTIC] Skipping Essentia for '{track.title}' ({duration_ms // 60000}m — too long for RhythmExtractor).")
         _essentia_cache[rk] = data
@@ -631,7 +678,9 @@ def analyze_track_essentia(track):
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
             "file_path": file_path,
-            "last_synced": now_ts
+            "track_updated_at": plex_track_ts,
+            "album_updated_at": plex_album_ts,
+            "artist_updated_at": plex_artist_ts,
         }
         _fill_missing_acoustic(data, file_path, audio=audio, track_title=track.title)
         _essentia_cache[rk] = data
@@ -641,7 +690,7 @@ def analyze_track_essentia(track):
         return None
 
 # Worker for Multiprocessing compatibility
-def analysis_worker(track_id):
+def analysis_worker(track_id, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
     try:
         # Silence Essentia explicitly in parallel worker processes
         if ESSENTIA_AVAILABLE:
@@ -652,7 +701,7 @@ def analysis_worker(track_id):
         # Initialize a new local connection session for process isolation.
         local_plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
         track = local_plex.fetchItem(track_id)
-        return str(track_id), analyze_track_essentia(track)
+        return str(track_id), analyze_track_essentia(track, plex_track_ts, plex_album_ts, plex_artist_ts)
     except Exception:
         return str(track_id), None
 
@@ -2386,24 +2435,26 @@ def main():
         if ESSENTIA_ENABLED:
             print_status(60, "Syncing metadata and analyzing new tracks...")
             all_tracks = [first, last] + middle
-            now_ts = datetime.now().timestamp()
             to_analyze = []
+            ts_map = {}  # ratingKey → (plex_track_ts, plex_album_ts, plex_artist_ts)
 
-            # PRE-FILTER: Check against your specific re-analyze logic
+            # PRE-FILTER: Re-analyze only if Plex reports a change or the entry is missing.
+            # album/artist timestamps are not on the track object — pass None here since
+            # meloday's inline analysis path is a fast fallback for cache misses during
+            # playlist generation. pre_analyze.py does the full three-level staleness check.
             for t in all_tracks:
                 rk = str(t.ratingKey)
                 file_path = get_local_path(t)
-                
+                plex_track_ts = t.updatedAt.timestamp() if getattr(t, "updatedAt", None) else None
+
                 if rk in _essentia_cache:
                     data = _essentia_cache[rk]
-                    last_sync = data.get("last_synced", 0)
-                    
-                    # LOGIC: Skip only if path is identical AND synced within last 7 days
-                    if data.get("file_path") == file_path and (now_ts - last_sync) < 604800:
-                        continue 
-                
-                # If we are here, the track is missing or needs a fresh look
+                    if (data.get("file_path") == file_path and
+                            data.get("track_updated_at") == plex_track_ts):
+                        continue
+
                 to_analyze.append(t.ratingKey)
+                ts_map[t.ratingKey] = (plex_track_ts, None, None)
 
             if to_analyze:
                 log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
@@ -2411,7 +2462,7 @@ def main():
                 new_entries = {}
                 with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
                     # Use submit/as_completed so one crashing worker doesn't abort the whole batch
-                    futures = {executor.submit(analysis_worker, tid): tid for tid in to_analyze}
+                    futures = {executor.submit(analysis_worker, tid, *ts_map[tid]): tid for tid in to_analyze}
                     for future in concurrent.futures.as_completed(futures):
                         try:
                             tid, data = future.result(timeout=120)
