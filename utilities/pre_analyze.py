@@ -13,7 +13,7 @@ from meloday import (
     PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia,
     save_essentia_cache, ESSENTIA_ENABLED,
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
-    get_local_path, _migrate_json_to_sqlite, get_optimal_workers
+    get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema
 )
 
 # --- LOGGING SETUP ---
@@ -82,19 +82,21 @@ def load_essentia_cache_exclusive():
     try:
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
+        _ensure_db_schema(conn)
         rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced "
+            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, last_synced "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
         result = {}
-        for rk, bpm, key, energy, year, artist, genres_j, styles_j, moods_j, file_path, last_synced in rows:
+        for rk, bpm, key, energy, danceability, brightness, year, artist, genres_j, styles_j, moods_j, file_path, last_synced in rows:
             result[rk] = {
-                "bpm": bpm, "key": key, "energy": energy, "year": year, "artist": artist,
+                "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
+                "year": year, "artist": artist,
                 "genres": json.loads(genres_j) if genres_j else [],
                 "styles": json.loads(styles_j) if styles_j else [],
                 "moods": json.loads(moods_j) if moods_j else [],
-                "file_path": file_path, "last_synced": last_synced
+                "file_path": file_path, "last_synced": last_synced,
             }
         return result
     except Exception:
@@ -107,15 +109,17 @@ def upsert_essentia_cache_entries(entries):
     try:
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL")
+        _ensure_db_schema(conn)
         conn.executemany("""
             INSERT OR REPLACE INTO essentia_cache
-            (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path, last_synced, danceability, brightness)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
              json.dumps(d.get("styles") or []),
-             json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"))
+             json.dumps(d.get("moods") or []), d.get("file_path"), d.get("last_synced"),
+             d.get("danceability"), d.get("brightness"))
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -213,6 +217,11 @@ def bulk_analyze():
             if (now_ts - last_sync) > 604800:
                 to_process.append(t.ratingKey)
             elif cached_data.get("file_path") != get_local_path(t):
+                to_process.append(t.ratingKey)
+            elif cached_data.get("energy") is not None and any(
+                cached_data.get(f) is None for f in ("danceability", "brightness")
+            ):
+                # Backfill: re-analyse tracks missing any acoustic feature added after initial analysis
                 to_process.append(t.ratingKey)
 
     num_to_process = len(to_process)
