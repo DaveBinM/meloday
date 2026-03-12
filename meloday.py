@@ -1725,10 +1725,34 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
                 bright_diff = abs(ea["brightness"] - eb["brightness"])
                 dist += (bright_diff ** 2) * BRIGHTNESS_WEIGHT
 
-            # Bridge Bonus Logic: Reward sonic compatibility across different genres
+            # Bridge Bonus Logic: Reward sonic compatibility across different styles/genres.
+            # Uses styles as the primary diversity axis (373 tags vs 43 genres — more granular).
+            # Only the top STYLE_TAG_DEPTH styles are compared so that a track with 7–8 styles
+            # doesn't share a minor tag with everything and lose the bonus unfairly.
+            # Two tracks are cross-category when their top-N style sets are completely disjoint.
+            # Falls back to genres only when both tracks have no style tags.
             ma, mb = meta_cache[ka], meta_cache[kb]
-            if ma["genres"] != mb["genres"]:
-                if abs(ea["bpm"] - eb["bpm"]) < 1.0 and get_harmonic_distance(ea["key"], eb["key"]) < 0.1:
+            a_styles = set(ea.get("styles", [])[:STYLE_TAG_DEPTH])
+            b_styles = set(eb.get("styles", [])[:STYLE_TAG_DEPTH])
+            if a_styles or b_styles:
+                cross_category = not (a_styles & b_styles)
+            else:
+                cross_category = ma["genres"] != mb["genres"]
+            if cross_category:
+                # Require BPM and harmonic alignment as before, plus danceability and brightness
+                # compatibility when data is available. Missing data does not block the bonus —
+                # the None fallback ensures full coverage in libraries without acoustic analysis.
+                dance_ok = (
+                    ea.get("danceability") is None or eb.get("danceability") is None
+                    or abs(ea["danceability"] - eb["danceability"]) < 0.2
+                )
+                bright_ok = (
+                    ea.get("brightness") is None or eb.get("brightness") is None
+                    or abs(ea["brightness"] - eb["brightness"]) < 0.1
+                )
+                if (abs(ea["bpm"] - eb["bpm"]) < 1.0
+                        and get_harmonic_distance(ea["key"], eb["key"]) < 0.1
+                        and dance_ok and bright_ok):
                     dist -= 0.08
 
     # 3. Artist Clustering Penalty (Strict)
