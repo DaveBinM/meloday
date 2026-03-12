@@ -185,6 +185,12 @@ def run_optimizer():
     # If no styled tracks exist in the cache, the default of 4 is used as a safe fallback.
     style_tag_counts = [len(entry["styles"]) for entry in cache_data.values() if entry.get("styles")]
     style_median_per_track = statistics.median(style_tag_counts) if style_tag_counts else 4
+    # Lower quartile (P25) of style counts — 75% of styled tracks carry at least this many
+    # styles, making it a more meaningful basis for style_tag_depth than the median, which
+    # is skewed upward by heavily-tagged outliers (8–10 styles) and would recommend a depth
+    # that half the library can't even fill.
+    _sorted_counts = sorted(style_tag_counts)
+    style_p25_per_track = _sorted_counts[len(_sorted_counts) // 4] if _sorted_counts else 3
 
     # --- GENRE AND STYLE DIVERSITY FROM CACHE ---
     # Built from ALL cached tracks for maximum accuracy — not just the sonic sample.
@@ -296,9 +302,10 @@ def run_optimizer():
     rec_style_ratio = round(max(0.10, 1.0 / n_styles), 2)
 
     # How many style slots to check per track — the depth into a track's style list.
-    # Derived from the median: if most tracks carry 3 styles, we check all 3.
+    # Based on P25 (lower quartile): 75% of styled tracks carry at least this many styles,
+    # so the depth is meaningful for the large majority of the library.
     # Capped at 5 to avoid diminishing returns on heavily-tagged libraries.
-    rec_style_tag_depth = max(1, min(round(style_median_per_track), 5))
+    rec_style_tag_depth = max(1, min(round(style_p25_per_track), 5))
 
     # Anti-starvation floor: if the library has very few distinct styles, the per-style cap
     # must be permissive enough that a full playlist can actually be assembled.
@@ -465,7 +472,7 @@ def run_optimizer():
 
     log_msg("\n" + "="*50, log_only=True)
     log_msg(f" STYLE DIVERSITY: {style_diversity:.3f} (Genre Diversity: {diversity:.3f})", log_only=True)
-    log_msg(f" Median style tags per track (cache): {style_median_per_track:.1f} → n_styles target: {n_styles}", log_only=True)
+    log_msg(f" Style tags per track (cache): median={style_median_per_track:.1f}, P25={style_p25_per_track} → depth={rec_style_tag_depth}, n_styles target: {n_styles}", log_only=True)
     if top_styles:
         log_msg(" Top Styles in Library:", log_only=True)
         for style, count in top_styles:
@@ -493,7 +500,7 @@ def run_optimizer():
     log_msg(f"  sonic_similarity_limit: {rec_limit}")
     log_msg(f"  historical_ratio: {rec_hist_ratio}  (≤{round(MAX_TRACKS_CFG * rec_hist_ratio)} of {MAX_TRACKS_CFG} tracks from history)")
     log_msg(f"  style_ratio: {rec_style_ratio}       (≤{round(MAX_TRACKS_CFG * rec_style_ratio)} of {MAX_TRACKS_CFG} tracks per style)")
-    log_msg(f"  style_tag_depth: {rec_style_tag_depth}         (check this many style slots per track; based on median {style_median_per_track:.1f} styles/track)")
+    log_msg(f"  style_tag_depth: {rec_style_tag_depth}         (check this many style slots per track; 75% of styled tracks carry ≥{style_p25_per_track} styles)")
     log_msg(f"  genre_ratio: {rec_genre_ratio}       (fallback only — applies to tracks with no style tags)")
     log_msg(f"  artist_ratio: {rec_artist_ratio}      (≤{round(MAX_TRACKS_CFG * rec_artist_ratio)} of {MAX_TRACKS_CFG} tracks per artist)")
     log_msg(f"  mood_ratio: {rec_mood_ratio}         (≤{round(MAX_TRACKS_CFG * rec_mood_ratio)} of {MAX_TRACKS_CFG} tracks per mood; {mood_coverage_pct:.0f}% coverage)")
