@@ -275,6 +275,18 @@ travel:
 
 Remove or leave empty when not travelling. Multiple trips can be listed and are matched in order.
 
+### `cron:`
+
+Controls whether Meloday manages its own playlist schedule in your crontab.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Set to `true` to allow Meloday to manage the playlist generation cron entry |
+| `python_path` | `""` | Path to the Python interpreter. Leave empty to use whichever interpreter is running the script (i.e. the active venv). |
+| `script_path` | `""` | Path to `meloday.py`. Leave empty to auto-detect from the script's own location. |
+
+When enabled, run `python utilities/meloday_cron.py` to install or update the schedule. See [Automating](#automating) below.
+
 ### `plex:`
 
 | Key | Description |
@@ -352,7 +364,53 @@ Controls how each period is referred to in the **playlist title** and **cover ar
 
 Meloday is designed to run at the **start of each time period**, so the playlist refreshes once when the mood naturally shifts rather than continuously throughout the day. The utility scripts run on their own separate schedules.
 
-Here's an example cron setup (macOS/Linux):
+### Managed scheduling (recommended)
+
+Your system's crontab is a list of scheduled commands — Meloday needs an entry there so it runs at the start of each time period. `meloday_cron.py` generates and maintains that entry for you, calculating the correct hours from your `time_periods` config. When a travel window is active, it converts each period's start hour from the destination timezone to your system clock so the playlist stays in sync with where you are.
+
+**1. Enable it in `config.yml`:**
+
+```yaml
+cron:
+  enabled: true
+  python_path: ""
+  script_path: ""
+```
+
+`python_path` is the full path to the Python interpreter to use in the cron entry — typically your venv's Python (run `which python` while the venv is active if you're unsure). Leave blank and it will use whichever interpreter is running the script, which is correct in most setups.
+
+`script_path` is the full path to `meloday.py`. Leave blank to auto-detect it from `meloday_cron.py`'s own location — only set this explicitly if the files are in unexpected locations.
+
+**2. Check the computed schedule:**
+
+```bash
+python utilities/meloday_cron.py --status
+```
+
+Shows the calculated run hours and the exact cron line that would be written, without touching your crontab. Use `--dry-run` instead to preview the full crontab output.
+
+**3. Install or update:**
+
+```bash
+python utilities/meloday_cron.py
+```
+
+Writes a clearly marked block into your crontab. Safe to re-run at any time — it updates the existing block in place rather than adding duplicates.
+
+**Optional — auto-switch on travel start/end:**
+
+The above installs a static schedule. To have it shift automatically when a trip begins or ends, add one more entry to your crontab (`crontab -e`):
+
+```bash
+# Re-evaluate the playlist schedule each midnight
+0 0 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_cron.py
+```
+
+Each midnight it rechecks whether a travel window is active and rewrites the schedule if needed — no manual intervention required when you leave or return.
+
+### Maintenance and calibration entries
+
+These are not managed by `meloday_cron.py` and should be added manually:
 
 ```bash
 # --- DAILY MAINTENANCE ---
@@ -365,14 +423,18 @@ Here's an example cron setup (macOS/Linux):
 # --- MONTHLY CALIBRATION ---
 # Recalibrate config values against the full library (1st of the month, 12:45 AM)
 45 0 1 * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_optimizer.py ALL
+```
 
-# --- PLAYLIST GENERATION ---
-# Refresh at the start of each time period (Late Night, Dawn, Early Morning,
-# Morning, Afternoon, Evening, Night)
+### Manual scheduling
+
+If you'd prefer to manage the playlist entry yourself, the default schedule fires at the start of each time period:
+
+```bash
+# Refresh at the start of each time period
 0 0,5,7,9,12,17,21 * * * /path/to/.venv/bin/python /path/to/meloday/meloday.py
 ```
 
-On **Windows**, use Task Scheduler to create equivalent triggers for each of the above.
+On **Windows**, use Task Scheduler to create equivalent triggers.
 
 ---
 

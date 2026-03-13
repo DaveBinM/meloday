@@ -3,6 +3,14 @@ travel:
     start: "2025-12-10"                             # First day away (YYYY-MM-DD)
     end: "2026-01-11"                               # Last day away (YYYY-MM-DD)
 
+cron:
+  enabled: false                                    # Set to true to let Meloday write and maintain its own crontab entry
+  python_path: ""                                   # Full path to your Python interpreter (e.g. /home/you/meloday/.venv/bin/python). Leave blank to use whichever Python is running this script.
+  script_path: ""                                   # Full path to meloday.py (e.g. /home/you/meloday/meloday.py). Leave blank to detect automatically.
+  # To install or update the schedule, run: python utilities/meloday_cron.py
+  # To auto-switch times when a trip starts or ends, add this line to your crontab once:
+  #   0 0 * * * /path/to/python /path/to/utilities/meloday_cron.py
+
 plex:
   url: "http://localhost:32400"                     # The URL of your Plex Media Server
   token: "YOUR_PLEX_TOKEN"                          # Your Plex API authentication token
