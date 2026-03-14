@@ -16,7 +16,7 @@ import concurrent.futures
 import multiprocessing
 import logging
 import argparse
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from zoneinfo import ZoneInfo
 from collections import Counter
 from plexapi.server import PlexServer
@@ -1207,6 +1207,21 @@ def get_effective_now():
             pass
     return datetime.now()
 
+def _viewedAt_to_effective(dt):
+    """Normalise a plexapi viewedAt timestamp to the effective timezone as a naive datetime.
+    plexapi may return naive UTC or timezone-aware UTC; both are handled."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    for trip in config.get("travel", []):
+        try:
+            tz = ZoneInfo(trip["timezone"])
+            dest_now = datetime.now(tz=tz)
+            if date.fromisoformat(trip["start"]) <= dest_now.date() <= date.fromisoformat(trip["end"]):
+                return dt.astimezone(tz).replace(tzinfo=None)
+        except Exception:
+            pass
+    return dt.astimezone().replace(tzinfo=None)
+
 # ---------------------------------------------------------------------
 def get_current_time_period():
     """Determine which daypart the current hour belongs to."""
@@ -1248,7 +1263,7 @@ def wrap_text(text, font, draw, max_width):
 def fetch_historical_tracks(period):
     """Fetch tracks from Plex history that match the current daypart while excluding recently played tracks."""
     music_section = plex.library.section(MUSIC_LIBRARY)
-    now = datetime.now()
+    now = get_effective_now()
     period_hours = set(time_periods[period]["hours"])
 
     history_start = now - timedelta(days=HISTORY_LOOKBACK_DAYS)
@@ -1259,16 +1274,17 @@ def fetch_historical_tracks(period):
     all_history = list(music_section.history(mindate=history_start))
 
     # Single pass: build excluded_keys and filtered_entries simultaneously.
-    # An entry that is recent (>= exclude_start) goes into excluded_keys only;
-    # an entry that is in the right period but not recent goes into filtered_entries.
+    # viewedAt from plexapi is UTC (naive or aware); normalise to the effective timezone
+    # so that exclusion windows and period-hour matching are both timezone-correct.
     excluded_keys = set()
     filtered_entries = []
     for entry in all_history:
         if not entry.viewedAt:
             continue
-        if entry.viewedAt >= exclude_start:
+        viewed = _viewedAt_to_effective(entry.viewedAt)
+        if viewed >= exclude_start:
             excluded_keys.add(entry.ratingKey)
-        elif entry.viewedAt.hour in period_hours:
+        elif viewed.hour in period_hours:
             filtered_entries.append(entry)
 
     # If no historical tracks found, try adjacent periods before falling back to all history
@@ -1589,7 +1605,7 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
     Returns a deduplicated list of candidate tracks ready for process_tracks().
     """
     similar_tracks = []
-    now = datetime.now()
+    now = get_effective_now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
 
     log_text(f"[SONIC] Searching similarities for {len(reference_tracks)} seed tracks.")
@@ -1631,7 +1647,7 @@ def fetch_sonically_similar_tracks(reference_tracks, excluded_keys=None):
             last_played = getattr(s, "lastViewedAt", None)
 
             # Exclude if it was played recently
-            if last_played and last_played >= exclude_start:
+            if last_played and _viewedAt_to_effective(last_played) >= exclude_start:
                 d_print(f"[SONIC] Skipping '{s.title}' ({s.ratingKey}): Recently played ({last_played}).")
                 continue
 
