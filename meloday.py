@@ -1299,6 +1299,18 @@ def fetch_historical_tracks(period):
                 filtered_entries = fallback_entries
 
     # --- OPTIMIZED BULK METADATA RESOLUTION ---
+    # 0. Pre-filter history entries before any API calls.
+    #    parentRatingKey and userRating are available on raw history entries, so
+    #    label, seasonal, and track-rating checks are free — no resolution needed.
+    #    (Album/artist ratings require resolved objects and are checked later in process_tracks.)
+    in_xmas = _in_christmas_window(now)
+    filtered_entries = [
+        e for e in filtered_entries
+        if str(getattr(e, "parentRatingKey", "")) not in _excluded_album_keys
+        and (in_xmas or str(getattr(e, "parentRatingKey", "")) not in _christmas_album_keys)
+        and not (getattr(e, "userRating", None) is not None and getattr(e, "userRating", 10) <= 4)
+    ]
+
     # 1. Identify unique ratingKeys to avoid redundant API hits
     unique_keys = list({entry.ratingKey for entry in filtered_entries if entry.ratingKey})
     
@@ -1336,15 +1348,11 @@ def fetch_historical_tracks(period):
     # Audit log for historical pool size
     log_text(f"[SELECTION] Found {len(resolved_tracks)} historical tracks after exclusion/lookback filtering.")
 
-    # 5. Filter against labels, seasonal exclusions, and low ratings
-    # (Uses the optimized set-based logic)
-    filtered_tracks = filter_excluded_tracks(resolved_tracks, now=now)
-
     track_play_counts = Counter()
-    for track in filtered_tracks:
+    for track in resolved_tracks:
         track_play_counts[track] += 1
 
-    sorted_tracks = sorted(filtered_tracks, key=lambda t: track_play_counts[t], reverse=True)
+    sorted_tracks = sorted(resolved_tracks, key=lambda t: track_play_counts[t], reverse=True)
     split_index = max(1, len(sorted_tracks) // 4)
     popular_tracks = sorted_tracks[:split_index]
     rare_tracks = sorted_tracks[split_index:]
