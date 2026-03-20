@@ -1364,11 +1364,17 @@ def fetch_historical_tracks(period):
     # Audit log for historical pool size
     log_text(f"[SELECTION] Found {len(resolved_tracks)} historical tracks after exclusion/lookback filtering.")
 
+    # 5. Re-apply seasonal and label exclusions on resolved track objects.
+    #    The pre-filter above works on raw history entries whose parentRatingKey may not
+    #    be reliably populated in all PlexAPI versions. Running filter_excluded_tracks on
+    #    the fully-resolved track objects guarantees Christmas music is excluded regardless.
+    filtered_tracks = filter_excluded_tracks(resolved_tracks, now=now)
+
     track_play_counts = Counter()
-    for track in resolved_tracks:
+    for track in filtered_tracks:
         track_play_counts[track] += 1
 
-    sorted_tracks = sorted(resolved_tracks, key=lambda t: track_play_counts[t], reverse=True)
+    sorted_tracks = sorted(filtered_tracks, key=lambda t: track_play_counts[t], reverse=True)
     split_index = max(1, len(sorted_tracks) // 4)
     popular_tracks = sorted_tracks[:split_index]
     rare_tracks = sorted_tracks[split_index:]
