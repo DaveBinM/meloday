@@ -215,7 +215,9 @@ python utilities/sonic_similar.py --ratingkey=12345 --limit=100 --maxdistance=0.
 
 Each playlist gets a **programmatically generated cover** in the same style as the main Meloday covers — gradient background, right-aligned title, and "Meloday+" branding. Daily Mixes use a **2×2 album-art collage** tinted with the mix's colour, regenerated each run to reflect current track selection.
 
-Star ratings feed into playlist selection throughout: tracks rated ≥ 3 stars are gently prioritised over unrated tracks in scoring and sorting. Tracks rated ≤ 2 stars are excluded everywhere. The neutral point is 2.5 stars (Plex internal value 5).
+Star ratings feed into playlist selection throughout: tracks rated ≥ 3 stars are gently prioritised over unrated tracks in scoring and sorting. Tracks rated ≤ 2 stars are excluded everywhere. The neutral point is 2.5 stars (Plex internal value 5). Only track-level ratings are used — album and artist ratings are ignored.
+
+If the same song exists on multiple albums in your library (studio release, singles compilation, Triple J Hottest 100, etc.), only one copy appears in any playlist — always the highest-scored version. Deduplication uses the track artist (resolving "Various Artists" on compilations back to the real performing artist) and a normalised title that ignores "Remastered", "Live", "Deluxe" suffixes.
 
 ### Running the script
 
@@ -262,7 +264,7 @@ python utilities/meloday_extras.py --playlist top_songs
 | Time Capsule | Meloday+ Time Capsule | Music from your formative years. Set `birth_year` in config for era-anchored selection (ages 13–25); otherwise infers peak listening eras from history. | Weekly (Sunday) |
 | Deep Cuts | Meloday+ Deep Cuts | Rarely-played tracks by your 15 most-listened artists in the past 6 months, ranked by similarity to each artist's well-played catalogue. Interleaved across artists. | Weekly (Sunday) |
 | Top Songs YYYY | Meloday+ Top Songs 2024 | Annual most-played playlists, one per calendar year back to `top_songs_start_year`. Past years are generated once and never regenerated; only the current year refreshes. | Monthly |
-| All-Time Favourites | Meloday+ All-Time Favourites | Your most-played tracks across your entire Plex history (uses `viewCount` — covers your full library lifetime, not just a history window). | Weekly (Sunday) |
+| All-Time Favourites | Meloday+ All-Time Favourites | Your 100 most-played tracks across your entire Plex library, sorted by all-time play count (uses `viewCount` — covers your full library lifetime, not just a history window). No artist cap — reflects your actual listening, however concentrated. | Weekly (Sunday) |
 | Mood Mixes | Meloday+ Workout, Focus, etc. | Up to 5 activity/mood playlists rotating from a pool of 14 profiles. See Mood Mixes below. | See below |
 
 ### Mood Mixes
