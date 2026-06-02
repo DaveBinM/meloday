@@ -17,6 +17,7 @@ import os
 import sys
 import re
 import math
+import random
 import time
 import logging
 import argparse
@@ -109,7 +110,28 @@ ARTIST_RATIO              = config["playlist"].get("artist_ratio", 0.05)
 PLAYLIST_IDS = [
     "on_repeat", "repeat_rewind", "release_radar", "discover_weekly",
     "daily_mixes", "rediscovery", "time_capsule", "deep_cuts",
+    "top_songs", "all_time_favourites", "mood_mixes",
 ]
+
+# How many days of history each playlist builder actually reads.
+# release_radar uses no history in its builder — only the centroid (pre-computed).
+# The 180-day value there covers the centroid computation, not the builder itself.
+_HISTORY_LOOKBACK_DAYS = {
+    "on_repeat":           30,    # fixed 30-day window
+    "repeat_rewind":       70,    # 10-week peak window
+    "release_radar":      180,    # centroid only — builder reads no history directly
+    "discover_weekly":    365,    # played_keys filter; older plays still valid to exclude
+    "daily_mixes":        180,    # 6 months gives stable acoustic clusters
+    "rediscovery":        730,    # 24-month outer boundary + buffer
+    "time_capsule":       548,    # 18 months for reliable peak-year inference
+    "deep_cuts":          180,    # 6-month artist ranking window
+    # top_songs lookback is computed dynamically from top_songs_start_year config
+    # all_time_favourites uses track.viewCount — no history needed
+    "mood_mixes":         180,    # play-count weighting + rotation scoring
+}
+
+# Only these playlists need the listening centroid computed from history.
+_CENTROID_PLAYLISTS = {"release_radar", "discover_weekly"}
 
 # ---------------------------------------------------------------------------
 # Cover Art — gradient colour palette (top RGB, bottom RGB) per playlist
@@ -125,10 +147,412 @@ _EXTRAS_COVER_COLORS = {
     "daily_mix_4":    ((220, 130,  20), (150,  70,  10)),  # amber orange
     "daily_mix_5":    ((150,  55, 215), ( 80,  20, 145)),  # purple
     "daily_mix_6":    (( 20, 165, 180), ( 10,  85, 115)),  # teal cyan
-    "rediscovery":    ((200,  80, 120), (110,  30,  70)),  # rose → deep rose
-    "time_capsule":   ((185, 135,  65), ( 95,  55,  20)),  # warm sepia → dark amber
-    "deep_cuts":      (( 50,  65, 110), ( 20,  30,  65)),  # slate → near-black blue
+    "rediscovery":        ((200,  80, 120), (110,  30,  70)),  # rose → deep rose
+    "time_capsule":       ((185, 135,  65), ( 95,  55,  20)),  # warm sepia → dark amber
+    "deep_cuts":          (( 50,  65, 110), ( 20,  30,  65)),  # slate → near-black blue
+    # Top Songs / All-Time
+    "top_songs":          ((200, 160,  30), (140,  90,  10)),  # warm gold
+    "all_time_favourites":((220, 180,  20), (160, 120,  10)),  # bright gold
+    # Mood / Activity Mixes (12 profiles)
+    "workout":            ((220,  50,  50), (160,  20,  20)),  # energetic red
+    "running":            ((220, 100,  30), (160,  60,  10)),  # orange
+    "party":              ((220,  80, 180), (150,  20, 120)),  # vivid magenta
+    "happy":              ((220, 190,  20), (170, 130,  10)),  # bright yellow
+    "morning":            ((240, 150,  50), (190,  90,  20)),  # warm peach
+    "focus":              (( 50,  80, 160), ( 20,  40, 100)),  # cool blue
+    "dinner":             ((120,  50, 140), ( 70,  20,  90)),  # warm purple
+    "chill":              (( 40, 150, 130), ( 20,  80,  80)),  # teal
+    "rainy_day":          (( 80, 110, 160), ( 40,  60, 110)),  # grey-blue
+    "melancholy":         (( 60,  50, 130), ( 30,  20,  90)),  # muted indigo
+    "late_night":         (( 40,  20,  80), ( 20,  10,  50)),  # deep purple
+    "sleep":              (( 30,  30, 100), ( 10,  10,  60)),  # deep navy
+    "sunny":              ((255, 200,  30), (220, 140,  10)),  # bright sunshine yellow
+    "cosy":           ((140, 190, 220), ( 80, 130, 175)),  # icy blue
 }
+
+
+# ---------------------------------------------------------------------------
+# Playlist descriptions — picked randomly each run for variety
+# ---------------------------------------------------------------------------
+_DESCRIPTIONS = {
+    "on_repeat": [
+        "The songs you can't stop playing right now.",
+        "Your most played, on heavy rotation.",
+        "Can't get enough of these right now.",
+        "The tracks you keep coming back to.",
+        "Your current obsessions, all in one place.",
+    ],
+    "repeat_rewind": [
+        "The songs that defined your recent past.",
+        "Back to what you couldn't stop playing a few weeks ago.",
+        "Your recent obsessions, revisited.",
+        "What you were listening to last month.",
+        "A look back at what had you hooked.",
+    ],
+    "release_radar": [
+        "New music matched to your taste. Updated every Friday.",
+        "Fresh releases, picked for you. Updated every Friday.",
+        "The latest from artists you love and more. Updated every Friday.",
+        "What's new in your world. Updated every Friday.",
+        "New music Friday, tailored to you.",
+    ],
+    "discover_weekly": [
+        "Your weekly mixtape of fresh music, chosen just for you. Updated every Monday.",
+        "Music you haven't heard yet but probably will love. Updated every Monday.",
+        "Hand-picked tracks you've never played. Updated every Monday.",
+        "Something new for your ears, every Monday.",
+        "Fresh picks from outside your usual rotation. Updated every Monday.",
+    ],
+    "rediscovery": [
+        "Songs you used to love. Time to rediscover them.",
+        "Old favourites you haven't heard in a while.",
+        "Dust these off — you used to play them all the time.",
+        "Music you loved and forgot about. Until now.",
+        "They've been waiting for you to come back.",
+    ],
+    "time_capsule": [
+        "A journey back to {era}. Made just for you.",
+        "Music from {era} that helped shape your taste.",
+        "Taking you back to {era}.",
+        "Your soundtrack from {era}.",
+        "The songs that defined {era} for you.",
+    ],
+    "deep_cuts": [
+        "Go deeper with the artists you love.",
+        "The tracks your favourite artists don't get enough credit for.",
+        "Hidden gems from artists you play all the time.",
+        "Less played. Just as good.",
+        "Beyond the obvious, from the artists you know best.",
+    ],
+    "top_songs": [
+        "Your most played songs of {year}.",
+        "The tracks that defined your {year}.",
+        "What you couldn't stop playing in {year}.",
+        "A look back at everything you loved in {year}.",
+        "Your {year} in music.",
+    ],
+    "all_time_favourites": [
+        "Your all-time most played tracks.",
+        "The songs you've always come back to.",
+        "Your personal greatest hits.",
+        "The tracks that have stood the test of time.",
+        "Everything you keep playing, year after year.",
+    ],
+    "workout": [
+        "Time to put in the work.",
+        "Push harder with these tracks.",
+        "Music to match your intensity.",
+        "Keep moving. Keep pushing.",
+        "Your training soundtrack.",
+    ],
+    "running": [
+        "Keep your pace up.",
+        "Music matched to your stride.",
+        "Every kilometre, these tracks.",
+        "Run further. Run faster.",
+        "Built for the road.",
+    ],
+    "party": [
+        "Get the party started.",
+        "Music that moves you.",
+        "Turn it up.",
+        "Dance. Repeat.",
+        "The floor is yours.",
+    ],
+    "happy": [
+        "Good vibes only.",
+        "Music to lift your mood.",
+        "Because today is a good day.",
+        "Bright tracks for bright moments.",
+        "Put a smile on it.",
+    ],
+    "morning": [
+        "Start your day right.",
+        "Music to ease you in.",
+        "A gentle start to the day.",
+        "Rise and press play.",
+        "Good morning.",
+    ],
+    "focus": [
+        "Music to help you concentrate.",
+        "Zone in.",
+        "Clear your head. Get it done.",
+        "Deep work, deeper sound.",
+        "Find your focus.",
+    ],
+    "dinner": [
+        "The perfect soundtrack for dinner.",
+        "Music for the table.",
+        "Easy listening for easy evenings.",
+        "Set the mood.",
+        "Slow down and savour it.",
+    ],
+    "chill": [
+        "Take it easy.",
+        "Relax. You've earned it.",
+        "Laid-back sounds for downtime.",
+        "Nothing to do. Nowhere to be.",
+        "Just breathe.",
+    ],
+    "rainy_day": [
+        "For when the skies are grey.",
+        "Music for a quiet day indoors.",
+        "Rain on the window. Tea in hand.",
+        "Overcast and reflective.",
+        "Let the weather in.",
+    ],
+    "melancholy": [
+        "Music for deeper moods.",
+        "Sometimes you need to feel it.",
+        "Sit with it for a while.",
+        "Dark, honest, real.",
+        "For when the mood is heavy.",
+    ],
+    "late_night": [
+        "For the late-night hours.",
+        "The city's asleep. You're not.",
+        "After midnight.",
+        "Dark and danceable.",
+        "The night is still young.",
+    ],
+    "sleep": [
+        "Wind down and drift off.",
+        "Quiet sounds for quiet moments.",
+        "Let it fade to sleep.",
+        "Slow, soft, still.",
+        "Close your eyes.",
+    ],
+    "sunny": [
+        "Turn up the sunshine.",
+        "Music as bright as the day.",
+        "Good weather, good music.",
+        "Windows down. Volume up.",
+        "The sun's out.",
+    ],
+    "cosy": [
+        "Warm music for cold days.",
+        "Stay in. Turn it on.",
+        "Warm sounds for cold weather.",
+        "Pull a blanket over. Press play.",
+        "Outside is cold. In here is warm.",
+    ],
+}
+
+
+def _pick_description(playlist_id, era=None, styles=None):
+    """Pick a random description for the given playlist, formatting any placeholders."""
+    pool = _DESCRIPTIONS.get(playlist_id, [])
+    if not pool:
+        return ""
+    desc = random.choice(pool)
+    if era and "{era}" in desc:
+        desc = desc.replace("{era}", era)
+    return desc
+
+
+# ---------------------------------------------------------------------------
+# Mood / Activity Mix profiles — acoustic target fingerprints
+# ---------------------------------------------------------------------------
+_MOOD_PROFILES = {
+    # General activity / mood profiles (rotation by acoustic fit)
+    "workout":    {"bpm": 150, "energy": -7,  "danceability": 0.60, "brightness": 0.30},
+    "running":    {"bpm": 160, "energy": -6,  "danceability": 0.45, "brightness": 0.28},
+    "party":      {"bpm": 125, "energy": -9,  "danceability": 0.78, "brightness": 0.38},
+    "happy":      {"bpm": 118, "energy": -11, "danceability": 0.65, "brightness": 0.48},
+    "focus":      {"bpm":  90, "energy": -18, "danceability": 0.22, "brightness": 0.10},
+    "chill":      {"bpm":  82, "energy": -15, "danceability": 0.32, "brightness": 0.16},
+    "melancholy": {"bpm":  68, "energy": -15, "danceability": 0.15, "brightness": 0.07},
+    # Time-of-day profiles (boosted when current time matches their window)
+    "morning":    {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.45},
+    "dinner":     {"bpm":  88, "energy": -19, "danceability": 0.25, "brightness": 0.22},
+    "late_night": {"bpm":  78, "energy": -14, "danceability": 0.42, "brightness": 0.05},
+    "sleep":      {"bpm":  65, "energy": -23, "danceability": 0.10, "brightness": 0.03},
+    # Weather-triggered profiles (boosted when conditions match)
+    "rainy_day":  {"bpm":  72, "energy": -16, "danceability": 0.18, "brightness": 0.09},
+    "sunny":      {"bpm": 108, "energy": -11, "danceability": 0.58, "brightness": 0.52},
+    "cosy":       {"bpm":  75, "energy": -16, "danceability": 0.20, "brightness": 0.18},
+}
+
+_MOOD_MIX_NAMES = {
+    "workout":    "Meloday+ Workout",
+    "running":    "Meloday+ Running",
+    "party":      "Meloday+ Party",
+    "happy":      "Meloday+ Happy Hits",
+    "focus":      "Meloday+ Focus",
+    "chill":      "Meloday+ Chill",
+    "melancholy": "Meloday+ Sad Songs",
+    "morning":    "Meloday+ Good Morning",
+    "dinner":     "Meloday+ Dinner",
+    "late_night": "Meloday+ Late Night",
+    "sleep":      "Meloday+ Sleep",
+    "rainy_day":  "Meloday+ Rainy Day",
+    "sunny":      "Meloday+ Sunny",
+    "cosy":       "Meloday+ Cosy",
+}
+
+# Time windows (start_hour, end_hour) in which a profile gets a strong rotation boost.
+# Hours past midnight use 24+: 1am=25, 2am=26, 3am=27, 4am=28.
+_TIME_BIASED_PROFILES = {
+    "morning":    ( 5, 12),   # 5am–noon
+    "dinner":     (17, 21),   # 5pm–9pm
+    "late_night": (22, 26),   # 10pm–2am
+    "sleep":      (22, 28),   # 10pm–4am
+}
+
+# Weather profile triggers: profile_key → weather condition that boosts it.
+_WEATHER_PROFILES = {"rainy_day", "sunny", "cosy"}
+_TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())             # morning, dinner, late_night, sleep
+_GENERAL_PROFILES = set(_MOOD_PROFILES) - _TIME_PROFILES - _WEATHER_PROFILES
+
+
+# ---------------------------------------------------------------------------
+# Mood Mix Context Helpers — time-of-day and weather
+# ---------------------------------------------------------------------------
+
+def _get_active_hour():
+    """Return the current hour (0–23) in the user's active timezone.
+    Uses the travel timezone if a trip window is active, otherwise local time.
+    Mirrors the same logic as meloday_cron.py."""
+    from zoneinfo import ZoneInfo
+    travel = config.get("travel", [])
+    for trip in travel:
+        try:
+            tz = ZoneInfo(trip["timezone"])
+            dest_today = datetime.now(tz=tz).date()
+            start = date.fromisoformat(trip["start"])
+            end   = date.fromisoformat(trip["end"])
+            if start <= dest_today <= end:
+                return datetime.now(tz=tz).hour
+        except Exception:
+            pass
+    return datetime.now().hour
+
+
+def _in_time_window(hour, window):
+    """True if `hour` falls within (start, end) where end > 24 means past midnight."""
+    start, end = window
+    # Normalise hour to compare with potentially-past-midnight window
+    h = hour if hour >= start else hour + 24
+    return start <= h < end
+
+
+def _get_weather(location):
+    """
+    Fetch current weather from wttr.in.
+    Returns a dict with temp_c, condition, code, and lat (for season detection),
+    or None on failure. Location can be a city name, coordinates, or airport code.
+    """
+    if not location or not _REQUESTS_AVAILABLE:
+        return None
+    try:
+        resp = _requests.get(
+            f"https://wttr.in/{location}",
+            params={"format": "j1"},
+            timeout=8,
+            headers={"User-Agent": "meloday-extras/1.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        current = data["current_condition"][0]
+        lat_str = (data.get("nearest_area", [{}])[0]
+                   .get("latitude", [{"value": "0"}])[0]
+                   .get("value", "0"))
+        return {
+            "temp_c":    int(current.get("temp_C", 20)),
+            "condition": current.get("weatherDesc", [{}])[0].get("value", "").lower(),
+            "code":      int(current.get("weatherCode", 113)),
+            "lat":       float(lat_str),
+        }
+    except Exception as e:
+        xlog(f"[WARN] Weather fetch failed for '{location}': {e}")
+        return None
+
+
+def _current_season(lat):
+    """
+    Return 'summer', 'autumn', 'winter', or 'spring' for the current month,
+    adjusted for hemisphere (negative latitude = Southern Hemisphere).
+    """
+    month = datetime.now().month
+    # Northern Hemisphere season by month, then flip for Southern
+    if month in (12, 1, 2):
+        base = "winter"
+    elif month in (3, 4, 5):
+        base = "spring"
+    elif month in (6, 7, 8):
+        base = "summer"
+    else:
+        base = "autumn"
+    if lat >= 0:
+        return base
+    return {"winter": "summer", "summer": "winter",
+            "spring": "autumn",  "autumn": "spring"}[base]
+
+
+# wttr.in weather codes (subset)
+_RAIN_CODES  = {176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 353, 356, 359}
+_SNOW_CODES  = {179, 182, 185, 227, 230, 323, 326, 329, 332, 335, 338, 368, 371, 374}
+_CLEAR_CODES = {113}  # sunny/clear
+
+def _weather_boost(profile_key, weather):
+    """
+    Distance reduction (negative = boost) or penalty (positive = discourage)
+    for a profile based on current weather. Thresholds are season-adjusted so
+    that a mild Melbourne winter day doesn't trigger Cosy all season, but an
+    unusually cold summer day does.
+    """
+    if weather is None:
+        return 0.0
+
+    code   = weather.get("code", 113)
+    temp   = weather.get("temp_c", 20)
+    season = _current_season(weather.get("lat", 0.0))
+
+    # Season-adjusted "feels cold" and "warm & sunny" thresholds.
+    # In Southern Hemisphere winter (Jun–Aug), typical Melbourne days are 10–15°C;
+    # Cosy should only trigger on genuinely cold outliers, not every winter day.
+    cold_threshold = {"summer": 18, "autumn": 14, "winter": 12, "spring": 15}[season]
+    warm_threshold = {"summer": 24, "autumn": 18, "winter": 15, "spring": 20}[season]
+
+    if profile_key == "rainy_day":
+        if code in _RAIN_CODES:                            return -0.40
+        if code in _CLEAR_CODES and temp > warm_threshold: return +0.20  # sunny → discourage
+    elif profile_key == "sunny":
+        if code in _CLEAR_CODES and temp > warm_threshold: return -0.40  # warm & clear → boost
+        if code in _RAIN_CODES:                            return +0.20  # raining → discourage
+    elif profile_key == "cosy":
+        if temp < cold_threshold:                          return -0.40  # cold for the season
+        if code in _SNOW_CODES:                            return -0.40  # snow (rare in AU)
+        if temp > warm_threshold + 5:                      return +0.15  # too warm → discourage
+
+    return 0.0
+
+
+def _mood_rotation_score(profile_key, acoustic_dist, current_hour, weather):
+    """
+    Hybrid rotation score for mood mix selection. Lower = selected.
+    Base is acoustic distance; context (time/weather) applies reductions.
+    """
+    score = acoustic_dist
+
+    # Time-of-day boost
+    window = _TIME_BIASED_PROFILES.get(profile_key)
+    if window and _in_time_window(current_hour, window):
+        score -= 0.35  # strong enough to override pure acoustic fit
+
+    # Weather boost
+    score += _weather_boost(profile_key, weather)
+
+    return score  # can go negative; sort ascending so lowest = most selected
+
+
+def _daily_mix_description(styles_list):
+    """Format Daily Mix description from a list of style names — Spotify style."""
+    if not styles_list:
+        return "A mix made just for you."
+    if len(styles_list) == 1:
+        return f"{styles_list[0]} and more."
+    return f"{', '.join(styles_list[:-1])} and more."
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +566,16 @@ def _parse_args():
         help="Which playlist to generate (default: all)",
     )
     p.add_argument("--debug", action="store_true")
+    p.add_argument(
+        "--reselect-moods", action="store_true",
+        help="Force full reselection of general mood mixes (runs weekly).",
+    )
+    p.add_argument(
+        "--time-context", action="store_true",
+        help="Only add/remove time-of-day mood mixes based on current hour. "
+             "Runs at each time boundary (5am, noon, 5pm, 9pm, 10pm, 2am, 4am). "
+             "Does not touch general or weather mixes.",
+    )
     args, _ = p.parse_known_args()
     return args
 
@@ -151,17 +585,19 @@ def _parse_args():
 # ---------------------------------------------------------------------------
 def _upsert_extras_playlist(plex, name, tracks, description,
                             cover_key=None, cover_title=None, cover_subtitle=None,
-                            cover_tracks=None):
+                            cover_tracks=None, existing_playlists=None):
     """
-    cover_tracks: if provided, generates a Daily Mix album-art collage cover instead of
-                  a plain gradient. Pass the mix's track list here for Daily Mixes.
+    cover_tracks:        pass the mix's track list to generate a Daily Mix collage cover.
+    existing_playlists:  pre-fetched {title: playlist_obj} dict; avoids a full plex.playlists()
+                         call per update. Populated in main() and passed through.
     """
     valid = [t for t in tracks if getattr(t, "ratingKey", None)]
     if not valid:
         xlog(f"[WARN] '{name}': no valid tracks — skipping.")
         return
     try:
-        existing = next((pl for pl in plex.playlists() if getattr(pl, "title", "") == name), None)
+        existing = (existing_playlists or {}).get(name) or \
+                   next((pl for pl in plex.playlists() if getattr(pl, "title", "") == name), None)
         if existing:
             existing.removeItems(existing.items())
             existing.addItems(valid)
@@ -246,7 +682,9 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
     play_counts = Counter(str(e.ratingKey) for e in history_entries)
     top_keys = [rk for rk, _ in play_counts.most_common(top_n)]
 
-    accum = defaultdict(list)
+    # Weighted sums — avoids extending large lists for heavily-played tracks
+    wsum  = defaultdict(float)
+    wcount = defaultdict(float)
     styles_counter = Counter()
     genres_counter = Counter()
 
@@ -258,18 +696,19 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
         for field in ("bpm", "energy", "danceability", "brightness", "year"):
             val = entry.get(field)
             if val is not None:
-                accum[field].extend([val] * count)
+                wsum[field]   += val * count
+                wcount[field] += count
         for s in (entry.get("styles") or []):
             styles_counter[s] += count
         for g in (entry.get("genres") or []):
             genres_counter[g] += count
 
     return {
-        "bpm":            sum(accum["bpm"]) / len(accum["bpm"]) if accum["bpm"] else None,
-        "energy":         sum(accum["energy"]) / len(accum["energy"]) if accum["energy"] else None,
-        "danceability":   sum(accum["danceability"]) / len(accum["danceability"]) if accum["danceability"] else None,
-        "brightness":     sum(accum["brightness"]) / len(accum["brightness"]) if accum["brightness"] else None,
-        "year":           sum(accum["year"]) / len(accum["year"]) if accum["year"] else None,
+        "bpm":            wsum["bpm"]          / wcount["bpm"]          if wcount["bpm"]          else None,
+        "energy":         wsum["energy"]        / wcount["energy"]        if wcount["energy"]        else None,
+        "danceability":   wsum["danceability"]  / wcount["danceability"]  if wcount["danceability"]  else None,
+        "brightness":     wsum["brightness"]    / wcount["brightness"]    if wcount["brightness"]    else None,
+        "year":           wsum["year"]          / wcount["year"]          if wcount["year"]          else None,
         "styles_counter": styles_counter,
         "genres_counter": genres_counter,
     }
@@ -367,6 +806,29 @@ def _round_robin_interleave(track_lists, cap):
 def is_low_rated(track, threshold=4):
     r = getattr(track, "userRating", None)
     return r is not None and r <= threshold
+
+
+def _rating_multiplier(ur):
+    """
+    Score multiplier for history-based playlists.
+    Plex internal scale: 5 = 2.5★ (neutral), 10 = 5★ (loved).
+    Unrated tracks are neutral — no penalty. Tracks ≤ 4 are excluded upstream.
+    """
+    if ur is None or ur <= 5: return 1.0
+    if ur >= 9:               return 1.20  # 4.5–5★ — Spotify "liked" equivalent
+    if ur >= 7:               return 1.10  # 3.5–4★ — enjoyed
+    return 1.05                             # 3★ — mildly positive
+
+
+def _rating_dist_bonus(ur):
+    """
+    Distance reduction for library-scanning sorts. High-rated tracks sort as if
+    acoustically closer to the target profile — Spotify's liked-track boosting.
+    """
+    if ur is None or ur <= 5: return 0.0
+    if ur >= 9:               return 0.05  # 4.5–5★
+    if ur >= 7:               return 0.02  # 3.5–4★
+    return 0.01                             # 3★
 
 
 def _artist_key(track):
@@ -546,8 +1008,8 @@ def _apply_cover_text(img, title, subtitle=None):
             y_pos += bbox[3] - bbox[1] + 8
 
     shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=40))
-    shadow_draw.text((110, H - 200), "Meloday", font=font_meloday, fill=(0, 0, 0, 120))
-    text_draw.text((110, H - 200),   "Meloday", font=font_meloday, fill=(255, 255, 255, 255))
+    shadow_draw.text((110, H - 200), "Meloday+", font=font_meloday, fill=(0, 0, 0, 120))
+    text_draw.text((110, H - 200),   "Meloday+", font=font_meloday, fill=(255, 255, 255, 255))
 
     result = Image.alpha_composite(img, shadow_layer)
     return Image.alpha_composite(result, text_layer)
@@ -641,14 +1103,18 @@ def _generate_daily_mix_cover(plex, tracks, mix_key, title, subtitle=None):
 
 def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
     """
-    Tracks played most heavily in the past 30 days, weighted by recency × frequency.
-    Score per play = 1 + (1 − days_ago/30), so a play today counts ~2×, 30 days ago ~1×.
+    Tracks you can't stop playing right now. Fixed 30-day window — Spotify never
+    expands the window to pad the count; fewer tracks is the correct result for
+    a light-listening week. Only tracks played at least twice qualify (genuine
+    repetition, not a casual single listen). Artist cap of 3 — Spotify allows
+    multiple tracks from the same artist when they genuinely dominate.
     """
     now = datetime.now(tz=timezone.utc)
     cutoff = now - timedelta(days=30)
-    artist_limit = min(2, max(1, int(target * 0.10)))
+    artist_limit = 3
 
-    scores = defaultdict(float)
+    # Count plays per track first, then score only those with >= 2 plays
+    play_counts_30d = Counter()
     for e in history_entries:
         if not e.viewedAt or e.viewedAt < cutoff:
             continue
@@ -658,11 +1124,21 @@ def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
         ur = getattr(e, "userRating", None)
         if ur is not None and ur <= 4:
             continue
+        play_counts_30d[str(e.ratingKey)] += 1
+
+    scores = defaultdict(float)
+    for e in history_entries:
+        if not e.viewedAt or e.viewedAt < cutoff:
+            continue
+        rk = str(e.ratingKey)
+        if play_counts_30d[rk] < 2:  # must have been played at least twice
+            continue
         days_ago = (now - e.viewedAt).total_seconds() / 86400
-        scores[str(e.ratingKey)] += 1.0 + (1.0 - days_ago / 30.0)
+        ur = getattr(e, "userRating", None)
+        scores[rk] += (1.0 + (1.0 - days_ago / 30.0)) * _rating_multiplier(ur)
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:target * 3]])
+    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(300, target * 8)]])
 
     artist_count = Counter()
     result = []
@@ -688,7 +1164,7 @@ def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
     in the last 21 days — the previous month's On Repeat.
     """
     now = datetime.now(tz=timezone.utc)
-    silence_cutoff = now - timedelta(days=21)
+    silence_cutoff = now - timedelta(days=30)
     peak_start    = now - timedelta(days=70)
     artist_limit  = min(2, max(1, int(target * 0.10)))
 
@@ -713,10 +1189,16 @@ def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
         ur = getattr(e, "userRating", None)
         if ur is not None and ur <= 4:
             continue
-        peak_counts[rk] += 1
+        peak_counts[rk] += _rating_multiplier(ur)  # float counts; threshold still applied below
 
-    ranked = sorted(peak_counts.items(), key=lambda x: x[1], reverse=True)
-    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:target * 3]])
+    # Only tracks played at least twice (equiv. score ≥ 2) qualify.
+    # Using float counts means a 5-star track played twice scores higher than
+    # an unrated track played twice.
+    ranked = sorted(
+        [(rk, c) for rk, c in peak_counts.items() if c >= 2],
+        key=lambda x: x[1], reverse=True,
+    )
+    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(200, target * 5)]])
 
     artist_count = Counter()
     result = []
@@ -753,10 +1235,12 @@ def _album_release_date(album):
     """Extract the release date from a Plex album object. Returns datetime.date or None."""
     oaa = getattr(album, "originallyAvailableAt", None)
     if oaa is not None:
+        # Check datetime before date — datetime is a subclass of date, so isinstance(oaa, date)
+        # would pass for both, returning the datetime object un-converted.
+        if isinstance(oaa, datetime):
+            return oaa.date()
         if isinstance(oaa, date):
             return oaa
-        if hasattr(oaa, "date"):
-            return oaa.date()
     yr = getattr(album, "year", None)
     if yr:
         return date(yr, 1, 1)
@@ -816,7 +1300,7 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
                 qualifying.append((rel, album))
 
         if qualifying:
-            # Score and flatten
+            # Score albums
             album_data = []
             for rel, album in qualifying:
                 tracks = _cached_album_tracks(album)
@@ -826,30 +1310,28 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
                 alb_centroid = _album_acoustic_centroid(rks, essentia_cache)
                 affinity = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
                 reps = _select_album_reps(album, tracks, essentia_cache)
-                album_data.append((rel, affinity, album.ratingKey, reps))
+                artist_key = _artist_key(reps[0]) if reps else ""
+                album_data.append((rel, affinity, album.ratingKey, artist_key, reps))
 
             # Sort: newest first, affinity as tiebreaker within the same week
             def _sort_key(item):
-                rel, affinity, _, _ = item
-                # Convert to "week bucket" (ISO week number) so same-week albums sort by affinity
+                rel, affinity, _, _, _ = item
                 week = rel.isocalendar()[1]
                 return (rel.year, week, affinity)
 
             album_data.sort(key=_sort_key, reverse=True)
 
-            album_count = Counter()
-            artist_count = Counter()
+            # One album per artist (the most recent) — matches Spotify's Release Radar behaviour.
+            # album_data is sorted newest-first, so the first album we see for each artist is
+            # their latest release; subsequent albums from the same artist are skipped.
+            seen_artists = set()
             result = []
-            for rel, affinity, album_rk, reps in album_data:
+            for rel, affinity, album_rk, art_k, reps in album_data:
+                if art_k and art_k in seen_artists:
+                    continue
+                if art_k:
+                    seen_artists.add(art_k)
                 for t in reps:
-                    ak_str = str(album_rk)
-                    art_k = _artist_key(t)
-                    if album_count[ak_str] >= 2:
-                        continue
-                    if artist_count[art_k] >= 3:
-                        continue
-                    album_count[ak_str] += 1
-                    artist_count[art_k] += 1
                     result.append((rel, t))
 
         if len(result) < RELEASE_RADAR_MIN_TRACKS:
@@ -864,53 +1346,128 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
 def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
                           excluded_album_keys, target=30):
     """
-    Tracks never played by the user that most closely match their taste fingerprint.
-    Scored entirely from the Essentia cache; only the top candidates are resolved via Plex.
+    Your weekly mixtape of fresh music.
+
+    Mirrors Spotify's Discover Weekly structure:
+    - ~70% from artists you've NEVER played (new artist discovery)
+    - ~30% from familiar artists, tracks you haven't heard
+    - 20% of the new-artist portion are 'stretch' picks — acoustically adjacent
+      but less predictable, drawn from rank 300+ rather than the top matches
+    - Max 1 track per artist and 1 per album across the whole playlist
+    - New-artist and familiar tracks interleaved throughout (not grouped)
+    - Exploration slice is seeded by date — stable within the same day
     """
     played_keys = {str(e.ratingKey) for e in history_entries}
 
-    # Score all unplayed cache entries
-    scored = sorted(
-        [(acoustic_affinity(rk, centroid, essentia_cache), rk)
-         for rk in essentia_cache if rk not in played_keys],
-        reverse=True,
-    )
+    # Artists the user has actually played (from cache entries in their history)
+    played_artists = {
+        norm_text(primary_artist(essentia_cache.get(rk, {}).get("artist", "") or ""))
+        for rk in played_keys
+        if essentia_cache.get(rk, {}).get("artist")
+    }
+    played_artists.discard("")
 
-    # Resolve a candidate pool larger than target to absorb exclusion/rating losses
-    candidate_keys = [rk for _, rk in scored[:target * 5]]
-    track_map = resolve_tracks_by_keys(plex, candidate_keys)
+    # Score all unplayed entries and split by artist familiarity
+    new_artist_scored = []
+    familiar_artist_scored = []
+    for rk, entry in essentia_cache.items():
+        if rk in played_keys:
+            continue
+        score = acoustic_affinity(rk, centroid, essentia_cache)
+        artist = norm_text(primary_artist(entry.get("artist", "") or ""))
+        if artist and artist not in played_artists:
+            new_artist_scored.append((score, rk))
+        else:
+            familiar_artist_scored.append((score, rk))
 
-    artist_limit = max(2, int(target * 0.10))
+    new_artist_scored.sort(reverse=True)
+    familiar_artist_scored.sort(reverse=True)
+
+    n_new      = int(target * 0.70)   # ~21 new-artist tracks
+    n_familiar = target - n_new        # ~9 familiar-artist tracks
+    n_new_safe    = int(n_new * 0.80)  # top-affinity new artists
+    n_new_explore = n_new - n_new_safe  # stretch picks
+
+    pool_size = max(300, target * 8)
+    explore_start = pool_size
+    explore_end   = pool_size + target * 4
+
+    # Resolve all candidates in one shot
+    all_candidate_keys = list(dict.fromkeys(
+        [rk for _, rk in new_artist_scored[:explore_end]] +
+        [rk for _, rk in familiar_artist_scored[:pool_size]]
+    ))
+    track_map = resolve_tracks_by_keys(plex, all_candidate_keys)
+
     artist_count = Counter()
-    result = []
+    album_count  = Counter()
 
-    for _, rk in scored:
-        t = track_map.get(rk)
-        if not t:
-            continue
-        vc = getattr(t, "viewCount", None)
-        if vc and vc > 0:
-            continue
+    def _eligible(rk, t):
+        if not t or is_low_rated(t):
+            return False
+        if (getattr(t, "viewCount", None) or 0) > 0:
+            return False
         pk = str(getattr(t, "parentRatingKey", "") or "")
-        if pk in excluded_album_keys:
-            continue
-        if is_low_rated(t):
-            continue
-        ak = _artist_key(t)
-        if artist_count[ak] >= artist_limit:
-            continue
-        artist_count[ak] += 1
-        result.append(t)
-        if len(result) >= target:
-            break
+        if pk in excluded_album_keys or album_count[pk] >= 1:
+            return False
+        if artist_count[_artist_key(t)] >= 1:
+            return False
+        return True
 
-    return result
+    def _accept(t):
+        pk = str(getattr(t, "parentRatingKey", "") or "")
+        artist_count[_artist_key(t)] += 1
+        album_count[pk] += 1
+
+    # 1. Safe new-artist picks (top affinity)
+    new_safe_tracks = []
+    for _, rk in new_artist_scored[:pool_size]:
+        if len(new_safe_tracks) >= n_new_safe:
+            break
+        t = track_map.get(rk)
+        if not _eligible(rk, t):
+            continue
+        _accept(t)
+        new_safe_tracks.append(t)
+
+    # 2. Exploration picks — random sample from rank pool_size→explore_end
+    #    Seeded by date so the same tracks appear if re-run on the same day.
+    day_seed = int(datetime.now(tz=timezone.utc).strftime("%Y%m%d"))
+    explore_candidates = [
+        (rk, track_map[rk])
+        for _, rk in new_artist_scored[explore_start:explore_end]
+        if rk in track_map and _eligible(rk, track_map[rk])
+    ]
+    random.Random(day_seed).shuffle(explore_candidates)
+    explore_tracks = []
+    for rk, t in explore_candidates:
+        if len(explore_tracks) >= n_new_explore:
+            break
+        if not _eligible(rk, t):  # re-check after other picks may have consumed artist/album
+            continue
+        _accept(t)
+        explore_tracks.append(t)
+
+    # 3. Familiar-artist picks
+    familiar_tracks = []
+    for _, rk in familiar_artist_scored[:pool_size]:
+        if len(familiar_tracks) >= n_familiar:
+            break
+        t = track_map.get(rk)
+        if not _eligible(rk, t):
+            continue
+        _accept(t)
+        familiar_tracks.append(t)
+
+    # Interleave: safe new → familiar → stretch, cycling through all three
+    # so the playlist flows as one curated mix rather than grouped sections.
+    return _round_robin_interleave([new_safe_tracks, familiar_tracks, explore_tracks], target)
 
 
 # --- 5. Daily Mixes ---
 
 def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
-                      n_mixes=6, mix_size=25):
+                      n_mixes=6, mix_size=50):
     """
     N Daily Mixes built via k-means acoustic clustering. Requires numpy.
     Each mix: 40% history tracks from the cluster, 60% library tracks closest to centroid.
@@ -1037,7 +1594,14 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
             artist_count[ak] += 1
             library_tracks.append(t)
 
-        tracks = _round_robin_interleave([history_tracks, library_tracks], mix_size)
+        # Sort combined tracks by distance to cluster centroid — creates acoustic
+        # flow within each mix rather than alternating history/library blocks.
+        combined = history_tracks + library_tracks
+        combined.sort(key=lambda t: (
+            float(np.linalg.norm(X[rk_to_idx[str(t.ratingKey)]] - centroid_vec))
+            if str(t.ratingKey) in rk_to_idx else 1.0
+        ) - _rating_dist_bonus(getattr(t, "userRating", None)))
+        tracks = combined[:mix_size]
         styles_subtitle = " · ".join(top_styles) if top_styles else ""
         mixes.append((f"Meloday+ Daily Mix {mix_num}", description, tracks, styles_subtitle))
 
@@ -1069,11 +1633,12 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
         if rk not in last_played or e.viewedAt > last_played[rk]:
             last_played[rk] = e.viewedAt
 
-    candidates = [
-        (rk, lp, all_time_plays[rk])
-        for rk, lp in last_played.items()
-        if silence_ceiling <= lp < silence_floor
-    ]
+    candidates = sorted(
+        [(rk, lp, all_time_plays[rk])
+         for rk, lp in last_played.items()
+         if silence_ceiling <= lp < silence_floor],
+        key=lambda x: x[2], reverse=True,  # most-played first — most likely to qualify
+    )[:target * 8]
 
     track_map = resolve_tracks_by_keys(plex, [rk for rk, _, _ in candidates])
 
@@ -1263,7 +1828,9 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
 
         artist_centroid = _album_acoustic_centroid(well_played_rks, essentia_cache) if well_played_rks else {}
 
-        # Score deep cuts by distance to artist's well-played centroid
+        # Score deep cuts by distance to artist's well-played centroid.
+        # Resolve a larger pool so rating bonus can surface high-rated tracks
+        # that sit slightly further from the centroid.
         has_acoustic = any(artist_centroid.get(f) for f in ("bpm", "energy"))
         scored = []
         for rk in deep_cut_rks:
@@ -1273,14 +1840,22 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
             scored.append((score, rk))
         scored.sort(reverse=True)
 
-        # Resolve top candidates
-        top_rks = [rk for _, rk in scored[:tracks_per_artist * 3]]
+        top_rks = [rk for _, rk in scored[:tracks_per_artist * 4]]
         track_map = resolve_tracks_by_keys(plex, top_rks)
 
-        selected = []
-        for _, rk in scored:
+        # Re-sort resolved tracks with rating bonus applied
+        resolved_scored = []
+        for score, rk in scored:
             t = track_map.get(rk)
-            if not t or is_low_rated(t):
+            if not t:
+                continue
+            adjusted = score + _rating_dist_bonus(getattr(t, "userRating", None))
+            resolved_scored.append((adjusted, t))
+        resolved_scored.sort(reverse=True)
+
+        selected = []
+        for _, t in resolved_scored:
+            if is_low_rated(t):
                 continue
             if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
                 continue
@@ -1297,65 +1872,414 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
     )
 
 
+# --- 9. Top Songs by Year ---
+
+def build_top_songs(plex, history_entries, excluded_album_keys,
+                    target=100, min_distinct=20, existing_playlists=None):
+    """
+    Your most-played tracks during each calendar year you have history for.
+    Returns list of (year, [tracks]) tuples sorted by year descending.
+    Past years whose playlists already exist in Plex are skipped — they don't
+    change. The current year is always regenerated.
+    """
+    current_year = datetime.now(tz=timezone.utc).year
+    start_year   = int(_extras.get("top_songs_start_year", current_year - 5))
+    existing     = existing_playlists or {}
+
+    year_plays = defaultdict(Counter)
+    for e in history_entries:
+        if not e.viewedAt:
+            continue
+        if e.viewedAt.year < start_year:
+            continue
+        pk = str(getattr(e, "parentRatingKey", "") or "")
+        if pk in excluded_album_keys:
+            continue
+        ur = getattr(e, "userRating", None)
+        if ur is not None and ur <= 4:
+            continue
+        year_plays[e.viewedAt.year][str(e.ratingKey)] += _rating_multiplier(ur)
+
+    results = []
+    for year in sorted(year_plays.keys(), reverse=True):
+        # Past years are immutable — skip if a playlist already exists.
+        # Current year is always regenerated as plays accumulate.
+        if year != current_year and f"Meloday+ Top Songs {year}" in existing:
+            xlog(f"[INFO] top_songs: skipping {year} (playlist already exists)")
+            continue
+        counts = year_plays[year]
+        if len(counts) < min_distinct:
+            continue
+        ranked = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        candidate_keys = [rk for rk, _ in ranked[:max(300, target * 3)]]
+        track_map = resolve_tracks_by_keys(plex, candidate_keys)
+
+        artist_count = Counter()
+        tracks = []
+        for rk, _ in ranked:
+            t = track_map.get(rk)
+            if not t or is_low_rated(t):
+                continue
+            ak = _artist_key(t)
+            if artist_count[ak] >= 5:
+                continue
+            artist_count[ak] += 1
+            tracks.append(t)
+            if len(tracks) >= target:
+                break
+
+        if tracks:
+            results.append((year, tracks))
+
+    return results
+
+
+# --- 10. All-Time Favourites ---
+
+def build_all_time_favourites(music, excluded_album_keys, target=50):
+    """
+    All-time most-played tracks using track.viewCount — no history fetch needed.
+    viewCount is stored natively by Plex and covers the entire lifetime of your
+    library, not just the history lookback window.
+    Fetches the top N tracks by play count directly from Plex, server-sorted.
+    """
+    try:
+        candidates = music.search(
+            libtype="track",
+            sort="viewCount:desc",
+            container_size=max(500, target * 10),
+        )
+    except Exception as e:
+        xlog(f"[ERROR] all_time_favourites: track fetch failed: {e}")
+        return []
+
+    artist_count = Counter()
+    result = []
+    for t in candidates:
+        vc = getattr(t, "viewCount", None) or 0
+        if vc == 0:
+            break  # server-sorted; once we hit zero plays we're done
+        if is_low_rated(t):
+            continue
+        pk = str(getattr(t, "parentRatingKey", "") or "")
+        if pk in excluded_album_keys:
+            continue
+        ak = _artist_key(t)
+        if artist_count[ak] >= 4:
+            continue
+        artist_count[ak] += 1
+        result.append(t)
+        if len(result) >= target:
+            break
+    return result
+
+
+# --- 11. Mood / Activity Mixes ---
+
+def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
+                     n_active=5, mix_size=50, reselect=False, time_context=False,
+                     existing_playlists=None):
+    """
+    Three operating modes:
+
+    time_context=True  (boundary cron — 5am, noon, 5pm, 9pm, 10pm, 2am, 4am):
+        Only adds/removes time-of-day playlists (Morning, Dinner, Late Night, Sleep)
+        based on the current hour. Does NOT touch general or weather mixes.
+        Returns (mixes_to_upsert, profiles_to_delete).
+
+    reselect=False (default, daily 6am):
+        Refreshes content for existing general mixes. Checks weather and
+        adds/removes weather mixes. Does NOT touch time-of-day mixes.
+
+    reselect=True (weekly Monday):
+        Full acoustic reselection of general mixes. Also updates weather mixes.
+        Does NOT touch time-of-day mixes.
+
+    Returns (mixes, profiles_to_delete) where mixes is a list of
+    (playlist_name, profile_key, tracks) tuples.
+    """
+    name_to_key = {v: k for k, v in _MOOD_MIX_NAMES.items()}
+    existing     = existing_playlists or {}
+
+    # ------------------------------------------------------------------
+    # MODE 1: Time-context — only manage time-of-day mixes
+    # ------------------------------------------------------------------
+    if time_context:
+        current_hour = _get_active_hour()
+        should_be_active = {
+            k for k in _TIME_PROFILES
+            if _in_time_window(current_hour, _TIME_BIASED_PROFILES[k])
+        }
+        currently_active = {
+            name_to_key[name]
+            for name in existing
+            if name in name_to_key and name_to_key[name] in _TIME_PROFILES
+        }
+        to_add    = should_be_active - currently_active
+        to_remove = currently_active - should_be_active
+
+        xlog(f"[INFO] mood_mixes (time): hour={current_hour} "
+             f"add={sorted(to_add)} remove={sorted(to_remove)}")
+
+        mixes = []
+        for profile_key in to_add:
+            tracks = _build_mix_tracks(
+                profile_key, essentia_cache, history_entries,
+                excluded_album_keys, mix_size, plex)
+            mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
+
+        return mixes, list(to_remove)
+
+    # ------------------------------------------------------------------
+    # MODE 2 / 3: General + weather mixes (daily refresh or weekly reselect)
+    # ------------------------------------------------------------------
+    weather_location = _extras.get("weather_location")
+    weather = _get_weather(weather_location) if weather_location else None
+    if weather:
+        xlog(f"[INFO] mood_mixes: weather = {weather['condition']}, {weather['temp_c']}°C")
+
+    # Determine which general profiles are active
+    if not reselect:
+        active_general = [
+            name_to_key[name]
+            for name in existing
+            if name in name_to_key and name_to_key[name] in _GENERAL_PROFILES
+        ]
+        if not active_general:
+            xlog("[INFO] mood_mixes: no general mixes found, running initial selection")
+            reselect = True
+
+    if reselect:
+        now = datetime.now(tz=timezone.utc)
+        recent_entries = [e for e in history_entries
+                          if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
+        recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
+        if recent_centroid.get("bpm"):
+            # Score only general profiles acoustically (no time/weather for stable weekly selection)
+            scored = sorted(
+                (_acoustic_distance_to_centroid(target, recent_centroid), k)
+                for k, target in _MOOD_PROFILES.items()
+                if k in _GENERAL_PROFILES
+            )
+            active_general = [k for _, k in scored[:n_active]]
+        else:
+            active_general = list(_GENERAL_PROFILES)[:n_active]
+        xlog(f"[INFO] mood_mixes: reselected general profiles = {active_general}")
+    else:
+        xlog(f"[INFO] mood_mixes: content refresh for general = {active_general}")
+
+    # Determine weather profiles: add if conditions match, remove if not
+    active_weather = [
+        k for k in _WEATHER_PROFILES
+        if _weather_boost(k, weather) < 0  # negative boost = conditions match
+    ]
+    inactive_weather = [
+        k for k in _WEATHER_PROFILES
+        if k not in active_weather
+    ]
+    # Remove inactive weather mixes that are currently in Plex
+    to_remove = [k for k in inactive_weather if _MOOD_MIX_NAMES[k] in existing]
+
+    active_profiles = active_general + active_weather
+    xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather}")
+
+    mixes = []
+    for profile_key in active_profiles:
+        tracks = _build_mix_tracks(
+            profile_key, essentia_cache, history_entries,
+            excluded_album_keys, mix_size, plex)
+        mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
+
+    # On reselect, also remove general mixes that rotated out
+    if reselect:
+        for name, key in name_to_key.items():
+            if key in _GENERAL_PROFILES and key not in active_general and name in existing:
+                to_remove.append(key)
+
+    return mixes, to_remove
+
+    # This block is now dead — all paths return early above.
+    # Kept as a safety fallback.
+    return [], []
+
+
+def _build_mix_tracks(profile_key, essentia_cache, history_entries,
+                      excluded_album_keys, mix_size, plex):
+    """Build the 50-track list for a single mood mix profile."""
+    target       = _MOOD_PROFILES[profile_key]
+    play_counts  = Counter(str(e.ratingKey) for e in history_entries)
+
+    history_rks = sorted(
+        [rk for rk in essentia_cache if rk in play_counts],
+        key=lambda rk: (
+            _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target),
+            -play_counts.get(rk, 0),
+        )
+    )
+    library_rks = sorted(
+        [rk for rk in essentia_cache if not play_counts.get(rk)],
+        key=lambda rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target)
+    )
+
+    n_history = int(mix_size * 0.40)
+    n_library  = mix_size - n_history
+    candidate_rks = list(dict.fromkeys(
+        history_rks[:n_history * 3] + library_rks[:n_library * 3]
+    ))
+    track_map    = resolve_tracks_by_keys(plex, candidate_rks)
+    artist_limit = max(2, int(mix_size * ARTIST_RATIO))
+    artist_count = Counter()
+
+    history_tracks = []
+    for rk in history_rks:
+        if len(history_tracks) >= n_history:
+            break
+        t = track_map.get(rk)
+        if not t or is_low_rated(t):
+            continue
+        if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
+            continue
+        ak = _artist_key(t)
+        if artist_count[ak] >= artist_limit:
+            continue
+        artist_count[ak] += 1
+        history_tracks.append(t)
+
+    library_tracks = []
+    for rk in library_rks:
+        if len(library_tracks) >= n_library:
+            break
+        t = track_map.get(rk)
+        if not t or is_low_rated(t):
+            continue
+        if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
+            continue
+        ak = _artist_key(t)
+        if artist_count[ak] >= artist_limit:
+            continue
+        artist_count[ak] += 1
+        library_tracks.append(t)
+
+    combined = history_tracks + library_tracks
+    combined.sort(key=lambda t: (
+        _acoustic_distance_to_centroid(essentia_cache.get(str(t.ratingKey), {}), target)
+        - _rating_dist_bonus(getattr(t, "userRating", None))
+    ))
+    return combined[:mix_size]
+
+
 # ===========================================================================
 # Orchestrator
 # ===========================================================================
 
-def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys):
+def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys,
+                  existing_playlists=None, reselect_moods=False, time_context=False):
+    ep = existing_playlists  # shorthand
+
     if playlist_id == "on_repeat":
         tracks = build_on_repeat(plex, history, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ On Repeat", tracks,
-            "Your most-played tracks from the past 30 days, weighted by recency. Updated weekly.",
-            cover_key="on_repeat", cover_title="On Repeat")
+            _pick_description("on_repeat"),
+            cover_key="on_repeat", cover_title="On Repeat",
+            existing_playlists=ep)
 
     elif playlist_id == "repeat_rewind":
         tracks = build_repeat_rewind(plex, history, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ Repeat Rewind", tracks,
-            "Tracks you were playing heavily 4–10 weeks ago. Updated weekly.",
-            cover_key="repeat_rewind", cover_title="Repeat Rewind")
+            _pick_description("repeat_rewind"),
+            cover_key="repeat_rewind", cover_title="Repeat Rewind",
+            existing_playlists=ep)
 
     elif playlist_id == "release_radar":
         tracks = build_release_radar(plex, music, ec, centroid, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ Release Radar", tracks,
-            "New releases from your library, ranked by how well they match your taste. Updated weekly.",
-            cover_key="release_radar", cover_title="Release Radar")
+            _pick_description("release_radar"),
+            cover_key="release_radar", cover_title="Release Radar",
+            existing_playlists=ep)
 
     elif playlist_id == "discover_weekly":
         tracks = build_discover_weekly(plex, history, ec, centroid, excluded_album_keys,
                                        target=DISCOVER_WEEKLY_SIZE)
         _upsert_extras_playlist(plex, "Meloday+ Discover Weekly", tracks,
-            "Tracks you've never played that match your taste fingerprint. Updated weekly.",
-            cover_key="discover_weekly", cover_title="Discover Weekly")
+            _pick_description("discover_weekly"),
+            cover_key="discover_weekly", cover_title="Discover Weekly",
+            existing_playlists=ep)
 
     elif playlist_id == "daily_mixes":
         mixes = build_daily_mixes(plex, history, ec, excluded_album_keys,
                                   n_mixes=DAILY_MIX_COUNT)
-        for name, description, tracks, styles_subtitle in mixes:
+        for name, _desc, tracks, styles_subtitle in mixes:
             mix_num = name.split()[-1]  # "Meloday+ Daily Mix 3" → "3"
-            _upsert_extras_playlist(plex, name, tracks, description,
+            styles_list = [s.strip() for s in styles_subtitle.split("·") if s.strip()] \
+                          if styles_subtitle else []
+            _upsert_extras_playlist(plex, name, tracks,
+                _daily_mix_description(styles_list),
                 cover_key=f"daily_mix_{mix_num}",
                 cover_title=f"Daily Mix {mix_num}",
                 cover_subtitle=styles_subtitle or None,
-                cover_tracks=tracks)
+                cover_tracks=tracks,
+                existing_playlists=ep)
 
     elif playlist_id == "rediscovery":
         tracks = build_rediscovery(plex, history, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ Rediscovery", tracks,
-            "Tracks you loved but haven't played in 6–24 months. Updated weekly.",
-            cover_key="rediscovery", cover_title="Rediscovery")
+            _pick_description("rediscovery"),
+            cover_key="rediscovery", cover_title="Rediscovery",
+            existing_playlists=ep)
 
     elif playlist_id == "time_capsule":
         tracks, era_label = build_time_capsule(plex, history, ec, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ Time Capsule", tracks,
-            "Music from the years you listened to most. Updated weekly.",
+            _pick_description("time_capsule", era=era_label or "your past"),
             cover_key="time_capsule", cover_title="Time Capsule",
-            cover_subtitle=era_label)
+            cover_subtitle=era_label, existing_playlists=ep)
 
     elif playlist_id == "deep_cuts":
         tracks = build_deep_cuts(plex, history, ec, excluded_album_keys)
         _upsert_extras_playlist(plex, "Meloday+ Deep Cuts", tracks,
-            "Unheard tracks from your most-listened artists. Updated weekly.",
-            cover_key="deep_cuts", cover_title="Deep Cuts")
+            _pick_description("deep_cuts"),
+            cover_key="deep_cuts", cover_title="Deep Cuts",
+            existing_playlists=ep)
+
+    elif playlist_id == "top_songs":
+        results = build_top_songs(plex, history, excluded_album_keys,
+                                  existing_playlists=ep)
+        for year, tracks in results:
+            year_str = str(year)
+            _upsert_extras_playlist(plex, f"Meloday+ Top Songs {year_str}", tracks,
+                _pick_description("top_songs", era=year_str),
+                cover_key="top_songs", cover_title=f"Top Songs",
+                cover_subtitle=year_str,
+                existing_playlists=ep)
+
+    elif playlist_id == "all_time_favourites":
+        tracks = build_all_time_favourites(music, excluded_album_keys)
+        _upsert_extras_playlist(plex, "Meloday+ All-Time Favourites", tracks,
+            _pick_description("all_time_favourites"),
+            cover_key="all_time_favourites", cover_title="All-Time Favourites",
+            existing_playlists=ep)
+
+    elif playlist_id == "mood_mixes":
+        n_active = int(_extras.get("mood_mix_count", 5))
+        mixes, to_remove = build_mood_mixes(
+            plex, history, ec, excluded_album_keys, n_active=n_active,
+            reselect=reselect_moods, time_context=time_context,
+            existing_playlists=ep)
+        # Delete profiles that rotated out or whose time/weather window closed
+        for profile_key in to_remove:
+            name = _MOOD_MIX_NAMES[profile_key]
+            pl   = (ep or {}).get(name)
+            if pl:
+                try:
+                    pl.delete()
+                    xlog(f"[OK] Removed: '{name}'")
+                except Exception as e:
+                    xlog(f"[WARN] Could not remove '{name}': {e}")
+        for name, profile_key, tracks in mixes:
+            _upsert_extras_playlist(plex, name, tracks,
+                _pick_description(profile_key),
+                cover_key=profile_key, cover_title=name.replace("Meloday+ ", ""),
+                existing_playlists=ep)
 
 
 def main():
@@ -1375,21 +2299,74 @@ def main():
     excluded_album_keys = build_excluded_album_keys(music)
     xlog(f"[OK] Excluded albums: {len(excluded_album_keys)}")
 
-    xlog("[...] Fetching history (18 months)...")
-    history = fetch_full_history(music, lookback_days=548)
-    xlog(f"[OK] History: {len(history)} entries")
+    # Pre-fetch existing playlists BEFORE the lookback calculation so that
+    # top_songs can skip years that are already generated.
+    existing_playlists = {
+        pl.title: pl
+        for pl in plex.playlists(title="Meloday")
+        if getattr(pl, "title", "").startswith("Meloday+")
+    }
+    xlog(f"[OK] Found {len(existing_playlists)} existing Meloday+ playlist(s)")
 
-    centroid = compute_listening_centroid(history, ec)
-    if centroid.get("bpm"):
-        xlog(f"[OK] Centroid: bpm={centroid['bpm']:.0f}  energy={centroid['energy']:.1f}  "
-             f"dance={centroid['danceability']:.2f}  bright={centroid['brightness']:.2f}")
+    def _top_songs_lookback():
+        """
+        Fetch only from Jan 1 of the oldest year that doesn't yet have a playlist.
+        Current year is always regenerated. Uses top_songs_start_year config key.
+        """
+        current_year = datetime.now(tz=timezone.utc).year
+        start_year   = int(_extras.get("top_songs_start_year", current_year - 5))
+
+        oldest_needed = current_year  # assume current year is always needed
+        for yr in range(start_year, current_year):
+            if f"Meloday+ Top Songs {yr}" not in existing_playlists:
+                oldest_needed = yr
+                break  # first (oldest) missing year — fetch from here
+
+        jan1 = datetime(oldest_needed, 1, 1, tzinfo=timezone.utc)
+        return (datetime.now(tz=timezone.utc) - jan1).days + 1
+
+    time_context_mode = getattr(args, "time_context", False)
+
+    def _lookback_for(pid):
+        if pid == "time_capsule" and BIRTH_YEAR:
+            return 180
+        if pid == "top_songs":
+            return _top_songs_lookback()
+        if pid == "all_time_favourites":
+            return 0   # uses track.viewCount — no history needed
+        if pid == "mood_mixes" and time_context_mode:
+            return 30  # only needs recent plays for mix content weighting
+        return _HISTORY_LOOKBACK_DAYS.get(pid, 180)
+
+    lookback_days = max((_lookback_for(pid) for pid in to_run), default=0)
+    if lookback_days > 0:
+        xlog(f"[...] Fetching history ({lookback_days} days)...")
+        history = fetch_full_history(music, lookback_days=lookback_days)
+        xlog(f"[OK] History: {len(history)} entries")
     else:
-        xlog("[OK] Centroid computed (limited acoustic data)")
+        history = []
+        xlog("[OK] History: not needed for selected playlists")
+
+    needs_centroid = bool(set(to_run) & _CENTROID_PLAYLISTS)
+    if needs_centroid:
+        centroid = compute_listening_centroid(history, ec)
+        if centroid.get("bpm"):
+            xlog(f"[OK] Centroid: bpm={centroid['bpm']:.0f}  energy={centroid['energy']:.1f}  "
+                 f"dance={centroid['danceability']:.2f}  bright={centroid['brightness']:.2f}")
+        else:
+            xlog("[OK] Centroid computed (limited acoustic data)")
+    else:
+        centroid = {}
+
+    reselect_moods = getattr(args, "reselect_moods", False)
 
     for playlist_id in to_run:
         xlog(f"\n[...] Building: {playlist_id}")
         try:
-            _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys)
+            _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys,
+                          existing_playlists=existing_playlists,
+                          reselect_moods=reselect_moods,
+                          time_context=time_context_mode)
         except Exception:
             xlog(f"[ERROR] {playlist_id} failed:\n{traceback.format_exc()}")
 
