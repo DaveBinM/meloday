@@ -34,6 +34,8 @@ from meloday import (
     load_essentia_cache,
     norm_text,
     primary_artist,
+    clean_title,
+    track_artist_name,
     wrap_text,
     PLEX_URL,
     PLEX_TOKEN,
@@ -547,12 +549,13 @@ def _mood_rotation_score(profile_key, acoustic_dist, current_hour, weather):
 
 
 def _daily_mix_description(styles_list):
-    """Format Daily Mix description from a list of style names — Spotify style."""
+    """
+    Format Daily Mix playlist description — matches Spotify's 'Genre1, Genre2 and more.' format.
+    Shows all styles (up to 3) followed by 'and more.' — e.g. 'Indie Rock, Alternative and more.'
+    """
     if not styles_list:
         return "A mix made just for you."
-    if len(styles_list) == 1:
-        return f"{styles_list[0]} and more."
-    return f"{', '.join(styles_list[:-1])} and more."
+    return ", ".join(styles_list) + " and more."
 
 
 # ---------------------------------------------------------------------------
@@ -838,6 +841,37 @@ def _artist_key(track):
     return norm_text(primary_artist(name))
 
 
+def _song_key(track):
+    """
+    Deduplication key: normalised (track_artist, clean_title) pair.
+    Uses track_artist_name() which resolves the actual performing artist even
+    on compilation albums where grandparentTitle is 'Various Artists' — in that
+    case it falls back to track.originalTitle (where Plex stores the real artist).
+    clean_title strips Live/Remastered/Deluxe suffixes.
+    """
+    artist = norm_text(primary_artist(track_artist_name(track)))
+    title  = norm_text(clean_title(getattr(track, "title", "") or ""))
+    return (artist, title)
+
+
+def _dedup_filter(tracks):
+    """
+    Remove duplicate songs from a track list, keeping the first occurrence
+    (which is always the highest-scored version since lists are pre-sorted).
+    Two tracks are considered the same song if they share a normalised
+    (artist, clean_title) key — so "Stars" from a studio album and
+    "Stars" from a compilation are treated as one entry.
+    """
+    seen = set()
+    result = []
+    for t in tracks:
+        key = _song_key(t)
+        if key not in seen:
+            seen.add(key)
+            result.append(t)
+    return result
+
+
 # ===========================================================================
 # Last.fm Helpers (optional — graceful no-op when key absent)
 # ===========================================================================
@@ -982,7 +1016,7 @@ def _apply_cover_text(img, title, subtitle=None):
 
     try:
         font_main    = ImageFont.truetype(FONT_MAIN_PATH,    size=67)
-        font_sub     = ImageFont.truetype(FONT_MAIN_PATH,    size=44)
+        font_sub     = ImageFont.truetype(FONT_MAIN_PATH,    size=52)
         font_meloday = ImageFont.truetype(FONT_MELODAY_PATH, size=87)
     except (IOError, OSError):
         font_main = font_sub = font_meloday = ImageFont.load_default()
@@ -1138,17 +1172,22 @@ def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
         scores[rk] += (1.0 + (1.0 - days_ago / 30.0)) * _rating_multiplier(ur)
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(300, target * 8)]])
+    track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(400, target * 10)]])
 
     artist_count = Counter()
+    seen_songs   = set()
     result = []
     for rk, _ in ranked:
         t = track_map.get(rk)
         if not t or is_low_rated(t):
             continue
+        sk = _song_key(t)
+        if sk in seen_songs:
+            continue
         ak = _artist_key(t)
         if artist_count[ak] >= artist_limit:
             continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         result.append(t)
         if len(result) >= target:
@@ -1201,14 +1240,19 @@ def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
     track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(200, target * 5)]])
 
     artist_count = Counter()
+    seen_songs   = set()
     result = []
     for rk, _ in ranked:
         t = track_map.get(rk)
         if not t or is_low_rated(t):
             continue
+        sk = _song_key(t)
+        if sk in seen_songs:
+            continue
         ak = _artist_key(t)
         if artist_count[ak] >= artist_limit:
             continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         result.append(t)
         if len(result) >= target:
@@ -1332,13 +1376,14 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
                 if art_k:
                     seen_artists.add(art_k)
                 for t in reps:
-                    result.append((rel, t))
+                    if not is_low_rated(t):
+                        result.append((rel, t))
 
         if len(result) < RELEASE_RADAR_MIN_TRACKS:
             window_days += RELEASE_RADAR_STEP_DAYS
 
     result.sort(key=lambda x: x[0], reverse=True)
-    return [t for _, t in result[:50]]
+    return _dedup_filter([t for _, t in result[:50]])
 
 
 # --- 4. Discover Weekly ---
@@ -1401,6 +1446,7 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
 
     artist_count = Counter()
     album_count  = Counter()
+    seen_songs   = set()
 
     def _eligible(rk, t):
         if not t or is_low_rated(t):
@@ -1412,12 +1458,15 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
             return False
         if artist_count[_artist_key(t)] >= 1:
             return False
+        if _song_key(t) in seen_songs:
+            return False
         return True
 
     def _accept(t):
         pk = str(getattr(t, "parentRatingKey", "") or "")
         artist_count[_artist_key(t)] += 1
         album_count[pk] += 1
+        seen_songs.add(_song_key(t))
 
     # 1. Safe new-artist picks (top affinity)
     new_safe_tracks = []
@@ -1655,11 +1704,16 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
     eligible.sort(key=lambda x: x[0])  # longest-neglected first
 
     artist_count = Counter()
+    seen_songs   = set()
     result = []
     for _, t in eligible:
+        sk = _song_key(t)
+        if sk in seen_songs:
+            continue
         ak = _artist_key(t)
         if artist_count[ak] >= artist_limit:
             continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         result.append(t)
         if len(result) >= target:
@@ -1758,16 +1812,21 @@ def build_time_capsule(plex, history_entries, essentia_cache, excluded_album_key
             filtered.append(t)
         filtered_pools.append(filtered)
 
-    # Round-robin across eras with artist cap
-    result = []
+    # Round-robin across eras with artist cap and inline dedup
+    result      = []
+    seen_songs  = set()
     queues = [list(p) for p in filtered_pools if p]
     while queues and len(result) < target:
         next_queues = []
         for q in queues:
             while q:
                 t = q.pop(0)
+                sk = _song_key(t)
+                if sk in seen_songs:
+                    continue
                 ak = _artist_key(t)
                 if artist_count[ak] < artist_limit:
+                    seen_songs.add(sk)
                     artist_count[ak] += 1
                     result.append(t)
                     break  # take one and move to next queue
@@ -1816,6 +1875,7 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
             tracks_by_artist_rks[ak].append(rk)
 
     artist_deep_cuts = {}
+    seen_songs = set()  # shared across all artists — prevents same song appearing twice
     for artist_key in top_artists:
         artist_rks = tracks_by_artist_rks.get(artist_key, [])
         if not artist_rks:
@@ -1859,6 +1919,10 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
                 continue
             if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
                 continue
+            sk = _song_key(t)
+            if sk in seen_songs:
+                continue
+            seen_songs.add(sk)
             selected.append(t)
             if len(selected) >= tracks_per_artist:
                 break
@@ -1911,18 +1975,23 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
         if len(counts) < min_distinct:
             continue
         ranked = sorted(counts.items(), key=lambda x: x[1], reverse=True)
-        candidate_keys = [rk for rk, _ in ranked[:max(300, target * 3)]]
+        candidate_keys = [rk for rk, _ in ranked[:max(400, target * 4)]]
         track_map = resolve_tracks_by_keys(plex, candidate_keys)
 
         artist_count = Counter()
+        seen_songs   = set()
         tracks = []
         for rk, _ in ranked:
             t = track_map.get(rk)
             if not t or is_low_rated(t):
                 continue
+            sk = _song_key(t)
+            if sk in seen_songs:
+                continue
             ak = _artist_key(t)
             if artist_count[ak] >= 5:
                 continue
+            seen_songs.add(sk)
             artist_count[ak] += 1
             tracks.append(t)
             if len(tracks) >= target:
@@ -1936,37 +2005,43 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
 
 # --- 10. All-Time Favourites ---
 
-def build_all_time_favourites(music, excluded_album_keys, target=50):
+def build_all_time_favourites(music, excluded_album_keys, target=100):
     """
     All-time most-played tracks using track.viewCount — no history fetch needed.
-    viewCount is stored natively by Plex and covers the entire lifetime of your
-    library, not just the history lookback window.
-    Fetches the top N tracks by play count directly from Plex, server-sorted.
+    viewCount covers the full lifetime of your library, not just a history window.
+    Deduplication is inline so we always hit the target count of unique songs
+    regardless of how many compilation copies exist for each track.
     """
     try:
         candidates = music.search(
             libtype="track",
             sort="viewCount:desc",
-            container_size=max(500, target * 10),
+            container_size=max(1000, target * 8),
         )
     except Exception as e:
         xlog(f"[ERROR] all_time_favourites: track fetch failed: {e}")
         return []
 
     artist_count = Counter()
+    seen_songs   = set()
     result = []
     for t in candidates:
         vc = getattr(t, "viewCount", None) or 0
         if vc == 0:
-            break  # server-sorted; once we hit zero plays we're done
+            break  # server-sorted; no point continuing past zero-play tracks
         if is_low_rated(t):
             continue
         pk = str(getattr(t, "parentRatingKey", "") or "")
         if pk in excluded_album_keys:
             continue
-        ak = _artist_key(t)
-        if artist_count[ak] >= 4:
+        # Dedup inline so compilation copies don't count towards the target
+        sk = _song_key(t)
+        if sk in seen_songs:
             continue
+        ak = _artist_key(t)
+        if artist_count[ak] >= 5:
+            continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         result.append(t)
         if len(result) >= target:
@@ -2129,6 +2204,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     track_map    = resolve_tracks_by_keys(plex, candidate_rks)
     artist_limit = max(2, int(mix_size * ARTIST_RATIO))
     artist_count = Counter()
+    seen_songs   = set()  # shared across history and library pools
 
     history_tracks = []
     for rk in history_rks:
@@ -2139,9 +2215,13 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             continue
         if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
             continue
+        sk = _song_key(t)
+        if sk in seen_songs:
+            continue
         ak = _artist_key(t)
         if artist_count[ak] >= artist_limit:
             continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         history_tracks.append(t)
 
@@ -2154,9 +2234,13 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             continue
         if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
             continue
+        sk = _song_key(t)
+        if sk in seen_songs:
+            continue
         ak = _artist_key(t)
         if artist_count[ak] >= artist_limit:
             continue
+        seen_songs.add(sk)
         artist_count[ak] += 1
         library_tracks.append(t)
 
@@ -2212,11 +2296,15 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
             mix_num = name.split()[-1]  # "Meloday+ Daily Mix 3" → "3"
             styles_list = [s.strip() for s in styles_subtitle.split("·") if s.strip()] \
                           if styles_subtitle else []
+            # Cover subtitle: cap at 2 styles so text stays readable at mobile size.
+            # The full style list is used in the playlist description.
+            cover_styles = styles_list[:2]
+            cover_sub = " · ".join(cover_styles) if cover_styles else None
             _upsert_extras_playlist(plex, name, tracks,
                 _daily_mix_description(styles_list),
                 cover_key=f"daily_mix_{mix_num}",
                 cover_title=f"Daily Mix {mix_num}",
-                cover_subtitle=styles_subtitle or None,
+                cover_subtitle=cover_sub,
                 cover_tracks=tracks,
                 existing_playlists=ep)
 
