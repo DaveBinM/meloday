@@ -22,6 +22,7 @@ import time
 import logging
 import argparse
 import traceback
+import colorsys
 import concurrent.futures
 from datetime import datetime, timedelta, timezone, date
 from collections import Counter, defaultdict
@@ -376,20 +377,20 @@ _MOOD_PROFILES = {
 }
 
 _MOOD_MIX_NAMES = {
-    "workout":    "Meloday+ Workout",
-    "running":    "Meloday+ Running",
-    "party":      "Meloday+ Party",
-    "happy":      "Meloday+ Happy Hits",
-    "focus":      "Meloday+ Focus",
-    "chill":      "Meloday+ Chill",
-    "melancholy": "Meloday+ Sad Songs",
-    "morning":    "Meloday+ Good Morning",
-    "dinner":     "Meloday+ Dinner",
-    "late_night": "Meloday+ Late Night",
-    "sleep":      "Meloday+ Sleep",
-    "rainy_day":  "Meloday+ Rainy Day",
-    "sunny":      "Meloday+ Sunny",
-    "cosy":       "Meloday+ Cosy",
+    "workout":    "Workout • Meloday+",
+    "running":    "Running • Meloday+",
+    "party":      "Party • Meloday+",
+    "happy":      "Happy Hits • Meloday+",
+    "focus":      "Focus • Meloday+",
+    "chill":      "Chill • Meloday+",
+    "melancholy": "Sad Songs • Meloday+",
+    "morning":    "Good Morning • Meloday+",
+    "dinner":     "Dinner • Meloday+",
+    "late_night": "Late Night • Meloday+",
+    "sleep":      "Sleep • Meloday+",
+    "rainy_day":  "Rainy Day • Meloday+",
+    "sunny":      "Sunny • Meloday+",
+    "cosy":       "Cosy • Meloday+",
 }
 
 # Time windows (start_hour, end_hour) in which a profile gets a strong rotation boost.
@@ -405,6 +406,70 @@ _TIME_BIASED_PROFILES = {
 _WEATHER_PROFILES = {"rainy_day", "sunny", "cosy"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())             # morning, dinner, late_night, sleep
 _GENERAL_PROFILES = set(_MOOD_PROFILES) - _TIME_PROFILES - _WEATHER_PROFILES
+
+# Mood tag signals per profile: (positive_substrings, negative_substrings).
+# Substring matching against lowercased Plex/MusicBrainz mood tags from the Essentia cache.
+# Tracks with matching positive tags get a distance boost; conflicting tags get a penalty.
+# Profiles where emotional character is the key distinguishing feature benefit most.
+_PROFILE_MOOD_SIGNALS = {
+    "melancholy":  (["sad", "melanchol", "bittersweet", "somber", "mournful", "despair",
+                     "lonely", "depressing", "heartbreak"],
+                   ["happy", "euphoric", "upbeat", "energetic", "fun"]),
+    "happy":       (["happy", "upbeat", "euphoric", "joyful", "cheerful", "feel good",
+                     "carefree", "fun", "positive"],
+                   ["sad", "melanchol", "dark", "depressing"]),
+    "workout":     (["energetic", "aggressive", "powerful", "intense", "triumphant",
+                     "motivating", "adrenaline"],
+                   ["calm", "peaceful", "sad", "melanchol"]),
+    "running":     (["energetic", "powerful", "upbeat", "motivating"],
+                   ["calm", "peaceful"]),
+    "party":       (["party", "energetic", "euphoric", "fun", "carefree", "celebrat"],
+                   ["sad", "calm", "melanchol"]),
+    "focus":       (["calm", "peaceful", "meditat", "relaxing", "ambient", "tranquil"],
+                   ["aggressive", "intense", "party"]),
+    "chill":       (["calm", "laid-back", "mellow", "relaxing", "peaceful", "easy"],
+                   ["aggressive", "intense", "angry"]),
+    "sleep":       (["calm", "peaceful", "dreamy", "ambient", "tranquil", "meditat"],
+                   ["energetic", "aggressive", "upbeat"]),
+    "late_night":  (["dark", "introspective", "moody", "atmospheric", "hypnotic"],
+                   ["happy", "upbeat", "fun"]),
+    "morning":     (["uplifting", "cheerful", "calm", "peaceful", "gentle", "fresh"],
+                   ["dark", "aggressive", "sad"]),
+    "dinner":      (["romantic", "sophisticated", "elegant", "smooth", "mellow"],
+                   ["aggressive", "intense", "angry"]),
+    "rainy_day":   (["melanchol", "bittersweet", "introspective", "nostalgic", "wistful"],
+                   ["upbeat", "energetic", "euphoric"]),
+    "sunny":       (["happy", "upbeat", "carefree", "fun", "joyful", "cheerful"],
+                   ["sad", "dark", "melanchol"]),
+    "cosy":        (["calm", "peaceful", "warm", "comfort", "nostalgic", "gentle"],
+                   ["aggressive", "intense", "energetic"]),
+}
+
+
+def _mood_tag_boost(entry, profile_key):
+    """
+    Distance adjustment from mood tag compatibility.
+    Negative = boost (track emotionally fits this profile).
+    Positive = penalty (track emotionally conflicts with this profile).
+    Returns 0.0 when no mood data is available (neutral — acoustic features take over).
+    """
+    signals = _PROFILE_MOOD_SIGNALS.get(profile_key)
+    if not signals:
+        return 0.0
+    positive_subs, negative_subs = signals
+    track_moods = [m.lower() for m in (entry.get("moods") or [])]
+    if not track_moods:
+        return 0.0
+
+    def _matches(subs):
+        return any(sub in mood for mood in track_moods for sub in subs)
+
+    boost = 0.0
+    if _matches(positive_subs):
+        boost -= 0.12  # meaningful push toward tracks that feel emotionally right
+    if _matches(negative_subs):
+        boost += 0.10  # discourage tracks that feel emotionally wrong
+    return boost
 
 
 # ---------------------------------------------------------------------------
@@ -454,11 +519,11 @@ def _get_weather(location):
             headers={"User-Agent": "meloday-extras/1.0"},
         )
         resp.raise_for_status()
-        data = resp.json()
+        data    = resp.json()
         current = data["current_condition"][0]
-        lat_str = (data.get("nearest_area", [{}])[0]
-                   .get("latitude", [{"value": "0"}])[0]
-                   .get("value", "0"))
+        # latitude in wttr.in JSON is a plain string ("-37.813"), not a nested list
+        nearest = data.get("nearest_area", [{}])[0]
+        lat_str = nearest.get("latitude", "0") if isinstance(nearest, dict) else "0"
         return {
             "temp_c":    int(current.get("temp_C", 20)),
             "condition": current.get("weatherDesc", [{}])[0].get("value", "").lower(),
@@ -986,15 +1051,35 @@ def _kmeans_fit(X, k, seed=42, max_iter=50):
 # Cover Generation
 # ===========================================================================
 
-def _make_gradient_image(w, h, color_top, color_bottom):
-    """RGBA gradient image. Colors are 3-tuples (RGB) or 4-tuples (RGBA)."""
-    img = Image.new("RGBA", (w, h))
-    draw = ImageDraw.Draw(img)
-    at = color_top[3]   if len(color_top)    == 4 else 255
+def _make_gradient_image(w, h, color_top, color_bottom, diagonal=False):
+    """
+    RGBA gradient image. Colors are 3-tuples (RGB) or 4-tuples (RGBA).
+    diagonal=True: blends top-left → bottom-right (requires numpy).
+    diagonal=False: simple vertical top → bottom gradient.
+    """
+    at = color_top[3]    if len(color_top)    == 4 else 255
     ab = color_bottom[3] if len(color_bottom) == 4 else 255
-    for y in range(h):
-        t = y / h
-        draw.line([(0, y), (w, y)], fill=(
+
+    if diagonal and _NUMPY_AVAILABLE:
+        x = np.linspace(0, 1, w, dtype=np.float32)
+        y = np.linspace(0, 1, h, dtype=np.float32)
+        t = (x[np.newaxis, :] + y[:, np.newaxis]) / 2.0   # shape (h, w), 0..1
+        def _ch(a, b):
+            return np.clip(a + t * (b - a), 0, 255).astype(np.uint8)
+        arr = np.stack([
+            _ch(color_top[0], color_bottom[0]),
+            _ch(color_top[1], color_bottom[1]),
+            _ch(color_top[2], color_bottom[2]),
+            _ch(at, ab),
+        ], axis=2)
+        return Image.fromarray(arr, "RGBA")
+
+    # Fallback: vertical gradient
+    img  = Image.new("RGBA", (w, h))
+    draw = ImageDraw.Draw(img)
+    for y_coord in range(h):
+        t = y_coord / h
+        draw.line([(0, y_coord), (w, y_coord)], fill=(
             int(color_top[0] + t * (color_bottom[0] - color_top[0])),
             int(color_top[1] + t * (color_bottom[1] - color_top[1])),
             int(color_top[2] + t * (color_bottom[2] - color_top[2])),
@@ -1005,8 +1090,12 @@ def _make_gradient_image(w, h, color_top, color_bottom):
 
 def _apply_cover_text(img, title, subtitle=None):
     """
-    Composite right-aligned title + optional subtitle + Meloday branding onto img (RGBA).
-    Returns the composited RGBA Image.
+    Composite title + subtitle + Meloday+ branding onto img (RGBA).
+
+    Layout:
+      - Title:    Large (82px), left-aligned, anchored near the bottom — the hero element.
+      - Subtitle: Auto-sized single line, left-aligned, just below the title.
+      - Meloday+: Small brand mark (34px), top-right corner — present but unobtrusive.
     """
     W, H = img.size
     shadow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -1014,51 +1103,104 @@ def _apply_cover_text(img, title, subtitle=None):
     shadow_draw  = ImageDraw.Draw(shadow_layer)
     text_draw    = ImageDraw.Draw(text_layer)
 
+    margin = 60
+
     try:
-        font_main    = ImageFont.truetype(FONT_MAIN_PATH,    size=67)
-        font_sub     = ImageFont.truetype(FONT_MAIN_PATH,    size=52)
-        font_meloday = ImageFont.truetype(FONT_MELODAY_PATH, size=87)
+        font_title = ImageFont.truetype(FONT_MAIN_PATH,    size=92)
+        font_brand = ImageFont.truetype(FONT_MELODAY_PATH, size=60)
     except (IOError, OSError):
-        font_main = font_sub = font_meloday = ImageFont.load_default()
+        font_title = font_brand = ImageFont.load_default()
 
-    text_box_width = 630
-    text_box_left  = W - 110 - text_box_width
-    y_pos = 100
+    # --- "Meloday+" brand mark — small, top-right ---
+    brand = "Meloday+"
+    try:
+        mb = text_draw.textbbox((0, 0), brand, font=font_brand)
+        bx = W - margin - (mb[2] - mb[0])
+        shadow_draw.text((bx, 44), brand, font=font_brand, fill=(0, 0, 0, 100))
+        text_draw.text((bx, 44),   brand, font=font_brand, fill=(255, 255, 255, 180))
+    except Exception:
+        pass
 
-    for line in wrap_text(title, font_main, text_draw, text_box_width):
-        bbox = text_draw.textbbox((0, 0), line, font=font_main)
-        x = text_box_left + (text_box_width - (bbox[2] - bbox[0]))
-        shadow_draw.text((x, y_pos), line, font=font_main, fill=(0, 0, 0, 120))
-        text_draw.text((x, y_pos),   line, font=font_main, fill=(255, 255, 255, 255))
-        y_pos += bbox[3] - bbox[1] + 10
-
+    # --- Auto-size subtitle to fit on one line ---
+    font_sub = None
     if subtitle:
-        y_pos += 16
-        for line in wrap_text(subtitle, font_sub, text_draw, text_box_width):
-            bbox = text_draw.textbbox((0, 0), line, font=font_sub)
-            x = text_box_left + (text_box_width - (bbox[2] - bbox[0]))
-            shadow_draw.text((x, y_pos), line, font=font_sub, fill=(0, 0, 0, 120))
-            text_draw.text((x, y_pos),   line, font=font_sub, fill=(255, 255, 255, 200))
-            y_pos += bbox[3] - bbox[1] + 8
+        sub_size = 50
+        try:
+            font_sub = ImageFont.truetype(FONT_MAIN_PATH, size=sub_size)
+            while sub_size > 30:
+                sb = text_draw.textbbox((0, 0), subtitle, font=font_sub)
+                if (sb[2] - sb[0]) <= W - margin * 2:
+                    break
+                sub_size -= 3
+                font_sub = ImageFont.truetype(FONT_MAIN_PATH, size=sub_size)
+        except (IOError, OSError):
+            font_sub = ImageFont.load_default()
 
-    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=40))
-    shadow_draw.text((110, H - 200), "Meloday+", font=font_meloday, fill=(0, 0, 0, 120))
-    text_draw.text((110, H - 200),   "Meloday+", font=font_meloday, fill=(255, 255, 255, 255))
+    # --- Measure title height ---
+    title_lines = wrap_text(title, font_title, text_draw, W - margin * 2)
+    line_h = 0
+    for line in title_lines:
+        b = text_draw.textbbox((0, 0), line, font=font_title)
+        line_h = b[3] - b[1]
 
+    # Always reserve the same vertical space for the subtitle zone so the title
+    # sits at a consistent position on every cover, whether or not there is a subtitle.
+    SUBTITLE_RESERVE = 68   # gap + subtitle line height at ~50px
+    title_block_h = len(title_lines) * (line_h + 8)
+    y_pos = H - 72 - SUBTITLE_RESERVE - title_block_h
+
+    # --- Draw title (left-aligned) ---
+    for line in title_lines:
+        b = text_draw.textbbox((0, 0), line, font=font_title)
+        shadow_draw.text((margin, y_pos), line, font=font_title, fill=(0, 0, 0, 160))
+        text_draw.text((margin, y_pos),   line, font=font_title, fill=(255, 255, 255, 255))
+        y_pos += b[3] - b[1] + 8
+
+    # --- Draw subtitle in the reserved zone below the title ---
+    if subtitle and font_sub:
+        sub_y = H - 72 - SUBTITLE_RESERVE + 20   # fixed position in the reserve area
+        shadow_draw.text((margin, sub_y), subtitle, font=font_sub, fill=(0, 0, 0, 120))
+        text_draw.text((margin, sub_y),   subtitle, font=font_sub, fill=(255, 255, 255, 200))
+
+    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=30))
     result = Image.alpha_composite(img, shadow_layer)
     return Image.alpha_composite(result, text_layer)
 
 
+def _extract_dominant_color(image):
+    """
+    Extract the most vibrant dominant color from a PIL Image.
+    Uses a saturation × brightness weighted average to find the prominent hue,
+    ignoring near-black and near-white pixels.
+    Returns an (R, G, B) tuple.
+    """
+    small   = image.resize((30, 30)).convert("RGB")
+    pixels  = list(small.getdata())
+    wr = wg = wb = total = 0.0
+    for r, g, b in pixels:
+        _, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        if v < 0.20 or v > 0.95:     # skip near-black and near-white
+            continue
+        w = s * v                      # weight: favour saturated, bright colours
+        wr += r * w
+        wg += g * w
+        wb += b * w
+        total += w
+    if total < 0.01:
+        return (80, 100, 200)          # fallback if no saturated pixels found
+    return (int(wr / total), int(wg / total), int(wb / total))
+
+
 def _generate_extras_cover(key, title, subtitle=None):
     """
-    Plain gradient cover for non-Daily-Mix playlists.
+    Diagonal gradient cover for non-Daily-Mix playlists.
     Returns saved .webp path or None on failure.
     """
     if not _PIL_AVAILABLE:
         xlog("[WARN] PIL not available — cover generation skipped.")
         return None
     color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
-    img = _make_gradient_image(1000, 1000, color_top, color_bottom)
+    img    = _make_gradient_image(1000, 1000, color_top, color_bottom, diagonal=True)
     result = _apply_cover_text(img, title, subtitle)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
     try:
@@ -1115,8 +1257,13 @@ def _generate_daily_mix_cover(plex, tracks, mix_key, title, subtitle=None):
     for thumb, (px, py) in zip(thumb_images, [(0, 0), (half, 0), (0, half), (half, half)]):
         collage.paste(thumb.resize((half, half), Image.LANCZOS), (px, py))
 
-    # Gradient colour tint (~60% opacity) — gives strong colour identity while album art shows through
-    tint = _make_gradient_image(W, H, color_top + (155,), color_bottom + (155,))
+    # Extract dominant colour from the collage (Spotify-style dynamic tinting)
+    dominant = _extract_dominant_color(collage.convert("RGB"))
+    r, g, b  = dominant
+    # Top-left: lighter, more vibrant; bottom-right: darker
+    tint_top    = (min(255, int(r * 1.25)), min(255, int(g * 1.25)), min(255, int(b * 1.25)), 145)
+    tint_bottom = (int(r * 0.55), int(g * 0.55), int(b * 0.55), 165)
+    tint = _make_gradient_image(W, H, tint_top, tint_bottom, diagonal=True)
     collage = Image.alpha_composite(collage, tint)
 
     result = _apply_cover_text(collage, title, subtitle)
@@ -1652,7 +1799,7 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
         ) - _rating_dist_bonus(getattr(t, "userRating", None)))
         tracks = combined[:mix_size]
         styles_subtitle = " · ".join(top_styles) if top_styles else ""
-        mixes.append((f"Meloday+ Daily Mix {mix_num}", description, tracks, styles_subtitle))
+        mixes.append((f"Daily Mix {mix_num} • Meloday+", description, tracks, styles_subtitle))
 
     return mixes
 
@@ -1911,7 +2058,7 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
                 continue
             adjusted = score + _rating_dist_bonus(getattr(t, "userRating", None))
             resolved_scored.append((adjusted, t))
-        resolved_scored.sort(reverse=True)
+        resolved_scored.sort(key=lambda x: x[0], reverse=True)
 
         selected = []
         for _, t in resolved_scored:
@@ -1968,7 +2115,7 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
     for year in sorted(year_plays.keys(), reverse=True):
         # Past years are immutable — skip if a playlist already exists.
         # Current year is always regenerated as plays accumulate.
-        if year != current_year and f"Meloday+ Top Songs {year}" in existing:
+        if year != current_year and f"Top Songs {year} • Meloday+" in existing:
             xlog(f"[INFO] top_songs: skipping {year} (playlist already exists)")
             continue
         counts = year_plays[year]
@@ -2184,16 +2331,21 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     target       = _MOOD_PROFILES[profile_key]
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
 
+    def _combined_score(rk):
+        """Acoustic distance adjusted by mood tag compatibility and play count."""
+        entry = essentia_cache.get(rk, {})
+        return (
+            _acoustic_distance_to_centroid(entry, target)
+            + _mood_tag_boost(entry, profile_key)
+        )
+
     history_rks = sorted(
         [rk for rk in essentia_cache if rk in play_counts],
-        key=lambda rk: (
-            _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target),
-            -play_counts.get(rk, 0),
-        )
+        key=lambda rk: (_combined_score(rk), -play_counts.get(rk, 0))
     )
     library_rks = sorted(
         [rk for rk in essentia_cache if not play_counts.get(rk)],
-        key=lambda rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target)
+        key=_combined_score
     )
 
     n_history = int(mix_size * 0.40)
@@ -2246,7 +2398,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
 
     combined = history_tracks + library_tracks
     combined.sort(key=lambda t: (
-        _acoustic_distance_to_centroid(essentia_cache.get(str(t.ratingKey), {}), target)
+        _combined_score(str(t.ratingKey))
         - _rating_dist_bonus(getattr(t, "userRating", None))
     ))
     return combined[:mix_size]
@@ -2262,21 +2414,21 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
 
     if playlist_id == "on_repeat":
         tracks = build_on_repeat(plex, history, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ On Repeat", tracks,
+        _upsert_extras_playlist(plex, "On Repeat • Meloday+", tracks,
             _pick_description("on_repeat"),
             cover_key="on_repeat", cover_title="On Repeat",
             existing_playlists=ep)
 
     elif playlist_id == "repeat_rewind":
         tracks = build_repeat_rewind(plex, history, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ Repeat Rewind", tracks,
+        _upsert_extras_playlist(plex, "Repeat Rewind • Meloday+", tracks,
             _pick_description("repeat_rewind"),
             cover_key="repeat_rewind", cover_title="Repeat Rewind",
             existing_playlists=ep)
 
     elif playlist_id == "release_radar":
         tracks = build_release_radar(plex, music, ec, centroid, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ Release Radar", tracks,
+        _upsert_extras_playlist(plex, "Release Radar • Meloday+", tracks,
             _pick_description("release_radar"),
             cover_key="release_radar", cover_title="Release Radar",
             existing_playlists=ep)
@@ -2284,7 +2436,7 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
     elif playlist_id == "discover_weekly":
         tracks = build_discover_weekly(plex, history, ec, centroid, excluded_album_keys,
                                        target=DISCOVER_WEEKLY_SIZE)
-        _upsert_extras_playlist(plex, "Meloday+ Discover Weekly", tracks,
+        _upsert_extras_playlist(plex, "Discover Weekly • Meloday+", tracks,
             _pick_description("discover_weekly"),
             cover_key="discover_weekly", cover_title="Discover Weekly",
             existing_playlists=ep)
@@ -2293,11 +2445,10 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
         mixes = build_daily_mixes(plex, history, ec, excluded_album_keys,
                                   n_mixes=DAILY_MIX_COUNT)
         for name, _desc, tracks, styles_subtitle in mixes:
-            mix_num = name.split()[-1]  # "Meloday+ Daily Mix 3" → "3"
+            # "Daily Mix 3 • Meloday+" → extract "3"
+            mix_num = name.split("•")[0].strip().split()[-1]
             styles_list = [s.strip() for s in styles_subtitle.split("·") if s.strip()] \
                           if styles_subtitle else []
-            # Cover subtitle: cap at 2 styles so text stays readable at mobile size.
-            # The full style list is used in the playlist description.
             cover_styles = styles_list[:2]
             cover_sub = " · ".join(cover_styles) if cover_styles else None
             _upsert_extras_playlist(plex, name, tracks,
@@ -2310,21 +2461,21 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
 
     elif playlist_id == "rediscovery":
         tracks = build_rediscovery(plex, history, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ Rediscovery", tracks,
+        _upsert_extras_playlist(plex, "Rediscovery • Meloday+", tracks,
             _pick_description("rediscovery"),
             cover_key="rediscovery", cover_title="Rediscovery",
             existing_playlists=ep)
 
     elif playlist_id == "time_capsule":
         tracks, era_label = build_time_capsule(plex, history, ec, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ Time Capsule", tracks,
+        _upsert_extras_playlist(plex, "Time Capsule • Meloday+", tracks,
             _pick_description("time_capsule", era=era_label or "your past"),
             cover_key="time_capsule", cover_title="Time Capsule",
             cover_subtitle=era_label, existing_playlists=ep)
 
     elif playlist_id == "deep_cuts":
         tracks = build_deep_cuts(plex, history, ec, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ Deep Cuts", tracks,
+        _upsert_extras_playlist(plex, "Deep Cuts • Meloday+", tracks,
             _pick_description("deep_cuts"),
             cover_key="deep_cuts", cover_title="Deep Cuts",
             existing_playlists=ep)
@@ -2334,15 +2485,15 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
                                   existing_playlists=ep)
         for year, tracks in results:
             year_str = str(year)
-            _upsert_extras_playlist(plex, f"Meloday+ Top Songs {year_str}", tracks,
+            _upsert_extras_playlist(plex, f"Top Songs {year_str} • Meloday+", tracks,
                 _pick_description("top_songs", era=year_str),
-                cover_key="top_songs", cover_title=f"Top Songs",
-                cover_subtitle=year_str,
+                cover_key="top_songs", cover_title=f"Top Songs {year_str}",
+                cover_subtitle=None,
                 existing_playlists=ep)
 
     elif playlist_id == "all_time_favourites":
         tracks = build_all_time_favourites(music, excluded_album_keys)
-        _upsert_extras_playlist(plex, "Meloday+ All-Time Favourites", tracks,
+        _upsert_extras_playlist(plex, "All-Time Favourites • Meloday+", tracks,
             _pick_description("all_time_favourites"),
             cover_key="all_time_favourites", cover_title="All-Time Favourites",
             existing_playlists=ep)
@@ -2353,7 +2504,6 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
             plex, history, ec, excluded_album_keys, n_active=n_active,
             reselect=reselect_moods, time_context=time_context,
             existing_playlists=ep)
-        # Delete profiles that rotated out or whose time/weather window closed
         for profile_key in to_remove:
             name = _MOOD_MIX_NAMES[profile_key]
             pl   = (ep or {}).get(name)
@@ -2366,7 +2516,8 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
         for name, profile_key, tracks in mixes:
             _upsert_extras_playlist(plex, name, tracks,
                 _pick_description(profile_key),
-                cover_key=profile_key, cover_title=name.replace("Meloday+ ", ""),
+                cover_key=profile_key,
+                cover_title=name.replace(" • Meloday+", ""),
                 existing_playlists=ep)
 
 
@@ -2392,25 +2543,32 @@ def main():
     existing_playlists = {
         pl.title: pl
         for pl in plex.playlists(title="Meloday")
-        if getattr(pl, "title", "").startswith("Meloday+")
+        if getattr(pl, "title", "").endswith("• Meloday+")
     }
     xlog(f"[OK] Found {len(existing_playlists)} existing Meloday+ playlist(s)")
 
     def _top_songs_lookback():
         """
-        Fetch only from Jan 1 of the oldest year that doesn't yet have a playlist.
-        Current year is always regenerated. Uses top_songs_start_year config key.
+        First run: fetch from Jan 1 of top_songs_start_year to build all years.
+        Subsequent runs: once any past-year playlist exists, the initial scan is
+        done. Years still missing a playlist at that point simply have no data —
+        don't keep fetching back to them. Only regenerate the current year.
         """
         current_year = datetime.now(tz=timezone.utc).year
         start_year   = int(_extras.get("top_songs_start_year", current_year - 5))
 
-        oldest_needed = current_year  # assume current year is always needed
-        for yr in range(start_year, current_year):
-            if f"Meloday+ Top Songs {yr}" not in existing_playlists:
-                oldest_needed = yr
-                break  # first (oldest) missing year — fetch from here
+        # If any past-year playlist exists, the initial full scan has been done.
+        # Only fetch the current year going forward.
+        has_past_year = any(
+            f"Top Songs {yr} • Meloday+" in existing_playlists
+            for yr in range(start_year, current_year)
+        )
+        if has_past_year:
+            jan1 = datetime(current_year, 1, 1, tzinfo=timezone.utc)
+            return (datetime.now(tz=timezone.utc) - jan1).days + 1
 
-        jan1 = datetime(oldest_needed, 1, 1, tzinfo=timezone.utc)
+        # First run — fetch the full range so all years with data get playlists.
+        jan1 = datetime(start_year, 1, 1, tzinfo=timezone.utc)
         return (datetime.now(tz=timezone.utc) - jan1).days + 1
 
     time_context_mode = getattr(args, "time_context", False)
