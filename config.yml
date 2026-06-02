@@ -99,6 +99,9 @@ extras:
   birth_year:                   # Optional: enables era-anchored Time Capsule (e.g. 1990)
   lastfm_api_key:               # Optional: enables Last.fm popularity ranking in Release Radar
   lastfm_api_secret:            # Optional: required alongside lastfm_api_key
+  top_songs_start_year: 2020    # Earliest year to generate a Top Songs playlist for (set to the year you started using Plex)
+  mood_mix_count: 5             # Number of mood/activity mixes to show at once (from 14 profiles, rotates based on listening + time + weather)
+  weather_location:             # Optional: city name, coordinates, or airport code (e.g. "Sydney") — enables weather-triggered mood mixes
 
 files:
   mood_map: "assets/moodmap.json"             
