@@ -1205,9 +1205,9 @@ _MOOD_PROFILES = {
     # ----------------------------------------------------------------
     # Romance
     # ----------------------------------------------------------------
-    "modern_romance":   {"bpm": 100, "energy": -13, "danceability": 0.48, "brightness": 0.25,
-                         "beat_confidence": 0.52, "onset_rate": 3.8, "dynamic_complexity": 0.48,
-                         "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.68},
+    "modern_romance":   {"bpm":  88, "energy": -15, "danceability": 0.32, "brightness": 0.22,
+                         "beat_confidence": 0.40, "onset_rate": 3.0, "dynamic_complexity": 0.52,
+                         "arousal": 0.35, "valence": 0.70, "vocal_presence": 0.75},
     "late_night_romance":{"bpm": 72, "energy": -18, "danceability": 0.22, "brightness": 0.08,
                          "beat_confidence": 0.28, "onset_rate": 2.0, "dynamic_complexity": 0.62,
                          "arousal": 0.28, "valence": 0.62, "vocal_presence": 0.72},
@@ -1270,7 +1270,7 @@ _MOOD_PROFILES = {
                          "arousal": 0.52, "valence": 0.75, "vocal_presence": 0.65},
     "deep_work":        {"bpm":  88, "energy": -17, "danceability": 0.18, "brightness": 0.08,
                          "beat_confidence": 0.25, "onset_rate": 1.8, "dynamic_complexity": 0.68,
-                         "arousal": 0.22, "valence": 0.52, "vocal_presence": 0.22},
+                         "arousal": 0.22, "valence": 0.52, "vocal_presence": 0.12},
     "folk_acoustic":    {"bpm":  82, "energy": -16, "danceability": 0.25, "brightness": 0.22,
                          "beat_confidence": 0.38, "onset_rate": 2.5, "dynamic_complexity": 0.68,
                          "arousal": 0.30, "valence": 0.62, "vocal_presence": 0.75},
@@ -1578,6 +1578,26 @@ _PROFILE_MOOD_SIGNALS = {
                         ["aggressive", "angry"]),
     "indie_romance":    (["romantic", "dreamy", "melanchol", "bittersweet", "indie"],
                         ["aggressive", "intense"]),
+    "modern_romance":   (["romantic", "love", "tender", "heartfelt", "longing"],
+                        ["aggressive", "angry", "party", "energetic"]),
+    "late_night_romance":(["romantic", "intimate", "sensual", "longing", "dark"],
+                        ["energetic", "upbeat", "fun", "party"]),
+    "romantic_dinner":  (["romantic", "elegant", "sophisticated", "smooth", "intimate"],
+                        ["aggressive", "intense", "energetic", "party"]),
+    "first_date":       (["romantic", "hopeful", "sweet", "tender", "gentle", "heartfelt"],
+                        ["aggressive", "intense", "angry"]),
+    "romantic_jazz":    (["romantic", "sophisticated", "smooth", "elegant", "intimate"],
+                        ["aggressive", "intense", "energetic"]),
+    "jazz_dinner":      (["sophisticated", "elegant", "smooth", "mellow", "relaxing"],
+                        ["aggressive", "intense", "energetic", "angry"]),
+    "string_quartet":   (["classical", "elegant", "orchestral", "sophisticated", "graceful"],
+                        ["aggressive", "intense", "energetic", "angry"]),
+    "strings_romance":  (["romantic", "orchestral", "elegant", "cinematic", "sweeping"],
+                        ["aggressive", "intense", "energetic"]),
+    "piano_romance":    (["romantic", "peaceful", "tender", "intimate", "gentle", "heartfelt"],
+                        ["aggressive", "intense", "energetic", "angry"]),
+    "synthpop_romance": (["romantic", "dreamy", "nostalgic", "longing", "heartfelt"],
+                        ["aggressive", "angry", "intense"]),
     "party_throwback":  (["party", "energetic", "fun", "carefree", "celebrat"],
                         ["sad", "calm", "melanchol"]),
     "heartbreak":       (["heartbreak", "sad", "longing", "lonely", "loss", "despair", "grief"],
@@ -1596,6 +1616,45 @@ _PROFILE_MOOD_SIGNALS = {
                         ["aggressive", "intense", "angry"]),
     "cooking_mix":      (["upbeat", "happy", "carefree", "fun", "cheerful"],
                         ["sad", "intense", "aggressive", "melanchol"]),
+    # Time-of-day / lifestyle
+    "after_work":       (["upbeat", "relaxing", "mellow", "laid-back", "easy"],
+                        ["aggressive", "intense", "angry"]),
+    "after_dark":       (["dark", "moody", "atmospheric", "nocturnal", "brooding", "hypnotic"],
+                        ["happy", "upbeat", "cheerful", "fun"]),
+    "brunch_mix":       (["happy", "cheerful", "upbeat", "carefree", "fun"],
+                        ["sad", "dark", "aggressive", "melanchol"]),
+    "sunday_morning":   (["calm", "peaceful", "gentle", "warm", "relaxing", "cosy"],
+                        ["aggressive", "energetic", "intense"]),
+    "lazy_sunday":      (["calm", "peaceful", "relaxing", "laid-back", "easy", "mellow"],
+                        ["aggressive", "energetic", "intense"]),
+    "golden_hour":      (["nostalgic", "wistful", "warm", "hopeful", "uplifting"],
+                        ["aggressive", "angry", "intense"]),
+    "sunset_mix":       (["nostalgic", "wistful", "bittersweet", "mellow", "introspective"],
+                        ["aggressive", "upbeat", "energetic"]),
+    "summer_evening":   (["warm", "carefree", "relaxing", "uplifting", "mellow"],
+                        ["aggressive", "intense", "dark"]),
+    "friday_night":     (["fun", "energetic", "carefree", "upbeat", "celebrat", "party"],
+                        ["sad", "melanchol", "calm"]),
+    "weekend_mix":      (["upbeat", "happy", "carefree", "relaxing", "fun", "cheerful"],
+                        ["aggressive", "angry", "sad"]),
+    "date_night":       (["romantic", "intimate", "smooth", "elegant", "tender"],
+                        ["aggressive", "intense", "energetic"]),
+    # Activity / driving
+    "driving_mix":      (["energetic", "upbeat", "powerful", "confident", "driving"],
+                        ["calm", "peaceful", "melanchol"]),
+    "night_drive":      (["dark", "moody", "atmospheric", "introspective", "nocturnal"],
+                        ["happy", "upbeat", "fun", "cheerful"]),
+    "driving_singalong":(["upbeat", "fun", "energetic", "carefree", "cheerful"],
+                        ["sad", "dark", "melanchol"]),
+    "road_trip":        (["upbeat", "energetic", "carefree", "fun", "optimistic"],
+                        ["sad", "melanchol", "dark"]),
+    "commute_mix":      (["upbeat", "engaging", "mellow", "laid-back", "easy"],
+                        ["aggressive", "angry"]),
+    "walking_mix":      (["upbeat", "energetic", "carefree", "optimistic", "fun"],
+                        ["aggressive", "intense", "angry"]),
+    # Aesthetic
+    "main_character":   (["confident", "dramatic", "powerful", "bold", "triumphant", "inspirational"],
+                        ["sad", "melanchol", "dark", "depressing"]),
 }
 
 
@@ -1622,6 +1681,44 @@ def _mood_tag_boost(entry, profile_key):
         boost -= 0.12  # meaningful push toward tracks that feel emotionally right
     if _matches(negative_subs):
         boost += 0.10  # discourage tracks that feel emotionally wrong
+    return boost
+
+
+# Genre/style signals for profiles where instrumental vs vocal content matters.
+# Checked against entry["styles"] + entry["genres"] — available without TF models.
+_PROFILE_STYLE_SIGNALS = {
+    "focus":     (["orchestral", "instrumental", "ambient", "classical", "score",
+                   "soundtrack", "new age", "cinematic", "post-rock"],
+                  ["singer-songwriter"]),
+    "deep_work": (["orchestral", "instrumental", "ambient", "classical", "score",
+                   "soundtrack", "new age", "cinematic", "post-rock"],
+                  ["singer-songwriter"]),
+}
+
+
+def _style_tag_boost(entry, profile_key):
+    """
+    Distance adjustment from genre/style tag compatibility.
+    Complements _mood_tag_boost for profiles where instrumental vs vocal content
+    is the primary selection axis — particularly focus and deep_work.
+    Returns 0.0 for profiles with no style signal defined.
+    """
+    signals = _PROFILE_STYLE_SIGNALS.get(profile_key)
+    if not signals:
+        return 0.0
+    positive_subs, negative_subs = signals
+    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    if not tags:
+        return 0.0
+
+    def _matches(subs):
+        return any(sub in tag for tag in tags for sub in subs)
+
+    boost = 0.0
+    if _matches(positive_subs):
+        boost -= 0.12
+    if _matches(negative_subs):
+        boost += 0.08
     return boost
 
 
@@ -2218,6 +2315,64 @@ def _lastfm_popularity_score(track_title, artist_name):
         if title_lower in k or k in title_lower:
             return v
     return 0
+
+
+_lastfm_album_cache = {}  # (artist_lower, album_lower) -> {track_title_lower: score}
+
+
+def _lastfm_album_track_scores(artist_name, album_name):
+    """
+    Fetch tracks for a specific album via album.getInfo.
+    Returns {track_title_lower: score} where score is album position inverted
+    (track 1 = highest score) — album.getInfo does not expose per-track play counts
+    for new releases, so position is the best available signal.
+    Returns {} on any failure or if album not found on Last.fm.
+    """
+    if not LASTFM_API_KEY or not _REQUESTS_AVAILABLE:
+        return {}
+    cache_key = (artist_name.strip().lower(), album_name.strip().lower())
+    if cache_key in _lastfm_album_cache:
+        return _lastfm_album_cache[cache_key]
+
+    for attempt in range(3):
+        try:
+            resp = _requests.get(
+                "http://ws.audioscrobbler.com/2.0/",
+                params={
+                    "method": "album.getInfo",
+                    "artist": artist_name,
+                    "album": album_name,
+                    "api_key": LASTFM_API_KEY,
+                    "format": "json",
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            raw = data.get("album", {}).get("tracks", {}).get("track", [])
+            if not raw:
+                _lastfm_album_cache[cache_key] = {}
+                return {}
+            # Last.fm returns a dict (not a list) when the album has only one track
+            if isinstance(raw, dict):
+                raw = [raw]
+            n = len(raw)
+            result = {}
+            for t in raw:
+                name = t.get("name", "")
+                if not name:
+                    continue
+                rank = int(t.get("@attr", {}).get("rank", n + 1))
+                result[name.lower()] = n - rank + 1
+            _lastfm_album_cache[cache_key] = result
+            return result
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1)
+            else:
+                xlog(f"[WARN] Last.fm album lookup failed for '{artist_name}' / '{album_name}': {e}")
+
+    _lastfm_album_cache[cache_key] = {}
+    return {}
 
 
 # ===========================================================================
@@ -3382,24 +3537,32 @@ def _album_release_date(album):
 def _select_album_reps(album, tracks, essentia_cache):
     """
     Pick 1–2 representative tracks from an album.
-    Priority: Last.fm popularity → acoustic centrality → positional fallback.
+    Priority: Last.fm album track order → acoustic centrality → positional fallback.
+    Uses album.getInfo (album-scoped) so new releases score correctly — artist top
+    tracks won't include recently released tracks yet.
     """
     if not tracks:
         return []
 
     artist_name = getattr(album, "parentTitle", "") or ""
+    album_name  = getattr(album, "title", "") or ""
     is_va = artist_name.strip().casefold() in {"various artists", "various"}
 
-    if LASTFM_API_KEY and artist_name and not is_va:
-        top = _lastfm_top_tracks_for_artist(artist_name)
-        if top:
+    if LASTFM_API_KEY and artist_name and album_name and not is_va:
+        scores = _lastfm_album_track_scores(artist_name, album_name)
+        if scores:
             scored = []
             for t in tracks:
-                count = _lastfm_popularity_score(t.title or "", artist_name)
-                scored.append((count, t))
+                title_lower = (t.title or "").lower()
+                s = scores.get(title_lower, 0)
+                if s == 0:
+                    for k, v in scores.items():
+                        if title_lower in k or k in title_lower:
+                            s = v
+                            break
+                scored.append((s, t))
             scored.sort(key=lambda x: x[0], reverse=True)
-            # Only use Last.fm ranking if the top track has meaningful data
-            if scored[0][0] >= 100:
+            if scored[0][0] > 0:
                 return [t for _, t in scored[:2]]
 
     return _pick_representative_tracks(tracks, essentia_cache, n=2)
@@ -3474,9 +3637,13 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
 
         album_data.sort(key=_sort_key, reverse=True)
 
-        # Count unique-artist first tracks to see if pass 1 can reach TARGET
+        # Count total available tracks (first + second per album) to see if we can
+        # reach TARGET. Counting only pass-1 tracks misses the case where the window
+        # has enough albums but many are singles — second tracks from multi-track
+        # albums fill the gap without requiring 50 distinct artists.
         seen     = set()
         p1_count = 0
+        p2_count = 0
         for _, _, _, art_k, reps in album_data:
             if art_k and art_k in seen:
                 continue
@@ -3484,8 +3651,10 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
                 seen.add(art_k)
             if reps and not is_low_rated(reps[0]):
                 p1_count += 1
+            if len(reps) > 1 and not is_low_rated(reps[1]):
+                p2_count += 1
 
-        if p1_count >= TARGET:
+        if p1_count + p2_count >= TARGET:
             break
         window_days += RELEASE_RADAR_STEP_DAYS
 
@@ -4419,11 +4588,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
 
     def _combined_score(rk):
-        """Acoustic distance adjusted by mood tag compatibility and play count."""
+        """Acoustic distance adjusted by mood/style tag compatibility and play count."""
         entry = essentia_cache.get(rk, {})
         return (
             _acoustic_distance_to_centroid(entry, target)
             + _mood_tag_boost(entry, profile_key)
+            + _style_tag_boost(entry, profile_key)
         )
 
     history_rks = sorted(
