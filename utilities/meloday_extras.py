@@ -400,13 +400,22 @@ _TOP_SONGS_YEAR_PALETTES = [
     ((215, 185,  38), (155, 128,  10)),  # 28 — yellow gold
     (( 52, 185, 115), ( 18, 125,  62)),  # 29 — mint green
 ]
-_TOP_SONGS_BG_CYCLE = [
-    "geometric", "waves", "floating_circles", "rays", "aurora",
-    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
-    "geometric", "waves", "floating_circles", "rays", "aurora",
-    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
-    "geometric", "waves", "floating_circles", "rays", "aurora",
-    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
+# All 13 generators with their maximum v value.  Used for year-seeded random
+# selection so every year gets a truly unique style+variant combination.
+_TOP_SONGS_STYLE_POOL = [
+    ("geometric",        8),
+    ("circles",          6),
+    ("radial",           6),
+    ("waves",            9),
+    ("floating_circles", 6),
+    ("rays",             5),
+    ("arc_sweep",        4),
+    ("aurora",           7),
+    ("triangles",        6),
+    ("diamond",          3),
+    ("starburst",        4),
+    ("chevrons",         2),
+    ("spiral",           2),
 ]
 
 # _MOOD_PROFILE_KEYS is defined after _MOOD_MIX_NAMES below.
@@ -1384,6 +1393,8 @@ _TIME_SOFT_BOOSTS = {
     "after_dark":         (22, 28, 0.15),   # 10pm–4am
     "night_drive":        (20, 28, 0.12),   # 8pm–4am
     "late_night_romance": (21, 27, 0.12),   # 9pm–3am
+    "focus":              ( 7, 15, 0.15),   # 7am–3pm work window
+    "deep_work":          ( 7, 15, 0.12),   # 7am–3pm work window
     "commute_mix":        ( 7, 10, 0.10),   # morning commute
     "sunday_morning":     ( 7, 14, 0.08),   # any morning (day-of-week not tracked)
     "lazy_sunday":        (11, 18, 0.07),   # any quiet afternoon
@@ -1403,6 +1414,8 @@ _WEEKDAY_BOOSTS = {
     "lazy_sunday":     ({6},     0.10),   # Sunday only
     "celebration":     ({4, 5},  0.08),   # Fri/Sat
     "party_throwback": ({4, 5},  0.06),   # Fri/Sat (slight)
+    "focus":           ({0, 1, 2, 3, 4}, 0.12),  # Mon-Fri work boost
+    "deep_work":       ({0, 1, 2, 3, 4}, 0.10),  # Mon-Fri work boost
 }
 
 # Hard day-of-week gates — profiles excluded from the pool entirely on the wrong day.
@@ -1422,6 +1435,9 @@ _WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes"}
 
 # Season-conditional profiles — triggered by current calendar season; no weather API needed.
 _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"}
+
+# Work-hours focus guarantee — at least one of these is always active Mon-Fri 7am-3pm.
+_WORK_FOCUS_PROFILES = {"focus", "deep_work"}
 
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
@@ -2312,7 +2328,7 @@ def _add_bottom_vignette(img, strength=175, coverage=0.55):
     return Image.alpha_composite(img, vignette)
 
 
-def _make_geometric_background(w, h, color_top, color_bottom, v=0):
+def _make_geometric_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Diagonal tilted strips. v selects strip angle/count/arrangement variant."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2350,14 +2366,15 @@ def _make_geometric_background(w, h, color_top, color_bottom, v=0):
          (0.55,0.38,0.62,1.72,52,40,M),(0.45,0.62,0.55,1.65,-45,34,L)],
     ]
     strips = variants[min(v, len(variants) - 1)]
+    angle_jitter = rng.uniform(-4, 4) if rng else 0
     for cx_f, cy_f, wf, hf, angle, alpha, color in strips:
-        pts = _rotated_rect_points(cx_f * w, cy_f * h, wf * w, hf * h, angle)
+        pts = _rotated_rect_points(cx_f * w, cy_f * h, wf * w, hf * h, angle + angle_jitter)
         r, g, b = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(r, g, b, alpha))
     return img
 
 
-def _make_concentric_circles_background(w, h, color_top, color_bottom, v=0):
+def _make_concentric_circles_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Concentric rings. v shifts centre position and ring count/density."""
     # (cx_frac, cy_frac, n_rings, r_max_frac)
     configs = [
@@ -2373,6 +2390,9 @@ def _make_concentric_circles_background(w, h, color_top, color_bottom, v=0):
     img  = _make_gradient_image(w, h, color_bottom, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
     cx, cy, r_max = int(cx_f * w), int(cy_f * h), int(r_frac * w)
+    if rng:
+        cx += int(rng.uniform(-0.04, 0.04) * w)
+        cy += int(rng.uniform(-0.04, 0.04) * h)
     for i in range(n_rings, 0, -1):
         r = int(r_max * i / n_rings)
         t = 1.0 - i / n_rings
@@ -2382,22 +2402,35 @@ def _make_concentric_circles_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_radial_glow_background(w, h, color_top, color_bottom, v=0):
+def _make_radial_glow_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Soft radial glow. v shifts the glow centre (sunrise, spotlight, candlelight, etc.)."""
     # (cx_frac, cy_frac, gamma)
     configs = [
         (0.50, 0.40, 0.65),  # v=0 discover_weekly — upper-centre
-        (0.50, 0.65, 0.70),  # v=1 sunday_morning  — warm lower glow (sunrise)
-        (0.50, 0.88, 0.55),  # v=2 sunset_mix       — horizon glow from bottom
-        (0.50, 0.50, 0.80),  # v=3 piano_romance    — centred spotlight
-        (0.50, 0.55, 0.75),  # v=4 candlelight      — just below centre, warm
+        (0.50, 0.65, 0.70),  # v=1 sunday_morning  — warm lower glow + sunrise rings
+        (0.50, 0.80, 0.38),  # v=2 sunset_mix       — horizon glow, sharp falloff + corona rings
+        (0.50, 0.50, 0.65),  # v=3 piano_romance    — centred spotlight + stage rings
+        (0.50, 0.52, 0.28),  # v=4 candlelight      — tight hot-spot + halo rings
         (0.32, 0.35, 0.60),  # v=5 late_night       — off-centre dark ambient
-        (0.50, 0.18, 0.55),  # v=6 rainy_day        — diffuse from top (overcast)
+        (0.50, 0.22, 0.42),  # v=6 rainy_day        — overcast top glow + rings
     ]
+    # Concentric ring overlays: {v: [(radius_norm, half_width_norm, brightness_delta), ...]}
+    # Rings are painted onto the gradient array after it is built, using the
+    # normalised dist array (same units as the gamma falloff).
+    _rings = {
+        1: [(0.22, 0.008, 38), (0.40, 0.007, 26)],                                          # sunrise horizon bands
+        2: [(0.16, 0.007, 55), (0.28, 0.006, 42), (0.42, 0.005, 30), (0.58, 0.005, 18)],
+        3: [(0.18, 0.009, 52), (0.32, 0.008, 38), (0.48, 0.007, 26)],                       # stage spotlight rings
+        4: [(0.07, 0.012, 100), (0.17, 0.010, 75), (0.30, 0.008, 52), (0.46, 0.007, 32)],
+        6: [(0.20, 0.009, 48), (0.38, 0.008, 35), (0.57, 0.007, 24)],
+    }
     cx_f, cy_f, gamma = configs[min(v, len(configs) - 1)]
     if not _NUMPY_AVAILABLE:
         return _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     cx, cy = w * cx_f, h * cy_f
+    if rng:
+        cx += rng.uniform(-0.03, 0.03) * w
+        cy += rng.uniform(-0.03, 0.03) * h
     x  = np.linspace(0, w, w, dtype=np.float32)
     y  = np.linspace(0, h, h, dtype=np.float32)
     xx, yy = np.meshgrid(x, y)
@@ -2408,10 +2441,13 @@ def _make_radial_glow_background(w, h, color_top, color_bottom, v=0):
                     _ch(color_top[1], color_bottom[1]),
                     _ch(color_top[2], color_bottom[2]),
                     np.full((h, w), 255, np.uint8)], axis=2)
+    for ring_r, ring_w, bright in _rings.get(v, []):
+        mask = np.abs(dist - ring_r) < ring_w
+        arr[mask, :3] = np.clip(arr[mask, :3].astype(np.int32) + bright, 0, 255).astype(np.uint8)
     return Image.fromarray(arr, "RGBA")
 
 
-def _make_waves_background(w, h, color_top, color_bottom, v=0):
+def _make_waves_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Sinusoidal wave bands. v controls band count, amplitude and phase for unique looks."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2454,6 +2490,8 @@ def _make_waves_background(w, h, color_top, color_bottom, v=0):
     wave_defs = variants[min(v, len(variants) - 1)]
     steps = w + 1
     for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in wave_defs:
+        if rng:
+            phase = phase + rng.uniform(-0.5, 0.5)
         cy  = y_frac * h; amp = amp_frac * h; bh = bh_frac * h
         top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
         bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
@@ -2462,7 +2500,7 @@ def _make_waves_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_floating_circles_background(w, h, color_top, color_bottom, v=0):
+def _make_floating_circles_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Overlapping semi-transparent spheres. v changes count, size and arrangement."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2498,13 +2536,17 @@ def _make_floating_circles_background(w, h, color_top, color_bottom, v=0):
     ]
     circle_defs = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, rf, alpha, color in circle_defs:
+        if rng:
+            cx_f = cx_f + rng.uniform(-0.04, 0.04)
+            cy_f = cy_f + rng.uniform(-0.04, 0.04)
+            rf   = max(0.04, rf + rng.uniform(-0.02, 0.02))
         cx  = int(cx_f * w); cy = int(cy_f * h); rad = int(rf * min(w, h))
         rc, gc, bc = (_clamp(c) for c in color)
         draw.ellipse([(cx - rad, cy - rad), (cx + rad, cy + rad)], fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_rays_background(w, h, color_top, color_bottom, v=0):
+def _make_rays_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Triangular rays. v changes origin point, ray count and angular spread."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2522,6 +2564,8 @@ def _make_rays_background(w, h, color_top, color_bottom, v=0):
         (-0.05,0.50, 7,   -55,   70),  # v=5 night_drive — from left edge, horizontal fan
     ]
     ox_f, oy_f, n_rays, start_deg, spread_deg = configs[min(v, len(configs) - 1)]
+    if rng:
+        start_deg += rng.uniform(-12, 12)
     ox, oy = ox_f * w, oy_f * h
     dist   = max(w, h) * 2.4
     for i in range(n_rays):
@@ -2537,7 +2581,7 @@ def _make_rays_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_arc_sweep_background(w, h, color_top, color_bottom, v=0):
+def _make_arc_sweep_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Large circular arcs from off-canvas centres. v shifts arc origins for different sweep directions."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2567,6 +2611,9 @@ def _make_arc_sweep_background(w, h, color_top, color_bottom, v=0):
     ]
     arc_defs = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, rf, a0, a1, alpha, color in arc_defs:
+        if rng:
+            aj = rng.uniform(-8, 8)
+            a0, a1 = a0 + aj, a1 + aj
         cx  = cx_f * w; cy = cy_f * h; rad = rf * max(w, h)
         pts = [(cx + rad * math.cos(math.radians(a0 + s * (a1 - a0) / n_steps)),
                 cy + rad * math.sin(math.radians(a0 + s * (a1 - a0) / n_steps)))
@@ -2577,7 +2624,7 @@ def _make_arc_sweep_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_aurora_background(w, h, color_top, color_bottom, v=0):
+def _make_aurora_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Narrow shimmering ribbon waves. v controls band count, frequency and pacing."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2617,6 +2664,9 @@ def _make_aurora_background(w, h, color_top, color_bottom, v=0):
     ribbon_defs = variants[min(v, len(variants) - 1)]
     steps = w + 1
     for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in ribbon_defs:
+        if rng:
+            y_frac = y_frac + rng.uniform(-0.015, 0.015)
+            phase  = phase  + rng.uniform(-0.4,   0.4)
         cy = y_frac * h; amp = amp_frac * h; bh = bh_frac * h
         top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
         bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
@@ -2625,7 +2675,7 @@ def _make_aurora_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_triangles_background(w, h, color_top, color_bottom, v=0):
+def _make_triangles_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Bold geometric triangles. v changes orientation, count and arrangement."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2685,13 +2735,16 @@ def _make_triangles_background(w, h, color_top, color_bottom, v=0):
     else:
         tri_defs = variants[min(v, len(variants) - 1)]
     for pts_frac, color, alpha in tri_defs:
-        pts = [(xf * w, yf * h) for xf, yf in pts_frac]
+        if rng:
+            pts = [((xf + rng.uniform(-0.04, 0.04)) * w, (yf + rng.uniform(-0.04, 0.04)) * h) for xf, yf in pts_frac]
+        else:
+            pts = [(xf * w, yf * h) for xf, yf in pts_frac]
         rc, gc, bc = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_diamond_background(w, h, color_top, color_bottom, v=0):
+def _make_diamond_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Overlapping diamond/rhombus shapes. v changes arrangement, rotation and size."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -2723,13 +2776,17 @@ def _make_diamond_background(w, h, color_top, color_bottom, v=0):
     ]
     diamond_defs = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, rw_f, rh_f, rot, alpha, color in diamond_defs:
+        if rng:
+            cx_f = cx_f + rng.uniform(-0.04, 0.04)
+            cy_f = cy_f + rng.uniform(-0.04, 0.04)
+            rot  = rot  + rng.uniform(-8, 8)
         pts = _diamond_pts(cx_f * w, cy_f * h, rw_f * w, rh_f * h, rot)
         rc, gc, bc = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_starburst_background(w, h, color_top, color_bottom, v=0):
+def _make_starburst_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Rays emanating from the exact centre — sunrise, euphoria, party burst."""
     # (n_rays, inner_r_frac)
     configs = [(14,0.06),(18,0.10),(16,0.14),(10,0.18),(22,0.04)]
@@ -2743,8 +2800,9 @@ def _make_starburst_background(w, h, color_top, color_bottom, v=0):
     def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
     def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
     L = _lighten(color_top); D = _darken(color_bottom)
+    rot_offset = rng.uniform(-15, 15) if rng else 0
     for i in range(n_rays):
-        a_mid  = math.radians(i * 360 / n_rays - 90)
+        a_mid  = math.radians(i * 360 / n_rays - 90 + rot_offset)
         a_half = math.radians(180 / n_rays * 0.52)
         a0, a1 = a_mid - a_half, a_mid + a_half
         color = L if i % 2 == 0 else D
@@ -2760,7 +2818,7 @@ def _make_starburst_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_chevrons_background(w, h, color_top, color_bottom, v=0):
+def _make_chevrons_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Right-pointing V-chevron bands stacked vertically — forward momentum."""
     # (n_chevrons, peak_x_frac) — peak is the rightward point of each V
     configs = [(4,0.62),(6,0.58),(8,0.54)]
@@ -2773,7 +2831,7 @@ def _make_chevrons_background(w, h, color_top, color_bottom, v=0):
     L = _lighten(color_top); D = _darken(color_bottom)
     spacing = h / n_chevs
     half_h  = spacing * 0.44
-    peak_x  = peak_f * w
+    peak_x  = peak_f * w + (rng.uniform(-0.04, 0.04) * w if rng else 0)
     for i in range(n_chevs):
         mid_y = spacing * (i + 0.5)
         pts = [
@@ -2788,7 +2846,7 @@ def _make_chevrons_background(w, h, color_top, color_bottom, v=0):
     return img
 
 
-def _make_spiral_background(w, h, color_top, color_bottom, v=0):
+def _make_spiral_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Concentric arc-bands offset progressively to create a spiral impression."""
     # (n_arcs, arc_span_deg, direction, base_alpha)
     configs = [(9, 260, 1, 50),(8, 250, -1, 48),(12, 240, 1, 45)]
@@ -2802,10 +2860,11 @@ def _make_spiral_background(w, h, color_top, color_bottom, v=0):
     def _lighten(c, amt=45): return tuple(_clamp(x + amt) for x in c[:3])
     def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
     L = _lighten(color_top); D = _darken(color_bottom)
+    start_offset = rng.uniform(-20, 20) if rng else 0
     for j in range(n_arcs):
         r_outer = max_r * (j + 1) / n_arcs
         r_inner = max_r * j / n_arcs * 0.90
-        start_deg = direction * j * (360 / n_arcs) * 0.65 - 90
+        start_deg = direction * j * (360 / n_arcs) * 0.65 - 90 + start_offset
         end_deg   = start_deg + direction * span
         alpha = max(18, base_alpha - j * 2)
         color = L if j % 2 == 0 else D
@@ -3017,14 +3076,24 @@ def _generate_extras_cover(key, title, subtitle=None):
     # Year-specific Top Songs covers: key = "top_songs_YYYY"
     if key.startswith("top_songs_") and len(key) == 14:
         try:
-            year       = int(key[-4:])
-            start_year = int(_extras.get("top_songs_start_year", datetime.now().year - 5))
-            offset     = (year - start_year) % 30
-            color_top, color_bottom = _TOP_SONGS_YEAR_PALETTES[offset]
-            bg_style, bg_v = _TOP_SONGS_BG_CYCLE[offset], 0
+            year     = int(key[-4:])
+            # Seed ALL choices (palette, style, variant, colour jitter) from the year
+            # number so the look is permanently stable — historical playlists should
+            # not shift weekly the way mood mixes do.
+            year_rng                 = random.Random(year)
+            palette_idx              = year_rng.randint(0, len(_TOP_SONGS_YEAR_PALETTES) - 1)
+            color_top, color_bottom  = _TOP_SONGS_YEAR_PALETTES[palette_idx]
+            _ts_style, _ts_max_v     = year_rng.choice(_TOP_SONGS_STYLE_POOL)
+            bg_style                 = _ts_style
+            bg_v                     = year_rng.randint(0, _ts_max_v)
+            _rng                     = year_rng  # geometry jitter uses the same seed stream
+            _jitter_range            = 30        # more dramatic shift between years
         except (ValueError, IndexError):
             color_top, color_bottom = _EXTRAS_COVER_COLORS.get("top_songs", ((200, 160, 30), (140, 90, 10)))
             bg_style, bg_v = "geometric", 0
+            _iso = datetime.now().isocalendar()
+            _rng = random.Random(hash((key, int(_iso[0]), int(_iso[1]))))
+            _jitter_range = 18
     else:
         color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
         style_entry = _COVER_BG_STYLES.get(key, ("geometric", 0))
@@ -3032,34 +3101,44 @@ def _generate_extras_cover(key, title, subtitle=None):
             bg_style, bg_v = style_entry
         else:
             bg_style, bg_v = style_entry, 0
+        # Weekly colour jitter — seeded by (key, ISO year, ISO week) so the cover is
+        # stable within a week and shifts naturally on Monday with profile reselection.
+        _iso = datetime.now().isocalendar()
+        _rng = random.Random(hash((key, int(_iso[0]), int(_iso[1]))))
+        _jitter_range = 18
+
+    def _jitter(c):
+        return tuple(max(0, min(255, ch + _rng.randint(-_jitter_range, _jitter_range))) for ch in c)
+    color_top    = _jitter(color_top)
+    color_bottom = _jitter(color_bottom)
 
     text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
     if bg_style == "circles":
-        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "radial":
-        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "waves":
-        img = _make_waves_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_waves_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "floating_circles":
-        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "rays":
-        img = _make_rays_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_rays_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "arc_sweep":
-        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "aurora":
-        img = _make_aurora_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_aurora_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "triangles":
-        img = _make_triangles_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_triangles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "diamond":
-        img = _make_diamond_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_diamond_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "starburst":
-        img = _make_starburst_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_starburst_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "chevrons":
-        img = _make_chevrons_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_chevrons_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "spiral":
-        img = _make_spiral_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_spiral_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     else:
-        img = _make_geometric_background(1000, 1000, color_top, color_bottom, bg_v)
+        img = _make_geometric_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     img    = _add_bottom_vignette(img)
     result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
@@ -4237,6 +4316,27 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                         active_general.append(best_inactive)
                         xlog(f"[INFO] mood_mixes: daily swap {worst_active} → {best_inactive} "
                              f"(scores {all_scored[worst_active]:.3f} vs {best_score:.3f})")
+
+    # Work-hours guarantee — Mon-Fri 7am-3pm: ensure at least one focus/work profile is active.
+    if 0 <= today_wd <= 4 and 7 <= current_hour < 15:
+        if not any(k in _WORK_FOCUS_PROFILES for k in active_general):
+            focus_pool = sorted(
+                _WORK_FOCUS_PROFILES & set(_GENERAL_PROFILES),
+                key=lambda k: (
+                    _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid)
+                    if recent_centroid.get("bpm") else 0
+                ),
+            )
+            if focus_pool:
+                pick = focus_pool[0]
+                if len(active_general) >= n_active:
+                    for evict in reversed(list(active_general)):
+                        if evict not in _WORK_FOCUS_PROFILES:
+                            active_general.remove(evict)
+                            xlog(f"[INFO] mood_mixes: work-hours guarantee: {evict} → {pick}")
+                            break
+                if pick not in active_general:
+                    active_general.append(pick)
 
     # Weather-conditional profiles
     active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
