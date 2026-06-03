@@ -577,6 +577,429 @@ _DESCRIPTIONS = {
         "Pull a blanket over. Press play.",
         "Outside is cold. In here is warm.",
     ],
+    # --- Energy / Intensity ---
+    "empowering": [
+        "Own every moment.",
+        "Music that makes you feel unstoppable.",
+        "Stand taller. Play louder.",
+        "Your power playlist.",
+        "For when you need to feel invincible.",
+    ],
+    "confidence_boost": [
+        "Walk in like you own it.",
+        "Head up. Volume up.",
+        "Music that makes you feel like you.",
+        "Turn confidence up to eleven.",
+        "For when you need to feel your best.",
+    ],
+    "cathartic": [
+        "Let it out.",
+        "Feel it all.",
+        "Release. Repeat.",
+        "Music for a good cry or a good scream.",
+        "A safe place for big feelings.",
+    ],
+    "angst_mix": [
+        "Channel the frustration.",
+        "Loud, raw, and real.",
+        "For when you've had enough.",
+        "Turn it up and let it out.",
+        "Feels so good to feel this bad.",
+    ],
+    "celebration": [
+        "Pop the cork. Press play.",
+        "Something worth celebrating.",
+        "Music for the best moments.",
+        "You deserve this.",
+        "Here's to tonight.",
+    ],
+    "euphoric": [
+        "Sky-high and unstoppable.",
+        "Total bliss.",
+        "Pure elation, in playlist form.",
+        "That feeling when everything clicks.",
+        "When life sounds like this.",
+    ],
+    # --- Calm / Gentle ---
+    "daydreaming": [
+        "Let your mind wander.",
+        "Head in the clouds.",
+        "Drift away.",
+        "Music for staring out of the window.",
+        "Somewhere between here and there.",
+    ],
+    "lazy_sunday": [
+        "Nowhere to be. Nothing to do.",
+        "A Sunday kind of easy.",
+        "Low effort. High comfort.",
+        "Sundays were made for this.",
+        "The softest kind of day.",
+    ],
+    "sunday_morning": [
+        "Sunday morning, slow and easy.",
+        "Coffee, light, and good music.",
+        "No rush. No plans. Just this.",
+        "Ease into Sunday.",
+        "For the slow mornings you love.",
+    ],
+    "deep_work": [
+        "Tune out. Tune in.",
+        "No distractions. Just depth.",
+        "Music for when the work matters.",
+        "Long sessions need long playlists.",
+        "Where deep work meets quiet music.",
+    ],
+    "evening_unwind": [
+        "The day is done. Wind it down.",
+        "Ease out of the day.",
+        "Soft landing after a long one.",
+        "Let the evening do its thing.",
+        "From the chaos of the day to calm.",
+    ],
+    "folk_acoustic": [
+        "Just wood, wire, and voice.",
+        "Stripped back. Still brilliant.",
+        "Music in its purest form.",
+        "Real instruments. Real feelings.",
+        "Close your eyes. Hear everything.",
+    ],
+    "emotional": [
+        "Music that means something.",
+        "Feel every word of it.",
+        "Big feelings deserve big music.",
+        "For the moments that hit hard.",
+        "Honest, open, emotional.",
+    ],
+    # --- Upbeat / Outdoor ---
+    "beach_vibes": [
+        "Sun, sand, and something to listen to.",
+        "Pure summer energy.",
+        "Flip-flops optional.",
+        "Music for when you can smell the sea.",
+        "As close as music gets to the beach.",
+    ],
+    "fresh_start": [
+        "New day. New chapter.",
+        "Clean slate. Press play.",
+        "Start fresh.",
+        "Music for new beginnings.",
+        "Whatever comes next, you're ready.",
+    ],
+    "spring_mix": [
+        "The season is turning.",
+        "Brighter days, brighter sounds.",
+        "Music as light as spring.",
+        "A soundtrack for bloom season.",
+        "Spring is here. Ears open.",
+    ],
+    "brunch_mix": [
+        "Good food. Better music.",
+        "Bottomless brunch energy.",
+        "Weekend morning, fully loaded.",
+        "For the long brunches.",
+        "Make it a Saturday.",
+    ],
+    "weekend_mix": [
+        "The weekend has officially started.",
+        "Saturday sounds. Sunday vibes.",
+        "Two days of this.",
+        "Finally.",
+        "Absolutely nothing urgent.",
+    ],
+    "cooking_mix": [
+        "Music for when you're in the kitchen.",
+        "Cook something good. Play something better.",
+        "Chopping, stirring, pressing play.",
+        "The kitchen has a soundtrack.",
+        "Tonight, you're cooking.",
+    ],
+    "summer_evening": [
+        "Warm air. Warm sounds.",
+        "The best part of summer.",
+        "When the heat of the day breaks.",
+        "Long summer nights.",
+        "Golden hour lasts longer in summer.",
+    ],
+    # --- Romantic ---
+    "romantic_mix": [
+        "Set the mood.",
+        "Romance, curated.",
+        "For the two of you.",
+        "Slow it down.",
+        "Music that means more when you're not alone.",
+    ],
+    "modern_romance": [
+        "Love songs for right now.",
+        "Modern and heartfelt.",
+        "Contemporary love, well soundtracked.",
+        "How it feels to fall now.",
+        "Romance, updated.",
+    ],
+    "slow_dance": [
+        "For dancing close.",
+        "Take their hand.",
+        "The slowest, sweetest songs.",
+        "Move together.",
+        "Nothing else in the room.",
+    ],
+    "love_songs": [
+        "Songs that say it better than words.",
+        "Love, in playlist form.",
+        "For the people worth a love song.",
+        "Music made for feeling this way.",
+        "All the love songs.",
+    ],
+    "first_date": [
+        "Nervous energy and first impressions.",
+        "Music for the butterflies.",
+        "Hopeful, warm, a little nervous.",
+        "For that first hello.",
+        "The beginning of something.",
+    ],
+    "acoustic_romance": [
+        "Quiet and close.",
+        "Just a guitar and a feeling.",
+        "Intimate and acoustic.",
+        "Soft enough to hear every word.",
+        "Music for close quarters.",
+    ],
+    "indie_romance": [
+        "Romance with a little edge.",
+        "Indie hearts, big feelings.",
+        "Love songs for those who skip the obvious ones.",
+        "Not your usual love playlist.",
+        "For when the feelings are real but the pop's too much.",
+    ],
+    "late_night_romance": [
+        "Just you, them, and past midnight.",
+        "Quiet lights. Closer now.",
+        "Romance after dark.",
+        "The night is for this.",
+        "No one else awake.",
+    ],
+    "piano_romance": [
+        "Romance built on 88 keys.",
+        "Just the piano and a feeling.",
+        "Beautiful, delicate, true.",
+        "Keys pressed gently.",
+        "For when only the piano will do.",
+    ],
+    "strings_romance": [
+        "Strings to match the feeling.",
+        "Romance, orchestrated.",
+        "Beautiful and sweeping.",
+        "When only strings will do.",
+        "As big as the feeling itself.",
+    ],
+    "string_quartet": [
+        "Four instruments. Everything you need.",
+        "The intimacy of a string quartet.",
+        "Perfectly balanced. Deeply moving.",
+        "Chamber music for your chamber.",
+        "Nothing added. Nothing missing.",
+    ],
+    # --- Atmospheric / Seasonal ---
+    "golden_hour": [
+        "Chase the light.",
+        "That hour when the world turns gold.",
+        "Music for the glow.",
+        "Everything looks better right now.",
+        "Catch it before it goes.",
+    ],
+    "sunset_mix": [
+        "Watch it go down.",
+        "Music for the end of the light.",
+        "Every ending is beautiful.",
+        "Sunset coming. Volume up.",
+        "The sky is doing something special.",
+    ],
+    "autumn_mix": [
+        "The year is turning amber.",
+        "Music for the falling leaves.",
+        "Autumn has its own soundtrack.",
+        "Wrapped up and wondering.",
+        "The most reflective season.",
+    ],
+    "winter_mix": [
+        "Cold outside. Warm in here.",
+        "Music for the shortest days.",
+        "Winter is here.",
+        "Dark skies, good music.",
+        "Deep winter listening.",
+    ],
+    "main_character": [
+        "You're the main character today.",
+        "For walking like the world is watching.",
+        "Your scene. Your music.",
+        "Live in the moment. Soundtrack optional.",
+        "Every hero needs a theme.",
+    ],
+    # --- Driving / Activity ---
+    "driving_mix": [
+        "Built for the open road.",
+        "Miles passing. Music playing.",
+        "Windows cracked. Speed up slightly.",
+        "Driving music, exactly that.",
+        "Keep moving.",
+    ],
+    "night_drive": [
+        "Late roads and empty lanes.",
+        "The city at night, through the windscreen.",
+        "Driving into the dark.",
+        "Night driving has its own rules.",
+        "Headlights on. Volume up.",
+    ],
+    "driving_singalong": [
+        "Sing it like no one's watching. They're not.",
+        "Full volume. Full chorus. Full commitment.",
+        "You know every word.",
+        "Hands on the wheel. Vocals on point.",
+        "The car is your concert venue.",
+    ],
+    "road_trip": [
+        "Long roads need great playlists.",
+        "Pack the car. Hit play.",
+        "Miles to go. Enjoy every one.",
+        "The journey is half the fun.",
+        "Road trip, officially started.",
+    ],
+    "commute_mix": [
+        "The commute, made better.",
+        "From door to desk with a soundtrack.",
+        "Better than silence on the way in.",
+        "Make the journey count.",
+        "Getting there.",
+    ],
+    "walking_mix": [
+        "Best foot forward.",
+        "Music to walk to.",
+        "Step by step.",
+        "For the daily walk.",
+        "The path is more interesting with these.",
+    ],
+    # --- Dinner / Evening ---
+    "jazz_dinner": [
+        "Jazz for the table.",
+        "Sophisticated dining, properly soundtracked.",
+        "Low, warm, effortless.",
+        "Dinner goes better with jazz.",
+        "The jazz is playing.",
+    ],
+    "romantic_jazz": [
+        "Jazz and romance. The classic combination.",
+        "Low lights. Low tempo. High feeling.",
+        "Romance, with a brushed snare.",
+        "Late evening, jazz turned down low.",
+        "Blue notes and warm feelings.",
+    ],
+    "candlelight": [
+        "Soft sounds for soft light.",
+        "Music for the candles.",
+        "Intimate, warm, unhurried.",
+        "Turn the lights down. Press play.",
+        "Everything is gentler right now.",
+    ],
+    "date_night": [
+        "Tonight has potential.",
+        "A perfect evening, properly soundtracked.",
+        "Date night, set to music.",
+        "Music for a night with someone special.",
+        "This is going well.",
+    ],
+    "romantic_dinner": [
+        "Dinner for two, sounding great.",
+        "Fine dining, finer playlist.",
+        "Tonight's reservation includes a soundtrack.",
+        "Set the table. Set the mood.",
+        "Music as good as the food.",
+    ],
+    # --- Mood / Feel ---
+    "dreamy_mix": [
+        "Lost in sound.",
+        "Music for drifting.",
+        "Soft edges and slow tempo.",
+        "Somewhere between awake and asleep.",
+        "Float away.",
+    ],
+    "moody_mix": [
+        "Lean into the mood.",
+        "Dark and interesting.",
+        "For the complicated days.",
+        "Not everything has to be uplifting.",
+        "Mood: exactly this.",
+    ],
+    "bittersweet": [
+        "Joy and sadness, together.",
+        "Both at once.",
+        "Happy-sad. You know the feeling.",
+        "For those feelings that are hard to name.",
+        "Mixed emotions, beautiful music.",
+    ],
+    "heartbreak": [
+        "Let yourself feel it.",
+        "For the ache.",
+        "Music for the hard moments.",
+        "It helps to have the right playlist.",
+        "Some songs know exactly what you're going through.",
+    ],
+    # --- Memory / Late Night ---
+    "nostalgia_mix": [
+        "Back when everything felt different.",
+        "A detour through memory lane.",
+        "For the part of you that misses it.",
+        "Music that takes you somewhere else.",
+        "Then and now.",
+    ],
+    "synthpop_romance": [
+        "Romance with a synth pulse.",
+        "Shimmering keys and big feelings.",
+        "Love songs with an electronic edge.",
+        "Modern love, analogue soul.",
+        "Synths, arpeggios, and a feeling you can't shake.",
+    ],
+    # --- Party / Social ---
+    "friday_night": [
+        "Friday. Finally.",
+        "The weekend starts here.",
+        "Tonight's the night.",
+        "End the week right.",
+        "Friday energy, amplified.",
+    ],
+    "pre_party": [
+        "Getting ready. Getting pumped.",
+        "The warmup before the warmup.",
+        "Pregame playlist, confirmed.",
+        "Turn it up while you get ready.",
+        "The party starts here.",
+    ],
+    "party_throwback": [
+        "Classics that still hit hard.",
+        "Throwback bangers for the party.",
+        "You forgot about some of these. You're welcome.",
+        "The old stuff still works.",
+        "Turn it up and go back.",
+    ],
+    "after_dark": [
+        "The night belongs to you.",
+        "Deep and dark and danceable.",
+        "After dark, everything changes.",
+        "Low lights, high tempo.",
+        "Where the night leads.",
+    ],
+    "after_work": [
+        "Clocked off. Tuned in.",
+        "Shake off the workday.",
+        "The commute home is different now.",
+        "From desk to done.",
+        "Office hours over. This begins.",
+    ],
+    "cool_down": [
+        "Take it down a notch.",
+        "The session is over. The music isn't.",
+        "Breath slowing. Sounds slowing.",
+        "Recovery, set to music.",
+        "Ease out of it.",
+    ],
 }
 
 
@@ -586,8 +1009,8 @@ def _pick_description(playlist_id, era=None, styles=None):
     if not pool:
         return ""
     desc = random.choice(pool)
-    if era and "{era}" in desc:
-        desc = desc.replace("{era}", era)
+    if era:
+        desc = desc.replace("{era}", era).replace("{year}", era)
     return desc
 
 
@@ -3570,6 +3993,9 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
         for rk, _ in ranked:
             t = track_map.get(rk)
             if not t or is_low_rated(t):
+                continue
+            pk = str(getattr(t, "parentRatingKey", "") or "")
+            if pk in excluded_album_keys:
                 continue
             sk = _song_key(t)
             if sk in seen_songs:
