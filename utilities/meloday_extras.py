@@ -255,9 +255,100 @@ _EXTRAS_COVER_COLORS = {
 #   circles   — concentric rings (Time Capsule radar aesthetic)
 #   radial    — soft radial glow, warm centre → cool edges (Discover Weekly)
 _COVER_BG_STYLES = {
-    "time_capsule":    "circles",
-    "discover_weekly": "radial",
+    # Non-mood extras — each has a distinct visual identity
+    "on_repeat":           "floating_circles",  # circular/looping
+    "repeat_rewind":       "triangles",          # ◄◄ rewind shape language
+    "rediscovery":         "aurora",             # dreamy re-emergence
+    "deep_cuts":           "waves",              # deep, layered, subterranean
+    "all_time_favourites": "rays",               # radiating gold star
+    "time_capsule":        "circles",            # concentric radar rings (looking back)
+    "discover_weekly":     "radial",             # warm centre glow
+    # Mood mixes — each profile has a distinct visual identity
+    # rays: energy radiating from corner
+    "workout": "rays", "running": "rays", "empowering": "rays",
+    "confidence_boost": "rays", "cathartic": "rays", "angst_mix": "rays",
+    "celebration": "rays", "euphoric": "rays",
+    # waves: flowing sinusoidal bands
+    "chill": "waves", "sleep": "waves", "daydreaming": "waves",
+    "lazy_sunday": "waves", "sunday_morning": "waves", "deep_work": "waves",
+    "evening_unwind": "waves", "folk_acoustic": "waves",
+    "melancholy": "waves", "emotional": "waves",
+    # floating_circles: overlapping spheres
+    "happy": "floating_circles", "sunny": "floating_circles",
+    "beach_vibes": "floating_circles", "fresh_start": "floating_circles",
+    "spring_mix": "floating_circles", "brunch_mix": "floating_circles",
+    "weekend_mix": "floating_circles", "cooking_mix": "floating_circles",
+    "summer_evening": "floating_circles",
+    # arc_sweep: large circular curves sweeping across
+    "romantic_mix": "arc_sweep", "modern_romance": "arc_sweep",
+    "slow_dance": "arc_sweep", "love_songs": "arc_sweep",
+    "first_date": "arc_sweep", "acoustic_romance": "arc_sweep",
+    "indie_romance": "arc_sweep", "late_night_romance": "arc_sweep",
+    "piano_romance": "arc_sweep", "strings_romance": "arc_sweep",
+    "string_quartet": "arc_sweep",
+    # aurora: narrow shimmering ribbon waves
+    "golden_hour": "aurora", "sunset_mix": "aurora", "autumn_mix": "aurora",
+    "winter_mix": "aurora", "cosy": "aurora", "main_character": "aurora",
+    "morning": "aurora",
+    # triangles: bold angular shapes
+    "driving_mix": "triangles", "road_trip": "triangles",
+    "commute_mix": "triangles", "walking_mix": "triangles",
+    "driving_singalong": "triangles",
+    # diamond: overlapping rhombuses
+    "dinner": "diamond", "jazz_dinner": "diamond", "romantic_jazz": "diamond",
+    "candlelight": "diamond", "date_night": "diamond", "romantic_dinner": "diamond",
+    # radial: soft glow (existing)
+    "focus": "radial", "dreamy_mix": "radial", "moody_mix": "radial",
+    "bittersweet": "radial", "heartbreak": "radial", "rainy_day": "radial",
+    # circles: concentric rings (existing)
+    "nostalgia_mix": "circles", "synthpop_romance": "circles",
+    "late_night": "circles",
+    # geometric (default, no entry): party, friday_night, pre_party, party_throwback,
+    # after_dark, night_drive, after_work, cool_down
 }
+
+# Top Songs year-specific covers — 30 colours + 10 background styles cycling by year offset.
+# Index: (year - top_songs_start_year) % 30
+_TOP_SONGS_YEAR_PALETTES = [
+    ((220,  60,  60), (155,  20,  20)),  #  0 — crimson red
+    ((230, 105,  35), (170,  55,  10)),  #  1 — fire orange
+    ((235, 185,  35), (175, 125,  10)),  #  2 — golden amber
+    ((190, 205,  30), (130, 145,  10)),  #  3 — yellow-green
+    ((100, 195,  45), ( 50, 135,  15)),  #  4 — lime
+    (( 35, 175,  85), ( 12, 115,  45)),  #  5 — emerald
+    (( 25, 180, 145), ( 10, 120,  95)),  #  6 — teal
+    (( 25, 160, 195), (  8,  95, 145)),  #  7 — cyan
+    (( 30, 120, 220), (  8,  55, 165)),  #  8 — cerulean blue
+    (( 55,  70, 215), ( 20,  28, 160)),  #  9 — cobalt
+    (( 90,  40, 205), ( 45,  12, 150)),  # 10 — electric indigo
+    ((130,  28, 205), ( 80,   8, 150)),  # 11 — deep violet
+    ((175,  30, 195), (120,  10, 140)),  # 12 — rich purple
+    ((215,  40, 180), (155,  12, 125)),  # 13 — magenta
+    ((225,  45, 130), (170,  15,  80)),  # 14 — hot pink
+    ((225,  50,  90), (165,  18,  50)),  # 15 — rose red
+    ((205,  75,  70), (150,  30,  30)),  # 16 — deep coral
+    ((210, 120,  50), (150,  65,  15)),  # 17 — terracotta
+    ((195, 160,  50), (135, 105,  12)),  # 18 — mustard
+    ((155, 195,  55), ( 95, 135,  18)),  # 19 — warm yellow-green
+    (( 70, 185,  85), ( 28, 125,  42)),  # 20 — spring green
+    (( 28, 170, 150), ( 10, 110, 100)),  # 21 — seafoam
+    (( 18, 140, 205), (  6,  78, 150)),  # 22 — sky blue
+    (( 58,  88, 215), ( 22,  42, 160)),  # 23 — royal blue
+    ((108,  48, 215), ( 55,  18, 160)),  # 24 — purple-violet
+    ((185,  42, 190), (130,  12, 135)),  # 25 — purple-magenta
+    ((215,  48, 120), (160,  15,  70)),  # 26 — deep rose
+    ((215, 115,  42), (155,  62,  12)),  # 27 — warm orange
+    ((215, 185,  38), (155, 128,  10)),  # 28 — yellow gold
+    (( 52, 185, 115), ( 18, 125,  62)),  # 29 — mint green
+]
+_TOP_SONGS_BG_CYCLE = [
+    "geometric", "waves", "floating_circles", "rays", "aurora",
+    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
+    "geometric", "waves", "floating_circles", "rays", "aurora",
+    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
+    "geometric", "waves", "floating_circles", "rays", "aurora",
+    "circles",   "radial", "triangles",       "arc_sweep", "diamond",
+]
 
 # _MOOD_PROFILE_KEYS is defined after _MOOD_MIX_NAMES below.
 
@@ -830,6 +921,18 @@ _WEEKDAY_BOOSTS = {
     "lazy_sunday":     ({6},     0.10),   # Sunday only
     "celebration":     ({4, 5},  0.08),   # Fri/Sat
     "party_throwback": ({4, 5},  0.06),   # Fri/Sat (slight)
+}
+
+# Hard day-of-week gates — profiles excluded from the pool entirely on the wrong day.
+# Different from _WEEKDAY_BOOSTS (score reduction only) — these are hard exclusions.
+# 0=Monday … 6=Sunday.
+_WEEKDAY_RESTRICTED = {
+    "friday_night":   {4, 5},   # Fri/Sat only
+    "pre_party":      {4, 5},   # Fri/Sat only
+    "weekend_mix":    {5, 6},   # Sat/Sun only
+    "brunch_mix":     {5, 6},   # Sat/Sun only
+    "sunday_morning": {6},      # Sunday only
+    "lazy_sunday":    {6},      # Sunday only
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
@@ -1786,6 +1889,215 @@ def _make_radial_glow_background(w, h, color_top, color_bottom):
     return Image.fromarray(arr, "RGBA")
 
 
+def _make_waves_background(w, h, color_top, color_bottom):
+    """Wide sinusoidal bands — calm, contemplative, introspective profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=45): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    # (y_frac, amp_frac, freq, phase, band_h_frac, alpha, color)
+    wave_defs = [
+        (0.22, 0.07, 0.9, 0.0, 0.20, 55, light),
+        (0.48, 0.08, 1.2, 1.1, 0.22, 48, dark),
+        (0.65, 0.06, 1.0, 2.3, 0.18, 42, mid),
+        (0.82, 0.07, 1.4, 0.6, 0.24, 38, light),
+    ]
+    steps = w + 1
+    for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in wave_defs:
+        cy  = y_frac * h
+        amp = amp_frac * h
+        bh  = bh_frac * h
+        top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
+        bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(top + bot, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_floating_circles_background(w, h, color_top, color_bottom):
+    """Overlapping semi-transparent spheres — playful, upbeat, positive profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    # (cx_frac, cy_frac, rad_frac, alpha, color) — some bleed off-canvas intentionally
+    circle_defs = [
+        (0.75, 0.22, 0.42, 48, light),
+        (0.15, 0.68, 0.34, 44, dark),
+        (0.90, 0.80, 0.28, 40, mid),
+        (0.42, 0.12, 0.20, 36, dark),
+        (0.12, 0.20, 0.16, 32, light),
+        (0.62, 0.70, 0.14, 28, light),
+        (0.88, 0.08, 0.11, 24, mid),
+    ]
+    for cx_f, cy_f, rf, alpha, color in circle_defs:
+        cx  = int(cx_f * w)
+        cy  = int(cy_f * h)
+        rad = int(rf * min(w, h))
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.ellipse([(cx - rad, cy - rad), (cx + rad, cy + rad)], fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_rays_background(w, h, color_top, color_bottom):
+    """Triangular rays from the upper-left corner — energy, power, momentum profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(v * fac) for v in c[:3])
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    ox, oy = int(w * 0.06), int(h * 0.06)
+    n_rays = 9
+    dist   = max(w, h) * 2.4
+    for i in range(n_rays):
+        a1 = math.radians(-8 + i * 100 / n_rays)
+        a2 = math.radians(-8 + (i + 1) * 100 / n_rays)
+        color = light if i % 2 == 0 else dark
+        alpha = 52 if i % 2 == 0 else 36
+        pts = [
+            (ox, oy),
+            (ox + dist * math.cos(a1), oy + dist * math.sin(a1)),
+            (ox + dist * math.cos(a2), oy + dist * math.sin(a2)),
+        ]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_arc_sweep_background(w, h, color_top, color_bottom):
+    """Large circular arcs from off-canvas centres — romantic, flowing profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=50): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    n_steps = 90
+    # Centre is off-canvas; only the sweeping edge is visible.
+    # (cx_frac, cy_frac, r_frac, a_start_deg, a_end_deg, alpha, color)
+    arc_defs = [
+        (1.35, 0.50, 1.20, 145, 215, 55, light),
+        (-0.30, 0.45, 1.00, -35,  55, 48, dark),
+        (0.50, 1.45, 1.05, 218, 322, 42, mid),
+        (0.50, -0.40, 0.90,  38, 142, 36, light),
+    ]
+    for cx_f, cy_f, rf, a0, a1, alpha, color in arc_defs:
+        cx  = cx_f * w
+        cy  = cy_f * h
+        rad = rf * max(w, h)
+        pts = [
+            (cx + rad * math.cos(math.radians(a0 + s * (a1 - a0) / n_steps)),
+             cy + rad * math.sin(math.radians(a0 + s * (a1 - a0) / n_steps)))
+            for s in range(n_steps + 1)
+        ]
+        pts.append((cx, cy))  # close back to off-canvas centre
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_aurora_background(w, h, color_top, color_bottom):
+    """Narrow shimmering ribbon waves at different phases — atmospheric profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=40): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.60): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    # Narrower, more numerous bands than waves; distinct phase offsets create shimmer
+    # (y_frac, amp_frac, freq, phase, band_h_frac, alpha, color)
+    ribbon_defs = [
+        (0.18, 0.04, 1.8, 0.0, 0.10, 55, light),
+        (0.32, 0.05, 1.3, 1.3, 0.12, 50, dark),
+        (0.46, 0.04, 2.1, 2.7, 0.09, 45, mid),
+        (0.58, 0.05, 1.6, 0.8, 0.11, 42, light),
+        (0.70, 0.04, 1.1, 1.9, 0.10, 38, dark),
+        (0.82, 0.05, 1.9, 3.2, 0.13, 35, mid),
+    ]
+    steps = w + 1
+    for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in ribbon_defs:
+        cy  = y_frac * h
+        amp = amp_frac * h
+        bh  = bh_frac * h
+        top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
+        bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(top + bot, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_triangles_background(w, h, color_top, color_bottom):
+    """Bold geometric triangles in multiple directions — activity, driving profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    # Each triangle as (x_frac, y_frac) tuples; some vertices bleed off-canvas
+    tri_defs = [
+        ([(1.05, -0.05), (0.30, 0.52), (1.05, 1.05)], light, 55),
+        ([(-0.05, 0.15), (0.70, 0.52), (-0.05, 1.05)], dark,  50),
+        ([(0.15, -0.05), (0.85, -0.05), (0.50, 0.70)], mid,   40),
+        ([(-0.05, -0.05), (0.38, -0.05), (-0.05, 0.50)], light, 30),
+    ]
+    for pts_frac, color, alpha in tri_defs:
+        pts = [(xf * w, yf * h) for xf, yf in pts_frac]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_diamond_background(w, h, color_top, color_bottom):
+    """Overlapping diamond/rhombus shapes — sophisticated, elegant evening profiles."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=45): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+    def _diamond_pts(cx, cy, rw, rh):
+        return [(cx, cy - rh), (cx + rw, cy), (cx, cy + rh), (cx - rw, cy)]
+    # (cx_frac, cy_frac, rw_frac, rh_frac, alpha, color)
+    diamond_defs = [
+        (0.82, 0.22, 0.60, 0.48, 52, light),
+        (0.20, 0.78, 0.55, 0.44, 47, dark),
+        (0.52, 0.52, 0.34, 0.28, 40, mid),
+        (0.08, 0.14, 0.26, 0.22, 33, light),
+        (0.92, 0.88, 0.28, 0.24, 28, dark),
+        (0.50, 0.16, 0.16, 0.14, 24, mid),
+    ]
+    for cx_f, cy_f, rw_f, rh_f, alpha, color in diamond_defs:
+        pts = _diamond_pts(cx_f * w, cy_f * h, rw_f * w, rh_f * h)
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
 def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="default"):
     """
     Composite title + optional subtitle + Meloday+ badge onto img (RGBA).
@@ -1979,13 +2291,41 @@ def _generate_extras_cover(key, title, subtitle=None):
     if not _PIL_AVAILABLE:
         xlog("[WARN] PIL not available — cover generation skipped.")
         return None
-    color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
-    bg_style   = _COVER_BG_STYLES.get(key, "geometric")
+
+    # Year-specific Top Songs covers: key = "top_songs_YYYY"
+    if key.startswith("top_songs_") and len(key) == 14:
+        try:
+            year       = int(key[-4:])
+            start_year = int(_extras.get("top_songs_start_year", datetime.now().year - 5))
+            offset     = (year - start_year) % 30
+            color_top, color_bottom = _TOP_SONGS_YEAR_PALETTES[offset]
+            bg_style   = _TOP_SONGS_BG_CYCLE[offset]
+        except (ValueError, IndexError):
+            color_top, color_bottom = _EXTRAS_COVER_COLORS.get("top_songs", ((200, 160, 30), (140, 90, 10)))
+            bg_style   = "geometric"
+    else:
+        color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
+        bg_style   = _COVER_BG_STYLES.get(key, "geometric")
+
     text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
     if bg_style == "circles":
         img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom)
     elif bg_style == "radial":
         img = _make_radial_glow_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "waves":
+        img = _make_waves_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "floating_circles":
+        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "rays":
+        img = _make_rays_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "arc_sweep":
+        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "aurora":
+        img = _make_aurora_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "triangles":
+        img = _make_triangles_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "diamond":
+        img = _make_diamond_background(1000, 1000, color_top, color_bottom)
     else:
         img = _make_geometric_background(1000, 1000, color_top, color_bottom)
     img    = _add_bottom_vignette(img)
@@ -3080,13 +3420,22 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     lat = weather.get("lat", 0.0) if weather else 0.0
 
     # Determine which general profiles are active
+    today_wd = datetime.now().weekday()
     if not reselect:
         active_general = [
             name_to_key[name]
             for name in existing
             if name in name_to_key and name_to_key[name] in _GENERAL_PROFILES
         ]
-        if not active_general:
+        # Evict any profile that is restricted to a different day of the week
+        day_expired = [k for k in active_general
+                       if today_wd not in _WEEKDAY_RESTRICTED.get(k, {today_wd})]
+        if day_expired:
+            for k in day_expired:
+                active_general.remove(k)
+            xlog(f"[INFO] mood_mixes: day-restricted profiles expired: {day_expired} — reselecting")
+            reselect = True
+        elif not active_general:
             xlog("[INFO] mood_mixes: no general mixes found, running initial selection")
             reselect = True
 
@@ -3105,6 +3454,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                  ), k)
                 for k, target in _MOOD_PROFILES.items()
                 if k in _GENERAL_PROFILES
+                and today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
             )
             n_cats      = len(set(_PROFILE_CATEGORY.values()))
             max_per_cat = max(1, math.ceil(n_active / n_cats))
@@ -3123,17 +3473,19 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                            if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
         recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
         if recent_centroid.get("bpm") and len(active_general) == n_active:
+            eligible = {k for k in _GENERAL_PROFILES
+                        if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})}
             all_scored = {
                 k: _mood_rotation_score(
                     k,
                     _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
                     current_hour, weather
                 )
-                for k in _GENERAL_PROFILES
+                for k in eligible
             }
             active_set        = set(active_general)
-            worst_active      = max(active_set,   key=lambda k: all_scored[k])
-            candidates        = sorted((all_scored[k], k) for k in _GENERAL_PROFILES
+            worst_active      = max(active_set,   key=lambda k: all_scored.get(k, 1.0))
+            candidates        = sorted((all_scored[k], k) for k in eligible
                                        if k not in active_set)
             if candidates:
                 best_score, best_inactive = candidates[0]
@@ -3347,7 +3699,7 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
             year_str = str(year)
             _upsert_extras_playlist(plex, f"Top Songs {year_str} • Meloday+", tracks,
                 _pick_description("top_songs", era=year_str),
-                cover_key="top_songs", cover_title=f"Top Songs {year_str}",
+                cover_key=f"top_songs_{year_str}", cover_title=f"Top Songs {year_str}",
                 cover_subtitle=None,
                 existing_playlists=ep)
 
