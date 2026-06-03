@@ -2317,62 +2317,38 @@ def _lastfm_popularity_score(track_title, artist_name):
     return 0
 
 
-_lastfm_album_cache = {}  # (artist_lower, album_lower) -> {track_title_lower: score}
+_lastfm_track_cache = {}  # (artist_lower, title_lower) -> int playcount
 
 
-def _lastfm_album_track_scores(artist_name, album_name):
+def _lastfm_track_playcount(track_title, artist_name):
     """
-    Fetch tracks for a specific album via album.getInfo.
-    Returns {track_title_lower: score} where score is album position inverted
-    (track 1 = highest score) — album.getInfo does not expose per-track play counts
-    for new releases, so position is the best available signal.
-    Returns {} on any failure or if album not found on Last.fm.
+    Fetch the global play count for a specific track via track.getInfo.
+    Returns int playcount, or 0 on failure / track not found on Last.fm.
+    Cached per (artist, title) within the run. Uses a short timeout with no
+    retries so brand-new or unindexed tracks fail fast rather than hanging.
     """
     if not LASTFM_API_KEY or not _REQUESTS_AVAILABLE:
-        return {}
-    cache_key = (artist_name.strip().lower(), album_name.strip().lower())
-    if cache_key in _lastfm_album_cache:
-        return _lastfm_album_cache[cache_key]
-
-    for attempt in range(3):
-        try:
-            resp = _requests.get(
-                "http://ws.audioscrobbler.com/2.0/",
-                params={
-                    "method": "album.getInfo",
-                    "artist": artist_name,
-                    "album": album_name,
-                    "api_key": LASTFM_API_KEY,
-                    "format": "json",
-                },
-                timeout=10,
-            )
-            data = resp.json()
-            raw = data.get("album", {}).get("tracks", {}).get("track", [])
-            if not raw:
-                _lastfm_album_cache[cache_key] = {}
-                return {}
-            # Last.fm returns a dict (not a list) when the album has only one track
-            if isinstance(raw, dict):
-                raw = [raw]
-            n = len(raw)
-            result = {}
-            for t in raw:
-                name = t.get("name", "")
-                if not name:
-                    continue
-                rank = int(t.get("@attr", {}).get("rank", n + 1))
-                result[name.lower()] = n - rank + 1
-            _lastfm_album_cache[cache_key] = result
-            return result
-        except Exception as e:
-            if attempt < 2:
-                time.sleep(1)
-            else:
-                xlog(f"[WARN] Last.fm album lookup failed for '{artist_name}' / '{album_name}': {e}")
-
-    _lastfm_album_cache[cache_key] = {}
-    return {}
+        return 0
+    cache_key = (artist_name.strip().lower(), track_title.strip().lower())
+    if cache_key in _lastfm_track_cache:
+        return _lastfm_track_cache[cache_key]
+    try:
+        resp = _requests.get(
+            "http://ws.audioscrobbler.com/2.0/",
+            params={
+                "method": "track.getInfo",
+                "artist": artist_name,
+                "track":  track_title,
+                "api_key": LASTFM_API_KEY,
+                "format": "json",
+            },
+            timeout=3,
+        )
+        count = int(resp.json().get("track", {}).get("playcount", 0) or 0)
+    except Exception:
+        count = 0
+    _lastfm_track_cache[cache_key] = count
+    return count
 
 
 # ===========================================================================
@@ -3537,35 +3513,41 @@ def _album_release_date(album):
 def _select_album_reps(album, tracks, essentia_cache):
     """
     Pick 1–2 representative tracks from an album.
-    Priority: Last.fm album track order → acoustic centrality → positional fallback.
-    Uses album.getInfo (album-scoped) so new releases score correctly — artist top
-    tracks won't include recently released tracks yet.
+
+    Primary:   most globally-played track per Last.fm track.getInfo — real
+               play-count data scoped to this specific track, not the artist's
+               all-time chart.
+    Secondary: most acoustically central track from the remaining tracks —
+               complements the popularity pick with a sonically representative
+               choice rather than simply taking track 2.
+
+    Falls back to pure acoustic centrality (n=2) when Last.fm is unavailable
+    or all tracks return zero plays (brand-new release not yet indexed).
     """
     if not tracks:
         return []
 
     artist_name = getattr(album, "parentTitle", "") or ""
-    album_name  = getattr(album, "title", "") or ""
     is_va = artist_name.strip().casefold() in {"various artists", "various"}
 
-    if LASTFM_API_KEY and artist_name and album_name and not is_va:
-        scores = _lastfm_album_track_scores(artist_name, album_name)
-        if scores:
-            scored = []
-            for t in tracks:
-                title_lower = (t.title or "").lower()
-                s = scores.get(title_lower, 0)
-                if s == 0:
-                    for k, v in scores.items():
-                        if title_lower in k or k in title_lower:
-                            s = v
-                            break
-                scored.append((s, t))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            if scored[0][0] > 0:
-                return [t for _, t in scored[:2]]
+    primary = None
 
-    return _pick_representative_tracks(tracks, essentia_cache, n=2)
+    if LASTFM_API_KEY and artist_name and not is_va:
+        scored = [(_lastfm_track_playcount(t.title or "", artist_name), t)
+                  for t in tracks]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        if scored[0][0] > 0:
+            primary = scored[0][1]
+
+    if primary is None:
+        return _pick_representative_tracks(tracks, essentia_cache, n=2)
+
+    # Secondary: most acoustically central track excluding the primary
+    remaining = [t for t in tracks if str(t.ratingKey) != str(primary.ratingKey)]
+    if not remaining:
+        return [primary]
+    acoustic = _pick_representative_tracks(remaining, essentia_cache, n=1)
+    return [primary] + (acoustic if acoustic else [])
 
 
 def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_keys,
