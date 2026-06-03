@@ -101,7 +101,7 @@ extras:
   discover_weekly_size: 30      # Number of tracks in Discover Weekly
   release_radar_start_days: 14  # Initial Release Radar window (days)
   release_radar_step_days: 7    # Expand window by this many days if below min_tracks
-  release_radar_min_tracks: 30  # Keep expanding until this many tracks are found
+  release_radar_min_tracks: 50  # Target track count; expand window until this many unique-artist releases are available
   release_radar_max_days: 90    # Hard cap on Release Radar window expansion
   birth_year:                   # Optional: enables era-anchored Time Capsule (e.g. 1990)
   lastfm_api_key:               # Optional: enables Last.fm popularity ranking in Release Radar

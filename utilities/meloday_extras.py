@@ -112,7 +112,7 @@ DAILY_MIX_COUNT          = int(_extras.get("daily_mix_count", 6))
 DISCOVER_WEEKLY_SIZE      = int(_extras.get("discover_weekly_size", 30))
 RELEASE_RADAR_START_DAYS  = int(_extras.get("release_radar_start_days", 14))
 RELEASE_RADAR_STEP_DAYS   = int(_extras.get("release_radar_step_days", 7))
-RELEASE_RADAR_MIN_TRACKS  = int(_extras.get("release_radar_min_tracks", 30))
+RELEASE_RADAR_MIN_TRACKS  = int(_extras.get("release_radar_min_tracks", 50))
 RELEASE_RADAR_MAX_DAYS    = int(_extras.get("release_radar_max_days", 90))
 BIRTH_YEAR                = _extras.get("birth_year")  # int or None
 LASTFM_API_KEY            = _extras.get("lastfm_api_key")
@@ -3405,12 +3405,33 @@ def _select_album_reps(album, tracks, essentia_cache):
     return _pick_representative_tracks(tracks, essentia_cache, n=2)
 
 
-def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_keys):
+def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_keys,
+                        history_entries=None):
     """
     Tracks from recently released albums, ranked by recency then affinity.
-    Expands the window in 7-day steps until RELEASE_RADAR_MIN_TRACKS are found.
+
+    Releases from artists in listening history are prioritised within the same
+    recency group so you never miss a new release from an artist you actually play.
+
+    Pass 1: one track per album (most popular per Last.fm, or most central).
+    Pass 2: if pass 1 yields fewer than TARGET tracks, fill with a second
+            representative track from the highest-ranked albums.
+
+    Expands the window in 7-day steps until TARGET unique-artist releases are
+    available or RELEASE_RADAR_MAX_DAYS is reached.
     """
-    today = date.today()
+    today  = date.today()
+    TARGET = RELEASE_RADAR_MIN_TRACKS  # default 50
+
+    # Build known-artist set from listening history — used to prioritise releases
+    # from artists the user actually plays over library-only artists.
+    known_artists = set()
+    if history_entries:
+        for e in history_entries:
+            name = (getattr(e, "grandparentTitle", "") or
+                    getattr(e, "originalTitle", "") or "")
+            if name:
+                known_artists.add(norm_text(primary_artist(name)))
 
     try:
         all_albums = music.search(libtype="album", container_size=5000)
@@ -3418,12 +3439,20 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
         xlog(f"[ERROR] release_radar: album fetch failed: {e}")
         return []
 
-    window_days = RELEASE_RADAR_START_DAYS
-    result = []
+    def _sort_key(item):
+        rel, affinity, _, art_k, _ = item
+        week     = rel.isocalendar()[1]
+        is_known = 1 if art_k in known_artists else 0
+        # Sort descending: newest week first; within week, known artists before
+        # library-only; within that group, higher acoustic affinity wins.
+        return (rel.year, week, is_known, affinity)
 
-    while len(result) < RELEASE_RADAR_MIN_TRACKS and window_days <= RELEASE_RADAR_MAX_DAYS:
+    window_days = RELEASE_RADAR_START_DAYS
+    album_data  = []
+
+    while window_days <= RELEASE_RADAR_MAX_DAYS:
         cutoff_date = today - timedelta(days=window_days)
-        qualifying = []
+        qualifying  = []
         for album in all_albums:
             if str(album.ratingKey) in excluded_album_keys:
                 continue
@@ -3431,47 +3460,59 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
             if rel and rel >= cutoff_date:
                 qualifying.append((rel, album))
 
-        if qualifying:
-            # Score albums
-            album_data = []
-            for rel, album in qualifying:
-                tracks = _cached_album_tracks(album)
-                if not tracks:
-                    continue
-                rks = [str(t.ratingKey) for t in tracks]
-                alb_centroid = _album_acoustic_centroid(rks, essentia_cache)
-                affinity = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
-                reps = _select_album_reps(album, tracks, essentia_cache)
-                artist_key = _artist_key(reps[0]) if reps else ""
-                album_data.append((rel, affinity, album.ratingKey, artist_key, reps))
+        album_data = []
+        for rel, album in qualifying:
+            tracks = _cached_album_tracks(album)
+            if not tracks:
+                continue
+            rks          = [str(t.ratingKey) for t in tracks]
+            alb_centroid = _album_acoustic_centroid(rks, essentia_cache)
+            affinity     = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
+            reps         = _select_album_reps(album, tracks, essentia_cache)
+            artist_key   = _artist_key(reps[0]) if reps else ""
+            album_data.append((rel, affinity, album.ratingKey, artist_key, reps))
 
-            # Sort: newest first, affinity as tiebreaker within the same week
-            def _sort_key(item):
-                rel, affinity, _, _, _ = item
-                week = rel.isocalendar()[1]
-                return (rel.year, week, affinity)
+        album_data.sort(key=_sort_key, reverse=True)
 
-            album_data.sort(key=_sort_key, reverse=True)
+        # Count unique-artist first tracks to see if pass 1 can reach TARGET
+        seen     = set()
+        p1_count = 0
+        for _, _, _, art_k, reps in album_data:
+            if art_k and art_k in seen:
+                continue
+            if art_k:
+                seen.add(art_k)
+            if reps and not is_low_rated(reps[0]):
+                p1_count += 1
 
-            # One album per artist (the most recent) — matches Spotify's Release Radar behaviour.
-            # album_data is sorted newest-first, so the first album we see for each artist is
-            # their latest release; subsequent albums from the same artist are skipped.
-            seen_artists = set()
-            result = []
-            for rel, affinity, album_rk, art_k, reps in album_data:
-                if art_k and art_k in seen_artists:
-                    continue
-                if art_k:
-                    seen_artists.add(art_k)
-                for t in reps:
-                    if not is_low_rated(t):
-                        result.append((rel, t))
+        if p1_count >= TARGET:
+            break
+        window_days += RELEASE_RADAR_STEP_DAYS
 
-        if len(result) < RELEASE_RADAR_MIN_TRACKS:
-            window_days += RELEASE_RADAR_STEP_DAYS
+    # Pass 1: one track per album (most recent release per artist)
+    seen_artists  = set()
+    result        = []
+    second_tracks = []
+    for rel, affinity, album_rk, art_k, reps in album_data:
+        if art_k and art_k in seen_artists:
+            continue
+        if art_k:
+            seen_artists.add(art_k)
+        if not reps:
+            continue
+        if not is_low_rated(reps[0]):
+            result.append((rel, reps[0]))
+        if len(reps) > 1 and not is_low_rated(reps[1]):
+            second_tracks.append((rel, reps[1]))
+
+    # Pass 2: fill to TARGET with second representative tracks if needed
+    for rel, t in second_tracks:
+        if len(result) >= TARGET:
+            break
+        result.append((rel, t))
 
     result.sort(key=lambda x: x[0], reverse=True)
-    return _dedup_filter([t for _, t in result[:50]])
+    return _dedup_filter([t for _, t in result[:TARGET]])
 
 
 # --- 4. Discover Weekly ---
@@ -4473,7 +4514,8 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
             existing_playlists=ep)
 
     elif playlist_id == "release_radar":
-        tracks = build_release_radar(plex, music, ec, centroid, excluded_album_keys)
+        tracks = build_release_radar(plex, music, ec, centroid, excluded_album_keys,
+                                     history_entries=history)
         _upsert_extras_playlist(plex, "Release Radar • Meloday+", tracks,
             _pick_description("release_radar"),
             cover_key="release_radar", cover_title="Release Radar",
