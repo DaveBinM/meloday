@@ -4248,6 +4248,13 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
     start_year   = int(_extras.get("top_songs_start_year", current_year - 5))
     existing     = existing_playlists or {}
 
+    # Regenerate the previous year during a 60-day grace period so that plays
+    # from the final days of December (after the last run of the year) are captured.
+    # After the grace period the previous year is treated as immutable.
+    _grace_cutoff = date(current_year, 1, 1) + timedelta(days=60)
+    _in_grace     = date.today() < _grace_cutoff
+    prev_year     = current_year - 1
+
     year_plays = defaultdict(Counter)
     for e in history_entries:
         if not e.viewedAt:
@@ -4264,11 +4271,15 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
 
     results = []
     for year in sorted(year_plays.keys(), reverse=True):
-        # Past years are immutable — skip if a playlist already exists.
-        # Current year is always regenerated as plays accumulate.
+        # Current year always regenerated; previous year regenerated during the
+        # 60-day grace period to capture plays from the final days of December;
+        # all other past years skipped once their playlist exists.
         if year != current_year and f"Top Songs {year} • Meloday+" in existing:
-            xlog(f"[INFO] top_songs: skipping {year} (playlist already exists)")
-            continue
+            if year == prev_year and _in_grace:
+                xlog(f"[INFO] top_songs: regenerating {year} (year-end grace — capturing final days)")
+            else:
+                xlog(f"[INFO] top_songs: skipping {year} (playlist already exists)")
+                continue
         counts = year_plays[year]
         if len(counts) < min_distinct:
             continue
@@ -4809,21 +4820,26 @@ def main():
     def _top_songs_lookback():
         """
         First run: fetch from Jan 1 of top_songs_start_year to build all years.
-        Subsequent runs: once any past-year playlist exists, the initial scan is
-        done. Years still missing a playlist at that point simply have no data —
-        don't keep fetching back to them. Only regenerate the current year.
+        Subsequent runs: fetch from Jan 1 of the current year — data for past years
+        is already locked in their playlists.
+        Grace period (first 60 days of new year): extend back to Jan 1 of the
+        previous year so that plays from the final days of December (after the last
+        run of the year) are included in the previous year's final regeneration.
         """
         current_year = datetime.now(tz=timezone.utc).year
         start_year   = int(_extras.get("top_songs_start_year", current_year - 5))
 
-        # If any past-year playlist exists, the initial full scan has been done.
-        # Only fetch the current year going forward.
         has_past_year = any(
             f"Top Songs {yr} • Meloday+" in existing_playlists
             for yr in range(start_year, current_year)
         )
         if has_past_year:
-            jan1 = datetime(current_year, 1, 1, tzinfo=timezone.utc)
+            grace_cutoff = datetime(current_year, 1, 1, tzinfo=timezone.utc) + timedelta(days=60)
+            if datetime.now(tz=timezone.utc) < grace_cutoff:
+                # Extend into the previous year to capture its final days of December
+                jan1 = datetime(current_year - 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                jan1 = datetime(current_year, 1, 1, tzinfo=timezone.utc)
             return (datetime.now(tz=timezone.utc) - jan1).days + 1
 
         # First run — fetch the full range so all years with data get playlists.
