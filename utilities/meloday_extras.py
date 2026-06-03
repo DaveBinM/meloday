@@ -1373,12 +1373,12 @@ _MOOD_PROFILE_KEYS = set(_MOOD_MIX_NAMES.keys())
 # ---------------------------------------------------------------------------
 
 # Hard time-of-day profiles — actively added/removed by the boundary cron.
-# Hours past midnight use 24+: 1am=25, 2am=26, etc.
+# Windows use (start, end) in 0–23. If start > end the window wraps past midnight.
 _TIME_BIASED_PROFILES = {
     "morning":    ( 5, 12),   # 5am–noon
     "dinner":     (17, 21),   # 5pm–9pm
-    "late_night": (22, 26),   # 10pm–2am
-    "sleep":      (22, 28),   # 10pm–4am
+    "late_night": (22,  2),   # 10pm–2am
+    "sleep":      (22,  4),   # 10pm–4am
 }
 
 # Soft time boosts — general-pool profiles that score better during a time window
@@ -1388,11 +1388,11 @@ _TIME_SOFT_BOOSTS = {
     "golden_hour":        (15, 20, 0.15),   # 3pm–8pm
     "after_work":         (16, 20, 0.12),   # 4pm–8pm
     "sunset_mix":         (17, 22, 0.15),   # 5pm–10pm
-    "date_night":         (17, 26, 0.10),   # 5pm–2am
-    "friday_night":       (17, 26, 0.10),   # 5pm–2am (any evening, not just Friday)
-    "after_dark":         (22, 28, 0.15),   # 10pm–4am
-    "night_drive":        (20, 28, 0.12),   # 8pm–4am
-    "late_night_romance": (21, 27, 0.12),   # 9pm–3am
+    "date_night":         (17,  2, 0.10),   # 5pm–2am
+    "friday_night":       (17,  2, 0.10),   # 5pm–2am (any evening, not just Friday)
+    "after_dark":         (22,  4, 0.15),   # 10pm–4am
+    "night_drive":        (20,  4, 0.12),   # 8pm–4am
+    "late_night_romance": (21,  3, 0.12),   # 9pm–3am
     "focus":              ( 7, 15, 0.15),   # 7am–3pm work window
     "deep_work":          ( 7, 15, 0.12),   # 7am–3pm work window
     "commute_mix":        ( 7, 10, 0.10),   # morning commute
@@ -1422,12 +1422,30 @@ _WEEKDAY_BOOSTS = {
 # Different from _WEEKDAY_BOOSTS (score reduction only) — these are hard exclusions.
 # 0=Monday … 6=Sunday.
 _WEEKDAY_RESTRICTED = {
-    "friday_night":   {4, 5},   # Fri/Sat only
-    "pre_party":      {4, 5},   # Fri/Sat only
-    "weekend_mix":    {5, 6},   # Sat/Sun only
-    "brunch_mix":     {5, 6},   # Sat/Sun only
-    "sunday_morning": {6},      # Sunday only
-    "lazy_sunday":    {6},      # Sunday only
+    "friday_night":   {4, 5},            # Fri/Sat only
+    "pre_party":      {4, 5},            # Fri/Sat only
+    "weekend_mix":    {5, 6},            # Sat/Sun only
+    "brunch_mix":     {5, 6},            # Sat/Sun only
+    "sunday_morning": {6},               # Sunday only
+    "lazy_sunday":    {6},               # Sunday only
+    "after_work":     {0, 1, 2, 3, 4},  # Mon–Fri only
+    "commute_mix":    {0, 1, 2, 3, 4},  # Mon–Fri only
+}
+
+# Hard time-of-day gates — profiles excluded from the pool entirely outside their
+# window. (start_hour, end_hour) in 0–23; if start > end the window wraps past midnight.
+# Profiles not listed here are always eligible.
+_HOUR_RESTRICTED = {
+    "focus":            ( 5, 17),   # 5am–5pm only
+    "deep_work":        ( 5, 17),   # 5am–5pm only
+    "fresh_start":      ( 4, 14),   # 4am–2pm — morning motivation only
+    "workout":          ( 5, 22),   # 5am–10pm — no gym music in the small hours
+    "running":          ( 5, 22),   # 5am–10pm
+    "evening_unwind":   (17,  2),   # 5pm–2am — evening only
+    "candlelight":      (17,  3),   # 5pm–3am — dinner and late romance
+    "night_drive":      (19,  4),   # 7pm–4am — night driving only
+    "after_dark":       (20,  6),   # 8pm–6am — after dark by definition
+    "late_night_romance":(19,  4),  # 7pm–4am — evening/night only
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
@@ -1746,11 +1764,11 @@ def _get_active_hour():
 
 
 def _in_time_window(hour, window):
-    """True if `hour` falls within (start, end) where end > 24 means past midnight."""
+    """True if `hour` (0–23) falls within (start, end). If start > end the window wraps past midnight."""
     start, end = window
-    # Normalise hour to compare with potentially-past-midnight window
-    h = hour if hour >= start else hour + 24
-    return start <= h < end
+    if start <= end:
+        return start <= hour < end
+    return hour >= start or hour < end
 
 
 def _get_weather(location):
@@ -4437,7 +4455,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     lat = weather.get("lat", 0.0) if weather else 0.0
 
     # Determine which general profiles are active
-    today_wd = datetime.now().weekday()
+    today_wd     = datetime.now().weekday()
+    current_hour = _get_active_hour()
+
+    def _hour_allowed(k):
+        window = _HOUR_RESTRICTED.get(k)
+        return _in_time_window(current_hour, window) if window else True
+
     if not reselect:
         active_general = [
             name_to_key[name]
@@ -4445,12 +4469,15 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
             if name in name_to_key and name_to_key[name] in _GENERAL_PROFILES
         ]
         # Evict any profile that is restricted to a different day of the week
+        # or is outside its allowed time-of-day window
         day_expired = [k for k in active_general
                        if today_wd not in _WEEKDAY_RESTRICTED.get(k, {today_wd})]
-        if day_expired:
-            for k in day_expired:
+        hour_expired = [k for k in active_general if not _hour_allowed(k)]
+        expired = list(dict.fromkeys(day_expired + hour_expired))
+        if expired:
+            for k in expired:
                 active_general.remove(k)
-            xlog(f"[INFO] mood_mixes: day-restricted profiles expired: {day_expired} — reselecting")
+            xlog(f"[INFO] mood_mixes: time-restricted profiles expired: {expired} — reselecting")
             reselect = True
         elif not active_general:
             xlog("[INFO] mood_mixes: no general mixes found, running initial selection")
@@ -4458,7 +4485,6 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
     if reselect:
         now = datetime.now(tz=timezone.utc)
-        current_hour    = _get_active_hour()
         recent_entries  = [e for e in history_entries
                            if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
         recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
@@ -4472,6 +4498,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                 for k, target in _MOOD_PROFILES.items()
                 if k in _GENERAL_PROFILES
                 and today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
+                and _hour_allowed(k)
             )
             n_cats      = len(set(_PROFILE_CATEGORY.values()))
             max_per_cat = max(1, math.ceil(n_active / n_cats))
@@ -4485,13 +4512,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         # outscored by the best inactive one, do a single swap so rotation stays
         # responsive between weekly reselections.
         now             = datetime.now(tz=timezone.utc)
-        current_hour    = _get_active_hour()
         recent_entries  = [e for e in history_entries
                            if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
         recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
         if recent_centroid.get("bpm") and len(active_general) == n_active:
             eligible = {k for k in _GENERAL_PROFILES
-                        if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})}
+                        if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
+                        and _hour_allowed(k)}
             all_scored = {
                 k: _mood_rotation_score(
                     k,
