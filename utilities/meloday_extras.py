@@ -366,6 +366,80 @@ _COVER_BG_STYLES = {
     "cool_down":        ("waves",           9),  # 4 measured cooling waves
 }
 
+# Per-profile icon overlay — drawn on top of the background before text.
+# Keys not listed here get no icon (plain background only).
+_PROFILE_ICON = {
+    # Romantic / love
+    "romantic_mix":      "hearts_3",
+    "modern_romance":    "hearts_2",
+    "late_night_romance":"hearts_2",
+    "romantic_dinner":   "wine_glass",
+    "love_songs":        "hearts_3",
+    "slow_dance":        "hearts_2",
+    "date_night":        "hearts_2",
+    "first_date":        "hearts_3",
+    "acoustic_romance":  "hearts_2",
+    "indie_romance":     "hearts_2",
+    "synthpop_romance":  "hearts_2",
+    "heartbreak":        "broken_heart",
+    "candlelight":       "candle",
+    # Musical / instrumental
+    "piano_romance":     "music_note",
+    "romantic_jazz":     "music_note",
+    "string_quartet":    "music_note",
+    "strings_romance":   "music_note",
+    "folk_acoustic":     "music_note",
+    # Drinks / food
+    "dinner":            "wine_glass",
+    "jazz_dinner":       "wine_glass",
+    "cosy":              "mug",
+    "brunch_mix":        "mug",
+    "cooking_mix":       "mug",
+    # Night / sleep
+    "sleep":             "moon_stars",
+    "late_night":        "moon",
+    "night_drive":       "moon",
+    "after_dark":        "stars",
+    # Weather / atmosphere
+    "rainy_day":         "raindrops",
+    "melancholy":        "raindrops_light",
+    "bittersweet":       "raindrop_single",
+    # Sun / day
+    "morning":           "sun",
+    "sunny":             "sun",
+    "golden_hour":       "sun",
+    "fresh_start":       "sun",
+    "sunday_morning":    "sun",
+    "summer_evening":    "sun",
+    "sunset_mix":        "sun",
+    "beach_vibes":       "sun",
+    # Season
+    "winter_mix":        "snowflake",
+    "autumn_mix":        "leaf",
+    "spring_mix":        "flower",
+    # Energy / power
+    "workout":           "lightning",
+    "running":           "lightning",
+    "cathartic":         "lightning",
+    "confidence_boost":  "lightning",
+    "empowering":        "lightning",
+    "angst_mix":         "lightning",
+    # Calm / dreamy
+    "daydreaming":       "cloud",
+    "lazy_sunday":       "cloud",
+    # Party / celebration
+    "party":             "sparkles",
+    "pre_party":         "sparkles",
+    "friday_night":      "sparkles",
+    "weekend_mix":       "sparkles",
+    "celebration":       "sparkles",
+    "party_throwback":   "sparkles",
+    "euphoric":          "sparkles",
+    "happy":             "sparkles",
+    # Spotlight
+    "main_character":    "star",
+}
+
 # Top Songs year-specific covers — 30 colours + 10 background styles cycling by year offset.
 # Index: (year - top_songs_start_year) % 30
 _TOP_SONGS_YEAR_PALETTES = [
@@ -3029,6 +3103,311 @@ def _make_spiral_background(w, h, color_top, color_bottom, v=0, rng=None):
     return img
 
 
+# ── Cover icon overlays ──────────────────────────────────────────────────────
+
+def _icon_light(c, f=0.45, alpha=200):
+    """Lightened, slightly warm variant of colour c for icon overlays."""
+    return (max(0, min(255, int(c[0] + (255 - c[0]) * f))),
+            max(0, min(255, int(c[1] + (255 - c[1]) * f * 0.95))),
+            max(0, min(255, int(c[2] + (255 - c[2]) * f * 0.85))),
+            alpha)
+
+
+def _heart_polygon(cx, cy, scale):
+    """Parametric heart (16sin³t, 13cost−5cos2t−2cos3t−cos4t). scale=pixels/unit."""
+    pts = []
+    for i in range(120):
+        t = 2 * math.pi * i / 120
+        x = cx + scale * 16 * math.sin(t) ** 3
+        y = cy - scale * (13 * math.cos(t) - 5 * math.cos(2 * t)
+                          - 2 * math.cos(3 * t) - math.cos(4 * t))
+        pts.append((x, y))
+    return pts
+
+
+def _star_polygon(cx, cy, n_points, outer_r, inner_r, start_deg=-90):
+    """Regular n-pointed star polygon."""
+    pts = []
+    for i in range(n_points * 2):
+        r = outer_r if i % 2 == 0 else inner_r
+        a = math.radians(start_deg + i * 180 / n_points)
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def _draw_candle_overlay(img):
+    """Draw a stylised candle + glowing flame onto img (RGBA). Returns composited RGBA."""
+    W, H  = img.size
+    cx    = W // 2
+    bw    = 74           # body half-width
+    btop  = int(H * 0.44)
+    bbot  = int(H * 0.74)
+    fw    = 38           # flame half-width at widest point
+    fh    = 90           # flame height
+    wlen  = 20           # wick length
+
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw    = ImageDraw.Draw(overlay)
+
+    # Body
+    body_color = (245, 235, 210, 220)
+    try:
+        draw.rounded_rectangle([cx - bw, btop, cx + bw, bbot], radius=10, fill=body_color)
+    except AttributeError:
+        draw.rectangle([cx - bw, btop, cx + bw, bbot], fill=body_color)
+
+    # Wax drip detail on left side
+    drip_x = cx - bw + bw // 2
+    draw.ellipse([drip_x - 9, btop - 6, drip_x + 9, btop + 16], fill=body_color)
+
+    # Wick
+    draw.line([(cx, btop), (cx, btop - wlen)], fill=(60, 40, 20, 220), width=3)
+
+    # Flame — 9-point polygon, wide at mid-height, tapering to tip and base
+    fb = btop - wlen    # flame base y
+    ft = fb - fh        # flame tip y
+    flame_pts = [
+        (cx,              ft),
+        (cx + fw * 0.35,  ft + fh * 0.18),
+        (cx + fw,         ft + fh * 0.48),
+        (cx + fw * 0.65,  fb - fh * 0.08),
+        (cx + fw * 0.32,  fb + 4),
+        (cx - fw * 0.32,  fb + 4),
+        (cx - fw * 0.65,  fb - fh * 0.08),
+        (cx - fw,         ft + fh * 0.48),
+        (cx - fw * 0.35,  ft + fh * 0.18),
+    ]
+    draw.polygon(flame_pts, fill=(255, 140, 30, 235))
+
+    # Inner flame — bright yellow
+    iw = fw * 0.52
+    inner_pts = [
+        (cx,              ft + fh * 0.10),
+        (cx + iw * 0.8,   ft + fh * 0.48),
+        (cx + iw * 0.4,   fb - fh * 0.05),
+        (cx - iw * 0.4,   fb - fh * 0.05),
+        (cx - iw * 0.8,   ft + fh * 0.48),
+    ]
+    draw.polygon(inner_pts, fill=(255, 245, 160, 245))
+
+    # Hot glint at core
+    draw.ellipse([cx - 7, ft + fh * 0.08, cx + 7, ft + fh * 0.08 + 14],
+                 fill=(255, 255, 240, 220))
+
+    # Blurred glow halo around flame
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd   = ImageDraw.Draw(glow)
+    gr   = 80
+    gd.ellipse([cx - gr, ft - gr // 3, cx + gr, fb + gr // 2], fill=(255, 155, 40, 95))
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=32))
+
+    result = Image.alpha_composite(img, glow)
+    return Image.alpha_composite(result, overlay)
+
+
+def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
+    """Composite a profile-specific icon onto img (RGBA). Returns RGBA image."""
+    icon_type = _PROFILE_ICON.get(key)
+    if not icon_type or not _PIL_AVAILABLE:
+        return img
+
+    W, H = img.size
+    cx   = W // 2
+    cy   = int(H * 0.42)    # icon centre — upper area, clear of the bottom text bar
+    base = img.convert("RGBA")
+
+    if icon_type == "candle":
+        return _draw_candle_overlay(base)
+
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw    = ImageDraw.Draw(overlay)
+    light   = _icon_light(color_top, f=0.45, alpha=200)
+    lc      = light[:3]
+
+    if icon_type in ("hearts_1", "hearts_2", "hearts_3"):
+        heart_fill = (238, 100, 130, 215)
+        scale = 55 / 16
+        n = int(icon_type[-1])
+        if n == 1:
+            draw.polygon(_heart_polygon(cx, cy, scale * 1.2), fill=heart_fill)
+        elif n == 2:
+            for hx in (cx - 90, cx + 90):
+                draw.polygon(_heart_polygon(hx, cy, scale * 0.85), fill=heart_fill)
+        else:
+            draw.polygon(_heart_polygon(cx, cy - 35, scale), fill=heart_fill)
+            for hx in (cx - 115, cx + 115):
+                draw.polygon(_heart_polygon(hx, cy + 50, scale * 0.72), fill=heart_fill)
+
+    elif icon_type == "broken_heart":
+        heart_fill = (200, 65, 90, 215)
+        draw.polygon(_heart_polygon(cx, cy, 60 / 16), fill=heart_fill)
+        crack = [
+            (cx - 4,  cy - 80), (cx + 14, cy - 45), (cx - 10, cy - 25),
+            (cx + 16, cy + 20), (cx,      cy + 50),
+            (cx + 4,  cy + 50), (cx + 20, cy + 20), (cx - 6,  cy - 25),
+            (cx + 18, cy - 45), (cx,      cy - 80),
+        ]
+        draw.polygon(crack, fill=(28, 10, 18, 240))
+
+    elif icon_type in ("raindrops", "raindrops_light", "raindrop_single"):
+        drop_alpha = 190 if icon_type == "raindrops" else 140
+        drop_fill  = (*lc, drop_alpha)
+        if icon_type == "raindrop_single":
+            drops = [(cx, cy, 36)]
+        elif icon_type == "raindrops_light":
+            drops = [(rng.randint(W // 5, 4 * W // 5), rng.randint(H // 6, 2 * H // 3),
+                      rng.randint(10, 16)) for _ in range(7)]
+        else:
+            drops = [(rng.randint(W // 5, 4 * W // 5), rng.randint(H // 6, 2 * H // 3),
+                      rng.randint(12, 22)) for _ in range(12)]
+        for rx, ry, rs in drops:
+            draw.ellipse([rx - rs, ry, rx + rs, ry + rs * 1.5], fill=drop_fill)
+            draw.polygon([(rx - rs * 0.6, ry + rs * 0.4),
+                           (rx + rs * 0.6, ry + rs * 0.4),
+                           (rx, ry - rs * 1.8)], fill=drop_fill)
+
+    elif icon_type in ("moon", "moon_stars"):
+        moon_rgb = (255, 246, 200)
+        if _NUMPY_AVAILABLE:
+            arr = np.zeros((H, W, 4), dtype=np.uint8)
+            yy, xx = np.mgrid[0:H, 0:W]
+            outer   = (xx - cx) ** 2 + (yy - cy) ** 2 <= 120 ** 2
+            inner   = (xx - (cx + 72)) ** 2 + (yy - (cy - 10)) ** 2 <= 102 ** 2
+            arr[outer & ~inner] = [*moon_rgb, 215]
+            base = Image.alpha_composite(base, Image.fromarray(arr, "RGBA"))
+        else:
+            draw.ellipse([cx - 120, cy - 120, cx + 120, cy + 120], fill=(*moon_rgb, 200))
+        if icon_type == "moon_stars":
+            sc = (*moon_rgb, 185)
+            for sx, sy, sr in ((cx + 195, cy - 115, 14), (cx - 195, cy - 45, 10),
+                                (cx + 95, cy + 160, 9)):
+                draw.polygon(_star_polygon(sx, sy, 5, sr, int(sr * 0.42)), fill=sc)
+
+    elif icon_type == "stars":
+        sc = (*lc, 210)
+        for sx, sy, sr in ((cx - 165, cy - 100, 22), (cx + 185, cy - 60, 16),
+                            (cx, cy - 175, 18), (cx - 80, cy + 120, 12), (cx + 130, cy + 100, 14)):
+            draw.polygon(_star_polygon(sx, sy, 5, sr, int(sr * 0.42)), fill=sc)
+
+    elif icon_type == "star":
+        draw.polygon(_star_polygon(cx, cy, 5, 135, 57), fill=(*lc, 225))
+
+    elif icon_type == "sun":
+        sc = (*lc, 210)
+        draw.ellipse([cx - 90, cy - 90, cx + 90, cy + 90], fill=sc)
+        for i in range(12):
+            a = math.radians(i * 30)
+            draw.line([(cx + 100 * math.cos(a), cy + 100 * math.sin(a)),
+                       (cx + 158 * math.cos(a), cy + 158 * math.sin(a))], fill=sc, width=6)
+
+    elif icon_type == "snowflake":
+        sc = (240, 250, 255, 215)
+        draw.ellipse([cx - 14, cy - 14, cx + 14, cy + 14], fill=sc)
+        for arm in range(6):
+            a = math.radians(arm * 60)
+            ex, ey = cx + 145 * math.cos(a), cy + 145 * math.sin(a)
+            draw.line([(cx, cy), (ex, ey)], fill=sc, width=5)
+            for frac, blen in ((0.38, 46), (0.68, 32)):
+                bx = cx + 145 * frac * math.cos(a)
+                by = cy + 145 * frac * math.sin(a)
+                for ba in (a + math.radians(60), a - math.radians(60)):
+                    draw.line([(bx, by), (bx + blen * math.cos(ba),
+                                          by + blen * math.sin(ba))], fill=sc, width=4)
+
+    elif icon_type == "leaf":
+        leaf_rgb = (195, 110, 35)
+        a = math.radians(22)
+        cos_a, sin_a = math.cos(a), math.sin(a)
+        pts = []
+        for i in range(80):
+            t = 2 * math.pi * i / 80
+            x, y = 135 * math.cos(t), 52 * math.sin(t)
+            pts.append((cx + x * cos_a - y * sin_a, cy + x * sin_a + y * cos_a))
+        draw.polygon(pts, fill=(*leaf_rgb, 215))
+        draw.line([(cx - 130 * cos_a, cy - 130 * sin_a),
+                   (cx + 130 * cos_a, cy + 130 * sin_a)],
+                  fill=(*_icon_light(leaf_rgb, 0.5)[:3], 180), width=3)
+
+    elif icon_type == "flower":
+        petal = (*lc, 200)
+        for i in range(6):
+            a = math.radians(i * 60)
+            px, py = cx + 68 * math.cos(a), cy + 68 * math.sin(a)
+            draw.ellipse([px - 40, py - 40, px + 40, py + 40], fill=petal)
+        draw.ellipse([cx - 35, cy - 35, cx + 35, cy + 35],
+                     fill=_icon_light(color_top, 0.75, 235))
+
+    elif icon_type == "music_note":
+        nc = (*lc, 215)
+        hx, hy = cx - 18, cy + 62
+        draw.ellipse([hx - 38, hy - 24, hx + 38, hy + 24], fill=nc)
+        draw.line([(hx + 36, hy), (cx + 36, cy - 75)], fill=nc, width=14)
+        draw.polygon([(cx + 36, cy - 75), (cx + 98, cy - 47), (cx + 76, cy - 17)], fill=nc)
+
+    elif icon_type == "wine_glass":
+        gc = (*lc, 200)
+        w, s = 120, 9
+        top, neck = cy - 115, cy + 10
+        base_top, base_bot = cy + 95, cy + 118
+        draw.polygon([
+            (cx - w,          top),
+            (cx + w,          top),
+            (cx + w * 0.14,   neck),
+            (cx + w * 0.55,   base_top),
+            (cx + w * 0.55,   base_bot),
+            (cx - w * 0.55,   base_bot),
+            (cx - w * 0.55,   base_top),
+            (cx - w * 0.14,   neck),
+        ], fill=gc)
+
+    elif icon_type == "mug":
+        mc = (*lc, 205)
+        hw, hh = 65, 75
+        try:
+            draw.rounded_rectangle([cx - hw, cy - hh, cx + hw, cy + hh],
+                                   radius=12, fill=mc)
+        except AttributeError:
+            draw.rectangle([cx - hw, cy - hh, cx + hw, cy + hh], fill=mc)
+        draw.arc([cx + hw - 10, cy - 35, cx + hw + 55, cy + 35],
+                 start=300, end=60, fill=mc, width=16)
+        steam = (*lc, 110)
+        for ox in (-22, 2, 26):
+            pts_s = [(cx + ox + 8 * math.sin(j * 0.9), cy - hh - j * 18) for j in range(5)]
+            for j in range(len(pts_s) - 1):
+                draw.line([pts_s[j], pts_s[j + 1]], fill=steam, width=3)
+
+    elif icon_type == "lightning":
+        lbc = (*lc, 225)
+        hw = 46
+        draw.polygon([
+            (cx + hw,         cy - 145),
+            (cx - hw * 0.2,   cy - 10),
+            (cx + hw * 0.55,  cy - 10),
+            (cx - hw,         cy + 145),
+            (cx + hw * 0.2,   cy + 10),
+            (cx - hw * 0.45,  cy + 10),
+        ], fill=lbc)
+
+    elif icon_type == "cloud":
+        cc = (*lc, 205)
+        for bx, by, br in (
+            (cx - 80, cy + 18, 51), (cx, cy - 10, 69),
+            (cx + 80, cy + 18, 51), (cx - 38, cy + 42, 49), (cx + 38, cy + 42, 49),
+        ):
+            draw.ellipse([bx - br, by - br, bx + br, by + br], fill=cc)
+
+    elif icon_type == "sparkles":
+        sc = (*lc, 215)
+        for sx, sy, outer, inner in (
+            (cx,       cy - 20, 60, 25), (cx - 150, cy - 85, 38, 15),
+            (cx + 165, cy - 55, 30, 12), (cx - 115, cy + 105, 24, 10),
+            (cx + 135, cy + 85, 20,  8),
+        ):
+            draw.polygon(_star_polygon(sx, sy, 4, outer, inner), fill=sc)
+
+    return Image.alpha_composite(base, overlay)
+
+
 def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="default"):
     """
     Composite title + optional subtitle + Meloday+ badge onto img (RGBA).
@@ -3290,6 +3669,7 @@ def _generate_extras_cover(key, title, subtitle=None):
     else:
         img = _make_geometric_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     img    = _add_bottom_vignette(img)
+    img    = _draw_icon_overlay(img, key, color_top, color_bottom, _rng)
     result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
     try:
