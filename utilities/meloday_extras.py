@@ -438,6 +438,13 @@ _PROFILE_ICON = {
     "happy":             "sparkles",
     # Spotlight
     "main_character":    "star",
+    # Non-mood extras (concept-driven icons only)
+    "on_repeat":         "repeat_loop",
+    "repeat_rewind":     "repeat_loop_ccw",
+    "release_radar":     "radar_pulse",
+    "rediscovery":       "magnifying_glass",
+    "time_capsule":      "clock",
+    "deep_cuts":         "vinyl",
 }
 
 # Top Songs year-specific covers — 30 colours + 10 background styles cycling by year offset.
@@ -3404,6 +3411,103 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
             (cx + 135, cy + 85, 20,  8),
         ):
             draw.polygon(_star_polygon(sx, sy, 4, outer, inner), fill=sc)
+
+    elif icon_type in ("repeat_loop", "repeat_loop_ccw"):
+        # Two arcs with arrowheads forming a circular loop.
+        # repeat_loop = clockwise; repeat_loop_ccw = counterclockwise (arrowheads at arc starts).
+        rc    = (*lc, 215)
+        r     = 130
+        lw    = 16
+        sz    = 26           # arrowhead size
+        ccw   = icon_type == "repeat_loop_ccw"
+        draw.arc([cx - r, cy - r, cx + r, cy + r], start=200, end=340, fill=rc, width=lw)
+        draw.arc([cx - r, cy - r, cx + r, cy + r], start=20,  end=160, fill=rc, width=lw)
+        # Arrowhead positions: CW → ends of arcs (340°, 160°); CCW → starts (200°, 20°)
+        for a_deg in ((340, 160) if not ccw else (200, 20)):
+            a    = math.radians(a_deg)
+            ax_  = cx + r * math.cos(a)
+            ay_  = cy + r * math.sin(a)
+            # Clockwise tangent: (-sin a, cos a); CCW: (sin a, -cos a)
+            if not ccw:
+                td = (-math.sin(a), math.cos(a))
+            else:
+                td = (math.sin(a), -math.cos(a))
+            perp = (-td[1], td[0])
+            draw.polygon([
+                (ax_ + td[0]*sz,          ay_ + td[1]*sz),
+                (ax_ + perp[0]*sz*0.55,   ay_ + perp[1]*sz*0.55),
+                (ax_ - perp[0]*sz*0.55,   ay_ - perp[1]*sz*0.55),
+            ], fill=rc)
+
+    elif icon_type == "radar_pulse":
+        # Concentric rings with a sweep line — sonar/radar look.
+        rc = (*lc, 215)
+        for radius, alpha in ((55, 210), (95, 170), (135, 125), (180, 80), (220, 40)):
+            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                         outline=(*lc, alpha), width=3)
+        # Centre dot
+        draw.ellipse([cx - 6, cy - 6, cx + 6, cy + 6], fill=rc)
+        # Sweep line at 45°
+        sa    = math.radians(45)
+        sweep = 215
+        draw.line([(cx, cy), (cx + sweep * math.cos(sa), cy + sweep * math.sin(sa))],
+                  fill=(*lc, 175), width=3)
+        # Blip arc near sweep line (simulating a detected release)
+        blip_r = 135
+        draw.arc([cx - blip_r, cy - blip_r, cx + blip_r, cy + blip_r],
+                 start=30, end=60, fill=(*lc, 220), width=8)
+
+    elif icon_type == "magnifying_glass":
+        # Circle (lens) outline + angled handle.
+        rc       = (*lc, 210)
+        lens_r   = 100
+        lw2      = 15
+        lx, ly   = cx - 18, cy - 18        # lens centre, offset slightly up-left
+        draw.ellipse([lx - lens_r, ly - lens_r, lx + lens_r, ly + lens_r],
+                     outline=rc, width=lw2)
+        ha    = math.radians(135)           # handle goes to lower-right
+        hx0   = lx + lens_r * math.cos(ha)
+        hy0   = ly + lens_r * math.sin(ha)
+        hlen  = 105
+        draw.line([(hx0, hy0), (hx0 + hlen * math.cos(ha), hy0 + hlen * math.sin(ha))],
+                  fill=rc, width=lw2)
+
+    elif icon_type == "clock":
+        # Clock face outline + 12 tick marks + two hands set to 10:10.
+        rc   = (*lc, 210)
+        r    = 140
+        lw2  = 12
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=rc, width=lw2)
+        for i in range(12):
+            a     = math.radians(i * 30 - 90)    # -90° = top (12 o'clock)
+            inner = r * 0.78
+            outer = r * 0.93
+            draw.line([(cx + inner * math.cos(a), cy + inner * math.sin(a)),
+                       (cx + outer * math.cos(a), cy + outer * math.sin(a))],
+                      fill=rc, width=5 if i % 3 == 0 else 3)
+        # Hour hand at 10 o'clock: 270° + (10/12)*360° = 210° in PIL space
+        h_ang = math.radians(210)
+        draw.line([(cx, cy), (cx + r * 0.50 * math.cos(h_ang),
+                               cy + r * 0.50 * math.sin(h_ang))], fill=rc, width=lw2)
+        # Minute hand at 10 minutes (pointing to 2): 270° + (10/60)*360° = 330°
+        m_ang = math.radians(330)
+        draw.line([(cx, cy), (cx + r * 0.70 * math.cos(m_ang),
+                               cy + r * 0.70 * math.sin(m_ang))], fill=rc, width=lw2 // 2)
+        draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=rc)
+
+    elif icon_type == "vinyl":
+        # Vinyl record: outer edge + groove rings + label disc + spindle hole.
+        rc  = (*lc, 205)
+        R   = 150
+        draw.ellipse([cx - R, cy - R, cx + R, cy + R], outline=rc, width=4)
+        for frac in (0.86, 0.71, 0.57, 0.44):
+            r2 = int(R * frac)
+            draw.ellipse([cx - r2, cy - r2, cx + r2, cy + r2], outline=rc, width=2)
+        # Label (filled centre disc)
+        r_label = int(R * 0.28)
+        draw.ellipse([cx - r_label, cy - r_label, cx + r_label, cy + r_label], fill=rc)
+        # Spindle hole
+        draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=(15, 8, 8, 230))
 
     return Image.alpha_composite(base, overlay)
 
