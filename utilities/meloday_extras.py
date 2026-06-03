@@ -119,6 +119,25 @@ LASTFM_API_KEY            = _extras.get("lastfm_api_key")
 LASTFM_API_SECRET         = _extras.get("lastfm_api_secret")
 ARTIST_RATIO              = config["playlist"].get("artist_ratio", 0.05)
 
+_xmas_cfg               = config.get("seasonal", {}).get("christmas", {})
+_XMAS_START_MONTH       = int(_xmas_cfg.get("start_month", 12))
+_XMAS_START_DAY         = int(_xmas_cfg.get("start_day",   1))
+_XMAS_END_MONTH         = int(_xmas_cfg.get("end_month",   12))
+_XMAS_END_DAY           = int(_xmas_cfg.get("end_day",     25))
+_CHRISTMAS_COLLECTION   = config.get("plex", {}).get("christmas_collection", "Christmas Music")
+
+
+def _in_christmas_window(now):
+    try:
+        start = datetime(now.year, _XMAS_START_MONTH, _XMAS_START_DAY)
+        end   = datetime(now.year, _XMAS_END_MONTH,   _XMAS_END_DAY)
+        if start > end:
+            return now >= start or now <= end
+        return start <= now <= end
+    except ValueError:
+        return now.month == 12 and 1 <= now.day <= 25
+
+
 PLAYLIST_IDS = [
     "on_repeat", "repeat_rewind", "release_radar", "discover_weekly",
     "daily_mixes", "rediscovery", "time_capsule", "deep_cuts",
@@ -250,61 +269,101 @@ _EXTRAS_COVER_COLORS = {
 }
 
 
-# Background generation style per cover key. Everything not listed defaults to "geometric".
-#   geometric — diagonal parallelogram strips over a gradient
-#   circles   — concentric rings (Time Capsule radar aesthetic)
-#   radial    — soft radial glow, warm centre → cool edges (Discover Weekly)
+# Background style per cover key — (style_name, variant_int) or plain string (v=0).
+# 13 style families: geometric, circles, radial, waves, floating_circles, rays,
+#   arc_sweep, aurora, triangles, diamond, starburst, chevrons, spiral
 _COVER_BG_STYLES = {
-    # Non-mood extras — each has a distinct visual identity
-    "on_repeat":           "floating_circles",  # circular/looping
-    "repeat_rewind":       "triangles",          # ◄◄ rewind shape language
-    "rediscovery":         "aurora",             # dreamy re-emergence
-    "deep_cuts":           "waves",              # deep, layered, subterranean
-    "all_time_favourites": "rays",               # radiating gold star
-    "time_capsule":        "circles",            # concentric radar rings (looking back)
-    "discover_weekly":     "radial",             # warm centre glow
-    # Mood mixes — each profile has a distinct visual identity
-    # rays: energy radiating from corner
-    "workout": "rays", "running": "rays", "empowering": "rays",
-    "confidence_boost": "rays", "cathartic": "rays", "angst_mix": "rays",
-    "celebration": "rays", "euphoric": "rays",
-    # waves: flowing sinusoidal bands
-    "chill": "waves", "sleep": "waves", "daydreaming": "waves",
-    "lazy_sunday": "waves", "sunday_morning": "waves", "deep_work": "waves",
-    "evening_unwind": "waves", "folk_acoustic": "waves",
-    "melancholy": "waves", "emotional": "waves",
-    # floating_circles: overlapping spheres
-    "happy": "floating_circles", "sunny": "floating_circles",
-    "beach_vibes": "floating_circles", "fresh_start": "floating_circles",
-    "spring_mix": "floating_circles", "brunch_mix": "floating_circles",
-    "weekend_mix": "floating_circles", "cooking_mix": "floating_circles",
-    "summer_evening": "floating_circles",
-    # arc_sweep: large circular curves sweeping across
-    "romantic_mix": "arc_sweep", "modern_romance": "arc_sweep",
-    "slow_dance": "arc_sweep", "love_songs": "arc_sweep",
-    "first_date": "arc_sweep", "acoustic_romance": "arc_sweep",
-    "indie_romance": "arc_sweep", "late_night_romance": "arc_sweep",
-    "piano_romance": "arc_sweep", "strings_romance": "arc_sweep",
-    "string_quartet": "arc_sweep",
-    # aurora: narrow shimmering ribbon waves
-    "golden_hour": "aurora", "sunset_mix": "aurora", "autumn_mix": "aurora",
-    "winter_mix": "aurora", "cosy": "aurora", "main_character": "aurora",
-    "morning": "aurora",
-    # triangles: bold angular shapes
-    "driving_mix": "triangles", "road_trip": "triangles",
-    "commute_mix": "triangles", "walking_mix": "triangles",
-    "driving_singalong": "triangles",
-    # diamond: overlapping rhombuses
-    "dinner": "diamond", "jazz_dinner": "diamond", "romantic_jazz": "diamond",
-    "candlelight": "diamond", "date_night": "diamond", "romantic_dinner": "diamond",
-    # radial: soft glow (existing)
-    "focus": "radial", "dreamy_mix": "radial", "moody_mix": "radial",
-    "bittersweet": "radial", "heartbreak": "radial", "rainy_day": "radial",
-    # circles: concentric rings (existing)
-    "nostalgia_mix": "circles", "synthpop_romance": "circles",
-    "late_night": "circles",
-    # geometric (default, no entry): party, friday_night, pre_party, party_throwback,
-    # after_dark, night_drive, after_work, cool_down
+    # Non-mood extras — distinct styles, default variant
+    "on_repeat":           ("floating_circles", 0),  # circular/looping
+    "repeat_rewind":       ("triangles",        0),  # angular rewind feel
+    "rediscovery":         ("aurora",           0),  # dreamy re-emergence
+    "deep_cuts":           ("waves",            0),  # deep layered bands
+    "all_time_favourites": ("rays",             0),  # radiating gold star
+    "time_capsule":        ("circles",          0),  # concentric radar rings
+    "discover_weekly":     ("radial",           0),  # warm centre glow
+    # ----- ENERGY -----
+    "workout":          ("starburst",       0),  # 14-ray tight centre burst
+    "running":          ("geometric",       1),  # flat 12° speed strips
+    "empowering":       ("rays",            1),  # 11 rays rising from bottom
+    "confidence_boost": ("geometric",       2),  # 3 bold strips at 38°
+    "cathartic":        ("triangles",       1),  # downward-pointing release
+    "angst_mix":        ("rays",            2),  # tight corner rays, 60° spread
+    "celebration":      ("floating_circles",1),  # confetti scattered circles
+    "euphoric":         ("starburst",       1),  # 18 rays, peak-bliss burst
+    # ----- CALM -----
+    "chill":            ("waves",           1),  # 3 wide gentle rolling waves
+    "sleep":            ("waves",           2),  # 2 barely-visible flat bands
+    "daydreaming":      ("aurora",          1),  # 5 slow dreamy ribbons
+    "lazy_sunday":      ("floating_circles",2),  # 4 large widely-spaced circles
+    "sunday_morning":   ("radial",          1),  # warm glow from lower centre
+    "deep_work":        ("circles",         4),  # 12 tight focus rings
+    "evening_unwind":   ("arc_sweep",       1),  # arcs from left (unwinding)
+    "folk_acoustic":    ("geometric",       3),  # simple 3 strips at 20°
+    "melancholy":       ("waves",           3),  # 6 narrow tight sad waves
+    "emotional":        ("aurora",          2),  # 8 intense fast ribbons
+    # ----- UPBEAT -----
+    "happy":            ("floating_circles",0),  # 7 classic joyful circles
+    "sunny":            ("starburst",       2),  # 16-ray sun
+    "beach_vibes":      ("waves",           8),  # 4 rolling ocean waves
+    "fresh_start":      ("chevrons",        0),  # 4 forward V-shapes
+    "spring_mix":       ("floating_circles",3),  # many small buds, upper half
+    "brunch_mix":       ("geometric",       4),  # 4 airy light strips at 25°
+    "weekend_mix":      ("arc_sweep",       2),  # arcs sweeping from top
+    "cooking_mix":      ("spiral",          0),  # 9-arc clockwise spiral
+    "summer_evening":   ("aurora",          3),  # 4 wide slow warm ribbons
+    # ----- ROMANTIC -----
+    "romantic_mix":     ("arc_sweep",       0),  # classic right-sweep arcs
+    "modern_romance":   ("chevrons",        1),  # 6 contemporary V-shapes
+    "slow_dance":       ("spiral",          1),  # 8-arc counter-clockwise
+    "love_songs":       ("waves",           4),  # 5 lyrical flowing waves
+    "first_date":       ("floating_circles",4),  # nervous scattered circles
+    "acoustic_romance": ("geometric",       5),  # 2 minimal gentle strips
+    "indie_romance":    ("triangles",       2),  # 3 asymmetric alt triangles
+    "late_night_romance":("circles",        2),  # off-centre left rings
+    "piano_romance":    ("radial",          3),  # centred spotlight glow
+    "strings_romance":  ("aurora",          4),  # 6 classical flow ribbons
+    "string_quartet":   ("diamond",         1),  # 6 diamonds rotated 18°
+    # ----- ATMOSPHERIC -----
+    "golden_hour":      ("aurora",          5),  # 4 wide slow golden bands
+    "sunset_mix":       ("radial",          2),  # glow from horizon bottom
+    "autumn_mix":       ("triangles",       3),  # falling leaf triangles
+    "winter_mix":       ("circles",         3),  # 7 rings from upper centre
+    "cosy":             ("waves",           7),  # 3 enveloping warm waves
+    "main_character":   ("rays",            3),  # 8 rays, top-centre spotlight
+    "morning":          ("starburst",       3),  # 10-ray gentle sunrise
+    # ----- DRIVING / ACTIVITY -----
+    "driving_mix":      ("triangles",       5),  # forward-pointing arrows
+    "night_drive":      ("rays",            5),  # 7 rays from left (headlights)
+    "driving_singalong":("floating_circles",5),  # carefree weighted-right
+    "road_trip":        ("chevrons",        2),  # 8 highway arrow chevrons
+    "commute_mix":      ("geometric",       6),  # 6 narrow regular strips
+    "walking_mix":      ("waves",           5),  # 5 steady even-spaced waves
+    # ----- DINNER / EVENING -----
+    "dinner":           ("diamond",         0),  # 6 classic diamonds
+    "jazz_dinner":      ("spiral",          2),  # 12-arc tight jazz spiral
+    "romantic_jazz":    ("arc_sweep",       4),  # smooth bottom-curve sweep
+    "candlelight":      ("radial",          4),  # candle glow just below centre
+    "date_night":       ("diamond",         2),  # 8 tighter diamonds
+    "romantic_dinner":  ("aurora",          6),  # 5 warm atmospheric ribbons
+    # ----- FOCUS / MOOD -----
+    "focus":            ("circles",         1),  # 14 tight centred focus rings
+    "dreamy_mix":       ("aurora",          7),  # 7 rapid dreamy ribbons
+    "moody_mix":        ("geometric",       7),  # 4 heavy dark strips at 30°
+    "bittersweet":      ("waves",           6),  # 4 irregular asymmetric waves
+    "heartbreak":       ("triangles",       4),  # shattered small triangles
+    "rainy_day":        ("radial",          6),  # diffuse glow from top
+    # ----- MEMORY / LATE NIGHT -----
+    "nostalgia_mix":    ("circles",         5),  # off-centre memory rings
+    "synthpop_romance": ("geometric",       8),  # steep 52° 80s strips
+    "late_night":       ("radial",          5),  # dark ambient off-centre glow
+    # ----- PARTY / SOCIAL -----
+    "party":            ("starburst",       4),  # 22-ray max party burst
+    "friday_night":     ("rays",            4),  # 10 rays, corner night energy
+    "pre_party":        ("floating_circles",6),  # building anticipation circles
+    "party_throwback":  ("circles",         6),  # off-centre right throwback
+    "after_dark":       ("diamond",         3),  # 3 large bold club diamonds
+    "after_work":       ("triangles",       6),  # sharp vertical slash
+    "cool_down":        ("waves",           9),  # 4 measured cooling waves
 }
 
 # Top Songs year-specific covers — 30 colours + 10 background styles cycling by year offset.
@@ -1417,7 +1476,8 @@ def resolve_tracks_by_keys(plex, rating_keys, workers=16):
 
 
 def build_excluded_album_keys(music):
-    """Returns set of album ratingKeys that carry any configured exclusion label."""
+    """Returns set of album ratingKeys that carry any configured exclusion label,
+    plus Christmas/seasonal albums when outside their configured window."""
     excluded = set()
     for label in EXCLUDE_LABEL_NAMES:
         try:
@@ -1425,6 +1485,15 @@ def build_excluded_album_keys(music):
             excluded.update(str(a.ratingKey) for a in albums)
         except Exception:
             pass
+    if not _in_christmas_window(datetime.now()):
+        try:
+            cols = music.collections(title=_CHRISTMAS_COLLECTION)
+            if cols:
+                xmas_keys = {str(a.ratingKey) for a in cols[0].items()}
+                excluded.update(xmas_keys)
+                xlog(f"[OK] Excluded {len(xmas_keys)} Christmas albums (outside seasonal window)")
+        except Exception as e:
+            xlog(f"[WARN] Could not fetch Christmas collection '{_CHRISTMAS_COLLECTION}': {e}")
     return excluded
 
 
@@ -1820,30 +1889,44 @@ def _add_bottom_vignette(img, strength=175, coverage=0.55):
     return Image.alpha_composite(img, vignette)
 
 
-def _make_geometric_background(w, h, color_top, color_bottom):
-    """Diagonal gradient base with 5 large overlapping semi-transparent tilted strips.
-    Inspired by Spotify's Niche/Mood Mix aesthetic."""
+def _make_geometric_background(w, h, color_top, color_bottom, v=0):
+    """Diagonal tilted strips. v selects strip angle/count/arrangement variant."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
-
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.50): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-
-    # (cx_frac, cy_frac, w_frac, h_frac, angle_deg, alpha, fill_rgb)
-    # Large strips that bleed off-canvas create the diagonal layering effect.
-    strips = [
-        (0.88, 0.10, 0.78, 1.90, 22, 55, light),  # upper-right, bright
-        (0.18, 0.90, 0.72, 1.80, 22, 50, dark),   # lower-left, deep
-        (0.52, 0.48, 0.60, 1.65, 22, 35, mid),    # centre stripe
-        (0.10, 0.22, 0.52, 1.45, -18, 32, light), # upper-left accent, opposite tilt
-        (0.82, 0.80, 0.55, 1.35, -18, 28, dark),  # lower-right accent
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # Each variant: list of (cx_f, cy_f, wf, hf, angle, alpha, color)
+    variants = [
+        # v=0 default — 5 strips at 22° (party/misc)
+        [(0.88,0.10,0.78,1.90,22,55,L),(0.18,0.90,0.72,1.80,22,50,D),
+         (0.52,0.48,0.60,1.65,22,35,M),(0.10,0.22,0.52,1.45,-18,32,L),(0.82,0.80,0.55,1.35,-18,28,D)],
+        # v=1 running — shallower 12° speed strips
+        [(0.90,0.08,0.85,1.90,12,52,L),(0.12,0.92,0.80,1.85,12,47,D),
+         (0.50,0.50,0.70,1.70,12,32,M),(0.25,0.30,0.55,1.50,-10,28,L),(0.75,0.72,0.50,1.40,-10,24,D)],
+        # v=2 confidence_boost — 3 bold strips at 38°
+        [(0.85,0.12,0.90,2.00,38,58,L),(0.15,0.88,0.85,1.95,38,52,D),(0.50,0.50,0.65,1.75,38,38,M)],
+        # v=3 folk_acoustic — simple 3 strips, warm angle 20°
+        [(0.80,0.15,0.75,1.85,20,48,L),(0.20,0.85,0.70,1.80,20,44,D),(0.50,0.50,0.50,1.60,20,30,M)],
+        # v=4 brunch_mix — 4 airy light strips at 25°
+        [(0.88,0.10,0.78,1.90,25,45,L),(0.18,0.90,0.72,1.80,25,40,D),
+         (0.55,0.42,0.55,1.60,25,28,M),(0.30,0.65,0.48,1.55,-20,22,L)],
+        # v=5 acoustic_romance — 2 minimal gentle strips
+        [(0.82,0.20,0.78,1.90,20,42,L),(0.18,0.80,0.72,1.85,20,38,D)],
+        # v=6 commute_mix — 6 narrow regular strips at 15°
+        [(0.92,0.08,0.60,1.90,15,44,L),(0.08,0.92,0.58,1.88,15,40,D),
+         (0.55,0.30,0.50,1.70,15,30,M),(0.45,0.70,0.48,1.68,15,28,L),
+         (0.20,0.20,0.42,1.55,-12,24,D),(0.80,0.80,0.40,1.52,-12,20,M)],
+        # v=7 moody_mix — 4 heavy dark strips at 30°
+        [(0.88,0.08,0.82,1.95,30,60,L),(0.12,0.92,0.78,1.90,30,55,D),
+         (0.52,0.45,0.62,1.72,30,42,M),(0.48,0.55,0.58,1.68,-25,36,D)],
+        # v=8 synthpop_romance — 4 steep 80s-style strips at 52°
+        [(0.88,0.08,0.78,1.95,52,58,L),(0.12,0.92,0.72,1.90,52,52,D),
+         (0.55,0.38,0.62,1.72,52,40,M),(0.45,0.62,0.55,1.65,-45,34,L)],
     ]
+    strips = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, wf, hf, angle, alpha, color in strips:
         pts = _rotated_rect_points(cx_f * w, cy_f * h, wf * w, hf * h, angle)
         r, g, b = (_clamp(c) for c in color)
@@ -1851,67 +1934,104 @@ def _make_geometric_background(w, h, color_top, color_bottom):
     return img
 
 
-def _make_concentric_circles_background(w, h, color_top, color_bottom):
-    """Concentric ring background — used for Time Capsule (Spotify radar aesthetic)."""
+def _make_concentric_circles_background(w, h, color_top, color_bottom, v=0):
+    """Concentric rings. v shifts centre position and ring count/density."""
+    # (cx_frac, cy_frac, n_rings, r_max_frac)
+    configs = [
+        (0.50, 0.52, 10, 0.90),  # v=0 time_capsule — centred
+        (0.50, 0.50, 14, 0.92),  # v=1 focus — more rings, tight
+        (0.35, 0.48, 10, 0.88),  # v=2 late_night_romance — off-centre left
+        (0.50, 0.32,  7, 0.85),  # v=3 winter_mix — fewer, from upper centre
+        (0.50, 0.46, 12, 0.88),  # v=4 deep_work — tight focus, slightly up
+        (0.42, 0.56, 10, 0.88),  # v=5 nostalgia_mix — slightly off-centre
+        (0.62, 0.46, 10, 0.88),  # v=6 party_throwback — off-centre right
+    ]
+    cx_f, cy_f, n_rings, r_frac = configs[min(v, len(configs) - 1)]
     img  = _make_gradient_image(w, h, color_bottom, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
-    cx, cy = w // 2, int(h * 0.52)
-    n_rings, r_max = 10, int(w * 0.90)
+    cx, cy, r_max = int(cx_f * w), int(cy_f * h), int(r_frac * w)
     for i in range(n_rings, 0, -1):
-        r   = int(r_max * i / n_rings)
-        t   = 1.0 - i / n_rings          # 0 = outermost ring, 1 = innermost
+        r = int(r_max * i / n_rings)
+        t = 1.0 - i / n_rings
         col = tuple(int(color_bottom[k] + t * (color_top[k] - color_bottom[k])) for k in range(3))
         draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)],
                      outline=(*col, 200), width=max(5, r // 7))
     return img
 
 
-def _make_radial_glow_background(w, h, color_top, color_bottom):
-    """Soft radial glow — warm-coloured centre fades to cool dark edges.
-    Spotify daylist / Discover Weekly aesthetic. Requires numpy; falls back to diagonal
-    gradient."""
+def _make_radial_glow_background(w, h, color_top, color_bottom, v=0):
+    """Soft radial glow. v shifts the glow centre (sunrise, spotlight, candlelight, etc.)."""
+    # (cx_frac, cy_frac, gamma)
+    configs = [
+        (0.50, 0.40, 0.65),  # v=0 discover_weekly — upper-centre
+        (0.50, 0.65, 0.70),  # v=1 sunday_morning  — warm lower glow (sunrise)
+        (0.50, 0.88, 0.55),  # v=2 sunset_mix       — horizon glow from bottom
+        (0.50, 0.50, 0.80),  # v=3 piano_romance    — centred spotlight
+        (0.50, 0.55, 0.75),  # v=4 candlelight      — just below centre, warm
+        (0.32, 0.35, 0.60),  # v=5 late_night       — off-centre dark ambient
+        (0.50, 0.18, 0.55),  # v=6 rainy_day        — diffuse from top (overcast)
+    ]
+    cx_f, cy_f, gamma = configs[min(v, len(configs) - 1)]
     if not _NUMPY_AVAILABLE:
         return _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
-    cx, cy = w * 0.50, h * 0.40
+    cx, cy = w * cx_f, h * cy_f
     x  = np.linspace(0, w, w, dtype=np.float32)
     y  = np.linspace(0, h, h, dtype=np.float32)
     xx, yy = np.meshgrid(x, y)
     dist = np.sqrt(((xx - cx) / (w * 0.62)) ** 2 + ((yy - cy) / (h * 0.62)) ** 2)
-    t    = np.clip(dist, 0.0, 1.0) ** 0.65   # gamma < 1 → broad warm centre
-    def _ch(a, b):
-        return np.clip(a + t * (b - a), 0, 255).astype(np.uint8)
-    arr = np.stack([
-        _ch(color_top[0], color_bottom[0]),
-        _ch(color_top[1], color_bottom[1]),
-        _ch(color_top[2], color_bottom[2]),
-        np.full((h, w), 255, np.uint8),
-    ], axis=2)
+    t    = np.clip(dist, 0.0, 1.0) ** gamma
+    def _ch(a, b): return np.clip(a + t * (b - a), 0, 255).astype(np.uint8)
+    arr = np.stack([_ch(color_top[0], color_bottom[0]),
+                    _ch(color_top[1], color_bottom[1]),
+                    _ch(color_top[2], color_bottom[2]),
+                    np.full((h, w), 255, np.uint8)], axis=2)
     return Image.fromarray(arr, "RGBA")
 
 
-def _make_waves_background(w, h, color_top, color_bottom):
-    """Wide sinusoidal bands — calm, contemplative, introspective profiles."""
+def _make_waves_background(w, h, color_top, color_bottom, v=0):
+    """Sinusoidal wave bands. v controls band count, amplitude and phase for unique looks."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=45): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=45): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-    # (y_frac, amp_frac, freq, phase, band_h_frac, alpha, color)
-    wave_defs = [
-        (0.22, 0.07, 0.9, 0.0, 0.20, 55, light),
-        (0.48, 0.08, 1.2, 1.1, 0.22, 48, dark),
-        (0.65, 0.06, 1.0, 2.3, 0.18, 42, mid),
-        (0.82, 0.07, 1.4, 0.6, 0.24, 38, light),
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # Each variant: list of (y_frac, amp_frac, freq, phase, band_h_frac, alpha, color)
+    variants = [
+        # v=0 default extras (deep_cuts etc) — 4 medium bands
+        [(0.22,0.07,0.9,0.0,0.20,55,L),(0.48,0.08,1.2,1.1,0.22,48,D),
+         (0.65,0.06,1.0,2.3,0.18,42,M),(0.82,0.07,1.4,0.6,0.24,38,L)],
+        # v=1 chill — 3 wide gentle rolling waves, high amplitude
+        [(0.25,0.10,0.7,0.0,0.26,52,L),(0.55,0.12,0.8,1.6,0.28,46,D),(0.80,0.09,0.6,3.0,0.24,40,M)],
+        # v=2 sleep — 2 barely-visible ultra-flat bands
+        [(0.35,0.03,0.5,0.0,0.18,38,L),(0.70,0.03,0.6,2.0,0.20,32,D)],
+        # v=3 melancholy — 6 narrow tight compressed waves
+        [(0.15,0.05,1.6,0.0,0.12,52,D),(0.28,0.04,1.8,0.8,0.11,46,L),
+         (0.42,0.05,1.4,1.7,0.12,42,D),(0.56,0.04,2.0,0.4,0.11,38,M),
+         (0.70,0.05,1.5,2.5,0.12,35,D),(0.84,0.04,1.7,1.2,0.11,30,L)],
+        # v=4 love_songs — 5 lyrical flowing, medium
+        [(0.18,0.08,0.8,0.0,0.18,52,L),(0.35,0.09,1.1,1.3,0.20,47,D),
+         (0.52,0.07,0.9,2.6,0.17,42,M),(0.68,0.08,1.0,0.9,0.19,38,L),(0.84,0.07,1.2,2.0,0.17,34,D)],
+        # v=5 walking_mix — 5 steady even-spaced, slight diagonal feel
+        [(0.18,0.06,1.0,0.3,0.16,50,L),(0.34,0.07,1.0,1.6,0.17,45,D),
+         (0.50,0.06,1.0,3.0,0.16,40,M),(0.66,0.07,1.0,1.0,0.17,36,L),(0.82,0.06,1.0,2.3,0.16,32,D)],
+        # v=6 bittersweet — 4 irregular, asymmetric mixed-feeling waves
+        [(0.20,0.09,0.7,0.0,0.22,54,L),(0.45,0.06,1.5,0.5,0.14,46,D),
+         (0.62,0.10,0.8,2.8,0.23,40,M),(0.83,0.05,1.8,1.4,0.13,35,L)],
+        # v=7 cosy — 3 enveloping warm waves (different phase from chill)
+        [(0.22,0.10,0.7,1.8,0.26,52,M),(0.52,0.11,0.8,0.3,0.28,46,L),(0.78,0.09,0.6,2.5,0.24,40,D)],
+        # v=8 beach_vibes — 4 rolling ocean waves, higher amplitude
+        [(0.20,0.11,0.8,0.0,0.22,54,L),(0.44,0.13,1.0,1.4,0.24,48,D),
+         (0.66,0.10,0.9,2.8,0.21,43,M),(0.85,0.12,1.1,0.7,0.23,38,L)],
+        # v=9 cool_down — 4 measured, slightly flatter cooling waves
+        [(0.22,0.07,0.8,0.6,0.19,50,L),(0.44,0.08,1.0,2.0,0.20,44,D),
+         (0.64,0.07,0.9,3.5,0.18,39,M),(0.83,0.08,1.1,1.2,0.20,34,L)],
     ]
+    wave_defs = variants[min(v, len(variants) - 1)]
     steps = w + 1
     for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in wave_defs:
-        cy  = y_frac * h
-        amp = amp_frac * h
-        bh  = bh_frac * h
+        cy  = y_frac * h; amp = amp_frac * h; bh = bh_frac * h
         top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
         bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
         rc, gc, bc = (_clamp(c) for c in color)
@@ -1919,124 +2039,162 @@ def _make_waves_background(w, h, color_top, color_bottom):
     return img
 
 
-def _make_floating_circles_background(w, h, color_top, color_bottom):
-    """Overlapping semi-transparent spheres — playful, upbeat, positive profiles."""
+def _make_floating_circles_background(w, h, color_top, color_bottom, v=0):
+    """Overlapping semi-transparent spheres. v changes count, size and arrangement."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.50): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-    # (cx_frac, cy_frac, rad_frac, alpha, color) — some bleed off-canvas intentionally
-    circle_defs = [
-        (0.75, 0.22, 0.42, 48, light),
-        (0.15, 0.68, 0.34, 44, dark),
-        (0.90, 0.80, 0.28, 40, mid),
-        (0.42, 0.12, 0.20, 36, dark),
-        (0.12, 0.20, 0.16, 32, light),
-        (0.62, 0.70, 0.14, 28, light),
-        (0.88, 0.08, 0.11, 24, mid),
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # Each variant: list of (cx_frac, cy_frac, rad_frac, alpha, color)
+    variants = [
+        # v=0 happy — 7 circles, classic joyful arrangement
+        [(0.75,0.22,0.42,48,L),(0.15,0.68,0.34,44,D),(0.90,0.80,0.28,40,M),
+         (0.42,0.12,0.20,36,D),(0.12,0.20,0.16,32,L),(0.62,0.70,0.14,28,L),(0.88,0.08,0.11,24,M)],
+        # v=1 celebration — many smaller scattered circles (confetti)
+        [(0.80,0.18,0.22,50,L),(0.20,0.72,0.20,46,D),(0.55,0.35,0.18,42,M),
+         (0.10,0.40,0.16,40,L),(0.88,0.55,0.15,38,D),(0.40,0.80,0.14,35,M),
+         (0.65,0.10,0.13,32,L),(0.30,0.25,0.12,28,D),(0.75,0.68,0.11,26,L),(0.50,0.58,0.10,22,M)],
+        # v=2 lazy_sunday — 4 large slow circles, widely spaced
+        [(0.72,0.25,0.52,44,L),(0.18,0.72,0.48,40,D),(0.88,0.78,0.34,36,M),(0.38,0.10,0.28,32,L)],
+        # v=3 spring_mix — many small clustered buds, upper half
+        [(0.60,0.20,0.18,50,L),(0.35,0.15,0.16,46,D),(0.80,0.12,0.15,42,M),
+         (0.20,0.30,0.14,40,L),(0.70,0.35,0.13,37,D),(0.45,0.28,0.12,34,M),
+         (0.90,0.30,0.11,30,L),(0.15,0.48,0.10,26,D),(0.55,0.42,0.09,22,M)],
+        # v=4 first_date — nervous scattered, uneven sizes
+        [(0.68,0.18,0.30,46,L),(0.22,0.62,0.25,42,D),(0.85,0.72,0.20,38,M),
+         (0.38,0.08,0.16,36,L),(0.08,0.18,0.13,32,D),(0.58,0.82,0.12,28,M),(0.92,0.08,0.09,24,L)],
+        # v=5 driving_singalong — carefree arrangement, weighted to right
+        [(0.82,0.20,0.38,48,L),(0.55,0.70,0.30,44,D),(0.95,0.60,0.24,40,M),
+         (0.68,0.10,0.18,36,L),(0.38,0.30,0.14,32,D),(0.78,0.85,0.12,28,L)],
+        # v=6 pre_party — building up, weighted to upper-right corner
+        [(0.88,0.12,0.40,50,L),(0.70,0.30,0.28,46,D),(0.92,0.45,0.22,42,M),
+         (0.55,0.15,0.18,38,L),(0.78,0.62,0.15,34,D),(0.60,0.50,0.11,28,M),(0.42,0.08,0.09,24,L)],
     ]
+    circle_defs = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, rf, alpha, color in circle_defs:
-        cx  = int(cx_f * w)
-        cy  = int(cy_f * h)
-        rad = int(rf * min(w, h))
+        cx  = int(cx_f * w); cy = int(cy_f * h); rad = int(rf * min(w, h))
         rc, gc, bc = (_clamp(c) for c in color)
         draw.ellipse([(cx - rad, cy - rad), (cx + rad, cy + rad)], fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_rays_background(w, h, color_top, color_bottom):
-    """Triangular rays from the upper-left corner — energy, power, momentum profiles."""
+def _make_rays_background(w, h, color_top, color_bottom, v=0):
+    """Triangular rays. v changes origin point, ray count and angular spread."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.45): return tuple(int(v * fac) for v in c[:3])
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    ox, oy = int(w * 0.06), int(h * 0.06)
-    n_rays = 9
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    # (ox_frac, oy_frac, n_rays, start_deg, spread_deg)
+    configs = [
+        (0.06, 0.06, 9,   -8,  100),  # v=0 default — upper-left, 9 rays
+        (0.50, 1.05, 11, -125,  110),  # v=1 empowering — from bottom-centre, upward fan
+        (0.06, 0.06, 6,   -5,   60),  # v=2 angst_mix — top-left, tight aggressive
+        (0.50,-0.05, 8,   -45,  130),  # v=3 main_character — from top-centre, spotlight
+        (0.06, 0.06, 10,  -10,   90),  # v=4 friday_night — top-left, medium spread
+        (-0.05,0.50, 7,   -55,   70),  # v=5 night_drive — from left edge, horizontal fan
+    ]
+    ox_f, oy_f, n_rays, start_deg, spread_deg = configs[min(v, len(configs) - 1)]
+    ox, oy = ox_f * w, oy_f * h
     dist   = max(w, h) * 2.4
     for i in range(n_rays):
-        a1 = math.radians(-8 + i * 100 / n_rays)
-        a2 = math.radians(-8 + (i + 1) * 100 / n_rays)
-        color = light if i % 2 == 0 else dark
+        a1 = math.radians(start_deg + i * spread_deg / n_rays)
+        a2 = math.radians(start_deg + (i + 1) * spread_deg / n_rays)
+        color = L if i % 2 == 0 else D
         alpha = 52 if i % 2 == 0 else 36
-        pts = [
-            (ox, oy),
-            (ox + dist * math.cos(a1), oy + dist * math.sin(a1)),
-            (ox + dist * math.cos(a2), oy + dist * math.sin(a2)),
-        ]
+        pts = [(ox, oy),
+               (ox + dist * math.cos(a1), oy + dist * math.sin(a1)),
+               (ox + dist * math.cos(a2), oy + dist * math.sin(a2))]
         rc, gc, bc = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_arc_sweep_background(w, h, color_top, color_bottom):
-    """Large circular arcs from off-canvas centres — romantic, flowing profiles."""
+def _make_arc_sweep_background(w, h, color_top, color_bottom, v=0):
+    """Large circular arcs from off-canvas centres. v shifts arc origins for different sweep directions."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=50): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=50): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
     n_steps = 90
-    # Centre is off-canvas; only the sweeping edge is visible.
-    # (cx_frac, cy_frac, r_frac, a_start_deg, a_end_deg, alpha, color)
-    arc_defs = [
-        (1.35, 0.50, 1.20, 145, 215, 55, light),
-        (-0.30, 0.45, 1.00, -35,  55, 48, dark),
-        (0.50, 1.45, 1.05, 218, 322, 42, mid),
-        (0.50, -0.40, 0.90,  38, 142, 36, light),
+    # Each variant: list of (cx_frac, cy_frac, r_frac, a_start_deg, a_end_deg, alpha, color)
+    variants = [
+        # v=0 romantic_mix — arcs sweeping in from right
+        [(1.35,0.50,1.20,145,215,55,L),(-0.30,0.45,1.00,-35,55,48,D),
+         (0.50,1.45,1.05,218,322,42,M),(0.50,-0.40,0.90,38,142,36,L)],
+        # v=1 evening_unwind — arcs from left (mirror, unwinding feel)
+        [(-0.35,0.50,1.20,-35,35,55,L),(1.30,0.45,1.00,145,215,48,D),
+         (0.50,1.45,1.05,218,322,42,M),(0.50,-0.40,0.90,38,142,36,L)],
+        # v=2 weekend_mix — arcs from top and bottom (horizontal sweeps)
+        [(0.50,-0.40,1.15,28,152,55,L),(0.50,1.40,1.10,212,332,48,D),
+         (1.35,0.50,0.95,145,215,40,M),(-0.30,0.45,0.88,-35,55,35,L)],
+        # v=3 on_repeat (non-mood extras default) — tighter, more circular
+        [(1.25,0.50,1.05,148,212,52,L),(-0.25,0.45,0.95,-32,52,46,D),
+         (0.50,1.35,0.98,220,320,40,M),(0.50,-0.35,0.85,40,140,34,L)],
+        # v=4 romantic_jazz — smooth bottom curves, jazzier flow
+        [(0.50,1.50,1.20,210,330,55,L),(1.30,0.40,1.05,148,212,48,D),
+         (-0.30,0.55,0.95,-30,50,42,M),(0.50,-0.40,0.85,40,140,36,L)],
     ]
+    arc_defs = variants[min(v, len(variants) - 1)]
     for cx_f, cy_f, rf, a0, a1, alpha, color in arc_defs:
-        cx  = cx_f * w
-        cy  = cy_f * h
-        rad = rf * max(w, h)
-        pts = [
-            (cx + rad * math.cos(math.radians(a0 + s * (a1 - a0) / n_steps)),
-             cy + rad * math.sin(math.radians(a0 + s * (a1 - a0) / n_steps)))
-            for s in range(n_steps + 1)
-        ]
-        pts.append((cx, cy))  # close back to off-canvas centre
+        cx  = cx_f * w; cy = cy_f * h; rad = rf * max(w, h)
+        pts = [(cx + rad * math.cos(math.radians(a0 + s * (a1 - a0) / n_steps)),
+                cy + rad * math.sin(math.radians(a0 + s * (a1 - a0) / n_steps)))
+               for s in range(n_steps + 1)]
+        pts.append((cx, cy))
         rc, gc, bc = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(rc, gc, bc, alpha))
     return img
 
 
-def _make_aurora_background(w, h, color_top, color_bottom):
-    """Narrow shimmering ribbon waves at different phases — atmospheric profiles."""
+def _make_aurora_background(w, h, color_top, color_bottom, v=0):
+    """Narrow shimmering ribbon waves. v controls band count, frequency and pacing."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=40): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.60): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=40): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.60): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-    # Narrower, more numerous bands than waves; distinct phase offsets create shimmer
-    # (y_frac, amp_frac, freq, phase, band_h_frac, alpha, color)
-    ribbon_defs = [
-        (0.18, 0.04, 1.8, 0.0, 0.10, 55, light),
-        (0.32, 0.05, 1.3, 1.3, 0.12, 50, dark),
-        (0.46, 0.04, 2.1, 2.7, 0.09, 45, mid),
-        (0.58, 0.05, 1.6, 0.8, 0.11, 42, light),
-        (0.70, 0.04, 1.1, 1.9, 0.10, 38, dark),
-        (0.82, 0.05, 1.9, 3.2, 0.13, 35, mid),
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    variants = [
+        # v=0 default — 6 ribbons, medium freq
+        [(0.18,0.04,1.8,0.0,0.10,55,L),(0.32,0.05,1.3,1.3,0.12,50,D),(0.46,0.04,2.1,2.7,0.09,45,M),
+         (0.58,0.05,1.6,0.8,0.11,42,L),(0.70,0.04,1.1,1.9,0.10,38,D),(0.82,0.05,1.9,3.2,0.13,35,M)],
+        # v=1 daydreaming — 5 slower ribbons, lower frequency, wider bands
+        [(0.20,0.05,0.9,0.0,0.14,52,L),(0.36,0.06,0.7,1.8,0.15,47,D),(0.52,0.05,1.0,3.2,0.13,43,M),
+         (0.66,0.06,0.8,0.6,0.14,38,L),(0.80,0.05,0.6,2.4,0.15,34,D)],
+        # v=2 emotional — 8 intense, faster ribbons
+        [(0.14,0.04,2.2,0.0,0.09,56,L),(0.24,0.05,1.8,0.9,0.10,51,D),(0.34,0.04,2.5,2.1,0.08,47,M),
+         (0.44,0.05,1.6,1.4,0.10,43,L),(0.54,0.04,2.0,3.0,0.09,39,D),(0.64,0.05,1.9,0.5,0.10,36,M),
+         (0.74,0.04,2.3,1.8,0.09,32,L),(0.84,0.05,1.7,2.7,0.10,28,D)],
+        # v=3 summer_evening — 4 wide slow warm ribbons
+        [(0.22,0.06,0.6,0.0,0.16,52,L),(0.42,0.07,0.5,2.0,0.18,47,D),
+         (0.62,0.06,0.7,1.0,0.16,42,M),(0.80,0.07,0.4,3.0,0.18,37,L)],
+        # v=4 strings_romance — 6 ribbons, different phases (classical)
+        [(0.18,0.04,1.6,0.5,0.10,54,L),(0.32,0.05,1.2,2.0,0.12,49,D),(0.46,0.04,1.9,0.0,0.09,44,M),
+         (0.58,0.05,1.4,2.8,0.11,41,L),(0.70,0.04,1.0,1.5,0.10,37,D),(0.82,0.05,1.7,0.3,0.12,33,M)],
+        # v=5 golden_hour — 4 wide, very slow, warm horizon bands
+        [(0.25,0.07,0.5,0.0,0.18,54,L),(0.48,0.08,0.4,2.5,0.20,48,D),
+         (0.68,0.07,0.6,1.2,0.17,43,M),(0.85,0.08,0.3,3.8,0.19,38,L)],
+        # v=6 romantic_dinner — 5 warm atmospheric ribbons
+        [(0.20,0.05,1.0,0.8,0.12,53,M),(0.36,0.06,0.8,2.2,0.13,48,L),(0.52,0.05,1.2,0.0,0.11,43,D),
+         (0.67,0.06,0.9,1.6,0.12,38,M),(0.82,0.05,1.1,3.0,0.13,34,L)],
+        # v=7 dreamy_mix — 7 rapid dreamy ribbons, high freq
+        [(0.16,0.04,2.4,0.0,0.09,55,L),(0.27,0.05,2.0,1.2,0.10,50,D),(0.38,0.04,2.8,2.5,0.08,46,M),
+         (0.49,0.05,2.2,0.7,0.10,42,L),(0.60,0.04,2.6,1.9,0.09,38,D),(0.71,0.05,2.1,3.1,0.10,34,M),
+         (0.82,0.04,2.4,0.4,0.09,30,L)],
     ]
+    ribbon_defs = variants[min(v, len(variants) - 1)]
     steps = w + 1
     for y_frac, amp_frac, freq, phase, bh_frac, alpha, color in ribbon_defs:
-        cy  = y_frac * h
-        amp = amp_frac * h
-        bh  = bh_frac * h
+        cy = y_frac * h; amp = amp_frac * h; bh = bh_frac * h
         top = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase)) for x in range(steps)]
         bot = [(x, cy + amp * math.sin(2 * math.pi * freq * x / w + phase) + bh) for x in range(steps - 1, -1, -1)]
         rc, gc, bc = (_clamp(c) for c in color)
@@ -2044,24 +2202,65 @@ def _make_aurora_background(w, h, color_top, color_bottom):
     return img
 
 
-def _make_triangles_background(w, h, color_top, color_bottom):
-    """Bold geometric triangles in multiple directions — activity, driving profiles."""
+def _make_triangles_background(w, h, color_top, color_bottom, v=0):
+    """Bold geometric triangles. v changes orientation, count and arrangement."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.45): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-    # Each triangle as (x_frac, y_frac) tuples; some vertices bleed off-canvas
-    tri_defs = [
-        ([(1.05, -0.05), (0.30, 0.52), (1.05, 1.05)], light, 55),
-        ([(-0.05, 0.15), (0.70, 0.52), (-0.05, 1.05)], dark,  50),
-        ([(0.15, -0.05), (0.85, -0.05), (0.50, 0.70)], mid,   40),
-        ([(-0.05, -0.05), (0.38, -0.05), (-0.05, 0.50)], light, 30),
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # Each variant: list of ([(xf,yf),...], color, alpha)
+    variants = [
+        # v=0 default — 4 triangles, diagonal mix (driving/commute)
+        [([(1.05,-0.05),(0.30,0.52),(1.05,1.05)],L,55),
+         ([(-0.05,0.15),(0.70,0.52),(-0.05,1.05)],D,50),
+         ([(0.15,-0.05),(0.85,-0.05),(0.50,0.70)],M,40),
+         ([(-0.05,-0.05),(0.38,-0.05),(-0.05,0.50)],L,30)],
+        # v=1 cathartic — downward-pointing triangles (emotional release, pouring down)
+        [([(0.15,-0.05),(0.85,-0.05),(0.50,0.80)],L,56),
+         ([(0.50,-0.05),(1.05,-0.05),(1.05,0.60)],D,50),
+         ([(-0.05,-0.05),(0.40,-0.05),(-0.05,0.65)],M,44),
+         ([(0.25,0.20),(0.75,0.20),(0.50,0.95)],L,36)],
+        # v=2 indie_romance — 3 asymmetric alternative-feel triangles
+        [([(1.05,0.08),(0.22,0.45),(1.05,0.88)],L,54),
+         ([(-0.05,0.28),(0.65,0.62),(-0.05,1.05)],D,48),
+         ([(0.10,-0.05),(1.05,-0.05),(0.62,0.55)],M,38)],
+        # v=3 autumn_mix — falling leaf arrangement, overlapping across canvas
+        [([(0.00,0.00),(0.50,0.00),(0.20,0.55)],L,52),
+         ([(0.50,0.00),(1.05,0.00),(0.80,0.60)],D,48),
+         ([(0.10,0.45),(0.60,0.45),(0.35,1.05)],M,42),
+         ([(0.55,0.40),(1.05,0.40),(0.82,1.05)],L,36),
+         ([(-0.05,0.20),(0.28,0.20),(-0.05,0.75)],D,28)],
+        # v=4 heartbreak — many sharp small triangles, shattered feel
+        [([(0.10,0.00),(0.45,0.00),(0.25,0.38)],L,54),
+         ([(0.55,0.00),(0.90,0.00),(0.72,0.40)],D,50),
+         ([(0.00,0.42),(0.32,0.42),(0.15,0.80)],M,46),
+         ([(0.35,0.38),(0.65,0.38),(0.50,0.75)],L,40),
+         ([(0.68,0.44),(1.00,0.44),(0.85,0.82)],D,36),
+         ([(0.20,0.78),(0.55,0.78),(0.38,1.05)],M,30)],
+        # v=5 driving_mix — forward-pointing right, motion arrows
+        [([(-0.05,0.10),(0.65,0.50),(-0.05,0.90)],L,55),
+         ([(0.10,0.00),(0.80,0.50),(0.10,1.00)],D,48),
+         ([(0.40,0.05),(1.05,0.50),(0.40,0.95)],M,40),
+         ([(0.70,0.15),(1.05,0.50),(0.70,0.85)],L,32)],
+        # v=6 after_work — sharp vertical slash, transition feel
+        [([(0.42,-0.05),(0.60,-0.05),(0.52,1.05)],L,55),
+         ([(0.60,-0.05),(1.05,-0.05),(1.05,0.55)],D,50),
+         ([(-0.05,0.45),( 0.42,-0.05),(-0.05,-0.05)],M,44),
+         ([(0.18,-0.05),(0.42,-0.05),(0.30,0.55)],L,36)],
     ]
+    # Fix negative literal syntax issue in v=5
+    if v == 5:
+        tri_defs = [
+            ([(0.00,0.10),(0.65,0.50),(0.00,0.90)],L,55),
+            ([(0.10,0.00),(0.80,0.50),(0.10,1.00)],D,48),
+            ([(0.40,0.05),(1.05,0.50),(0.40,0.95)],M,40),
+            ([(0.70,0.15),(1.05,0.50),(0.70,0.85)],L,32),
+        ]
+    else:
+        tri_defs = variants[min(v, len(variants) - 1)]
     for pts_frac, color, alpha in tri_defs:
         pts = [(xf * w, yf * h) for xf, yf in pts_frac]
         rc, gc, bc = (_clamp(c) for c in color)
@@ -2069,32 +2268,132 @@ def _make_triangles_background(w, h, color_top, color_bottom):
     return img
 
 
-def _make_diamond_background(w, h, color_top, color_bottom):
-    """Overlapping diamond/rhombus shapes — sophisticated, elegant evening profiles."""
+def _make_diamond_background(w, h, color_top, color_bottom, v=0):
+    """Overlapping diamond/rhombus shapes. v changes arrangement, rotation and size."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
     draw = ImageDraw.Draw(img, 'RGBA')
-    def _clamp(v): return max(0, min(255, v))
-    def _lighten(c, amt=45): return tuple(_clamp(v + amt) for v in c[:3])
-    def _darken(c, fac=0.55): return tuple(int(v * fac) for v in c[:3])
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=45): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
     def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
-    light = _lighten(color_top)
-    dark  = _darken(color_bottom)
-    mid   = _mid(color_top, color_bottom)
-    def _diamond_pts(cx, cy, rw, rh):
-        return [(cx, cy - rh), (cx + rw, cy), (cx, cy + rh), (cx - rw, cy)]
-    # (cx_frac, cy_frac, rw_frac, rh_frac, alpha, color)
-    diamond_defs = [
-        (0.82, 0.22, 0.60, 0.48, 52, light),
-        (0.20, 0.78, 0.55, 0.44, 47, dark),
-        (0.52, 0.52, 0.34, 0.28, 40, mid),
-        (0.08, 0.14, 0.26, 0.22, 33, light),
-        (0.92, 0.88, 0.28, 0.24, 28, dark),
-        (0.50, 0.16, 0.16, 0.14, 24, mid),
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    def _diamond_pts(cx, cy, rw, rh, rot_deg=0):
+        """Diamond (rhombus) optionally rotated by rot_deg around its centre."""
+        r = math.radians(rot_deg)
+        base = [(0, -rh), (rw, 0), (0, rh), (-rw, 0)]
+        return [(cx + bx*math.cos(r) - by*math.sin(r),
+                 cy + bx*math.sin(r) + by*math.cos(r)) for bx, by in base]
+    # Each variant: list of (cx_f, cy_f, rw_f, rh_f, rot_deg, alpha, color)
+    variants = [
+        # v=0 dinner — default 6 diamonds, classic
+        [(0.82,0.22,0.60,0.48,0,52,L),(0.20,0.78,0.55,0.44,0,47,D),(0.52,0.52,0.34,0.28,0,40,M),
+         (0.08,0.14,0.26,0.22,0,33,L),(0.92,0.88,0.28,0.24,0,28,D),(0.50,0.16,0.16,0.14,0,24,M)],
+        # v=1 string_quartet — rotated 18° (formal, tilted elegance)
+        [(0.80,0.20,0.62,0.50,18,52,L),(0.22,0.80,0.56,0.46,18,47,D),(0.52,0.52,0.36,0.30,18,40,M),
+         (0.10,0.12,0.28,0.24,18,33,L),(0.90,0.88,0.30,0.26,18,28,D),(0.50,0.18,0.18,0.16,18,24,M)],
+        # v=2 date_night — tighter, smaller, more numerous
+        [(0.78,0.20,0.42,0.34,0,50,L),(0.22,0.78,0.40,0.32,0,46,D),(0.52,0.52,0.28,0.22,0,42,M),
+         (0.08,0.12,0.22,0.18,0,36,L),(0.92,0.88,0.24,0.20,0,30,D),
+         (0.50,0.14,0.14,0.12,0,26,M),(0.30,0.42,0.18,0.15,0,22,L),(0.72,0.60,0.16,0.14,0,18,D)],
+        # v=3 after_dark — 3 large, bold, club aesthetic
+        [(0.78,0.22,0.75,0.60,8,56,L),(0.22,0.78,0.70,0.56,8,50,D),(0.50,0.50,0.45,0.36,8,40,M)],
     ]
-    for cx_f, cy_f, rw_f, rh_f, alpha, color in diamond_defs:
-        pts = _diamond_pts(cx_f * w, cy_f * h, rw_f * w, rh_f * h)
+    diamond_defs = variants[min(v, len(variants) - 1)]
+    for cx_f, cy_f, rw_f, rh_f, rot, alpha, color in diamond_defs:
+        pts = _diamond_pts(cx_f * w, cy_f * h, rw_f * w, rh_f * h, rot)
         rc, gc, bc = (_clamp(c) for c in color)
         draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_starburst_background(w, h, color_top, color_bottom, v=0):
+    """Rays emanating from the exact centre — sunrise, euphoria, party burst."""
+    # (n_rays, inner_r_frac)
+    configs = [(14,0.06),(18,0.10),(16,0.14),(10,0.18),(22,0.04)]
+    n_rays, inner_r_frac = configs[min(v, len(configs) - 1)]
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    cx, cy = w // 2, h // 2
+    outer  = max(w, h) * 1.25
+    inner  = inner_r_frac * min(w, h)
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    for i in range(n_rays):
+        a_mid  = math.radians(i * 360 / n_rays - 90)
+        a_half = math.radians(180 / n_rays * 0.52)
+        a0, a1 = a_mid - a_half, a_mid + a_half
+        color = L if i % 2 == 0 else D
+        alpha = 55 if i % 2 == 0 else 34
+        pts = [
+            (cx + inner * math.cos(a0), cy + inner * math.sin(a0)),
+            (cx + outer * math.cos(a0), cy + outer * math.sin(a0)),
+            (cx + outer * math.cos(a1), cy + outer * math.sin(a1)),
+            (cx + inner * math.cos(a1), cy + inner * math.sin(a1)),
+        ]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_chevrons_background(w, h, color_top, color_bottom, v=0):
+    """Right-pointing V-chevron bands stacked vertically — forward momentum."""
+    # (n_chevrons, peak_x_frac) — peak is the rightward point of each V
+    configs = [(4,0.62),(6,0.58),(8,0.54)]
+    n_chevs, peak_f = configs[min(v, len(configs) - 1)]
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=50): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    spacing = h / n_chevs
+    half_h  = spacing * 0.44
+    peak_x  = peak_f * w
+    for i in range(n_chevs):
+        mid_y = spacing * (i + 0.5)
+        pts = [
+            (-0.05 * w, mid_y - half_h),
+            (peak_x,    mid_y),
+            (-0.05 * w, mid_y + half_h),
+        ]
+        color = L if i % 2 == 0 else D
+        alpha = 54 if i % 2 == 0 else 38
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(rc, gc, bc, alpha))
+    return img
+
+
+def _make_spiral_background(w, h, color_top, color_bottom, v=0):
+    """Concentric arc-bands offset progressively to create a spiral impression."""
+    # (n_arcs, arc_span_deg, direction, base_alpha)
+    configs = [(9, 260, 1, 50),(8, 250, -1, 48),(12, 240, 1, 45)]
+    n_arcs, span, direction, base_alpha = configs[min(v, len(configs) - 1)]
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    cx, cy  = w // 2, h // 2
+    max_r   = min(w, h) * 0.52
+    n_pts   = 100
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=45): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    for j in range(n_arcs):
+        r_outer = max_r * (j + 1) / n_arcs
+        r_inner = max_r * j / n_arcs * 0.90
+        start_deg = direction * j * (360 / n_arcs) * 0.65 - 90
+        end_deg   = start_deg + direction * span
+        alpha = max(18, base_alpha - j * 2)
+        color = L if j % 2 == 0 else D
+        outer_pts = [(cx + r_outer * math.cos(math.radians(start_deg + k * (end_deg - start_deg) / n_pts)),
+                      cy + r_outer * math.sin(math.radians(start_deg + k * (end_deg - start_deg) / n_pts)))
+                     for k in range(n_pts + 1)]
+        inner_pts = [(cx + r_inner * math.cos(math.radians(start_deg + k * (end_deg - start_deg) / n_pts)),
+                      cy + r_inner * math.sin(math.radians(start_deg + k * (end_deg - start_deg) / n_pts)))
+                     for k in range(n_pts, -1, -1)]
+        rc, gc, bc = (_clamp(c) for c in color)
+        draw.polygon(outer_pts + inner_pts, fill=(rc, gc, bc, alpha))
     return img
 
 
@@ -2299,35 +2598,45 @@ def _generate_extras_cover(key, title, subtitle=None):
             start_year = int(_extras.get("top_songs_start_year", datetime.now().year - 5))
             offset     = (year - start_year) % 30
             color_top, color_bottom = _TOP_SONGS_YEAR_PALETTES[offset]
-            bg_style   = _TOP_SONGS_BG_CYCLE[offset]
+            bg_style, bg_v = _TOP_SONGS_BG_CYCLE[offset], 0
         except (ValueError, IndexError):
             color_top, color_bottom = _EXTRAS_COVER_COLORS.get("top_songs", ((200, 160, 30), (140, 90, 10)))
-            bg_style   = "geometric"
+            bg_style, bg_v = "geometric", 0
     else:
         color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
-        bg_style   = _COVER_BG_STYLES.get(key, "geometric")
+        style_entry = _COVER_BG_STYLES.get(key, ("geometric", 0))
+        if isinstance(style_entry, tuple):
+            bg_style, bg_v = style_entry
+        else:
+            bg_style, bg_v = style_entry, 0
 
     text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
     if bg_style == "circles":
-        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom)
+        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "radial":
-        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom)
+        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "waves":
-        img = _make_waves_background(1000, 1000, color_top, color_bottom)
+        img = _make_waves_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "floating_circles":
-        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom)
+        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "rays":
-        img = _make_rays_background(1000, 1000, color_top, color_bottom)
+        img = _make_rays_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "arc_sweep":
-        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom)
+        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "aurora":
-        img = _make_aurora_background(1000, 1000, color_top, color_bottom)
+        img = _make_aurora_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "triangles":
-        img = _make_triangles_background(1000, 1000, color_top, color_bottom)
+        img = _make_triangles_background(1000, 1000, color_top, color_bottom, bg_v)
     elif bg_style == "diamond":
-        img = _make_diamond_background(1000, 1000, color_top, color_bottom)
+        img = _make_diamond_background(1000, 1000, color_top, color_bottom, bg_v)
+    elif bg_style == "starburst":
+        img = _make_starburst_background(1000, 1000, color_top, color_bottom, bg_v)
+    elif bg_style == "chevrons":
+        img = _make_chevrons_background(1000, 1000, color_top, color_bottom, bg_v)
+    elif bg_style == "spiral":
+        img = _make_spiral_background(1000, 1000, color_top, color_bottom, bg_v)
     else:
-        img = _make_geometric_background(1000, 1000, color_top, color_bottom)
+        img = _make_geometric_background(1000, 1000, color_top, color_bottom, bg_v)
     img    = _add_bottom_vignette(img)
     result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
