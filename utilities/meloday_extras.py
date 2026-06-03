@@ -45,6 +45,7 @@ from meloday import (
     COVER_IMAGE_DIR,
     FONT_MAIN_PATH,
     FONT_MELODAY_PATH,
+    FONT_LIGHT_PATH,
 )
 from plexapi.server import PlexServer
 
@@ -68,6 +69,14 @@ try:
     _PIL_AVAILABLE = True
 except ImportError:
     _PIL_AVAILABLE = False
+
+# --- Optional: essentia-tensorflow for arousal/valence/vocal_presence ---
+# Mirrors the _TF_MODELS_LOADED flag in meloday.py — True only when package and model files exist.
+try:
+    import essentia.standard as _es_probe
+    _TF_AVAILABLE = getattr(_es_probe, "TensorflowPredictEffnetDiscogs", None) is not None
+except Exception:
+    _TF_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -142,8 +151,8 @@ _CENTROID_PLAYLISTS = {"release_radar", "discover_weekly"}
 _EXTRAS_COVER_COLORS = {
     "on_repeat":      ((255, 140, 40),  (180,  60, 20)),   # warm amber → deep orange
     "repeat_rewind":  ((140,  60, 220), ( 70,  20, 140)),  # violet → deep indigo
-    "release_radar":  (( 30, 110, 200), ( 10,  50, 120)),  # sky blue → navy
-    "discover_weekly":(( 30, 160, 100), ( 10,  70,  60)),  # emerald → dark teal
+    "release_radar":  (( 20, 105, 200), ( 10,  45, 110)),  # sky blue → navy
+    "discover_weekly":((200, 100, 210), ( 20,  40, 115)),  # warm lavender → deep navy
     "daily_mix_1":    (( 50, 110, 230), ( 20,  50, 160)),  # blue
     "daily_mix_2":    ((220,  70,  70), (160,  20,  40)),  # coral red
     "daily_mix_3":    (( 60, 185,  80), ( 20, 100,  40)),  # green
@@ -170,8 +179,87 @@ _EXTRAS_COVER_COLORS = {
     "late_night":         (( 40,  20,  80), ( 20,  10,  50)),  # deep purple
     "sleep":              (( 30,  30, 100), ( 10,  10,  60)),  # deep navy
     "sunny":              ((255, 200,  30), (220, 140,  10)),  # bright sunshine yellow
-    "cosy":           ((140, 190, 220), ( 80, 130, 175)),  # icy blue
+    "cosy":               ((140, 190, 220), ( 80, 130, 175)),  # icy blue
+    # --- Mood / Emotional ---
+    "nostalgia_mix":      ((190, 145,  85), (120,  75,  35)),  # warm sepia-rose
+    "dreamy_mix":         ((160, 120, 200), ( 80,  60, 140)),  # soft lavender
+    "moody_mix":          (( 55,  55, 110), ( 25,  25,  70)),  # dark slate blue
+    "emotional":          ((180,  70, 110), (110,  30,  65)),  # deep rose-mauve
+    "bittersweet":        ((200, 130,  60), (130,  70,  25)),  # warm amber-rust
+    "cathartic":          ((180,  40,  80), (110,  15,  45)),  # crimson-burgundy
+    "confidence_boost":   ((220, 180,  40), (160, 120,  15)),  # electric gold-brass
+    "empowering":         ((170,  50, 220), (100,  20, 160)),  # bright violet
+    "euphoric":           ((240,  80, 140), (170,  20,  90)),  # hot pink-coral
+    "angst_mix":          ((150,  30,  30), ( 80,  10,  10)),  # dark red-charcoal
+    "romantic_mix":       ((210, 120, 150), (140,  65,  90)),  # soft rose-dusty pink
+    "daydreaming":        ((110, 160, 210), ( 60, 100, 160)),  # pale blue-powder
+    "fresh_start":        ((100, 200, 150), ( 40, 130,  90)),  # mint-sage green
+    # --- Aesthetic / Time-of-Day ---
+    "main_character":     (( 40,  50,  90), ( 15,  20,  55)),  # dramatic navy
+    "golden_hour":        ((230, 170,  60), (170, 100,  20)),  # warm gold-amber
+    "sunset_mix":         ((220, 110,  80), (160,  55,  40)),  # coral-orange-pink
+    "after_dark":         (( 30,  20,  70), ( 10,   5,  40)),  # deep blue-black
+    # --- Time / Occasion ---
+    "after_work":         ((180, 155, 100), (110,  90,  50)),  # warm khaki-neutral
+    "friday_night":       (( 40,  80, 200), ( 20,  40, 130)),  # electric blue-navy
+    "weekend_mix":        ((110, 150, 220), ( 60,  90, 170)),  # sky blue-periwinkle
+    "sunday_morning":     ((230, 200, 130), (175, 140,  75)),  # warm cream-yellow
+    "lazy_sunday":        ((190, 155, 165), (120,  90, 100)),  # dusty rose-soft
+    "brunch_mix":         ((140, 200, 100), ( 80, 140,  50)),  # fresh green-lime
+    "date_night":         ((120,  30,  70), ( 70,  10,  40)),  # deep wine-burgundy
+    # --- Activity ---
+    "driving_mix":        (( 70,  90, 130), ( 35,  50,  85)),  # road grey-asphalt blue
+    "night_drive":        (( 20,  60,  90), ( 10,  30,  60)),  # deep teal-midnight
+    "driving_singalong":  (( 60, 140, 220), ( 25,  75, 160)),  # bright sky blue
+    "road_trip":          ((210, 140,  60), (150,  85,  25)),  # desert orange-sandy
+    "commute_mix":        ((100, 115, 140), ( 55,  65,  90)),  # steel grey-slate
+    "walking_mix":        (( 80, 175, 100), ( 35, 110,  55)),  # grass green-nature
+    # --- Social / Nostalgia ---
+    "party_throwback":    ((230,  60, 150), (160,  15,  90)),  # neon pink-electric
+    # --- Weather / Season ---
+    "beach_vibes":        (( 30, 175, 180), ( 10, 100, 130)),  # turquoise-ocean
+    "summer_evening":     ((200, 130, 100), (120,  65,  85)),  # warm coral-lilac twilight
+    "autumn_mix":         ((195, 110,  40), (125,  60,  15)),  # burnt orange-rust
+    "winter_mix":         ((110, 145, 185), ( 55,  85, 135)),  # icy blue-grey
+    "spring_mix":         ((210, 155, 175), (155,  90, 115)),  # blossom pink
+    # --- Romance ---
+    "modern_romance":     ((170,  90, 160), (100,  40, 105)),  # warm purple-mauve
+    "late_night_romance": (( 25,  20,  65), ( 10,   8,  40)),  # deep midnight blue
+    "romantic_dinner":    ((145,  30,  55), ( 85,  10,  30)),  # dark red-wine
+    "love_songs":         ((225, 130, 155), (165,  70,  95)),  # blush pink-rose
+    "slow_dance":         ((145, 100, 175), ( 85,  50, 120)),  # soft purple-lavender
+    "candlelight":        ((215, 150,  50), (150,  90,  20)),  # warm amber-gold
+    "first_date":         ((220, 140, 110), (160,  80,  60)),  # coral-peach
+    "romantic_jazz":      ((140,  80,  30), ( 85,  40,  10)),  # dark cognac-amber
+    "jazz_dinner":        (( 80,  70,  75), ( 45,  38,  42)),  # dark slate-warm grey
+    "string_quartet":     ((195, 170, 140), (130, 100,  70)),  # elegant cream-warm
+    "strings_romance":    ((200, 160, 155), (135,  95,  90)),  # soft rose-cream
+    "piano_romance":      (( 50,  40,  55), ( 20,  15,  25)),  # deep charcoal-black
+    "acoustic_romance":   ((175, 130,  70), (110,  75,  30)),  # warm wood-honey
+    "indie_romance":      ((100, 140, 110), ( 55,  85,  65)),  # muted sage-dusty green
+    "synthpop_romance":   ((160,  60, 180), ( 90,  20, 130)),  # electric mauve-neon pink
+    # --- Gap fills ---
+    "evening_unwind":     ((120, 100, 160), ( 65,  50, 110)),  # soft lavender-slate purple
+    "heartbreak":         ((130,  40,  60), ( 70,  15,  30)),  # deep crimson-charcoal
+    "pre_party":          ((230, 120,  50), (170,  65,  15)),  # electric coral-gold
+    "cool_down":          (( 60, 160, 140), ( 25,  95,  85)),  # soft seafoam-teal
+    "cooking_mix":        ((210, 120,  50), (145,  65,  20)),  # warm terracotta-orange
+    "deep_work":          (( 45,  65, 100), ( 18,  30,  60)),  # dark steel blue
+    "folk_acoustic":      ((150, 110,  60), ( 90,  60,  25)),  # warm earth-wood
+    "celebration":        ((240, 200,  60), (190, 140,  20)),  # bright champagne-gold
 }
+
+
+# Background generation style per cover key. Everything not listed defaults to "geometric".
+#   geometric — diagonal parallelogram strips over a gradient
+#   circles   — concentric rings (Time Capsule radar aesthetic)
+#   radial    — soft radial glow, warm centre → cool edges (Discover Weekly)
+_COVER_BG_STYLES = {
+    "time_capsule":    "circles",
+    "discover_weekly": "radial",
+}
+
+# _MOOD_PROFILE_KEYS is defined after _MOOD_MIX_NAMES below.
 
 
 # ---------------------------------------------------------------------------
@@ -358,43 +446,352 @@ def _pick_description(playlist_id, era=None, styles=None):
 # ---------------------------------------------------------------------------
 _MOOD_PROFILES = {
     # General activity / mood profiles (rotation by acoustic fit)
-    "workout":    {"bpm": 150, "energy": -7,  "danceability": 0.60, "brightness": 0.30},
-    "running":    {"bpm": 160, "energy": -6,  "danceability": 0.45, "brightness": 0.28},
-    "party":      {"bpm": 125, "energy": -9,  "danceability": 0.78, "brightness": 0.38},
-    "happy":      {"bpm": 118, "energy": -11, "danceability": 0.65, "brightness": 0.48},
-    "focus":      {"bpm":  90, "energy": -18, "danceability": 0.22, "brightness": 0.10},
-    "chill":      {"bpm":  82, "energy": -15, "danceability": 0.32, "brightness": 0.16},
-    "melancholy": {"bpm":  68, "energy": -15, "danceability": 0.15, "brightness": 0.07},
+    # beat_confidence: groove/pulse strength (0=loose, 1=driving)
+    # onset_rate: note density in onsets/sec
+    # dynamic_complexity: loudness variance (low=compressed, high=dynamic; 0.3=EDM, 0.6=folk/jazz)
+    # arousal/valence/vocal_presence: TF-derived — None-safe, only scored when data exists
+    "workout":    {"bpm": 150, "energy": -7,  "danceability": 0.60, "brightness": 0.30,
+                   "beat_confidence": 0.85, "onset_rate": 7.0, "dynamic_complexity": 0.40,
+                   "arousal": 0.80, "valence": 0.65, "vocal_presence": 0.60},
+    "running":    {"bpm": 160, "energy": -6,  "danceability": 0.45, "brightness": 0.28,
+                   "beat_confidence": 0.80, "onset_rate": 6.0, "dynamic_complexity": 0.42,
+                   "arousal": 0.85, "valence": 0.60, "vocal_presence": 0.55},
+    "party":      {"bpm": 125, "energy": -9,  "danceability": 0.78, "brightness": 0.38,
+                   "beat_confidence": 0.75, "onset_rate": 6.5, "dynamic_complexity": 0.35,
+                   "arousal": 0.75, "valence": 0.80, "vocal_presence": 0.70},
+    "happy":      {"bpm": 118, "energy": -11, "danceability": 0.65, "brightness": 0.48,
+                   "beat_confidence": 0.65, "onset_rate": 5.5, "dynamic_complexity": 0.45,
+                   "arousal": 0.65, "valence": 0.85, "vocal_presence": 0.75},
+    "focus":      {"bpm":  90, "energy": -18, "danceability": 0.22, "brightness": 0.10,
+                   "beat_confidence": 0.30, "onset_rate": 2.0, "dynamic_complexity": 0.65,
+                   "arousal": 0.25, "valence": 0.55, "vocal_presence": 0.15},
+    "chill":      {"bpm":  82, "energy": -15, "danceability": 0.32, "brightness": 0.16,
+                   "beat_confidence": 0.45, "onset_rate": 3.0, "dynamic_complexity": 0.55,
+                   "arousal": 0.30, "valence": 0.65, "vocal_presence": 0.45},
+    "melancholy": {"bpm":  68, "energy": -15, "danceability": 0.15, "brightness": 0.07,
+                   "beat_confidence": 0.35, "onset_rate": 2.5, "dynamic_complexity": 0.60,
+                   "arousal": 0.25, "valence": 0.20, "vocal_presence": 0.65},
     # Time-of-day profiles (boosted when current time matches their window)
-    "morning":    {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.45},
-    "dinner":     {"bpm":  88, "energy": -19, "danceability": 0.25, "brightness": 0.22},
-    "late_night": {"bpm":  78, "energy": -14, "danceability": 0.42, "brightness": 0.05},
-    "sleep":      {"bpm":  65, "energy": -23, "danceability": 0.10, "brightness": 0.03},
+    "morning":    {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.45,
+                   "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.55,
+                   "arousal": 0.50, "valence": 0.70, "vocal_presence": 0.55},
+    "dinner":     {"bpm":  88, "energy": -19, "danceability": 0.25, "brightness": 0.22,
+                   "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.65,
+                   "arousal": 0.25, "valence": 0.60, "vocal_presence": 0.40},
+    "late_night": {"bpm":  78, "energy": -14, "danceability": 0.42, "brightness": 0.05,
+                   "beat_confidence": 0.50, "onset_rate": 3.5, "dynamic_complexity": 0.52,
+                   "arousal": 0.40, "valence": 0.35, "vocal_presence": 0.50},
+    "sleep":      {"bpm":  65, "energy": -23, "danceability": 0.10, "brightness": 0.03,
+                   "beat_confidence": 0.15, "onset_rate": 1.0, "dynamic_complexity": 0.70,
+                   "arousal": 0.10, "valence": 0.50, "vocal_presence": 0.10},
     # Weather-triggered profiles (boosted when conditions match)
-    "rainy_day":  {"bpm":  72, "energy": -16, "danceability": 0.18, "brightness": 0.09},
-    "sunny":      {"bpm": 108, "energy": -11, "danceability": 0.58, "brightness": 0.52},
-    "cosy":       {"bpm":  75, "energy": -16, "danceability": 0.20, "brightness": 0.18},
+    "rainy_day":  {"bpm":  72, "energy": -16, "danceability": 0.18, "brightness": 0.09,
+                   "beat_confidence": 0.30, "onset_rate": 2.0, "dynamic_complexity": 0.62,
+                   "arousal": 0.25, "valence": 0.30, "vocal_presence": 0.60},
+    "sunny":      {"bpm": 108, "energy": -11, "danceability": 0.58, "brightness": 0.52,
+                   "beat_confidence": 0.65, "onset_rate": 5.0, "dynamic_complexity": 0.48,
+                   "arousal": 0.70, "valence": 0.85, "vocal_presence": 0.65},
+    "cosy":       {"bpm":  75, "energy": -16, "danceability": 0.20, "brightness": 0.18,
+                   "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.62,
+                   "arousal": 0.25, "valence": 0.65, "vocal_presence": 0.45},
+    # ----------------------------------------------------------------
+    # Mood / Emotional
+    # ----------------------------------------------------------------
+    "nostalgia_mix":    {"bpm":  88, "energy": -14, "danceability": 0.28, "brightness": 0.15,
+                         "beat_confidence": 0.35, "onset_rate": 2.5, "dynamic_complexity": 0.58,
+                         "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.70},
+    "dreamy_mix":       {"bpm":  85, "energy": -18, "danceability": 0.25, "brightness": 0.12,
+                         "beat_confidence": 0.25, "onset_rate": 2.0, "dynamic_complexity": 0.60,
+                         "arousal": 0.20, "valence": 0.55, "vocal_presence": 0.50},
+    "moody_mix":        {"bpm":  78, "energy": -16, "danceability": 0.22, "brightness": 0.08,
+                         "beat_confidence": 0.40, "onset_rate": 2.8, "dynamic_complexity": 0.58,
+                         "arousal": 0.35, "valence": 0.30, "vocal_presence": 0.60},
+    "emotional":        {"bpm":  95, "energy": -12, "danceability": 0.35, "brightness": 0.25,
+                         "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.65,
+                         "arousal": 0.50, "valence": 0.45, "vocal_presence": 0.85},
+    "bittersweet":      {"bpm":  82, "energy": -15, "danceability": 0.25, "brightness": 0.18,
+                         "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
+                         "arousal": 0.35, "valence": 0.45, "vocal_presence": 0.70},
+    "cathartic":        {"bpm": 108, "energy": -10, "danceability": 0.38, "brightness": 0.22,
+                         "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.70,
+                         "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.80},
+    "confidence_boost": {"bpm": 118, "energy":  -9, "danceability": 0.58, "brightness": 0.35,
+                         "beat_confidence": 0.70, "onset_rate": 5.5, "dynamic_complexity": 0.40,
+                         "arousal": 0.68, "valence": 0.72, "vocal_presence": 0.70},
+    "empowering":       {"bpm": 128, "energy":  -8, "danceability": 0.50, "brightness": 0.30,
+                         "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.55,
+                         "arousal": 0.75, "valence": 0.70, "vocal_presence": 0.75},
+    "euphoric":         {"bpm": 132, "energy":  -8, "danceability": 0.72, "brightness": 0.42,
+                         "beat_confidence": 0.80, "onset_rate": 6.5, "dynamic_complexity": 0.35,
+                         "arousal": 0.85, "valence": 0.90, "vocal_presence": 0.65},
+    "angst_mix":        {"bpm": 138, "energy":  -9, "danceability": 0.40, "brightness": 0.22,
+                         "beat_confidence": 0.65, "onset_rate": 6.0, "dynamic_complexity": 0.55,
+                         "arousal": 0.78, "valence": 0.25, "vocal_presence": 0.82},
+    "romantic_mix":     {"bpm":  88, "energy": -16, "danceability": 0.28, "brightness": 0.20,
+                         "beat_confidence": 0.32, "onset_rate": 2.5, "dynamic_complexity": 0.60,
+                         "arousal": 0.28, "valence": 0.70, "vocal_presence": 0.72},
+    "daydreaming":      {"bpm":  80, "energy": -19, "danceability": 0.20, "brightness": 0.10,
+                         "beat_confidence": 0.22, "onset_rate": 1.8, "dynamic_complexity": 0.62,
+                         "arousal": 0.18, "valence": 0.60, "vocal_presence": 0.55},
+    "fresh_start":      {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.40,
+                         "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.50,
+                         "arousal": 0.52, "valence": 0.78, "vocal_presence": 0.65},
+    # ----------------------------------------------------------------
+    # Aesthetic / Time-of-Day (general pool; soft time boost in rotation)
+    # ----------------------------------------------------------------
+    "main_character":   {"bpm": 115, "energy": -10, "danceability": 0.48, "brightness": 0.30,
+                         "beat_confidence": 0.62, "onset_rate": 5.0, "dynamic_complexity": 0.55,
+                         "arousal": 0.65, "valence": 0.58, "vocal_presence": 0.72},
+    "golden_hour":      {"bpm":  95, "energy": -13, "danceability": 0.35, "brightness": 0.28,
+                         "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.55,
+                         "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.62},
+    "sunset_mix":       {"bpm":  85, "energy": -16, "danceability": 0.25, "brightness": 0.18,
+                         "beat_confidence": 0.35, "onset_rate": 2.8, "dynamic_complexity": 0.60,
+                         "arousal": 0.32, "valence": 0.62, "vocal_presence": 0.55},
+    "after_dark":       {"bpm": 105, "energy": -12, "danceability": 0.52, "brightness": 0.08,
+                         "beat_confidence": 0.60, "onset_rate": 4.5, "dynamic_complexity": 0.42,
+                         "arousal": 0.48, "valence": 0.38, "vocal_presence": 0.55},
+    # ----------------------------------------------------------------
+    # Time / Occasion (general pool; soft time boost in rotation)
+    # ----------------------------------------------------------------
+    "after_work":       {"bpm": 100, "energy": -12, "danceability": 0.45, "brightness": 0.30,
+                         "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.50,
+                         "arousal": 0.48, "valence": 0.65, "vocal_presence": 0.60},
+    "friday_night":     {"bpm": 118, "energy": -10, "danceability": 0.60, "brightness": 0.35,
+                         "beat_confidence": 0.68, "onset_rate": 5.5, "dynamic_complexity": 0.42,
+                         "arousal": 0.68, "valence": 0.78, "vocal_presence": 0.68},
+    "weekend_mix":      {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.32,
+                         "beat_confidence": 0.50, "onset_rate": 4.0, "dynamic_complexity": 0.52,
+                         "arousal": 0.48, "valence": 0.72, "vocal_presence": 0.62},
+    "sunday_morning":   {"bpm":  82, "energy": -16, "danceability": 0.28, "brightness": 0.30,
+                         "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
+                         "arousal": 0.32, "valence": 0.72, "vocal_presence": 0.60},
+    "lazy_sunday":      {"bpm":  70, "energy": -19, "danceability": 0.20, "brightness": 0.20,
+                         "beat_confidence": 0.28, "onset_rate": 2.0, "dynamic_complexity": 0.65,
+                         "arousal": 0.22, "valence": 0.68, "vocal_presence": 0.55},
+    "brunch_mix":       {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.35,
+                         "beat_confidence": 0.50, "onset_rate": 3.8, "dynamic_complexity": 0.52,
+                         "arousal": 0.48, "valence": 0.78, "vocal_presence": 0.65},
+    "date_night":       {"bpm":  88, "energy": -17, "danceability": 0.28, "brightness": 0.22,
+                         "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.62,
+                         "arousal": 0.28, "valence": 0.68, "vocal_presence": 0.62},
+    # ----------------------------------------------------------------
+    # Activity / Driving
+    # ----------------------------------------------------------------
+    "driving_mix":      {"bpm": 110, "energy": -10, "danceability": 0.50, "brightness": 0.32,
+                         "beat_confidence": 0.62, "onset_rate": 4.8, "dynamic_complexity": 0.50,
+                         "arousal": 0.58, "valence": 0.68, "vocal_presence": 0.70},
+    "night_drive":      {"bpm": 100, "energy": -12, "danceability": 0.48, "brightness": 0.08,
+                         "beat_confidence": 0.55, "onset_rate": 3.8, "dynamic_complexity": 0.45,
+                         "arousal": 0.42, "valence": 0.35, "vocal_presence": 0.52},
+    "driving_singalong":{"bpm": 112, "energy": -10, "danceability": 0.55, "brightness": 0.38,
+                         "beat_confidence": 0.65, "onset_rate": 5.0, "dynamic_complexity": 0.48,
+                         "arousal": 0.62, "valence": 0.78, "vocal_presence": 0.85},
+    "road_trip":        {"bpm": 108, "energy": -11, "danceability": 0.48, "brightness": 0.35,
+                         "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.52,
+                         "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.72},
+    "commute_mix":      {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.28,
+                         "beat_confidence": 0.52, "onset_rate": 4.0, "dynamic_complexity": 0.52,
+                         "arousal": 0.48, "valence": 0.62, "vocal_presence": 0.65},
+    "walking_mix":      {"bpm": 105, "energy": -12, "danceability": 0.48, "brightness": 0.32,
+                         "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.50,
+                         "arousal": 0.52, "valence": 0.68, "vocal_presence": 0.68},
+    # ----------------------------------------------------------------
+    # Social / Nostalgia
+    # ----------------------------------------------------------------
+    "party_throwback":  {"bpm": 128, "energy":  -8, "danceability": 0.72, "brightness": 0.42,
+                         "beat_confidence": 0.75, "onset_rate": 6.0, "dynamic_complexity": 0.38,
+                         "arousal": 0.78, "valence": 0.78, "vocal_presence": 0.70},
+    # ----------------------------------------------------------------
+    # Weather / Season (managed by _WEATHER_PROFILES / _SEASONAL_PROFILES)
+    # ----------------------------------------------------------------
+    "beach_vibes":      {"bpm": 100, "energy": -13, "danceability": 0.55, "brightness": 0.48,
+                         "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.50,
+                         "arousal": 0.52, "valence": 0.82, "vocal_presence": 0.65},
+    "summer_evening":   {"bpm": 100, "energy": -13, "danceability": 0.50, "brightness": 0.30,
+                         "beat_confidence": 0.52, "onset_rate": 4.0, "dynamic_complexity": 0.50,
+                         "arousal": 0.48, "valence": 0.75, "vocal_presence": 0.62},
+    "autumn_mix":       {"bpm":  80, "energy": -15, "danceability": 0.25, "brightness": 0.18,
+                         "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
+                         "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.65},
+    "winter_mix":       {"bpm":  75, "energy": -17, "danceability": 0.22, "brightness": 0.12,
+                         "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.62,
+                         "arousal": 0.28, "valence": 0.45, "vocal_presence": 0.60},
+    "spring_mix":       {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.42,
+                         "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.52,
+                         "arousal": 0.55, "valence": 0.78, "vocal_presence": 0.62},
+    # ----------------------------------------------------------------
+    # Romance
+    # ----------------------------------------------------------------
+    "modern_romance":   {"bpm": 100, "energy": -13, "danceability": 0.48, "brightness": 0.25,
+                         "beat_confidence": 0.52, "onset_rate": 3.8, "dynamic_complexity": 0.48,
+                         "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.68},
+    "late_night_romance":{"bpm": 72, "energy": -18, "danceability": 0.22, "brightness": 0.08,
+                         "beat_confidence": 0.28, "onset_rate": 2.0, "dynamic_complexity": 0.62,
+                         "arousal": 0.28, "valence": 0.62, "vocal_presence": 0.72},
+    "romantic_dinner":  {"bpm":  80, "energy": -20, "danceability": 0.20, "brightness": 0.18,
+                         "beat_confidence": 0.25, "onset_rate": 2.0, "dynamic_complexity": 0.65,
+                         "arousal": 0.22, "valence": 0.62, "vocal_presence": 0.55},
+    "love_songs":       {"bpm":  90, "energy": -14, "danceability": 0.30, "brightness": 0.25,
+                         "beat_confidence": 0.42, "onset_rate": 3.0, "dynamic_complexity": 0.62,
+                         "arousal": 0.42, "valence": 0.75, "vocal_presence": 0.82},
+    "slow_dance":       {"bpm":  68, "energy": -18, "danceability": 0.18, "brightness": 0.15,
+                         "beat_confidence": 0.28, "onset_rate": 1.8, "dynamic_complexity": 0.65,
+                         "arousal": 0.22, "valence": 0.68, "vocal_presence": 0.78},
+    "candlelight":      {"bpm":  72, "energy": -20, "danceability": 0.15, "brightness": 0.15,
+                         "beat_confidence": 0.22, "onset_rate": 1.5, "dynamic_complexity": 0.70,
+                         "arousal": 0.18, "valence": 0.62, "vocal_presence": 0.65},
+    "first_date":       {"bpm":  95, "energy": -14, "danceability": 0.38, "brightness": 0.30,
+                         "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.55,
+                         "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.70},
+    "romantic_jazz":    {"bpm":  78, "energy": -20, "danceability": 0.22, "brightness": 0.18,
+                         "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.70,
+                         "arousal": 0.22, "valence": 0.65, "vocal_presence": 0.72},
+    "jazz_dinner":      {"bpm":  85, "energy": -21, "danceability": 0.25, "brightness": 0.20,
+                         "beat_confidence": 0.28, "onset_rate": 2.8, "dynamic_complexity": 0.72,
+                         "arousal": 0.20, "valence": 0.60, "vocal_presence": 0.50},
+    "string_quartet":   {"bpm":  80, "energy": -19, "danceability": 0.18, "brightness": 0.20,
+                         "beat_confidence": 0.20, "onset_rate": 2.0, "dynamic_complexity": 0.75,
+                         "arousal": 0.22, "valence": 0.58, "vocal_presence": 0.30},
+    "strings_romance":  {"bpm":  75, "energy": -20, "danceability": 0.15, "brightness": 0.18,
+                         "beat_confidence": 0.18, "onset_rate": 1.8, "dynamic_complexity": 0.75,
+                         "arousal": 0.20, "valence": 0.65, "vocal_presence": 0.32},
+    "piano_romance":    {"bpm":  72, "energy": -22, "danceability": 0.15, "brightness": 0.16,
+                         "beat_confidence": 0.18, "onset_rate": 1.5, "dynamic_complexity": 0.72,
+                         "arousal": 0.18, "valence": 0.62, "vocal_presence": 0.35},
+    "acoustic_romance": {"bpm":  78, "energy": -18, "danceability": 0.22, "brightness": 0.20,
+                         "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.65,
+                         "arousal": 0.28, "valence": 0.68, "vocal_presence": 0.78},
+    "indie_romance":    {"bpm":  85, "energy": -17, "danceability": 0.28, "brightness": 0.18,
+                         "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.62,
+                         "arousal": 0.32, "valence": 0.65, "vocal_presence": 0.72},
+    "synthpop_romance": {"bpm": 100, "energy": -13, "danceability": 0.48, "brightness": 0.15,
+                         "beat_confidence": 0.55, "onset_rate": 3.8, "dynamic_complexity": 0.45,
+                         "arousal": 0.40, "valence": 0.68, "vocal_presence": 0.62},
+    # ----------------------------------------------------------------
+    # Gap fills
+    # ----------------------------------------------------------------
+    "evening_unwind":   {"bpm":  78, "energy": -17, "danceability": 0.22, "brightness": 0.15,
+                         "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.62,
+                         "arousal": 0.28, "valence": 0.58, "vocal_presence": 0.50},
+    "heartbreak":       {"bpm":  75, "energy": -14, "danceability": 0.18, "brightness": 0.07,
+                         "beat_confidence": 0.32, "onset_rate": 2.0, "dynamic_complexity": 0.65,
+                         "arousal": 0.45, "valence": 0.12, "vocal_presence": 0.88},
+    "pre_party":        {"bpm": 122, "energy":  -9, "danceability": 0.65, "brightness": 0.38,
+                         "beat_confidence": 0.72, "onset_rate": 5.8, "dynamic_complexity": 0.40,
+                         "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.68},
+    "cool_down":        {"bpm":  78, "energy": -14, "danceability": 0.28, "brightness": 0.20,
+                         "beat_confidence": 0.42, "onset_rate": 3.0, "dynamic_complexity": 0.55,
+                         "arousal": 0.30, "valence": 0.60, "vocal_presence": 0.50},
+    "cooking_mix":      {"bpm": 102, "energy": -12, "danceability": 0.48, "brightness": 0.38,
+                         "beat_confidence": 0.55, "onset_rate": 4.2, "dynamic_complexity": 0.50,
+                         "arousal": 0.52, "valence": 0.75, "vocal_presence": 0.65},
+    "deep_work":        {"bpm":  88, "energy": -17, "danceability": 0.18, "brightness": 0.08,
+                         "beat_confidence": 0.25, "onset_rate": 1.8, "dynamic_complexity": 0.68,
+                         "arousal": 0.22, "valence": 0.52, "vocal_presence": 0.22},
+    "folk_acoustic":    {"bpm":  82, "energy": -16, "danceability": 0.25, "brightness": 0.22,
+                         "beat_confidence": 0.38, "onset_rate": 2.5, "dynamic_complexity": 0.68,
+                         "arousal": 0.30, "valence": 0.62, "vocal_presence": 0.75},
+    "celebration":      {"bpm": 125, "energy":  -8, "danceability": 0.62, "brightness": 0.42,
+                         "beat_confidence": 0.72, "onset_rate": 5.8, "dynamic_complexity": 0.45,
+                         "arousal": 0.78, "valence": 0.90, "vocal_presence": 0.78},
 }
 
 _MOOD_MIX_NAMES = {
-    "workout":    "Workout • Meloday+",
-    "running":    "Running • Meloday+",
-    "party":      "Party • Meloday+",
-    "happy":      "Happy Hits • Meloday+",
-    "focus":      "Focus • Meloday+",
-    "chill":      "Chill • Meloday+",
-    "melancholy": "Sad Songs • Meloday+",
-    "morning":    "Good Morning • Meloday+",
-    "dinner":     "Dinner • Meloday+",
-    "late_night": "Late Night • Meloday+",
-    "sleep":      "Sleep • Meloday+",
-    "rainy_day":  "Rainy Day • Meloday+",
-    "sunny":      "Sunny • Meloday+",
-    "cosy":       "Cosy • Meloday+",
+    # Original 14
+    "workout":            "Workout Mix • Meloday+",
+    "running":            "Running Mix • Meloday+",
+    "party":              "Party Mix • Meloday+",
+    "happy":              "Happy Hits • Meloday+",
+    "focus":              "Focus Mix • Meloday+",
+    "chill":              "Chill Mix • Meloday+",
+    "melancholy":         "Sad Songs • Meloday+",
+    "morning":            "Good Morning Mix • Meloday+",
+    "dinner":             "Dinner Mix • Meloday+",
+    "late_night":         "Late Night Mix • Meloday+",
+    "sleep":              "Sleep Mix • Meloday+",
+    "rainy_day":          "Rainy Day Mix • Meloday+",
+    "sunny":              "Sunny Mix • Meloday+",
+    "cosy":               "Cosy Mix • Meloday+",
+    # Mood / Emotional
+    "nostalgia_mix":      "Nostalgia Mix • Meloday+",
+    "dreamy_mix":         "Dreamy Mix • Meloday+",
+    "moody_mix":          "Moody Mix • Meloday+",
+    "emotional":          "Emotional Mix • Meloday+",
+    "bittersweet":        "Bittersweet Mix • Meloday+",
+    "cathartic":          "Cathartic Mix • Meloday+",
+    "confidence_boost":   "Confidence Boost Mix • Meloday+",
+    "empowering":         "Empowering Mix • Meloday+",
+    "euphoric":           "Euphoric Mix • Meloday+",
+    "angst_mix":          "Angst Mix • Meloday+",
+    "romantic_mix":       "Romantic Mix • Meloday+",
+    "daydreaming":        "Daydreaming Mix • Meloday+",
+    "fresh_start":        "Fresh Start Mix • Meloday+",
+    # Aesthetic / Time-of-Day
+    "main_character":     "Main Character Mix • Meloday+",
+    "golden_hour":        "Golden Hour Mix • Meloday+",
+    "sunset_mix":         "Sunset Mix • Meloday+",
+    "after_dark":         "After Dark Mix • Meloday+",
+    # Time / Occasion
+    "after_work":         "After Work Mix • Meloday+",
+    "friday_night":       "Friday Night Mix • Meloday+",
+    "weekend_mix":        "Weekend Mix • Meloday+",
+    "sunday_morning":     "Sunday Morning Mix • Meloday+",
+    "lazy_sunday":        "Lazy Sunday Mix • Meloday+",
+    "brunch_mix":         "Brunch Mix • Meloday+",
+    "date_night":         "Date Night Mix • Meloday+",
+    # Activity
+    "driving_mix":        "Driving Mix • Meloday+",
+    "night_drive":        "Night Drive Mix • Meloday+",
+    "driving_singalong":  "Driving Singalong Mix • Meloday+",
+    "road_trip":          "Road Trip Mix • Meloday+",
+    "commute_mix":        "Commute Mix • Meloday+",
+    "walking_mix":        "Walking Mix • Meloday+",
+    # Social / Nostalgia
+    "party_throwback":    "Party Throwback Mix • Meloday+",
+    # Weather / Season
+    "beach_vibes":        "Beach Vibes Mix • Meloday+",
+    "summer_evening":     "Summer Evening Mix • Meloday+",
+    "autumn_mix":         "Autumn Mix • Meloday+",
+    "winter_mix":         "Winter Mix • Meloday+",
+    "spring_mix":         "Spring Mix • Meloday+",
+    # Romance
+    "modern_romance":     "Modern Romance Mix • Meloday+",
+    "late_night_romance": "Late Night Romance Mix • Meloday+",
+    "romantic_dinner":    "Romantic Dinner Mix • Meloday+",
+    "love_songs":         "Love Songs • Meloday+",
+    "slow_dance":         "Slow Dance Mix • Meloday+",
+    "candlelight":        "Candlelight Mix • Meloday+",
+    "first_date":         "First Date Mix • Meloday+",
+    "romantic_jazz":      "Romantic Jazz Mix • Meloday+",
+    "jazz_dinner":        "Jazz Dinner Mix • Meloday+",
+    "string_quartet":     "String Quartet Mix • Meloday+",
+    "strings_romance":    "Strings & Romance Mix • Meloday+",
+    "piano_romance":      "Piano Romance Mix • Meloday+",
+    "acoustic_romance":   "Acoustic Romance Mix • Meloday+",
+    "indie_romance":      "Indie Romance Mix • Meloday+",
+    "synthpop_romance":   "Synth-Pop Romance Mix • Meloday+",
+    # Gap fills
+    "evening_unwind":     "Evening Unwind Mix • Meloday+",
+    "heartbreak":         "Heartbreak Mix • Meloday+",
+    "pre_party":          "Pre-Party Mix • Meloday+",
+    "cool_down":          "Cool Down Mix • Meloday+",
+    "cooking_mix":        "Cooking Mix • Meloday+",
+    "deep_work":          "Deep Work Mix • Meloday+",
+    "folk_acoustic":      "Folk & Acoustic Mix • Meloday+",
+    "celebration":        "Celebration Mix • Meloday+",
 }
 
-# Time windows (start_hour, end_hour) in which a profile gets a strong rotation boost.
-# Hours past midnight use 24+: 1am=25, 2am=26, 3am=27, 4am=28.
+# Mood-profile keys get a bottom-bar text treatment (Spotify Niche/Mood Mix style)
+# rather than the standard near-bottom overlay used by the other extras.
+_MOOD_PROFILE_KEYS = set(_MOOD_MIX_NAMES.keys())
+
+# ---------------------------------------------------------------------------
+# Rotation infrastructure: time windows, weather/season sets, categories
+# ---------------------------------------------------------------------------
+
+# Hard time-of-day profiles — actively added/removed by the boundary cron.
+# Hours past midnight use 24+: 1am=25, 2am=26, etc.
 _TIME_BIASED_PROFILES = {
     "morning":    ( 5, 12),   # 5am–noon
     "dinner":     (17, 21),   # 5pm–9pm
@@ -402,10 +799,102 @@ _TIME_BIASED_PROFILES = {
     "sleep":      (22, 28),   # 10pm–4am
 }
 
-# Weather profile triggers: profile_key → weather condition that boosts it.
-_WEATHER_PROFILES = {"rainy_day", "sunny", "cosy"}
-_TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())             # morning, dinner, late_night, sleep
-_GENERAL_PROFILES = set(_MOOD_PROFILES) - _TIME_PROFILES - _WEATHER_PROFILES
+# Soft time boosts — general-pool profiles that score better during a time window
+# but are NOT managed by the boundary cron. (start_hour, end_hour, reduction_amount)
+_TIME_SOFT_BOOSTS = {
+    "brunch_mix":         ( 9, 15, 0.12),   # 9am–3pm
+    "golden_hour":        (15, 20, 0.15),   # 3pm–8pm
+    "after_work":         (16, 20, 0.12),   # 4pm–8pm
+    "sunset_mix":         (17, 22, 0.15),   # 5pm–10pm
+    "date_night":         (17, 26, 0.10),   # 5pm–2am
+    "friday_night":       (17, 26, 0.10),   # 5pm–2am (any evening, not just Friday)
+    "after_dark":         (22, 28, 0.15),   # 10pm–4am
+    "night_drive":        (20, 28, 0.12),   # 8pm–4am
+    "late_night_romance": (21, 27, 0.12),   # 9pm–3am
+    "commute_mix":        ( 7, 10, 0.10),   # morning commute
+    "sunday_morning":     ( 7, 14, 0.08),   # any morning (day-of-week not tracked)
+    "lazy_sunday":        (11, 18, 0.07),   # any quiet afternoon
+    "evening_unwind":     (20, 23, 0.15),   # 8pm–11pm (dinner-to-late-night gap)
+    "pre_party":          (17, 23, 0.12),   # 5pm–11pm evenings
+    "cooking_mix":        (17, 20, 0.10),   # 5pm–8pm dinner-prep window
+}
+
+# Day-of-week boosts — applied on top of soft time boosts for profiles with a natural weekday.
+# 0=Monday … 6=Sunday. Amount is an additional score reduction (lower = more likely selected).
+_WEEKDAY_BOOSTS = {
+    "friday_night":    ({4, 5},  0.15),   # Fri/Sat evenings
+    "pre_party":       ({4, 5},  0.10),   # Fri/Sat
+    "weekend_mix":     ({5, 6},  0.10),   # Sat/Sun all day
+    "brunch_mix":      ({5, 6},  0.08),   # Weekend brunch
+    "sunday_morning":  ({6},     0.12),   # Sunday only
+    "lazy_sunday":     ({6},     0.10),   # Sunday only
+    "celebration":     ({4, 5},  0.08),   # Fri/Sat
+    "party_throwback": ({4, 5},  0.06),   # Fri/Sat (slight)
+}
+
+# Weather-conditional profiles — require weather data; add/remove when conditions match.
+_WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes"}
+
+# Season-conditional profiles — triggered by current calendar season; no weather API needed.
+_SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"}
+
+_TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
+_GENERAL_PROFILES = (set(_MOOD_PROFILES)
+                     - _TIME_PROFILES
+                     - _WEATHER_PROFILES
+                     - _SEASONAL_PROFILES)
+
+# Category labels for diversity-aware rotation (max 2 per category in active slots).
+_PROFILE_CATEGORY = {
+    # High energy / physical
+    "workout":          "energy",   "running":         "energy",
+    "party":            "energy",   "euphoric":        "energy",
+    "confidence_boost": "energy",   "empowering":      "energy",
+    "cathartic":        "energy",   "angst_mix":       "energy",
+    "friday_night":     "energy",   "party_throwback": "energy",
+    # Relaxed / low-key
+    "focus":            "calm",     "chill":           "calm",
+    "sleep":            "calm",     "daydreaming":     "calm",
+    "lazy_sunday":      "calm",     "candlelight":     "calm",
+    "piano_romance":    "calm",     "string_quartet":  "calm",
+    "strings_romance":  "calm",     "jazz_dinner":     "calm",
+    "romantic_jazz":    "calm",
+    # Emotional / introspective
+    "melancholy":       "emotional","moody_mix":       "emotional",
+    "bittersweet":      "emotional","emotional":       "emotional",
+    "nostalgia_mix":    "emotional","rainy_day":       "emotional",
+    # Romantic / love
+    "romantic_mix":     "romantic", "modern_romance":  "romantic",
+    "love_songs":       "romantic", "slow_dance":      "romantic",
+    "first_date":       "romantic", "acoustic_romance":"romantic",
+    "indie_romance":    "romantic", "synthpop_romance":"romantic",
+    "date_night":       "romantic", "late_night_romance":"romantic",
+    "romantic_dinner":  "romantic",
+    # Upbeat / positive / social
+    "happy":            "upbeat",   "sunny":           "upbeat",
+    "beach_vibes":      "upbeat",   "morning":         "upbeat",
+    "brunch_mix":       "upbeat",   "sunday_morning":  "upbeat",
+    "weekend_mix":      "upbeat",   "fresh_start":     "upbeat",
+    "summer_evening":   "upbeat",   "spring_mix":      "upbeat",
+    # Activity / driving / occasion
+    "driving_mix":      "activity", "night_drive":     "activity",
+    "driving_singalong":"activity", "road_trip":       "activity",
+    "commute_mix":      "activity", "walking_mix":     "activity",
+    "after_work":       "activity",
+    # Atmospheric / ambient / aesthetic
+    "dreamy_mix":       "atmospheric","main_character": "atmospheric",
+    "golden_hour":      "atmospheric","sunset_mix":     "atmospheric",
+    "after_dark":       "atmospheric","late_night":     "atmospheric",
+    "dinner":           "atmospheric","winter_mix":     "atmospheric",
+    "autumn_mix":       "atmospheric","cosy":           "atmospheric",
+    "evening_unwind":   "atmospheric","folk_acoustic":  "atmospheric",
+    # Gap fills — other categories
+    "heartbreak":       "emotional",
+    "pre_party":        "energy",    "celebration":    "energy",
+    "cool_down":        "activity",
+    "cooking_mix":      "activity",
+    "deep_work":        "calm",
+}
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
 # Substring matching against lowercased Plex/MusicBrainz mood tags from the Essentia cache.
@@ -437,12 +926,75 @@ _PROFILE_MOOD_SIGNALS = {
                    ["dark", "aggressive", "sad"]),
     "dinner":      (["romantic", "sophisticated", "elegant", "smooth", "mellow"],
                    ["aggressive", "intense", "angry"]),
-    "rainy_day":   (["melanchol", "bittersweet", "introspective", "nostalgic", "wistful"],
-                   ["upbeat", "energetic", "euphoric"]),
-    "sunny":       (["happy", "upbeat", "carefree", "fun", "joyful", "cheerful"],
-                   ["sad", "dark", "melanchol"]),
-    "cosy":        (["calm", "peaceful", "warm", "comfort", "nostalgic", "gentle"],
-                   ["aggressive", "intense", "energetic"]),
+    "rainy_day":        (["melanchol", "bittersweet", "introspective", "nostalgic", "wistful"],
+                        ["upbeat", "energetic", "euphoric"]),
+    "sunny":            (["happy", "upbeat", "carefree", "fun", "joyful", "cheerful"],
+                        ["sad", "dark", "melanchol"]),
+    "cosy":             (["calm", "peaceful", "warm", "comfort", "nostalgic", "gentle"],
+                        ["aggressive", "intense", "energetic"]),
+    # New profiles
+    "nostalgia_mix":    (["nostalgic", "wistful", "bittersweet", "sentimental", "reminiscent"],
+                        ["aggressive", "energetic", "euphoric"]),
+    "dreamy_mix":       (["dreamy", "ethereal", "atmospheric", "ambient", "surreal"],
+                        ["aggressive", "intense", "angry"]),
+    "moody_mix":        (["dark", "introspective", "moody", "brooding", "melanchol"],
+                        ["happy", "upbeat", "fun", "euphoric"]),
+    "emotional":        (["emotional", "heartbreak", "bittersweet", "intense", "powerful"],
+                        []),
+    "bittersweet":      (["bittersweet", "nostalgic", "wistful", "sad", "melanchol"],
+                        ["upbeat", "energetic", "euphoric"]),
+    "cathartic":        (["intense", "powerful", "dramatic", "triumphant", "emotional"],
+                        ["calm", "peaceful", "ambient"]),
+    "confidence_boost": (["confident", "powerful", "upbeat", "bold", "assertive"],
+                        ["sad", "melanchol", "dark"]),
+    "empowering":       (["empowering", "triumphant", "powerful", "motivating", "inspirational"],
+                        ["sad", "melanchol", "dark"]),
+    "angst_mix":        (["angry", "aggressive", "intense", "restless", "rebellious"],
+                        ["calm", "peaceful", "happy", "upbeat"]),
+    "romantic_mix":     (["romantic", "love", "tender", "intimate", "affectionate"],
+                        ["aggressive", "angry", "intense"]),
+    "daydreaming":      (["dreamy", "ambient", "calm", "peaceful", "ethereal"],
+                        ["energetic", "aggressive", "intense"]),
+    "fresh_start":      (["uplifting", "hopeful", "optimistic", "cheerful", "bright"],
+                        ["dark", "aggressive", "sad"]),
+    "euphoric":         (["euphoric", "ecstatic", "upbeat", "carefree", "exhilarating"],
+                        ["sad", "dark", "melanchol"]),
+    "beach_vibes":      (["happy", "carefree", "upbeat", "relaxing", "fun"],
+                        ["sad", "dark", "aggressive"]),
+    "autumn_mix":       (["nostalgic", "wistful", "melanchol", "introspective", "bittersweet"],
+                        ["upbeat", "euphoric", "energetic"]),
+    "winter_mix":       (["calm", "peaceful", "melanchol", "atmospheric", "nostalgic"],
+                        ["energetic", "aggressive", "upbeat"]),
+    "spring_mix":       (["uplifting", "hopeful", "cheerful", "fresh", "optimistic"],
+                        ["dark", "sad", "aggressive"]),
+    "love_songs":       (["romantic", "love", "tender", "heartfelt", "sincere"],
+                        ["aggressive", "angry"]),
+    "slow_dance":       (["romantic", "tender", "intimate", "love", "affectionate"],
+                        ["aggressive", "energetic", "intense"]),
+    "candlelight":      (["romantic", "elegant", "peaceful", "gentle", "intimate"],
+                        ["aggressive", "intense", "energetic"]),
+    "acoustic_romance": (["romantic", "love", "acoustic", "tender", "sincere"],
+                        ["aggressive", "angry"]),
+    "indie_romance":    (["romantic", "dreamy", "melanchol", "bittersweet", "indie"],
+                        ["aggressive", "intense"]),
+    "party_throwback":  (["party", "energetic", "fun", "carefree", "celebrat"],
+                        ["sad", "calm", "melanchol"]),
+    "heartbreak":       (["heartbreak", "sad", "longing", "lonely", "loss", "despair", "grief"],
+                        ["happy", "upbeat", "euphoric", "carefree"]),
+    "pre_party":        (["energetic", "fun", "carefree", "upbeat", "party", "celebrat"],
+                        ["sad", "melanchol", "calm", "peaceful"]),
+    "celebration":      (["celebrat", "triumphant", "happy", "euphoric", "upbeat", "joyful"],
+                        ["sad", "melanchol", "dark"]),
+    "folk_acoustic":    (["acoustic", "folk", "earthy", "organic", "natural", "singer-songwriter"],
+                        ["aggressive", "intense", "electronic"]),
+    "deep_work":        (["calm", "ambient", "meditat", "peaceful", "tranquil", "focus"],
+                        ["aggressive", "intense", "party", "energetic"]),
+    "evening_unwind":   (["calm", "peaceful", "mellow", "relaxing", "smooth", "easy"],
+                        ["aggressive", "intense", "energetic"]),
+    "cool_down":        (["calm", "relaxing", "peaceful", "mellow", "gentle"],
+                        ["aggressive", "intense", "angry"]),
+    "cooking_mix":      (["upbeat", "happy", "carefree", "fun", "cheerful"],
+                        ["sad", "intense", "aggressive", "melanchol"]),
 }
 
 
@@ -591,21 +1143,53 @@ def _weather_boost(profile_key, weather):
         if temp < cold_threshold:                          return -0.40  # cold for the season
         if code in _SNOW_CODES:                            return -0.40  # snow (rare in AU)
         if temp > warm_threshold + 5:                      return +0.15  # too warm → discourage
+    elif profile_key == "beach_vibes":
+        if code in _CLEAR_CODES and temp > warm_threshold + 5: return -0.40  # hot & sunny
+        if code in _RAIN_CODES:                               return +0.20
 
     return 0.0
+
+
+def _season_active(profile_key, lat=0.0):
+    """
+    True if the current calendar season matches the profile's target season.
+    Does not require a weather API call — uses local date only.
+    Latitude (from weather data when available) adjusts for hemisphere.
+    """
+    season = _current_season(lat)
+    return {
+        "autumn_mix":     season == "autumn",
+        "winter_mix":     season == "winter",
+        "spring_mix":     season == "spring",
+        "summer_evening": season == "summer",
+    }.get(profile_key, False)
 
 
 def _mood_rotation_score(profile_key, acoustic_dist, current_hour, weather):
     """
     Hybrid rotation score for mood mix selection. Lower = selected.
-    Base is acoustic distance; context (time/weather) applies reductions.
+    Base is acoustic distance; context (time/weather/soft-time) applies reductions.
     """
     score = acoustic_dist
 
-    # Time-of-day boost
+    # Hard time-of-day boost (time-managed profiles only)
     window = _TIME_BIASED_PROFILES.get(profile_key)
     if window and _in_time_window(current_hour, window):
         score -= 0.35  # strong enough to override pure acoustic fit
+
+    # Soft time boost (general-pool profiles with a time affinity)
+    soft = _TIME_SOFT_BOOSTS.get(profile_key)
+    if soft:
+        start, end, amount = soft
+        if _in_time_window(current_hour, (start, end)):
+            score -= amount
+
+    # Day-of-week boost (e.g. Friday Night only on Fri/Sat; Sunday Morning only on Sunday)
+    weekday_entry = _WEEKDAY_BOOSTS.get(profile_key)
+    if weekday_entry:
+        days, amount = weekday_entry
+        if datetime.now().weekday() in days:
+            score -= amount
 
     # Weather boost
     score += _weather_boost(profile_key, weather)
@@ -761,7 +1345,9 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
         if not entry:
             continue
         count = play_counts[rk]
-        for field in ("bpm", "energy", "danceability", "brightness", "year"):
+        for field in ("bpm", "energy", "danceability", "brightness", "year",
+                      "beat_confidence", "onset_rate", "dynamic_complexity",
+                      "integrated_loudness", "arousal", "valence", "vocal_presence"):
             val = entry.get(field)
             if val is not None:
                 wsum[field]   += val * count
@@ -772,11 +1358,18 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
             genres_counter[g] += count
 
     return {
-        "bpm":            wsum["bpm"]          / wcount["bpm"]          if wcount["bpm"]          else None,
-        "energy":         wsum["energy"]        / wcount["energy"]        if wcount["energy"]        else None,
-        "danceability":   wsum["danceability"]  / wcount["danceability"]  if wcount["danceability"]  else None,
-        "brightness":     wsum["brightness"]    / wcount["brightness"]    if wcount["brightness"]    else None,
-        "year":           wsum["year"]          / wcount["year"]          if wcount["year"]          else None,
+        "bpm":                wsum["bpm"]               / wcount["bpm"]               if wcount["bpm"]               else None,
+        "energy":             wsum["energy"]             / wcount["energy"]             if wcount["energy"]             else None,
+        "danceability":       wsum["danceability"]       / wcount["danceability"]       if wcount["danceability"]       else None,
+        "brightness":         wsum["brightness"]         / wcount["brightness"]         if wcount["brightness"]         else None,
+        "year":               wsum["year"]               / wcount["year"]               if wcount["year"]               else None,
+        "beat_confidence":    wsum["beat_confidence"]    / wcount["beat_confidence"]    if wcount["beat_confidence"]    else None,
+        "onset_rate":         wsum["onset_rate"]         / wcount["onset_rate"]         if wcount["onset_rate"]         else None,
+        "dynamic_complexity": wsum["dynamic_complexity"] / wcount["dynamic_complexity"] if wcount["dynamic_complexity"] else None,
+        "integrated_loudness":wsum["integrated_loudness"]/ wcount["integrated_loudness"]if wcount["integrated_loudness"]else None,
+        "arousal":            wsum["arousal"]            / wcount["arousal"]            if wcount["arousal"]            else None,
+        "valence":            wsum["valence"]            / wcount["valence"]            if wcount["valence"]            else None,
+        "vocal_presence":     wsum["vocal_presence"]     / wcount["vocal_presence"]     if wcount["vocal_presence"]     else None,
         "styles_counter": styles_counter,
         "genres_counter": genres_counter,
     }
@@ -786,6 +1379,9 @@ def _acoustic_distance_to_centroid(entry, centroid):
     """
     Normalised Euclidean distance between a track entry and a centroid.
     Returns 0.5 (neutral) when insufficient data is available.
+    New fields (beat_confidence, onset_rate, dynamic_complexity, arousal, valence,
+    vocal_presence) are None-safe — only scored when both entry and centroid have data,
+    so the function degrades gracefully on libraries without TF features or new columns.
     """
     pairs = []
     if entry.get("bpm") and centroid.get("bpm"):
@@ -798,6 +1394,18 @@ def _acoustic_distance_to_centroid(entry, centroid):
         pairs.append((entry["brightness"] - centroid["brightness"]) ** 2)
     if entry.get("year") and centroid.get("year"):
         pairs.append(min(abs(entry["year"] - centroid["year"]) / 100.0, 1.0) ** 2)
+    if entry.get("beat_confidence") is not None and centroid.get("beat_confidence") is not None:
+        pairs.append((entry["beat_confidence"] - centroid["beat_confidence"]) ** 2)
+    if entry.get("onset_rate") is not None and centroid.get("onset_rate") is not None:
+        pairs.append(min(abs(entry["onset_rate"] - centroid["onset_rate"]) / 10.0, 1.0) ** 2)
+    if entry.get("dynamic_complexity") is not None and centroid.get("dynamic_complexity") is not None:
+        pairs.append((entry["dynamic_complexity"] - centroid["dynamic_complexity"]) ** 2)
+    if entry.get("arousal") is not None and centroid.get("arousal") is not None:
+        pairs.append((entry["arousal"] - centroid["arousal"]) ** 2)
+    if entry.get("valence") is not None and centroid.get("valence") is not None:
+        pairs.append((entry["valence"] - centroid["valence"]) ** 2)
+    if entry.get("vocal_presence") is not None and centroid.get("vocal_presence") is not None:
+        pairs.append((entry["vocal_presence"] - centroid["vocal_presence"]) ** 2)
     if not pairs:
         return 0.5
     return min(math.sqrt(sum(pairs) / len(pairs)), 1.0)
@@ -1063,7 +1671,7 @@ def _make_gradient_image(w, h, color_top, color_bottom, diagonal=False):
     if diagonal and _NUMPY_AVAILABLE:
         x = np.linspace(0, 1, w, dtype=np.float32)
         y = np.linspace(0, 1, h, dtype=np.float32)
-        t = (x[np.newaxis, :] + y[:, np.newaxis]) / 2.0   # shape (h, w), 0..1
+        t = (x[np.newaxis, :] + y[:, np.newaxis]) / 2.0
         def _ch(a, b):
             return np.clip(a + t * (b - a), 0, 255).astype(np.uint8)
         arr = np.stack([
@@ -1074,7 +1682,6 @@ def _make_gradient_image(w, h, color_top, color_bottom, diagonal=False):
         ], axis=2)
         return Image.fromarray(arr, "RGBA")
 
-    # Fallback: vertical gradient
     img  = Image.new("RGBA", (w, h))
     draw = ImageDraw.Draw(img)
     for y_coord in range(h):
@@ -1088,77 +1695,246 @@ def _make_gradient_image(w, h, color_top, color_bottom, diagonal=False):
     return img
 
 
-def _apply_cover_text(img, title, subtitle=None):
-    """
-    Composite title + subtitle + Meloday+ branding onto img (RGBA).
+def _rotated_rect_points(cx, cy, w, h, angle_deg):
+    """4 corner points of a rectangle centred at (cx, cy) rotated by angle_deg."""
+    import math
+    rad = math.radians(angle_deg)
+    ca, sa = math.cos(rad), math.sin(rad)
+    hw, hh = w / 2, h / 2
+    corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+    return [(cx + dx * ca - dy * sa, cy + dx * sa + dy * ca) for dx, dy in corners]
 
-    Layout:
-      - Title:    Large (82px), left-aligned, anchored near the bottom — the hero element.
-      - Subtitle: Auto-sized single line, left-aligned, just below the title.
-      - Meloday+: Small brand mark (34px), top-right corner — present but unobtrusive.
+
+def _add_bottom_vignette(img, strength=175, coverage=0.55):
+    """Quadratic dark gradient over the bottom `coverage` fraction — improves text contrast."""
+    W, H = img.size
+    vignette = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(vignette)
+    start_y = int(H * (1.0 - coverage))
+    for y in range(start_y, H):
+        t = (y - start_y) / (H - start_y)
+        draw.line([(0, y), (W, y)], fill=(0, 0, 0, int(t * t * strength)))
+    return Image.alpha_composite(img, vignette)
+
+
+def _make_geometric_background(w, h, color_top, color_bottom):
+    """Diagonal gradient base with 5 large overlapping semi-transparent tilted strips.
+    Inspired by Spotify's Niche/Mood Mix aesthetic."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+
+    def _clamp(v): return max(0, min(255, v))
+    def _lighten(c, amt=55): return tuple(_clamp(v + amt) for v in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(v * fac) for v in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+
+    light = _lighten(color_top)
+    dark  = _darken(color_bottom)
+    mid   = _mid(color_top, color_bottom)
+
+    # (cx_frac, cy_frac, w_frac, h_frac, angle_deg, alpha, fill_rgb)
+    # Large strips that bleed off-canvas create the diagonal layering effect.
+    strips = [
+        (0.88, 0.10, 0.78, 1.90, 22, 55, light),  # upper-right, bright
+        (0.18, 0.90, 0.72, 1.80, 22, 50, dark),   # lower-left, deep
+        (0.52, 0.48, 0.60, 1.65, 22, 35, mid),    # centre stripe
+        (0.10, 0.22, 0.52, 1.45, -18, 32, light), # upper-left accent, opposite tilt
+        (0.82, 0.80, 0.55, 1.35, -18, 28, dark),  # lower-right accent
+    ]
+    for cx_f, cy_f, wf, hf, angle, alpha, color in strips:
+        pts = _rotated_rect_points(cx_f * w, cy_f * h, wf * w, hf * h, angle)
+        r, g, b = (_clamp(c) for c in color)
+        draw.polygon(pts, fill=(r, g, b, alpha))
+    return img
+
+
+def _make_concentric_circles_background(w, h, color_top, color_bottom):
+    """Concentric ring background — used for Time Capsule (Spotify radar aesthetic)."""
+    img  = _make_gradient_image(w, h, color_bottom, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    cx, cy = w // 2, int(h * 0.52)
+    n_rings, r_max = 10, int(w * 0.90)
+    for i in range(n_rings, 0, -1):
+        r   = int(r_max * i / n_rings)
+        t   = 1.0 - i / n_rings          # 0 = outermost ring, 1 = innermost
+        col = tuple(int(color_bottom[k] + t * (color_top[k] - color_bottom[k])) for k in range(3))
+        draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)],
+                     outline=(*col, 200), width=max(5, r // 7))
+    return img
+
+
+def _make_radial_glow_background(w, h, color_top, color_bottom):
+    """Soft radial glow — warm-coloured centre fades to cool dark edges.
+    Spotify daylist / Discover Weekly aesthetic. Requires numpy; falls back to diagonal
+    gradient."""
+    if not _NUMPY_AVAILABLE:
+        return _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    cx, cy = w * 0.50, h * 0.40
+    x  = np.linspace(0, w, w, dtype=np.float32)
+    y  = np.linspace(0, h, h, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+    dist = np.sqrt(((xx - cx) / (w * 0.62)) ** 2 + ((yy - cy) / (h * 0.62)) ** 2)
+    t    = np.clip(dist, 0.0, 1.0) ** 0.65   # gamma < 1 → broad warm centre
+    def _ch(a, b):
+        return np.clip(a + t * (b - a), 0, 255).astype(np.uint8)
+    arr = np.stack([
+        _ch(color_top[0], color_bottom[0]),
+        _ch(color_top[1], color_bottom[1]),
+        _ch(color_top[2], color_bottom[2]),
+        np.full((h, w), 255, np.uint8),
+    ], axis=2)
+    return Image.fromarray(arr, "RGBA")
+
+
+def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="default"):
+    """
+    Composite title + optional subtitle + Meloday+ badge onto img (RGBA).
+
+    text_style="default":
+      Meloday+ pill badge top-left. Title near bottom, split into lines:
+        2-word title  → word-per-line; second line in accent_color
+        "Daily Mix N" → "Daily Mix" label (90px) + large N (180px) in accent_color
+        "X … YYYY"    → title line white + year at 220px in accent_color (Spotify Top Songs)
+        other         → wrap_text fallback, all white
+      Subtitle in light font below.
+
+    text_style="bar":
+      Meloday+ pill badge top-left. Solid dark bar across bottom 22% of canvas.
+      Left accent stripe (10px) in accent_color. Title text white inside bar (single line).
     """
     W, H = img.size
     shadow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     text_layer   = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     shadow_draw  = ImageDraw.Draw(shadow_layer)
     text_draw    = ImageDraw.Draw(text_layer)
-
     margin = 60
 
-    try:
-        font_title = ImageFont.truetype(FONT_MAIN_PATH,    size=92)
-        font_brand = ImageFont.truetype(FONT_MELODAY_PATH, size=60)
-    except (IOError, OSError):
-        font_title = font_brand = ImageFont.load_default()
+    _accent_rgba = (*(accent_color or (255, 255, 255)), 255)
 
-    # --- "Meloday+" brand mark — small, top-right ---
-    brand = "Meloday+"
+    # --- Meloday+ pill badge (top-left, both styles) ---
     try:
-        mb = text_draw.textbbox((0, 0), brand, font=font_brand)
-        bx = W - margin - (mb[2] - mb[0])
-        shadow_draw.text((bx, 44), brand, font=font_brand, fill=(0, 0, 0, 100))
-        text_draw.text((bx, 44),   brand, font=font_brand, fill=(255, 255, 255, 180))
+        badge_font = ImageFont.truetype(FONT_MELODAY_PATH, size=26)
+        badge_text = "Meloday+"
+        bb   = text_draw.textbbox((0, 0), badge_text, font=badge_font)
+        bw   = bb[2] - bb[0] + 28
+        bh   = bb[3] - bb[1] + 16
+        bx, by = margin, 44
+        badge_draw = ImageDraw.Draw(text_layer)
+        try:
+            badge_draw.rounded_rectangle(
+                [(bx, by), (bx + bw, by + bh)],
+                radius=bh // 2, fill=(255, 255, 255, 230))
+        except AttributeError:
+            badge_draw.rectangle([(bx, by), (bx + bw, by + bh)], fill=(255, 255, 255, 230))
+        badge_draw.text((bx + 14, by + 8), badge_text, font=badge_font, fill=(20, 20, 20, 255))
     except Exception:
         pass
 
-    # --- Auto-size subtitle to fit on one line ---
+    # ======================================================== BAR STYLE
+    if text_style == "bar":
+        # Solid dark bar at bottom with left accent stripe — Spotify Niche/Mood Mix look.
+        BAR_H    = int(H * 0.22)
+        STRIPE_W = 10
+        bar_y    = H - BAR_H
+        bar_draw = ImageDraw.Draw(text_layer)
+        bar_draw.rectangle([(0, bar_y), (W, H)], fill=(0, 0, 0, 200))
+        if accent_color:
+            bar_draw.rectangle([(0, bar_y), (STRIPE_W, H)], fill=(*accent_color, 255))
+
+        bar_size = 58
+        try:
+            font_bar = ImageFont.truetype(FONT_MAIN_PATH, size=bar_size)
+        except (IOError, OSError):
+            font_bar = ImageFont.load_default()
+        text_x = STRIPE_W + 24
+        while bar_size > 32:
+            try:
+                font_bar = ImageFont.truetype(FONT_MAIN_PATH, size=bar_size)
+            except (IOError, OSError):
+                break
+            tb = text_draw.textbbox((0, 0), title, font=font_bar)
+            if (tb[2] - tb[0]) <= W - text_x - margin:
+                break
+            bar_size -= 3
+
+        tb = text_draw.textbbox((0, 0), title, font=font_bar)
+        ty = bar_y + (BAR_H - (tb[3] - tb[1])) // 2
+        shadow_draw.text((text_x, ty), title, font=font_bar, fill=(0, 0, 0, 120))
+        text_draw.text((text_x, ty),   title, font=font_bar, fill=(255, 255, 255, 255))
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=20))
+        result = Image.alpha_composite(img, shadow_layer)
+        return Image.alpha_composite(result, text_layer)
+
+    # ======================================================== DEFAULT STYLE
+    def _load_font(size):
+        try:
+            return ImageFont.truetype(FONT_MAIN_PATH, size=size)
+        except (IOError, OSError):
+            return ImageFont.load_default()
+
+    font_title = _load_font(92)
+    font_year  = _load_font(220)
+
+    # --- Auto-size subtitle ---
     font_sub = None
     if subtitle:
-        sub_size = 50
+        sub_size = 46
         try:
-            font_sub = ImageFont.truetype(FONT_MAIN_PATH, size=sub_size)
-            while sub_size > 30:
+            font_sub = ImageFont.truetype(FONT_LIGHT_PATH, size=sub_size)
+            while sub_size > 28:
                 sb = text_draw.textbbox((0, 0), subtitle, font=font_sub)
                 if (sb[2] - sb[0]) <= W - margin * 2:
                     break
                 sub_size -= 3
-                font_sub = ImageFont.truetype(FONT_MAIN_PATH, size=sub_size)
+                font_sub = ImageFont.truetype(FONT_LIGHT_PATH, size=sub_size)
         except (IOError, OSError):
             font_sub = ImageFont.load_default()
 
-    # --- Measure title height ---
-    title_lines = wrap_text(title, font_title, text_draw, W - margin * 2)
-    line_h = 0
-    for line in title_lines:
-        b = text_draw.textbbox((0, 0), line, font=font_title)
-        line_h = b[3] - b[1]
+    # --- Smart title segmentation — each segment: (text, color_rgba, font) ---
+    # "Daily Mix N" intentionally falls through to the wrap_text path so the full
+    # title renders as one large white line — matching the Spotify Daily Mix layout
+    # where the album art collage and tint carry the visual identity, not the number.
+    m_year = re.match(r'^(.+?)\s+(\d{4})$', title.strip())
+    words  = title.split()
 
-    # Always reserve the same vertical space for the subtitle zone so the title
-    # sits at a consistent position on every cover, whether or not there is a subtitle.
-    SUBTITLE_RESERVE = 68   # gap + subtitle line height at ~50px
-    title_block_h = len(title_lines) * (line_h + 8)
-    y_pos = H - 72 - SUBTITLE_RESERVE - title_block_h
+    if m_year:
+        # "Top Songs 2024" → white label + giant accent year (Spotify "Your Top Songs" style)
+        segments = [
+            (m_year.group(1), (255, 255, 255, 255), font_title),
+            (m_year.group(2), _accent_rgba,          font_year),
+        ]
+    elif len(words) == 2:
+        # Two-word title: word-per-line; second word in accent color
+        segments = [
+            (words[0], (255, 255, 255, 255), font_title),
+            (words[1], _accent_rgba,          font_title),
+        ]
+    else:
+        # Fallback: standard text wrap, all white
+        lines = wrap_text(title, font_title, text_draw, W - margin * 2)
+        segments = [(line, (255, 255, 255, 255), font_title) for line in lines]
 
-    # --- Draw title (left-aligned) ---
-    for line in title_lines:
-        b = text_draw.textbbox((0, 0), line, font=font_title)
-        shadow_draw.text((margin, y_pos), line, font=font_title, fill=(0, 0, 0, 160))
-        text_draw.text((margin, y_pos),   line, font=font_title, fill=(255, 255, 255, 255))
-        y_pos += b[3] - b[1] + 8
+    # --- Measure total title block height ---
+    LINE_GAP = 12
+    total_h = sum(
+        (text_draw.textbbox((0, 0), t, font=f)[3] - text_draw.textbbox((0, 0), t, font=f)[1]) + LINE_GAP
+        for t, _, f in segments
+    )
 
-    # --- Draw subtitle in the reserved zone below the title ---
+    SUBTITLE_RESERVE = 68
+    y_pos = H - 72 - SUBTITLE_RESERVE - total_h
+
+    # --- Draw title segments ---
+    for text, color, font in segments:
+        b  = text_draw.textbbox((0, 0), text, font=font)
+        lh = b[3] - b[1]
+        shadow_draw.text((margin, y_pos), text, font=font, fill=(0, 0, 0, 160))
+        text_draw.text((margin, y_pos),   text, font=font, fill=color)
+        y_pos += lh + LINE_GAP
+
+    # --- Subtitle ---
     if subtitle and font_sub:
-        sub_y = H - 72 - SUBTITLE_RESERVE + 20   # fixed position in the reserve area
+        sub_y = H - 72 - SUBTITLE_RESERVE + 20
         shadow_draw.text((margin, sub_y), subtitle, font=font_sub, fill=(0, 0, 0, 120))
         text_draw.text((margin, sub_y),   subtitle, font=font_sub, fill=(255, 255, 255, 200))
 
@@ -1193,15 +1969,27 @@ def _extract_dominant_color(image):
 
 def _generate_extras_cover(key, title, subtitle=None):
     """
-    Diagonal gradient cover for non-Daily-Mix playlists.
+    Styled cover for non-Daily-Mix playlists.
+    Background style per key (geometric / circles / radial).
+    Text style: "bar" for mood profiles (Spotify Niche Mix bottom-bar look),
+                "default" for all other extras (word-per-line split + accent last line).
+    Vignette + Meloday+ badge applied to all styles.
     Returns saved .webp path or None on failure.
     """
     if not _PIL_AVAILABLE:
         xlog("[WARN] PIL not available — cover generation skipped.")
         return None
     color_top, color_bottom = _EXTRAS_COVER_COLORS.get(key, ((50, 65, 110), (20, 30, 65)))
-    img    = _make_gradient_image(1000, 1000, color_top, color_bottom, diagonal=True)
-    result = _apply_cover_text(img, title, subtitle)
+    bg_style   = _COVER_BG_STYLES.get(key, "geometric")
+    text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
+    if bg_style == "circles":
+        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom)
+    elif bg_style == "radial":
+        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom)
+    else:
+        img = _make_geometric_background(1000, 1000, color_top, color_bottom)
+    img    = _add_bottom_vignette(img)
+    result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
     try:
         result.convert("RGB").save(out_path)
@@ -1265,8 +2053,10 @@ def _generate_daily_mix_cover(plex, tracks, mix_key, title, subtitle=None):
     tint_bottom = (int(r * 0.55), int(g * 0.55), int(b * 0.55), 165)
     tint = _make_gradient_image(W, H, tint_top, tint_bottom, diagonal=True)
     collage = Image.alpha_composite(collage, tint)
+    collage = _add_bottom_vignette(collage)
 
-    result = _apply_cover_text(collage, title, subtitle)
+    accent_rgb = tint_top[:3]   # dominant-colour-derived accent for the mix number
+    result = _apply_cover_text(collage, title, subtitle, accent_color=accent_rgb)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{mix_key}.webp")
     try:
         result.convert("RGB").save(out_path)
@@ -2198,6 +2988,34 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
 
 # --- 11. Mood / Activity Mixes ---
 
+
+def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
+    """
+    Greedy category-diversity selection.
+    `scored_profiles` is sorted (score, profile_key) ascending (lower = better fit).
+    Picks n_active profiles ensuring at most max_per_category from the same category,
+    then fills any remaining slots from the unselected remainder if needed.
+    """
+    cat_count = Counter()
+    selected  = []
+    remainder = []
+    for _, key in scored_profiles:
+        cat = _PROFILE_CATEGORY.get(key, "other")
+        if cat_count[cat] < max_per_category:
+            selected.append(key)
+            cat_count[cat] += 1
+        else:
+            remainder.append(key)
+        if len(selected) >= n_active:
+            break
+    # Fill gaps if strict diversity left us short
+    for key in remainder:
+        if len(selected) >= n_active:
+            break
+        selected.append(key)
+    return selected[:n_active]
+
+
 def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                      n_active=5, mix_size=50, reselect=False, time_context=False,
                      existing_playlists=None):
@@ -2205,17 +3023,16 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     Three operating modes:
 
     time_context=True  (boundary cron — 5am, noon, 5pm, 9pm, 10pm, 2am, 4am):
-        Only adds/removes time-of-day playlists (Morning, Dinner, Late Night, Sleep)
-        based on the current hour. Does NOT touch general or weather mixes.
-        Returns (mixes_to_upsert, profiles_to_delete).
+        Only adds/removes hard time-of-day playlists (Morning, Dinner, Late Night, Sleep).
+        Does NOT touch general, weather, or seasonal mixes.
 
     reselect=False (default, daily 6am):
-        Refreshes content for existing general mixes. Checks weather and
-        adds/removes weather mixes. Does NOT touch time-of-day mixes.
+        Refreshes content for existing general mixes. Checks weather and season;
+        adds/removes weather and seasonal mixes.
 
     reselect=True (weekly Monday):
-        Full acoustic reselection of general mixes. Also updates weather mixes.
-        Does NOT touch time-of-day mixes.
+        Full acoustic reselection of general mixes with category-diversity constraint.
+        Also updates weather and seasonal mixes.
 
     Returns (mixes, profiles_to_delete) where mixes is a list of
     (playlist_name, profile_key, tracks) tuples.
@@ -2224,7 +3041,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     existing     = existing_playlists or {}
 
     # ------------------------------------------------------------------
-    # MODE 1: Time-context — only manage time-of-day mixes
+    # MODE 1: Time-context — only manage hard time-of-day mixes
     # ------------------------------------------------------------------
     if time_context:
         current_hour = _get_active_hour()
@@ -2253,12 +3070,14 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return mixes, list(to_remove)
 
     # ------------------------------------------------------------------
-    # MODE 2 / 3: General + weather mixes (daily refresh or weekly reselect)
+    # MODE 2 / 3: General + weather + seasonal mixes
     # ------------------------------------------------------------------
     weather_location = _extras.get("weather_location")
     weather = _get_weather(weather_location) if weather_location else None
     if weather:
         xlog(f"[INFO] mood_mixes: weather = {weather['condition']}, {weather['temp_c']}°C")
+
+    lat = weather.get("lat", 0.0) if weather else 0.0
 
     # Determine which general profiles are active
     if not reselect:
@@ -2273,37 +3092,81 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
     if reselect:
         now = datetime.now(tz=timezone.utc)
-        recent_entries = [e for e in history_entries
-                          if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
+        current_hour    = _get_active_hour()
+        recent_entries  = [e for e in history_entries
+                           if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
         recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
         if recent_centroid.get("bpm"):
-            # Score only general profiles acoustically (no time/weather for stable weekly selection)
             scored = sorted(
-                (_acoustic_distance_to_centroid(target, recent_centroid), k)
+                (_mood_rotation_score(
+                     k,
+                     _acoustic_distance_to_centroid(target, recent_centroid),
+                     current_hour, weather
+                 ), k)
                 for k, target in _MOOD_PROFILES.items()
                 if k in _GENERAL_PROFILES
             )
-            active_general = [k for _, k in scored[:n_active]]
+            n_cats      = len(set(_PROFILE_CATEGORY.values()))
+            max_per_cat = max(1, math.ceil(n_active / n_cats))
+            active_general = _select_diverse_profiles(scored, n_active, max_per_category=max_per_cat)
         else:
             active_general = list(_GENERAL_PROFILES)[:n_active]
         xlog(f"[INFO] mood_mixes: reselected general profiles = {active_general}")
     else:
         xlog(f"[INFO] mood_mixes: content refresh for general = {active_general}")
+        # Gentle daily check: if the worst-fit active profile is significantly
+        # outscored by the best inactive one, do a single swap so rotation stays
+        # responsive between weekly reselections.
+        now             = datetime.now(tz=timezone.utc)
+        current_hour    = _get_active_hour()
+        recent_entries  = [e for e in history_entries
+                           if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
+        recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
+        if recent_centroid.get("bpm") and len(active_general) == n_active:
+            all_scored = {
+                k: _mood_rotation_score(
+                    k,
+                    _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
+                    current_hour, weather
+                )
+                for k in _GENERAL_PROFILES
+            }
+            active_set        = set(active_general)
+            worst_active      = max(active_set,   key=lambda k: all_scored[k])
+            candidates        = sorted((all_scored[k], k) for k in _GENERAL_PROFILES
+                                       if k not in active_set)
+            if candidates:
+                best_score, best_inactive = candidates[0]
+                if best_score < all_scored[worst_active] - 0.20:
+                    incoming_cat = _PROFILE_CATEGORY.get(best_inactive, "other")
+                    n_cats       = len(set(_PROFILE_CATEGORY.values()))
+                    max_per_cat  = max(1, math.ceil(n_active / n_cats))
+                    remaining_cats = Counter(
+                        _PROFILE_CATEGORY.get(k, "other")
+                        for k in active_set if k != worst_active
+                    )
+                    if remaining_cats[incoming_cat] < max_per_cat:
+                        active_general.remove(worst_active)
+                        active_general.append(best_inactive)
+                        xlog(f"[INFO] mood_mixes: daily swap {worst_active} → {best_inactive} "
+                             f"(scores {all_scored[worst_active]:.3f} vs {best_score:.3f})")
 
-    # Determine weather profiles: add if conditions match, remove if not
-    active_weather = [
-        k for k in _WEATHER_PROFILES
-        if _weather_boost(k, weather) < 0  # negative boost = conditions match
-    ]
-    inactive_weather = [
-        k for k in _WEATHER_PROFILES
-        if k not in active_weather
-    ]
-    # Remove inactive weather mixes that are currently in Plex
-    to_remove = [k for k in inactive_weather if _MOOD_MIX_NAMES[k] in existing]
+    # Weather-conditional profiles
+    active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
+    inactive_weather = [k for k in _WEATHER_PROFILES if k not in active_weather]
 
-    active_profiles = active_general + active_weather
-    xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather}")
+    # Season-conditional profiles (work without weather API)
+    active_seasonal   = [k for k in _SEASONAL_PROFILES if _season_active(k, lat)]
+    inactive_seasonal = [k for k in _SEASONAL_PROFILES if k not in active_seasonal]
+
+    to_remove = (
+        [k for k in inactive_weather  if _MOOD_MIX_NAMES[k] in existing] +
+        [k for k in inactive_seasonal if _MOOD_MIX_NAMES[k] in existing]
+    )
+
+    active_profiles = active_general + active_weather + active_seasonal
+    xlog(f"[INFO] mood_mixes: active = general{active_general} "
+         f"+ weather{active_weather} + seasonal{active_seasonal}")
 
     mixes = []
     for profile_key in active_profiles:
@@ -2312,17 +3175,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
             excluded_album_keys, mix_size, plex)
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
-    # On reselect, also remove general mixes that rotated out
+    # On reselect, remove general mixes that rotated out
     if reselect:
         for name, key in name_to_key.items():
             if key in _GENERAL_PROFILES and key not in active_general and name in existing:
                 to_remove.append(key)
 
     return mixes, to_remove
-
-    # This block is now dead — all paths return early above.
-    # Kept as a safety fallback.
-    return [], []
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
@@ -2431,6 +3290,7 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
         _upsert_extras_playlist(plex, "Release Radar • Meloday+", tracks,
             _pick_description("release_radar"),
             cover_key="release_radar", cover_title="Release Radar",
+            cover_tracks=tracks,
             existing_playlists=ep)
 
     elif playlist_id == "discover_weekly":

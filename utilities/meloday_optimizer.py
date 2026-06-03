@@ -516,6 +516,16 @@ def run_optimizer():
         if dance_coverage_pct < 50:
             log_msg(f"\n[NOTE] Only {dance_coverage_pct:.1f}% of cached tracks have danceability/brightness data.")
             log_msg(f"       Run pre_analyze.py to backfill — weights will be more accurate with higher coverage.")
+        # Show the newer acoustic weights as user-configured (not tuned by optimizer)
+        _new_weight_keys = [
+            "beat_confidence_weight", "onset_rate_weight",
+            "arousal_weight", "valence_weight", "vocal_weight",
+        ]
+        _new_weights = {k: ess_cfg.get(k) for k in _new_weight_keys if ess_cfg.get(k) is not None}
+        if _new_weights:
+            log_msg(f"\n  The following weights are user-configured (not tuned by optimizer):")
+            for k, v in _new_weights.items():
+                log_msg(f"    {k}: {v}")
     else:
         log_msg("\n[INFO] Acoustic weight recommendations (bpm_weight, key_weight, energy_weight, era_weight) skipped —")
         log_msg("       no Essentia data found in cache. Set essentia: enabled: true in config.yml and")

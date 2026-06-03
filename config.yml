@@ -27,6 +27,12 @@ essentia:
   era_weight: 0.05                                  # Influence of production era (year)
   danceability_weight: 0.08                         # Influence of rhythmic danceability difference
   brightness_weight: 0.06                           # Influence of spectral brightness (tonal darkness vs brightness)
+  beat_confidence_weight: 0.07                      # Influence of beat/groove strength difference
+  onset_rate_weight: 0.05                           # Influence of arrangement density difference
+  arousal_weight: 0.10                              # Influence of arousal (energy/activation) difference — TF only
+  valence_weight: 0.08                              # Influence of valence (positive/negative mood) difference — TF only
+  vocal_weight: 0.04                                # Influence of vocal presence difference — TF only
+  models_dir: assets/models                         # Directory containing essentia-tensorflow .pb model files
   path_mapping: {}                                  # Optional: {"/remote/path/": "/local/path/"} if script/server paths differ
 
 bridging:
@@ -64,6 +70,7 @@ directories:
 fonts:
   main: "Circular/Circular-Bold.ttf"                # Primary font used for playlist covers
   meloday: "Circular/Circular-Bold.ttf"             # Specific font for "Meloday" branding on covers
+  light: "Circular/Circular-Book.ttf"               # Lighter-weight font for subtitles (falls back to main if missing)
 
 
 time_periods:
@@ -100,7 +107,7 @@ extras:
   lastfm_api_key:               # Optional: enables Last.fm popularity ranking in Release Radar
   lastfm_api_secret:            # Optional: required alongside lastfm_api_key
   top_songs_start_year: 2020    # Earliest year to generate a Top Songs playlist for (set to the year you started using Plex)
-  mood_mix_count: 5             # Number of mood/activity mixes to show at once (from 14 profiles, rotates based on listening + time + weather)
+  mood_mix_count: 5             # Number of mood/activity mixes to show at once (from 73 profiles, rotates based on listening + time + weather)
   weather_location:             # Optional: city name, coordinates, or airport code (e.g. "Sydney") — enables weather-triggered mood mixes
 
 files:

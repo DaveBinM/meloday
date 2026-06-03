@@ -1,8 +1,9 @@
 import yaml
 import os
 
-# This must happen before any essentia imports to stop the SVM Info messages
-os.environ['ESSENTIA_LOG_LEVEL'] = '1' 
+# These must be set before any essentia/TF imports — the C++ runtimes read them during dlopen
+os.environ['ESSENTIA_LOG_LEVEL']    = '1'   # suppress essentia SVM info messages
+os.environ['TF_CPP_MIN_LOG_LEVEL']  = '2'   # suppress TF INFO+WARNING (incl. CUDA probe noise)
 
 import re
 import random
@@ -126,13 +127,49 @@ ESSENTIA_CACHE_PATH = resolve_path(ess_cfg.get("cache_path", "assets/essentia_ca
 # Auto-upgrade: if config still references the old .json path, silently redirect to .db
 if ESSENTIA_CACHE_PATH.endswith('.json'):
     ESSENTIA_CACHE_PATH = ESSENTIA_CACHE_PATH[:-5] + '.db'
-BPM_WEIGHT = ess_cfg.get("bpm_weight", 0.15)
-KEY_WEIGHT = ess_cfg.get("key_weight", 0.10)
-ENERGY_WEIGHT = ess_cfg.get("energy_weight", 0.10)
-ERA_WEIGHT = ess_cfg.get("era_weight", 0.05)
-DANCEABILITY_WEIGHT = ess_cfg.get("danceability_weight", 0.08)
-BRIGHTNESS_WEIGHT = ess_cfg.get("brightness_weight", 0.06)
-PATH_MAPPING = ess_cfg.get("path_mapping", {})
+BPM_WEIGHT           = ess_cfg.get("bpm_weight",            0.15)
+KEY_WEIGHT           = ess_cfg.get("key_weight",            0.10)
+ENERGY_WEIGHT        = ess_cfg.get("energy_weight",         0.10)
+ERA_WEIGHT           = ess_cfg.get("era_weight",            0.05)
+DANCEABILITY_WEIGHT  = ess_cfg.get("danceability_weight",   0.08)
+BRIGHTNESS_WEIGHT    = ess_cfg.get("brightness_weight",     0.06)
+BEAT_CONF_WEIGHT     = ess_cfg.get("beat_confidence_weight", 0.07)
+ONSET_RATE_WEIGHT    = ess_cfg.get("onset_rate_weight",      0.05)
+AROUSAL_WEIGHT       = ess_cfg.get("arousal_weight",         0.10)
+VALENCE_WEIGHT       = ess_cfg.get("valence_weight",         0.08)
+VOCAL_WEIGHT         = ess_cfg.get("vocal_weight",           0.04)
+PATH_MAPPING         = ess_cfg.get("path_mapping", {})
+
+# Optional TF model inference (requires essentia-tensorflow + downloaded model files).
+# Falls back silently when the package or model files are absent.
+_TF_AVAILABLE     = False
+_TF_MODELS_LOADED = False
+_effnet_model = _av_model = _vocal_model = None
+
+# MELODAY_SKIP_TF_MODELS is set by pre_analyze.py in the main process before spawning
+# workers. With 'spawn' context, workers re-import meloday.py; loading the TF C++
+# runtime + three .pb models in every worker simultaneously uses ~700 MB–1 GB per
+# worker and causes OOM on typical servers. Workers skip TF loading entirely;
+# arousal/valence/vocal_presence are filled later during meloday.py playlist runs.
+if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
+    try:
+        _probe = getattr(es, "TensorflowPredictEffnetDiscogs", None)
+        if _probe is not None:
+            _TF_AVAILABLE = True
+            _models_dir  = resolve_path(ess_cfg.get("models_dir", "assets/models"), BASE_DIR)
+            _effnet_path = os.path.join(_models_dir, "discogs-effnet-bs64-1.pb")
+            _av_path     = os.path.join(_models_dir, "deam-msd-musicnn-2.pb")
+            _vocal_path  = os.path.join(_models_dir, "voice_instrumental-discogs-effnet-1.pb")
+            if all(os.path.isfile(p) for p in [_effnet_path, _av_path, _vocal_path]):
+                _effnet_model = es.TensorflowPredictEffnetDiscogs(
+                    graphFilename=_effnet_path, output="PartitionedCall:1")
+                _av_model     = es.TensorflowPredict2D(
+                    graphFilename=_av_path,     output="model/Identity:0")
+                _vocal_model  = es.TensorflowPredict2D(
+                    graphFilename=_vocal_path,  output="model/Softmax")
+                _TF_MODELS_LOADED = True
+    except Exception:
+        pass
 
 # Bridging Configuration
 BRIDGING_ENABLED = config.get("bridging", {}).get("enabled", True)
@@ -149,8 +186,11 @@ XMAS_END_DAY     = xmas_cfg.get("end_day", 25)
 COVER_IMAGE_DIR = resolve_path(config["directories"]["cover_images"], BASE_DIR)
 FONTS_DIR       = resolve_path(config["directories"]["fonts"], BASE_DIR)
 MOOD_MAP_PATH   = resolve_path(config["files"]["mood_map"], BASE_DIR)
-FONT_MAIN_PATH   = resolve_path(config["fonts"]["main"], FONTS_DIR)
+FONT_MAIN_PATH    = resolve_path(config["fonts"]["main"],    FONTS_DIR)
 FONT_MELODAY_PATH = resolve_path(config["fonts"]["meloday"], FONTS_DIR)
+FONT_LIGHT_PATH   = resolve_path(
+    config.get("fonts", {}).get("light", config["fonts"]["main"]), FONTS_DIR
+)
 
 # Musical Data Maps
 CAMELOT_MAP = {
@@ -308,15 +348,19 @@ def prefetch_label_exclusions():
 _UPSERT_SQL = """
     INSERT OR REPLACE INTO essentia_cache
     (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
-     track_updated_at, album_updated_at, artist_updated_at, danceability, brightness)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     track_updated_at, album_updated_at, artist_updated_at, danceability, brightness,
+     beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
+     arousal, valence, vocal_presence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
     "rating_key TEXT PRIMARY KEY NOT NULL, "
     "bpm REAL, key TEXT, energy REAL, danceability REAL, brightness REAL, "
     "year INTEGER, artist TEXT, genres TEXT, styles TEXT, moods TEXT, "
-    "file_path TEXT, track_updated_at REAL, album_updated_at REAL, artist_updated_at REAL"
+    "file_path TEXT, track_updated_at REAL, album_updated_at REAL, artist_updated_at REAL, "
+    "beat_confidence REAL, integrated_loudness REAL, onset_rate REAL, dynamic_complexity REAL, "
+    "arousal REAL, valence REAL, vocal_presence REAL"
 )
 
 def _ensure_db_schema(conn):
@@ -326,12 +370,19 @@ def _ensure_db_schema(conn):
 
     # Step 1: Add any columns missing from older databases
     for col_name, col_def in (
-        ("styles",             "styles TEXT"),
-        ("danceability",       "danceability REAL"),
-        ("brightness",         "brightness REAL"),
-        ("track_updated_at",   "track_updated_at REAL"),
-        ("album_updated_at",   "album_updated_at REAL"),
-        ("artist_updated_at",  "artist_updated_at REAL"),
+        ("styles",               "styles TEXT"),
+        ("danceability",         "danceability REAL"),
+        ("brightness",           "brightness REAL"),
+        ("track_updated_at",     "track_updated_at REAL"),
+        ("album_updated_at",     "album_updated_at REAL"),
+        ("artist_updated_at",    "artist_updated_at REAL"),
+        ("beat_confidence",      "beat_confidence REAL"),
+        ("integrated_loudness",  "integrated_loudness REAL"),
+        ("onset_rate",           "onset_rate REAL"),
+        ("dynamic_complexity",   "dynamic_complexity REAL"),
+        ("arousal",              "arousal REAL"),
+        ("valence",              "valence REAL"),
+        ("vocal_presence",       "vocal_presence REAL"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -348,7 +399,8 @@ def _ensure_db_schema(conn):
     needs_reorder = (
         "track_updated_at" not in col_names or
         "last_synced" in col_names or
-        ("danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1)
+        ("danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1) or
+        "beat_confidence" not in col_names
     )
     if needs_reorder:
         m_print("[INFO] DB migration: reordering table to canonical schema...")
@@ -365,20 +417,34 @@ def _ensure_db_schema(conn):
             m_print(f"[WARN] DB migration: could not back up database: {backup_err}")
         try:
             # Map last_synced → track_updated_at for backward compat; album/artist default to NULL.
-            has_last_synced = "last_synced" in col_names
-            has_dance       = "danceability" in col_names
-            has_bright      = "brightness" in col_names
+            has_last_synced = "last_synced"           in col_names
+            has_dance       = "danceability"         in col_names
+            has_bright      = "brightness"           in col_names
+            has_beat_conf   = "beat_confidence"      in col_names
+            has_int_loud    = "integrated_loudness"  in col_names
+            has_onset       = "onset_rate"           in col_names
+            has_dyn_comp    = "dynamic_complexity"   in col_names
+            has_arousal     = "arousal"              in col_names
+            has_valence     = "valence"              in col_names
+            has_vocal       = "vocal_presence"       in col_names
             conn.execute("DROP TABLE IF EXISTS essentia_cache_reordered")
             conn.execute(f"CREATE TABLE essentia_cache_reordered ({_CANONICAL_COLUMNS})")
             conn.execute(f"""
                 INSERT INTO essentia_cache_reordered
                 SELECT rating_key, bpm, key, energy,
-                       {'danceability' if has_dance else 'NULL'},
-                       {'brightness'   if has_bright else 'NULL'},
+                       {'danceability'        if has_dance     else 'NULL'},
+                       {'brightness'          if has_bright    else 'NULL'},
                        year, artist, genres, styles, moods, file_path,
-                       {'last_synced' if has_last_synced else 'NULL'} AS track_updated_at,
+                       {'last_synced'         if has_last_synced else 'NULL'} AS track_updated_at,
                        NULL AS album_updated_at,
-                       NULL AS artist_updated_at
+                       NULL AS artist_updated_at,
+                       {'beat_confidence'     if has_beat_conf else 'NULL'} AS beat_confidence,
+                       {'integrated_loudness' if has_int_loud  else 'NULL'} AS integrated_loudness,
+                       {'onset_rate'          if has_onset     else 'NULL'} AS onset_rate,
+                       {'dynamic_complexity'  if has_dyn_comp  else 'NULL'} AS dynamic_complexity,
+                       {'arousal'             if has_arousal   else 'NULL'} AS arousal,
+                       {'valence'             if has_valence   else 'NULL'} AS valence,
+                       {'vocal_presence'      if has_vocal     else 'NULL'} AS vocal_presence
                 FROM essentia_cache
             """)
             conn.commit()
@@ -398,12 +464,17 @@ def _entry_to_row(rk, d):
             json.dumps(d.get("styles") or []),
             json.dumps(d.get("moods") or []), d.get("file_path"),
             d.get("track_updated_at"), d.get("album_updated_at"), d.get("artist_updated_at"),
-            d.get("danceability"), d.get("brightness"))
+            d.get("danceability"), d.get("brightness"),
+            d.get("beat_confidence"), d.get("integrated_loudness"),
+            d.get("onset_rate"), d.get("dynamic_complexity"),
+            d.get("arousal"), d.get("valence"), d.get("vocal_presence"))
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
         genres_j, styles_j, moods_j, file_path, \
-        track_updated_at, album_updated_at, artist_updated_at = row
+        track_updated_at, album_updated_at, artist_updated_at, \
+        beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
+        arousal, valence, vocal_presence = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -414,6 +485,13 @@ def _row_to_entry(row):
         "track_updated_at": track_updated_at,
         "album_updated_at": album_updated_at,
         "artist_updated_at": artist_updated_at,
+        "beat_confidence": beat_confidence,
+        "integrated_loudness": integrated_loudness,
+        "onset_rate": onset_rate,
+        "dynamic_complexity": dynamic_complexity,
+        "arousal": arousal,
+        "valence": valence,
+        "vocal_presence": vocal_presence,
     }
 
 def _migrate_json_to_sqlite():
@@ -446,7 +524,9 @@ def load_essentia_cache():
         _ensure_db_schema(conn)
         rows = conn.execute(
             "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
-            "track_updated_at, album_updated_at, artist_updated_at "
+            "track_updated_at, album_updated_at, artist_updated_at, "
+            "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
+            "arousal, valence, vocal_presence "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -500,46 +580,121 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
     If audio is already loaded (full analysis path), pass it to avoid a second decode.
     Only runs the algorithms required for the missing fields."""
     needs_bpm        = data.get("bpm") is None
+    needs_beat_conf  = data.get("beat_confidence") is None
     needs_key        = data.get("key") is None
     needs_energy     = data.get("energy") is None
+    needs_int_loud   = data.get("integrated_loudness") is None
     needs_dance      = data.get("danceability") is None
     needs_brightness = data.get("brightness") is None
+    needs_onset      = data.get("onset_rate") is None
+    needs_dyn_comp   = data.get("dynamic_complexity") is None
+    needs_tf         = (data.get("arousal") is None or data.get("valence") is None
+                        or data.get("vocal_presence") is None)
 
-    if not any([needs_bpm, needs_key, needs_energy, needs_dance, needs_brightness]):
+    if not any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
+                needs_dance, needs_brightness, needs_onset, needs_dyn_comp,
+                needs_tf and _TF_MODELS_LOADED]):
         return
 
     if audio is None:
         audio = es.MonoLoader(filename=file_path)()
 
-    if needs_bpm:
-        bpm = es.RhythmExtractor2013(method="multifeature")(audio)[0]
-        if bpm >= 250:
-            bpm_retry = es.RhythmExtractor2013(method="degara")(audio)[0]
-            bpm = bpm_retry if bpm_retry < 250 else None
-            if bpm is None and track_title:
-                log_text(f"[WARN] BPM >= 250 for '{track_title}' after retry — storing as null (excluded from weight calculations).")
-        data["bpm"] = round(bpm, 2) if bpm is not None else None
+    # Each algorithm block is isolated in its own try/except so a failure in one
+    # field does not prevent the remaining fields from being computed.
+
+    # BPM + beat confidence share the same RhythmExtractor2013 call
+    if needs_bpm or needs_beat_conf:
+        try:
+            rhythm_result = es.RhythmExtractor2013(method="multifeature")(audio)
+            bpm        = rhythm_result[0]
+            confidence = rhythm_result[2]
+            if needs_bpm:
+                if bpm >= 250:
+                    bpm_retry = es.RhythmExtractor2013(method="degara")(audio)[0]
+                    bpm = bpm_retry if bpm_retry < 250 else None
+                    if bpm is None and track_title:
+                        log_text(f"[WARN] BPM >= 250 for '{track_title}' after retry — storing as null (excluded from weight calculations).")
+                data["bpm"] = round(bpm, 2) if bpm is not None else None
+            if needs_beat_conf:
+                data["beat_confidence"] = round(float(confidence), 4)
+        except Exception as e:
+            if track_title:
+                log_text(f"[WARN] BPM/beat_confidence failed for '{track_title}': {e}")
 
     if needs_key:
-        key_alg = es.KeyExtractor()(audio)
-        data["key"] = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
+        try:
+            key_alg = es.KeyExtractor()(audio)
+            data["key"] = CAMELOT_MAP.get(f"{key_alg[0]} {key_alg[1]}", "0A")
+        except Exception:
+            pass
 
-    if needs_energy:
-        audio_stereo = es.StereoMuxer()(audio, audio)
-        data["energy"] = round(es.LoudnessEBUR128()(audio_stereo)[2], 2)
+    # energy (integratedLoudness, LUFS) and integrated_loudness (loudnessRange, LU) both come
+    # from a single LoudnessEBUR128 call. LoudnessEBUR128 output tuple:
+    #   [0] momentaryLoudness  — vector_real (one value per 400 ms block)
+    #   [1] shortTermLoudness  — vector_real (one value per 3 s block)
+    #   [2] integratedLoudness — real scalar, LUFS  → stored as "energy"
+    #   [3] loudnessRange      — real scalar, LU    → stored as "integrated_loudness"
+    # numpy column_stack creates the (N, 2) stereo array LoudnessEBUR128 expects — avoids
+    # a dependency on es.StereoMuxer which is a streaming-only algorithm in some builds.
+    if needs_energy or needs_int_loud:
+        try:
+            import numpy as _np
+            audio_stereo = _np.column_stack([audio, audio])
+            ebur = es.LoudnessEBUR128()(audio_stereo)
+            if needs_energy:
+                data["energy"] = round(float(ebur[2]), 2)
+            if needs_int_loud:
+                data["integrated_loudness"] = round(float(ebur[3]), 4)
+        except Exception as e:
+            if track_title:
+                log_text(f"[WARN] LoudnessEBUR128 failed for '{track_title}': {e}")
 
     if needs_dance:
-        data["danceability"] = round(min(float(es.Danceability()(audio)[0]) / 3.0, 1.0), 4)
+        try:
+            data["danceability"] = round(min(float(es.Danceability()(audio)[0]) / 3.0, 1.0), 4)
+        except Exception:
+            pass
 
     if needs_brightness:
-        _w = es.Windowing(type='hann')
-        _spec = es.Spectrum()
-        _centroid = es.Centroid(range=1.0)
-        brightness_frames = [
-            _centroid(_spec(_w(frame)))
-            for frame in es.FrameGenerator(audio, frameSize=2048, hopSize=1024, startFromZero=True)
-        ]
-        data["brightness"] = round(float(sum(brightness_frames) / len(brightness_frames)), 4) if brightness_frames else 0.0
+        try:
+            _w = es.Windowing(type='hann')
+            _spec = es.Spectrum()
+            _centroid = es.Centroid(range=1.0)
+            brightness_frames = [
+                _centroid(_spec(_w(frame)))
+                for frame in es.FrameGenerator(audio, frameSize=2048, hopSize=1024, startFromZero=True)
+            ]
+            data["brightness"] = round(float(sum(brightness_frames) / len(brightness_frames)), 4) if brightness_frames else 0.0
+        except Exception:
+            pass
+
+    if needs_onset:
+        try:
+            # OnsetRate returns (onsets_times_array, onset_rate_scalar) — index [1] is the rate.
+            data["onset_rate"] = round(float(es.OnsetRate()(audio)[1]), 4)
+        except Exception as e:
+            if track_title:
+                log_text(f"[WARN] OnsetRate failed for '{track_title}': {e}")
+
+    if needs_dyn_comp:
+        try:
+            data["dynamic_complexity"] = round(float(es.DynamicComplexity()(audio)[0]), 4)
+        except Exception:
+            pass
+
+    if needs_tf and _TF_MODELS_LOADED:
+        try:
+            embeddings = _effnet_model(audio)
+            av  = _av_model(embeddings)
+            voc = _vocal_model(embeddings)
+            if data.get("arousal") is None:
+                data["arousal"]        = round(float(av[:, 0].mean()), 4)
+            if data.get("valence") is None:
+                data["valence"]        = round(float(av[:, 1].mean()), 4)
+            if data.get("vocal_presence") is None:
+                data["vocal_presence"] = round(float(voc[:, 0].mean()), 4)
+        except Exception as tf_err:
+            log_text(f"[WARN] TF inference failed: {tf_err}")
 
 def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
     rk = str(track.ratingKey)
@@ -626,6 +781,9 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "track_updated_at": plex_track_ts,
             "album_updated_at": plex_album_ts,
             "artist_updated_at": plex_artist_ts,
+            "beat_confidence": None, "integrated_loudness": None,
+            "onset_rate": None, "dynamic_complexity": None,
+            "arousal": None, "valence": None, "vocal_presence": None,
         }
         _essentia_cache[rk] = data
         return data
@@ -653,6 +811,9 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "track_updated_at": plex_track_ts,
             "album_updated_at": plex_album_ts,
             "artist_updated_at": plex_artist_ts,
+            "beat_confidence": None, "integrated_loudness": None,
+            "onset_rate": None, "dynamic_complexity": None,
+            "arousal": None, "valence": None, "vocal_presence": None,
         }
         log_text(f"[DIAGNOSTIC] Skipping Essentia for '{track.title}' ({duration_ms // 60000}m — too long for RhythmExtractor).")
         _essentia_cache[rk] = data
@@ -681,6 +842,9 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "track_updated_at": plex_track_ts,
             "album_updated_at": plex_album_ts,
             "artist_updated_at": plex_artist_ts,
+            "beat_confidence": None, "integrated_loudness": None,
+            "onset_rate": None, "dynamic_complexity": None,
+            "arousal": None, "valence": None, "vocal_presence": None,
         }
         _fill_missing_acoustic(data, file_path, audio=audio, track_title=track.title)
         _essentia_cache[rk] = data
@@ -1754,6 +1918,23 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
             if ea.get("brightness") is not None and eb.get("brightness") is not None:
                 bright_diff = abs(ea["brightness"] - eb["brightness"])
                 dist += (bright_diff ** 2) * BRIGHTNESS_WEIGHT
+
+            # Beat confidence jump — penalises transitions from strong-groove to loose/ambient
+            if ea.get("beat_confidence") is not None and eb.get("beat_confidence") is not None:
+                bc_diff = abs(ea["beat_confidence"] - eb["beat_confidence"])
+                dist += (bc_diff ** 2) * BEAT_CONF_WEIGHT
+
+            # Onset rate jump — penalises transitions between dense and sparse arrangements
+            if ea.get("onset_rate") is not None and eb.get("onset_rate") is not None:
+                or_diff = min(abs(ea["onset_rate"] - eb["onset_rate"]) / 10.0, 1.0)
+                dist += (or_diff ** 2) * ONSET_RATE_WEIGHT
+
+            # Arousal/valence/vocal jumps (TF features — only applied when both entries have data)
+            if ea.get("arousal") is not None and eb.get("arousal") is not None:
+                dist += ((ea["arousal"] - eb["arousal"]) ** 2) * AROUSAL_WEIGHT
+                dist += ((ea["valence"] - eb["valence"]) ** 2) * VALENCE_WEIGHT
+            if ea.get("vocal_presence") is not None and eb.get("vocal_presence") is not None:
+                dist += ((ea["vocal_presence"] - eb["vocal_presence"]) ** 2) * VOCAL_WEIGHT
 
             # Bridge Bonus Logic: Reward sonic compatibility across different styles/genres.
             # Uses styles as the primary diversity axis (373 tags vs 43 genres — more granular).
