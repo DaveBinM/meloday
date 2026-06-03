@@ -2906,7 +2906,7 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
 
     # --- Meloday+ pill badge (top-left, both styles) ---
     try:
-        badge_font = ImageFont.truetype(FONT_MELODAY_PATH, size=26)
+        badge_font = ImageFont.truetype(FONT_MELODAY_PATH, size=30)
         badge_text = "Meloday+"
         bb   = text_draw.textbbox((0, 0), badge_text, font=badge_font)
         bw   = bb[2] - bb[0] + 28
@@ -2934,13 +2934,13 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
         if accent_color:
             bar_draw.rectangle([(0, bar_y), (STRIPE_W, H)], fill=(*accent_color, 255))
 
-        bar_size = 58
+        bar_size = 76
         try:
             font_bar = ImageFont.truetype(FONT_MAIN_PATH, size=bar_size)
         except (IOError, OSError):
             font_bar = ImageFont.load_default()
         text_x = STRIPE_W + 24
-        while bar_size > 32:
+        while bar_size > 48:
             try:
                 font_bar = ImageFont.truetype(FONT_MAIN_PATH, size=bar_size)
             except (IOError, OSError):
@@ -2965,16 +2965,16 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
         except (IOError, OSError):
             return ImageFont.load_default()
 
-    font_title = _load_font(92)
+    font_title = _load_font(108)
     font_year  = _load_font(220)
 
     # --- Auto-size subtitle ---
     font_sub = None
     if subtitle:
-        sub_size = 46
+        sub_size = 54
         try:
             font_sub = ImageFont.truetype(FONT_LIGHT_PATH, size=sub_size)
-            while sub_size > 28:
+            while sub_size > 38:
                 sb = text_draw.textbbox((0, 0), subtitle, font=font_sub)
                 if (sb[2] - sb[0]) <= W - margin * 2:
                     break
@@ -3014,7 +3014,7 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
         for t, _, f in segments
     )
 
-    SUBTITLE_RESERVE = 68
+    SUBTITLE_RESERVE = 78
     y_pos = H - 72 - SUBTITLE_RESERVE - total_h
 
     # --- Draw title segments ---
