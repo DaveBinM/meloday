@@ -1384,7 +1384,7 @@ _TIME_BIASED_PROFILES = {
 # Soft time boosts — general-pool profiles that score better during a time window
 # but are NOT managed by the boundary cron. (start_hour, end_hour, reduction_amount)
 _TIME_SOFT_BOOSTS = {
-    "brunch_mix":         ( 9, 15, 0.12),   # 9am–3pm
+    "brunch_mix":         ( 9, 13, 0.12),   # 9am–1pm
     "golden_hour":        (15, 20, 0.15),   # 3pm–8pm
     "after_work":         (16, 20, 0.12),   # 4pm–8pm
     "sunset_mix":         (17, 22, 0.15),   # 5pm–10pm
@@ -1406,7 +1406,7 @@ _TIME_SOFT_BOOSTS = {
 # Day-of-week boosts — applied on top of soft time boosts for profiles with a natural weekday.
 # 0=Monday … 6=Sunday. Amount is an additional score reduction (lower = more likely selected).
 _WEEKDAY_BOOSTS = {
-    "friday_night":    ({4, 5},  0.15),   # Fri/Sat evenings
+    "friday_night":    ({4},     0.15),   # Friday evenings
     "pre_party":       ({4, 5},  0.10),   # Fri/Sat
     "weekend_mix":     ({5, 6},  0.10),   # Sat/Sun all day
     "brunch_mix":      ({5, 6},  0.08),   # Weekend brunch
@@ -1422,7 +1422,7 @@ _WEEKDAY_BOOSTS = {
 # Different from _WEEKDAY_BOOSTS (score reduction only) — these are hard exclusions.
 # 0=Monday … 6=Sunday.
 _WEEKDAY_RESTRICTED = {
-    "friday_night":   {4, 5},            # Fri/Sat only
+    "friday_night":   {4},               # Friday only
     "pre_party":      {4, 5},            # Fri/Sat only
     "weekend_mix":    {5, 6},            # Sat/Sun only
     "brunch_mix":     {5, 6},            # Sat/Sun only
@@ -1436,6 +1436,7 @@ _WEEKDAY_RESTRICTED = {
 # window. (start_hour, end_hour) in 0–23; if start > end the window wraps past midnight.
 # Profiles not listed here are always eligible.
 _HOUR_RESTRICTED = {
+    "brunch_mix":       ( 8, 13),   # 8am-1pm only
     "focus":            ( 5, 17),   # 5am–5pm only
     "deep_work":        ( 5, 17),   # 5am–5pm only
     "fresh_start":      ( 4, 14),   # 4am–2pm — morning motivation only
