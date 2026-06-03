@@ -188,49 +188,49 @@ _EXTRAS_COVER_COLORS = {
     "workout":            ((220,  50,  50), (160,  20,  20)),  # energetic red
     "running":            ((220, 100,  30), (160,  60,  10)),  # orange
     "party":              ((220,  80, 180), (150,  20, 120)),  # vivid magenta
-    "happy":              ((220, 190,  20), (170, 130,  10)),  # bright yellow
-    "morning":            ((240, 150,  50), (190,  90,  20)),  # warm peach
+    "happy":              ((235, 168,  28), (188, 112,   8)),  # warm orange-yellow
+    "morning":            ((252, 185,  62), (242, 132,  28)),  # warm orange-golden sunrise
     "focus":              (( 50,  80, 160), ( 20,  40, 100)),  # cool blue
     "dinner":             ((120,  50, 140), ( 70,  20,  90)),  # warm purple
     "chill":              (( 40, 150, 130), ( 20,  80,  80)),  # teal
     "rainy_day":          (( 80, 110, 160), ( 40,  60, 110)),  # grey-blue
     "melancholy":         (( 60,  50, 130), ( 30,  20,  90)),  # muted indigo
-    "late_night":         (( 40,  20,  80), ( 20,  10,  50)),  # deep purple
+    "late_night":         (( 58,  18,  88), ( 28,   8,  52)),  # distinctly purple
     "sleep":              (( 30,  30, 100), ( 10,  10,  60)),  # deep navy
     "sunny":              ((255, 200,  30), (220, 140,  10)),  # bright sunshine yellow
-    "cosy":               ((140, 190, 220), ( 80, 130, 175)),  # icy blue
+    "cosy":               ((205, 145,  80), (140,  85,  35)),  # warm amber-caramel
     # --- Mood / Emotional ---
-    "nostalgia_mix":      ((190, 145,  85), (120,  75,  35)),  # warm sepia-rose
+    "nostalgia_mix":      ((168, 118,  90), (100,  62,  42)),  # warm sepia-terracotta
     "dreamy_mix":         ((160, 120, 200), ( 80,  60, 140)),  # soft lavender
     "moody_mix":          (( 55,  55, 110), ( 25,  25,  70)),  # dark slate blue
     "emotional":          ((180,  70, 110), (110,  30,  65)),  # deep rose-mauve
     "bittersweet":        ((200, 130,  60), (130,  70,  25)),  # warm amber-rust
     "cathartic":          ((180,  40,  80), (110,  15,  45)),  # crimson-burgundy
-    "confidence_boost":   ((220, 180,  40), (160, 120,  15)),  # electric gold-brass
+    "confidence_boost":   ((192, 158,  42), (135, 105,  14)),  # deeper brass-gold
     "empowering":         ((170,  50, 220), (100,  20, 160)),  # bright violet
     "euphoric":           ((240,  80, 140), (170,  20,  90)),  # hot pink-coral
     "angst_mix":          ((150,  30,  30), ( 80,  10,  10)),  # dark red-charcoal
     "romantic_mix":       ((210, 120, 150), (140,  65,  90)),  # soft rose-dusty pink
-    "daydreaming":        ((110, 160, 210), ( 60, 100, 160)),  # pale blue-powder
+    "daydreaming":        ((130, 145, 215), ( 75,  85, 165)),  # soft periwinkle-lavender
     "fresh_start":        ((100, 200, 150), ( 40, 130,  90)),  # mint-sage green
     # --- Aesthetic / Time-of-Day ---
     "main_character":     (( 40,  50,  90), ( 15,  20,  55)),  # dramatic navy
     "golden_hour":        ((230, 170,  60), (170, 100,  20)),  # warm gold-amber
     "sunset_mix":         ((220, 110,  80), (160,  55,  40)),  # coral-orange-pink
-    "after_dark":         (( 30,  20,  70), ( 10,   5,  40)),  # deep blue-black
+    "after_dark":         (( 18,  14,  58), (  7,   5,  30)),  # deep blue-black
     # --- Time / Occasion ---
     "after_work":         ((180, 155, 100), (110,  90,  50)),  # warm khaki-neutral
     "friday_night":       (( 40,  80, 200), ( 20,  40, 130)),  # electric blue-navy
     "weekend_mix":        ((110, 150, 220), ( 60,  90, 170)),  # sky blue-periwinkle
     "sunday_morning":     ((230, 200, 130), (175, 140,  75)),  # warm cream-yellow
-    "lazy_sunday":        ((190, 155, 165), (120,  90, 100)),  # dusty rose-soft
+    "lazy_sunday":        ((178, 148, 175), (110,  88, 108)),  # soft lavender-haze
     "brunch_mix":         ((140, 200, 100), ( 80, 140,  50)),  # fresh green-lime
     "date_night":         ((120,  30,  70), ( 70,  10,  40)),  # deep wine-burgundy
     # --- Activity ---
     "driving_mix":        (( 70,  90, 130), ( 35,  50,  85)),  # road grey-asphalt blue
     "night_drive":        (( 20,  60,  90), ( 10,  30,  60)),  # deep teal-midnight
     "driving_singalong":  (( 60, 140, 220), ( 25,  75, 160)),  # bright sky blue
-    "road_trip":          ((210, 140,  60), (150,  85,  25)),  # desert orange-sandy
+    "road_trip":          ((222, 172,  90), (160, 108,  42)),  # sandy ochre-desert
     "commute_mix":        ((100, 115, 140), ( 55,  65,  90)),  # steel grey-slate
     "walking_mix":        (( 80, 175, 100), ( 35, 110,  55)),  # grass green-nature
     # --- Social / Nostalgia ---
@@ -243,7 +243,7 @@ _EXTRAS_COVER_COLORS = {
     "spring_mix":         ((210, 155, 175), (155,  90, 115)),  # blossom pink
     # --- Romance ---
     "modern_romance":     ((170,  90, 160), (100,  40, 105)),  # warm purple-mauve
-    "late_night_romance": (( 25,  20,  65), ( 10,   8,  40)),  # deep midnight blue
+    "late_night_romance": (( 28,  16,  78), ( 12,   6,  48)),  # deep midnight navy-blue
     "romantic_dinner":    ((145,  30,  55), ( 85,  10,  30)),  # dark red-wine
     "love_songs":         ((225, 130, 155), (165,  70,  95)),  # blush pink-rose
     "slow_dance":         ((145, 100, 175), ( 85,  50, 120)),  # soft purple-lavender
@@ -254,8 +254,8 @@ _EXTRAS_COVER_COLORS = {
     "string_quartet":     ((195, 170, 140), (130, 100,  70)),  # elegant cream-warm
     "strings_romance":    ((200, 160, 155), (135,  95,  90)),  # soft rose-cream
     "piano_romance":      (( 50,  40,  55), ( 20,  15,  25)),  # deep charcoal-black
-    "acoustic_romance":   ((175, 130,  70), (110,  75,  30)),  # warm wood-honey
-    "indie_romance":      ((100, 140, 110), ( 55,  85,  65)),  # muted sage-dusty green
+    "acoustic_romance":   ((205, 130, 120), (145,  72,  80)),  # warm dusty rose-blush
+    "indie_romance":      ((155, 110, 140), ( 92,  55,  88)),  # dusty mauve-plum
     "synthpop_romance":   ((160,  60, 180), ( 90,  20, 130)),  # electric mauve-neon pink
     # --- Gap fills ---
     "evening_unwind":     ((120, 100, 160), ( 65,  50, 110)),  # soft lavender-slate purple
