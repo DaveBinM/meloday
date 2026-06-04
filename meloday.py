@@ -144,7 +144,7 @@ PATH_MAPPING         = ess_cfg.get("path_mapping", {})
 # Falls back silently when the package or model files are absent.
 _TF_AVAILABLE     = False
 _TF_MODELS_LOADED = False
-_effnet_model = _av_model = _vocal_model = None
+_effnet_model = _musicnn_model = _av_model = _vocal_model = None
 
 # MELODAY_SKIP_TF_MODELS is set by pre_analyze.py in the main process before spawning
 # workers. With 'spawn' context, workers re-import meloday.py; loading the TF C++
@@ -157,16 +157,24 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
         if _probe is not None:
             _TF_AVAILABLE = True
             _models_dir  = resolve_path(ess_cfg.get("models_dir", "assets/models"), BASE_DIR)
-            _effnet_path = os.path.join(_models_dir, "discogs-effnet-bs64-1.pb")
-            _av_path     = os.path.join(_models_dir, "deam-msd-musicnn-2.pb")
-            _vocal_path  = os.path.join(_models_dir, "voice_instrumental-discogs-effnet-1.pb")
-            if all(os.path.isfile(p) for p in [_effnet_path, _av_path, _vocal_path]):
-                _effnet_model = es.TensorflowPredictEffnetDiscogs(
-                    graphFilename=_effnet_path, output="PartitionedCall:1")
-                _av_model     = es.TensorflowPredict2D(
-                    graphFilename=_av_path,     output="model/Identity:0")
-                _vocal_model  = es.TensorflowPredict2D(
-                    graphFilename=_vocal_path,  output="model/Softmax")
+            _effnet_path  = os.path.join(_models_dir, "discogs-effnet-bs64-1.pb")
+            _musicnn_path = os.path.join(_models_dir, "msd-musicnn-1.pb")
+            _av_path      = os.path.join(_models_dir, "deam-msd-musicnn-2.pb")
+            _vocal_path   = os.path.join(_models_dir, "voice_instrumental-discogs-effnet-1.pb")
+            if all(os.path.isfile(p) for p in [_effnet_path, _musicnn_path, _av_path, _vocal_path]):
+                # Two embedding extractors (both expect 16 kHz mono):
+                #   EffNet-Discogs → 1280-dim, feeds the voice/instrumental head.
+                #   MusiCNN-MSD    →  200-dim, feeds the DEAM valence/arousal head.
+                # The DEAM head is a *musicnn* model — feeding it EffNet's 1280-dim vectors
+                # is what caused "Matrix size-incompatible [n,1280]x[200,100]" on every track.
+                _effnet_model  = es.TensorflowPredictEffnetDiscogs(
+                    graphFilename=_effnet_path,  output="PartitionedCall:1")
+                _musicnn_model = es.TensorflowPredictMusiCNN(
+                    graphFilename=_musicnn_path, output="model/dense/BiasAdd")
+                _av_model      = es.TensorflowPredict2D(
+                    graphFilename=_av_path,      output="model/Identity:0")
+                _vocal_model   = es.TensorflowPredict2D(
+                    graphFilename=_vocal_path,   output="model/Softmax")
                 _TF_MODELS_LOADED = True
     except Exception:
         pass
@@ -591,12 +599,14 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
     needs_tf         = (data.get("arousal") is None or data.get("valence") is None
                         or data.get("vocal_presence") is None)
 
-    if not any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
-                needs_dance, needs_brightness, needs_onset, needs_dyn_comp,
-                needs_tf and _TF_MODELS_LOADED]):
+    needs_base = any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
+                      needs_dance, needs_brightness, needs_onset, needs_dyn_comp])
+    if not (needs_base or (needs_tf and _TF_MODELS_LOADED)):
         return
 
-    if audio is None:
+    # Base features decode at the native 44.1 kHz. The TF block decodes its own 16 kHz copy,
+    # so when only TF fields are missing (the post-pass case) we skip this decode entirely.
+    if audio is None and needs_base:
         audio = es.MonoLoader(filename=file_path)()
 
     # Each algorithm block is isolated in its own try/except so a failure in one
@@ -684,15 +694,22 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
 
     if needs_tf and _TF_MODELS_LOADED:
         try:
-            embeddings = _effnet_model(audio)
-            av  = _av_model(embeddings)
-            voc = _vocal_model(embeddings)
-            if data.get("arousal") is None:
-                data["arousal"]        = round(float(av[:, 0].mean()), 4)
+            import numpy as _np
+            # The TF embedding networks require 16 kHz mono — the `audio` used for the base
+            # features is 44.1 kHz (wrong rate for these models), so decode a dedicated copy.
+            audio_tf    = es.MonoLoader(filename=file_path, sampleRate=16000, resampleQuality=4)()
+            emb_effnet  = _np.asarray(_effnet_model(audio_tf))    # (n, 1280) → vocal head
+            emb_musicnn = _np.asarray(_musicnn_model(audio_tf))   # (n,  200) → DEAM head
+            av  = _np.asarray(_av_model(emb_musicnn))             # (n, 2): [valence, arousal], 1–9 scale
+            voc = _np.asarray(_vocal_model(emb_effnet))           # (n, 2): softmax [instrumental, voice]
+            # DEAM emits valence then arousal on the 1–9 annotation scale → normalise to 0–1.
             if data.get("valence") is None:
-                data["valence"]        = round(float(av[:, 1].mean()), 4)
+                data["valence"]        = round((float(av[:, 0].mean()) - 1.0) / 8.0, 4)
+            if data.get("arousal") is None:
+                data["arousal"]        = round((float(av[:, 1].mean()) - 1.0) / 8.0, 4)
+            # voice_instrumental classes are [instrumental, voice] → vocal_presence = P(voice).
             if data.get("vocal_presence") is None:
-                data["vocal_presence"] = round(float(voc[:, 0].mean()), 4)
+                data["vocal_presence"] = round(float(voc[:, 1].mean()), 4)
         except Exception as tf_err:
             log_text(f"[WARN] TF inference failed: {tf_err}")
 
