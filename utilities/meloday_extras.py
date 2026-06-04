@@ -478,7 +478,7 @@ _ICON_META = {
     "explore":             {"tilt": 0, "anchor": (0.50, 0.42)},
     "center_focus_strong": {"tilt": 0},
     "trending_up":         {"tilt": 6},
-    "candle":              {"extent": 185, "tilt": 0},   # tall, narrow glyph
+    "candle":              {"extent": 185, "tilt": 12, "anchor": (0.58, 0.45)},  # off-centre (lower-right) + tilted
     "star_shine":          {"extent": 220},
 }
 
@@ -510,6 +510,66 @@ _HEART_MODE = {
     "indie_romance":      "cluster",
     "synthpop_romance":   "pair",
 }
+
+# Mood-appropriate icon colour per glyph — the icon's natural / emotional colour, chosen to
+# suit both the symbol and the vibe. Abstract concept glyphs (repeat, replay, radar, history,
+# album, travel_explore, explore, route, directions_*) are intentionally omitted: they have no
+# natural colour, so they fall back to an in-hue tint of the cover palette. _ensure_icon_contrast
+# then nudges whatever colour is chosen just enough to stay legible on the background.
+_ICON_COLOR = {
+    # Love / warmth — rose-red
+    "favorite":              (240,  90, 115),
+    "heart_broken":          (214, 102, 122),
+    "wine_bar":              (214, 116, 138),   # wine rose
+    # Fire / energy — orange-red
+    "local_fire_department": (255, 125,  55),
+    "whatshot":              (255, 135,  60),
+    "fitness_center":        (255, 152,  92),
+    "directions_run":        (255, 162,  98),
+    # Sun / day / uplift — golden
+    "wb_sunny":              (255, 200,  70),
+    "clear_day":             (255, 210,  95),
+    "mood":                  (255, 205,  85),   # happy smiley
+    "star_shine":            (255, 214, 110),   # spotlight gold
+    "trending_up":           (255, 206, 110),
+    "weekend":               (255, 200, 120),
+    # Night / moon — pale silver-blue
+    "bedtime":               (224, 228, 246),
+    "dark_mode":             (208, 214, 240),
+    # Rain / water / storm — cool blue
+    "rainy":                 (150, 198, 238),
+    "water_drop":            (140, 196, 240),
+    "thunderstorm":          (176, 192, 224),
+    # Snow — icy white-blue
+    "snowflake":             (224, 240, 255),
+    # Dreamy / calm — soft lavender-white, spa
+    "cloud":                 (222, 226, 244),
+    "self_improvement":      (198, 222, 214),
+    "spa":                   (190, 220, 212),
+    "center_focus_strong":   (202, 216, 232),
+    # Nature — autumn amber, spring pink, beach warm
+    "forest":                (220, 138,  66),
+    "local_florist":         (246, 158, 196),
+    "beach_access":          (255, 178, 102),
+    # Food / drink — warm creams
+    "local_cafe":            (226, 196, 150),   # latte
+    "restaurant":            (238, 200, 150),
+    "skillet":               (236, 192, 132),
+    # Candle — warm glow
+    "candle":                (255, 198, 120),
+    # Music — warm cream accent
+    "music_note":            (244, 230, 206),
+    "music_note_2":          (244, 230, 206),
+    "piano":                 (238, 232, 222),
+    # Party / celebration — vivid festive
+    "celebration":           (255, 140, 175),
+    "festival":              (255, 150, 165),
+    "nightlife":             (236, 150, 210),
+}
+
+# Per-profile icon-colour overrides (mood nuance where a shared glyph serves different moods).
+# Merged over _ICON_COLOR. Empty by default — add entries as specific covers want tuning.
+_PROFILE_ICON_COLOR = {}
 
 # Top Songs year-specific covers — 30 colours + 10 background styles cycling by year offset.
 # Index: (year - top_songs_start_year) % 30
@@ -3377,6 +3437,20 @@ def _icon_dark(c, f=0.42):
     return tuple(max(8, int(x * f)) for x in c[:3])
 
 
+def _ensure_icon_contrast(rgb, bg_lum, min_gap=72):
+    """Keep an icon colour's hue but nudge it lighter or darker only as much as needed to
+    hold a minimum luminance gap from the background under it (pushing whichever way the
+    colour already leans relative to the background)."""
+    il  = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+    gap = abs(il - bg_lum)
+    if gap >= min_gap:
+        return tuple(int(c) for c in rgb[:3])
+    t = min(0.80, (min_gap - gap) / 150.0)
+    if il >= bg_lum:                                          # already lighter → lighten
+        return tuple(int(c + (255 - c) * t) for c in rgb[:3])
+    return tuple(int(c * (1 - t)) for c in rgb[:3])          # darker → darken
+
+
 def _bg_luminance(base, cx, cy, R):
     """Mean perceived luminance (0–255) of `base` (RGBA) under the icon footprint."""
     W, H = base.size
@@ -3470,9 +3544,12 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     cx, cy = int(round(cx)), int(round(cy))
     bg_lum = _bg_luminance(base, cx, cy, R)
 
-    # Adaptive glyph colour: lighten on dark backgrounds, deepen on bright ones.
-    rgb  = _icon_dark(color_top) if bg_lum >= 150 else _icon_light(color_top, f=0.50)[:3]
-    fill = (*rgb, 240)
+    # Glyph colour: the icon's own mood-appropriate colour where defined, else an in-hue
+    # tint of the cover palette (abstract concept icons). Then guard contrast vs. the bg.
+    base_rgb = _PROFILE_ICON_COLOR.get(key) or _ICON_COLOR.get(icon_name)
+    if base_rgb is None:
+        base_rgb = _icon_dark(color_top) if bg_lum >= 150 else _icon_light(color_top, f=0.50)[:3]
+    fill = (*_ensure_icon_contrast(base_rgb, bg_lum), 240)
     size = max(40, int(round(2 * R)))            # font em size → prominent, hero proportion
 
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
