@@ -2248,40 +2248,127 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
     }
 
 
+# Mood-tag → (valence, arousal) lexicon, on Russell's circumplex (valence = pleasant↔
+# unpleasant, arousal = activated↔calm). Used as a FALLBACK for the TF-derived valence/
+# arousal columns while those are still being generated: when a track has no TF value,
+# we estimate it from its mood tags so the per-profile valence/arousal targets in
+# _MOOD_PROFILES still discriminate. Real TF values, once present, always take precedence.
+_MOOD_AFFECT = {
+    "happy": (0.90, 0.65), "joyful": (0.92, 0.68), "cheerful": (0.88, 0.62),
+    "uplifting": (0.85, 0.62), "upbeat": (0.80, 0.70), "euphoric": (0.92, 0.85),
+    "ecstatic": (0.93, 0.88), "exhilarat": (0.88, 0.85), "carefree": (0.82, 0.55),
+    "fun": (0.82, 0.65), "celebrat": (0.88, 0.78), "triumphant": (0.80, 0.78),
+    "hopeful": (0.75, 0.50), "optimistic": (0.80, 0.55), "bright": (0.78, 0.58),
+    "playful": (0.80, 0.62), "warm": (0.70, 0.40), "comfort": (0.68, 0.32),
+    "cosy": (0.68, 0.30), "cozy": (0.68, 0.30), "calm": (0.62, 0.22),
+    "peaceful": (0.65, 0.20), "gentle": (0.63, 0.28), "relax": (0.62, 0.25),
+    "mellow": (0.58, 0.30), "laid-back": (0.62, 0.30), "easy": (0.60, 0.30),
+    "smooth": (0.60, 0.35), "soothing": (0.63, 0.20), "tranquil": (0.62, 0.15),
+    "meditat": (0.55, 0.15), "dreamy": (0.58, 0.25), "ethereal": (0.55, 0.25),
+    "ambient": (0.50, 0.18), "atmospheric": (0.45, 0.32), "hypnotic": (0.45, 0.45),
+    "romantic": (0.68, 0.40), "tender": (0.65, 0.32), "intimate": (0.62, 0.35),
+    "sensual": (0.60, 0.45), "affectionate": (0.70, 0.40), "love": (0.68, 0.42),
+    "sweet": (0.75, 0.45), "heartfelt": (0.60, 0.45), "sincere": (0.60, 0.40),
+    "sentimental": (0.50, 0.35), "nostalgic": (0.48, 0.35), "wistful": (0.42, 0.32),
+    "bittersweet": (0.42, 0.38), "longing": (0.40, 0.42), "yearning": (0.40, 0.45),
+    "introspective": (0.42, 0.30), "reflective": (0.45, 0.28), "melanchol": (0.25, 0.30),
+    "sad": (0.18, 0.30), "somber": (0.25, 0.25), "sombre": (0.25, 0.25),
+    "moody": (0.32, 0.42), "brooding": (0.28, 0.45), "dark": (0.28, 0.46),
+    "haunting": (0.30, 0.45), "nocturnal": (0.38, 0.45), "lonely": (0.18, 0.32),
+    "heartbreak": (0.15, 0.45), "loss": (0.15, 0.38), "grief": (0.12, 0.40),
+    "despair": (0.10, 0.45), "depress": (0.12, 0.30), "angry": (0.20, 0.85),
+    "aggressive": (0.22, 0.88), "intense": (0.35, 0.82), "rebellious": (0.35, 0.80),
+    "restless": (0.38, 0.72), "anxious": (0.28, 0.70), "energetic": (0.65, 0.85),
+    "powerful": (0.55, 0.80), "driving": (0.55, 0.80), "epic": (0.60, 0.78),
+    "dramatic": (0.45, 0.70), "motivating": (0.72, 0.78), "inspirational": (0.75, 0.70),
+    "confident": (0.70, 0.68), "bold": (0.68, 0.72), "empowering": (0.75, 0.75),
+    "groovy": (0.72, 0.65), "funky": (0.75, 0.70), "sexy": (0.62, 0.55),
+    "quirky": (0.72, 0.58), "sophisticated": (0.55, 0.40), "elegant": (0.58, 0.35),
+    "graceful": (0.60, 0.32), "cinematic": (0.50, 0.50), "earthy": (0.55, 0.35),
+    "organic": (0.58, 0.35), "fresh": (0.75, 0.55), "spiritual": (0.55, 0.30),
+}
+
+# Valence/arousal define a "mood", so the emotional axis dominates the acoustic distance
+# (texture dims carry weight 1.0). Applies equally to TF and proxy-derived values, so the
+# behaviour is correct now and once TF columns are populated.
+_VALENCE_WEIGHT = 4.0
+_AROUSAL_WEIGHT = 2.0
+
+
+def _entry_affect_proxy(entry):
+    """(valence, arousal) estimated from an entry's mood tags, or (None, None) when no
+    tags match the lexicon. Memoised on the entry. Only consulted as a fallback when the
+    track's TF valence/arousal are absent."""
+    cached = entry.get("_affect_proxy")
+    if cached is not None:
+        return cached
+    vs, as_ = [], []
+    for m in (entry.get("moods") or []):
+        ml = m.lower()
+        for sub, (v, a) in _MOOD_AFFECT.items():
+            if sub in ml:
+                vs.append(v)
+                as_.append(a)
+                break
+    result = (sum(vs) / len(vs), sum(as_) / len(as_)) if vs else (None, None)
+    try:
+        entry["_affect_proxy"] = result
+    except (TypeError, AttributeError):
+        pass
+    return result
+
+
 def _acoustic_distance_to_centroid(entry, centroid):
     """
-    Normalised Euclidean distance between a track entry and a centroid.
+    Weighted normalised Euclidean distance between a track entry and a centroid.
     Returns 0.5 (neutral) when insufficient data is available.
-    New fields (beat_confidence, onset_rate, dynamic_complexity, arousal, valence,
-    vocal_presence) are None-safe — only scored when both entry and centroid have data,
-    so the function degrades gracefully on libraries without TF features or new columns.
+
+    Every dimension is None-safe — only scored when both entry and centroid have data —
+    so the function degrades gracefully on libraries without certain columns. The emotional
+    axis (valence/arousal) is weighted heavily (_VALENCE_WEIGHT / _AROUSAL_WEIGHT) so two
+    profiles with similar tempo/texture but different moods (e.g. rainy_day vs cosy) stay
+    distinct. When a track lacks TF valence/arousal, a tag-derived proxy stands in.
     """
-    pairs = []
+    num = 0.0
+    den = 0.0
+
+    def _add(d2, w):
+        nonlocal num, den
+        num += w * d2
+        den += w
+
     if entry.get("bpm") and centroid.get("bpm"):
-        pairs.append(((entry["bpm"] - centroid["bpm"]) / 200.0) ** 2)
+        _add(((entry["bpm"] - centroid["bpm"]) / 200.0) ** 2, 1.0)
     if entry.get("energy") is not None and centroid.get("energy") is not None:
-        pairs.append(((entry["energy"] - centroid["energy"]) / 23.0) ** 2)
+        _add(((entry["energy"] - centroid["energy"]) / 23.0) ** 2, 1.0)
     if entry.get("danceability") is not None and centroid.get("danceability") is not None:
-        pairs.append((entry["danceability"] - centroid["danceability"]) ** 2)
+        _add((entry["danceability"] - centroid["danceability"]) ** 2, 1.0)
     if entry.get("brightness") is not None and centroid.get("brightness") is not None:
-        pairs.append((entry["brightness"] - centroid["brightness"]) ** 2)
+        _add((entry["brightness"] - centroid["brightness"]) ** 2, 1.0)
     if entry.get("year") and centroid.get("year"):
-        pairs.append(min(abs(entry["year"] - centroid["year"]) / 100.0, 1.0) ** 2)
+        _add(min(abs(entry["year"] - centroid["year"]) / 100.0, 1.0) ** 2, 1.0)
     if entry.get("beat_confidence") is not None and centroid.get("beat_confidence") is not None:
-        pairs.append((entry["beat_confidence"] - centroid["beat_confidence"]) ** 2)
+        _add((entry["beat_confidence"] - centroid["beat_confidence"]) ** 2, 1.0)
     if entry.get("onset_rate") is not None and centroid.get("onset_rate") is not None:
-        pairs.append(min(abs(entry["onset_rate"] - centroid["onset_rate"]) / 10.0, 1.0) ** 2)
+        _add(min(abs(entry["onset_rate"] - centroid["onset_rate"]) / 10.0, 1.0) ** 2, 1.0)
     if entry.get("dynamic_complexity") is not None and centroid.get("dynamic_complexity") is not None:
-        pairs.append((entry["dynamic_complexity"] - centroid["dynamic_complexity"]) ** 2)
-    if entry.get("arousal") is not None and centroid.get("arousal") is not None:
-        pairs.append((entry["arousal"] - centroid["arousal"]) ** 2)
-    if entry.get("valence") is not None and centroid.get("valence") is not None:
-        pairs.append((entry["valence"] - centroid["valence"]) ** 2)
+        _add((entry["dynamic_complexity"] - centroid["dynamic_complexity"]) ** 2, 1.0)
+    # Emotional axis — TF value preferred, tag-derived proxy as fallback. Weighted heavily.
+    if centroid.get("valence") is not None or centroid.get("arousal") is not None:
+        ev, ea = entry.get("valence"), entry.get("arousal")
+        if ev is None or ea is None:
+            pv, pa = _entry_affect_proxy(entry)
+            ev = ev if ev is not None else pv
+            ea = ea if ea is not None else pa
+        if ev is not None and centroid.get("valence") is not None:
+            _add((ev - centroid["valence"]) ** 2, _VALENCE_WEIGHT)
+        if ea is not None and centroid.get("arousal") is not None:
+            _add((ea - centroid["arousal"]) ** 2, _AROUSAL_WEIGHT)
     if entry.get("vocal_presence") is not None and centroid.get("vocal_presence") is not None:
-        pairs.append((entry["vocal_presence"] - centroid["vocal_presence"]) ** 2)
-    if not pairs:
+        _add((entry["vocal_presence"] - centroid["vocal_presence"]) ** 2, 1.0)
+    if den == 0:
         return 0.5
-    return min(math.sqrt(sum(pairs) / len(pairs)), 1.0)
+    return min(math.sqrt(num / den), 1.0)
 
 
 def _tag_overlap_score(entry, centroid):
@@ -5151,30 +5238,54 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
 # --- 11. Mood / Activity Mixes ---
 
 
+# Two mood mixes whose (valence-weighted) centroids are closer than this select overly
+# similar tracks — don't surface them at the same time. Tuned against the live cache so
+# near-duplicate pairs (happy/sunny, workout/running, chill/lazy_sunday, focus/sleep) are
+# caught while genuinely-distinct pairs (rainy_day/cosy) are not.
+_SIM_GUARD_DISTANCE = 0.12
+
+
 def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
     """
-    Greedy category-diversity selection.
+    Greedy diversity selection.
     `scored_profiles` is sorted (score, profile_key) ascending (lower = better fit).
-    Picks n_active profiles ensuring at most max_per_category from the same category,
-    then fills any remaining slots from the unselected remainder if needed.
+    Picks n_active profiles ensuring (a) at most max_per_category from the same category
+    and (b) no two picks whose centroids are within _SIM_GUARD_DISTANCE (so very similar
+    mixes aren't shown together). Deferred candidates backfill any remaining slots —
+    preferring still-distinct ones — so the slate is never left short.
     """
     cat_count = Counter()
     selected  = []
-    remainder = []
+    deferred  = []
+
+    def _too_similar(key):
+        return any(
+            _acoustic_distance_to_centroid(_MOOD_PROFILES[key], _MOOD_PROFILES[s]) < _SIM_GUARD_DISTANCE
+            for s in selected if s in _MOOD_PROFILES
+        )
+
     for _, key in scored_profiles:
+        if len(selected) >= n_active:
+            break
         cat = _PROFILE_CATEGORY.get(key, "other")
-        if cat_count[cat] < max_per_category:
-            selected.append(key)
-            cat_count[cat] += 1
-        else:
-            remainder.append(key)
-        if len(selected) >= n_active:
-            break
-    # Fill gaps if strict diversity left us short
-    for key in remainder:
-        if len(selected) >= n_active:
-            break
+        if cat_count[cat] >= max_per_category or (key in _MOOD_PROFILES and _too_similar(key)):
+            deferred.append(key)
+            continue
         selected.append(key)
+        cat_count[cat] += 1
+
+    # Backfill: first with deferred profiles that are still distinct, then with any.
+    for require_distinct in (True, False):
+        for key in deferred:
+            if len(selected) >= n_active:
+                break
+            if key in selected:
+                continue
+            if require_distinct and key in _MOOD_PROFILES and _too_similar(key):
+                continue
+            selected.append(key)
+        if len(selected) >= n_active:
+            break
     return selected[:n_active]
 
 
