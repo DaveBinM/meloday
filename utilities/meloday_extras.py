@@ -351,7 +351,7 @@ _COVER_BG_STYLES = {
     "moody_mix":        ("geometric",       7),  # 4 heavy dark strips at 30°
     "bittersweet":      ("waves",           6),  # 4 irregular asymmetric waves
     "heartbreak":       ("triangles",       4),  # shattered small triangles
-    "rainy_day":        ("radial",          6),  # diffuse glow from top
+    "rainy_day":        ("ripples",         0),  # concentric ripples where drops land
     # ----- MEMORY / LATE NIGHT -----
     "nostalgia_mix":    ("circles",         5),  # off-centre memory rings
     "synthpop_romance": ("geometric",       8),  # steep 52° 80s strips
@@ -1581,6 +1581,7 @@ _WEEKDAY_RESTRICTED = {
 # window. (start_hour, end_hour) in 0–23; if start > end the window wraps past midnight.
 # Profiles not listed here are always eligible.
 _HOUR_RESTRICTED = {
+    "after_work":       (15, 22),   # 3pm-10pm only
     "brunch_mix":       ( 8, 13),   # 8am-1pm only
     "focus":            ( 5, 17),   # 5am–5pm only
     "deep_work":        ( 5, 17),   # 5am–5pm only
@@ -2742,6 +2743,31 @@ def _make_radial_glow_background(w, h, color_top, color_bottom, v=0, rng=None):
     return Image.fromarray(arr, "RGBA")
 
 
+def _make_ripples_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Overlapping concentric ripple rings — like raindrops landing on water. Flattened
+    ellipses give a gentle on-the-surface perspective. Used for rainy themes so the
+    background echoes the falling-drop icon."""
+    rng = rng or random
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw    = ImageDraw.Draw(overlay)
+    def _clamp(x): return max(0, min(255, x))
+    light = tuple(_clamp(c + 64) for c in color_top[:3])
+    dark  = tuple(int(c * 0.6) for c in color_top[:3])
+    for _ in range(5 + (v % 3)):
+        rx    = rng.randint(int(w * 0.10), int(w * 0.90))
+        ry    = rng.randint(int(h * 0.08), int(h * 0.70))
+        rings = rng.randint(3, 5)
+        gap   = rng.randint(24, 40)
+        for k in range(1, rings + 1):
+            rr    = k * gap
+            alpha = max(16, 110 - k * 20)
+            tone  = light if k % 2 else dark
+            draw.ellipse([rx - rr, ry - rr * 0.62, rx + rr, ry + rr * 0.62],
+                         outline=(*tone, alpha), width=3)
+    return Image.alpha_composite(img, overlay)
+
+
 def _make_waves_background(w, h, color_top, color_bottom, v=0, rng=None):
     """Sinusoidal wave bands. v controls band count, amplitude and phase for unique looks."""
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
@@ -3265,18 +3291,15 @@ def _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, shadow=True, bg_lum
         layer.paste(scaled, (int(round(cx - cx * scale)), int(round(cy - cy * scale))), scaled)
         overlay = layer
     if shadow:
-        if bg_lum is None:
-            bg_lum = _bg_luminance(base, cx, cy, min(W, H) // 4)
-        # Dark glow on light backgrounds; light glow on dark backgrounds.
-        if bg_lum >= 140:
-            tone, sa = (0, 0, 0), 155
-        else:
-            tone, sa = (255, 255, 255), 115
-        sh_alpha = overlay.getchannel("A").point(lambda v: int(v * sa / 255))
-        glow = Image.new("RGBA", (W, H), (tone[0], tone[1], tone[2], 0))
-        glow.putalpha(sh_alpha)
-        glow = glow.filter(ImageFilter.GaussianBlur(radius=14))
-        base = Image.alpha_composite(base, glow)
+        # Soft dark drop shadow (down-right) that hugs the icon shape — lifts it off the
+        # background for separation without the neon halo a light glow would produce.
+        sh_alpha = overlay.getchannel("A").point(lambda v: int(v * 0.5))
+        tint = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        tint.putalpha(sh_alpha)
+        tint = tint.filter(ImageFilter.GaussianBlur(radius=11))
+        drop = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        drop.alpha_composite(tint, (4, 6))
+        base = Image.alpha_composite(base, drop)
     return Image.alpha_composite(base, overlay)
 
 
@@ -3580,8 +3603,9 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
 
     elif icon_type == "music_note":
         nc = (*lc, 218)
+        # Always a small cluster (never a lone note); varied count, size and tilt.
         _scatter_cluster(draw, _draw_note, cx, cy,
-                         rng.randint(1, 3), (50, 42), (66, 104), 18, rng, nc)
+                         rng.randint(2, 4), (66, 54), (62, 96), 20, rng, nc)
 
     elif icon_type == "wine_glass":
         gc = (*lc, 200)
@@ -3600,20 +3624,29 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
         ], fill=gc)
 
     elif icon_type == "mug":
-        mc = (*lc, 205)
-        hw, hh = 65, 75
-        try:
-            draw.rounded_rectangle([cx - hw, cy - hh, cx + hw, cy + hh],
-                                   radius=12, fill=mc)
-        except AttributeError:
-            draw.rectangle([cx - hw, cy - hh, cx + hw, cy + hh], fill=mc)
-        draw.arc([cx + hw - 10, cy - 35, cx + hw + 55, cy + 35],
-                 start=300, end=60, fill=mc, width=16)
-        steam = (*lc, 110)
-        for ox in (-22, 2, 26):
-            pts_s = [(cx + ox + 8 * math.sin(j * 0.9), cy - hh - j * 18) for j in range(5)]
+        mc = (*lc, 212)
+        bw, bh = 54, 60                       # cup body half-width / half-height
+        top    = cy - bh
+        # C-handle first (behind the body), opening toward the cup so it reads as attached
+        hx0 = cx + bw - 26
+        draw.arc([hx0, cy - 36, hx0 + 64, cy + 36], start=-140, end=140, fill=mc, width=15)
+        # tapered cup body with a rounded base
+        draw.polygon([
+            (cx - bw,        top + 4),
+            (cx + bw,        top + 4),
+            (cx + bw * 0.9,  cy + bh - 14),
+            (cx + bw * 0.6,  cy + bh),
+            (cx - bw * 0.6,  cy + bh),
+            (cx - bw * 0.9,  cy + bh - 14),
+        ], fill=mc)
+        # rim / opening as a flat ellipse
+        draw.ellipse([cx - bw, top - 9, cx + bw, top + 17], fill=mc)
+        # two short steam wisps rising just above the rim
+        steam = (*lc, 140)
+        for ox in (-16, 16):
+            pts_s = [(cx + ox + 7 * math.sin(j * 1.2), top - 12 - j * 14) for j in range(4)]
             for j in range(len(pts_s) - 1):
-                draw.line([pts_s[j], pts_s[j + 1]], fill=steam, width=3)
+                draw.line([pts_s[j], pts_s[j + 1]], fill=steam, width=4)
 
     elif icon_type == "dumbbell":
         dc = (*lc, 224)
@@ -3678,30 +3711,25 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
                          rng.randint(3, 6), (122, 92), (18, 54), 30, rng, sc)
 
     elif icon_type in ("repeat_loop", "repeat_loop_ccw"):
-        # Two arcs with arrowheads forming a circular loop.
-        # repeat_loop = clockwise; repeat_loop_ccw = counterclockwise (arrowheads at arc starts).
-        rc    = (*lc, 215)
-        r     = 130
-        lw    = 16
-        sz    = 26           # arrowhead size
-        ccw   = icon_type == "repeat_loop_ccw"
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=200, end=340, fill=rc, width=lw)
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=20,  end=160, fill=rc, width=lw)
-        # Arrowhead positions: CW → ends of arcs (340°, 160°); CCW → starts (200°, 20°)
-        for a_deg in ((340, 160) if not ccw else (200, 20)):
-            a    = math.radians(a_deg)
-            ax_  = cx + r * math.cos(a)
-            ay_  = cy + r * math.sin(a)
-            # Clockwise tangent: (-sin a, cos a); CCW: (sin a, -cos a)
-            if not ccw:
-                td = (-math.sin(a), math.cos(a))
-            else:
-                td = (math.sin(a), -math.cos(a))
-            perp = (-td[1], td[0])
+        # Two bold arcs forming a ring with a clear gap top-right and bottom-left; a filled
+        # arrowhead caps each leading end so it reads as a repeat (CW) / rewind (CCW) loop.
+        rc   = (*lc, 224)
+        r    = 116
+        lw   = 22
+        ccw  = icon_type == "repeat_loop_ccw"
+        draw.arc([cx - r, cy - r, cx + r, cy + r], start=-60, end=100, fill=rc, width=lw)
+        draw.arc([cx - r, cy - r, cx + r, cy + r], start=120, end=280, fill=rc, width=lw)
+        ah = 36
+        for a_deg in ((100, 280) if not ccw else (-60, 120)):
+            a      = math.radians(a_deg)
+            tipdir = 1 if not ccw else -1
+            tx, ty = -math.sin(a) * tipdir, math.cos(a) * tipdir   # tangent = flow direction
+            rx, ry = math.cos(a), math.sin(a)                      # radial
+            px, py = cx + r * math.cos(a), cy + r * math.sin(a)
             draw.polygon([
-                (ax_ + td[0]*sz,          ay_ + td[1]*sz),
-                (ax_ + perp[0]*sz*0.55,   ay_ + perp[1]*sz*0.55),
-                (ax_ - perp[0]*sz*0.55,   ay_ - perp[1]*sz*0.55),
+                (px + tx * ah,                          py + ty * ah),                          # tip
+                (px - tx * ah * 0.25 + rx * ah * 0.92,  py - ty * ah * 0.25 + ry * ah * 0.92),  # outer corner
+                (px - tx * ah * 0.25 - rx * ah * 0.92,  py - ty * ah * 0.25 - ry * ah * 0.92),  # inner corner
             ], fill=rc)
 
     elif icon_type == "radar_pulse":
@@ -4022,6 +4050,8 @@ def _generate_extras_cover(key, title, subtitle=None):
         img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "radial":
         img = _make_radial_glow_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
+    elif bg_style == "ripples":
+        img = _make_ripples_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "waves":
         img = _make_waves_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
     elif bg_style == "floating_circles":
