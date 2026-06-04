@@ -108,6 +108,7 @@ EXCLUDE_LABEL_NAMES = [_raw_exclude] if isinstance(_raw_exclude, str) else list(
 
 # Playlist & Logic Rules
 EXCLUDE_PLAYED_DAYS = config["playlist"]["exclude_played_days"]
+MAX_TRACK_MS = 15 * 60 * 1000   # exclude tracks longer than 15 minutes from all playlists
 HISTORY_LOOKBACK_DAYS = config["playlist"]["history_lookback_days"]
 MAX_TRACKS = config["playlist"]["max_tracks"]
 SONIC_SIMILAR_LIMIT = MAX_TRACKS   # Sorting breadth always tracks playlist size; not user-configurable
@@ -976,6 +977,10 @@ def filter_excluded_tracks(tracks, now=None):
         # Check pre-fetched excluded label set (memory check)
         if parent_key in _excluded_album_keys:
             log_text(f"[EXCLUSION] Track '{t.title}' skipped: album has an exclusion label.")
+            continue
+
+        # Length cap — exclude anything over 15 minutes
+        if (getattr(t, "duration", 0) or 0) > MAX_TRACK_MS:
             continue
 
         cleaned.append(t)

@@ -382,7 +382,6 @@ _PROFILE_ICON = {
     "indie_romance":     "favorite",
     "synthpop_romance":  "favorite",
     "heartbreak":        "heart_broken",
-    "candlelight":       "candle",
     # Musical / instrumental — note glyph clusters mix music_note + music_note_2
     "piano_romance":     "piano",
     "romantic_jazz":     "music_note",
@@ -392,19 +391,14 @@ _PROFILE_ICON = {
     # Drinks / food
     "dinner":            "restaurant",
     "jazz_dinner":       "restaurant",
-    "cooking_mix":       "skillet",
     "cosy":              "local_cafe",
     "brunch_mix":        "local_cafe",
     # Night / sleep
-    "sleep":             "bedtime",
-    "late_night":        "bedtime",
-    "night_drive":       "bedtime",
-    "after_dark":        "dark_mode",
+    "sleep":             "moon_stars",
+    "late_night":        "partly_cloudy_night",
     # Weather / atmosphere
     "rainy_day":         "rainy",
     "melancholy":        "water_drop",
-    "bittersweet":       "water_drop",
-    "moody_mix":         "dark_mode",
     "dreamy_mix":        "cloud",
     # Sun / day
     "morning":           "wb_sunny",
@@ -422,10 +416,8 @@ _PROFILE_ICON = {
     # Energy / power
     "workout":           "fitness_center",
     "running":           "directions_run",
-    "empowering":        "local_fire_department",
     "confidence_boost":  "trending_up",
     "cathartic":         "whatshot",
-    "angst_mix":         "thunderstorm",
     # Calm / dreamy / focus
     "daydreaming":       "cloud",
     "lazy_sunday":       "cloud",
@@ -437,14 +429,14 @@ _PROFILE_ICON = {
     "party":             "celebration",
     "pre_party":         "nightlife",
     "friday_night":      "nightlife",
-    "celebration":       "celebration",
+    "celebration":       "flare",          # cluster of flares
     "party_throwback":   "festival",
     "euphoric":          "festival",
     "happy":             "mood",
     "weekend_mix":       "weekend",
     # Driving / activity
     "driving_mix":       "directions_car",
-    "commute_mix":       "directions_car",
+    "commute_mix":       "route",
     "driving_singalong": "directions_car",
     "road_trip":         "route",
     "walking_mix":       "directions_walk",
@@ -457,7 +449,11 @@ _PROFILE_ICON = {
     "rediscovery":       "travel_explore",
     "discover_weekly":   "explore",
     "time_capsule":      "history",
-    "deep_cuts":         "album",
+}
+
+# Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
+_PROFILE_ICON_ROTATE = {
+    "date_night": ["wine_bar", "local_bar", "brunch_dining"],
 }
 
 # Per-glyph placement metadata for _draw_icon_overlay.
@@ -473,7 +469,6 @@ _ICON_META = {
     "replay":              {"tilt": 0, "anchor": (0.50, 0.42)},
     "radar":               {"tilt": 0, "anchor": (0.50, 0.42)},
     "history":             {"tilt": 0, "anchor": (0.50, 0.42)},
-    "album":               {"tilt": 4, "anchor": (0.50, 0.42)},
     "travel_explore":      {"tilt": 0, "anchor": (0.50, 0.42)},
     "explore":             {"tilt": 0, "anchor": (0.50, 0.42)},
     "center_focus_strong": {"tilt": 0},
@@ -495,6 +490,10 @@ _ICON_PROFILE_OVERRIDE = {
     "sunset_mix":     {"anchor": (0.50, 0.36)},
     "beach_vibes":    {"anchor": (0.60, 0.37)},
     "summer_evening": {"anchor": (0.40, 0.37)},
+    # Release Radar — small, lower-right quadrant, semi-transparent, no shadow.
+    "release_radar":  {"anchor": (0.74, 0.60), "base_scale": 0.45, "alpha": 120, "shadow": False},
+    # Rainy Day — cloud up in the top-right, mirrored (rain falls left), ripples drawn below it.
+    "rainy_day":      {"anchor": (0.72, 0.31), "flip": True},
 }
 
 # Heart arrangement per romance profile — deliberately spread so no two covers match.
@@ -521,6 +520,8 @@ _ICON_COLOR = {
     "favorite":              (240,  90, 115),
     "heart_broken":          (214, 102, 122),
     "wine_bar":              (214, 116, 138),   # wine rose
+    "local_bar":             (224, 140, 110),   # cocktail amber
+    "brunch_dining":         (236, 196, 140),   # brunch warm
     # Fire / energy — orange-red
     "local_fire_department": (255, 125,  55),
     "whatshot":              (255, 135,  60),
@@ -535,6 +536,8 @@ _ICON_COLOR = {
     "weekend":               (255, 200, 120),
     # Night / moon — pale silver-blue
     "bedtime":               (224, 228, 246),
+    "moon_stars":            (224, 228, 246),
+    "partly_cloudy_night":   (210, 218, 240),
     "dark_mode":             (208, 214, 240),
     # Rain / water / storm — cool blue
     "rainy":                 (150, 198, 238),
@@ -565,6 +568,7 @@ _ICON_COLOR = {
     "celebration":           (255, 140, 175),
     "festival":              (255, 150, 165),
     "nightlife":             (236, 150, 210),
+    "flare":                 (255, 214, 130),   # festive gold spark
 }
 
 # Per-profile icon-colour overrides (mood nuance where a shared glyph serves different moods).
@@ -1583,7 +1587,7 @@ _TIME_BIASED_PROFILES = {
     "morning":    ( 5, 12),   # 5am–noon
     "dinner":     (17, 21),   # 5pm–9pm
     "late_night": (22,  2),   # 10pm–2am
-    "sleep":      (22,  4),   # 10pm–4am
+    "sleep":      (21,  4),   # 9pm–4am
 }
 
 # Soft time boosts — general-pool profiles that score better during a time window
@@ -1592,7 +1596,7 @@ _TIME_SOFT_BOOSTS = {
     "brunch_mix":         ( 9, 13, 0.12),   # 9am–1pm
     "golden_hour":        (15, 20, 0.15),   # 3pm–8pm
     "after_work":         (16, 20, 0.12),   # 4pm–8pm
-    "sunset_mix":         (17, 22, 0.15),   # 5pm–10pm
+    "sunset_mix":         (17, 21, 0.15),   # 5pm–9pm
     "date_night":         (17,  2, 0.10),   # 5pm–2am
     "friday_night":       (17,  2, 0.10),   # 5pm–2am (any evening, not just Friday)
     "after_dark":         (22,  4, 0.15),   # 10pm–4am
@@ -1600,10 +1604,10 @@ _TIME_SOFT_BOOSTS = {
     "late_night_romance": (21,  3, 0.12),   # 9pm–3am
     "focus":              ( 7, 15, 0.15),   # 7am–3pm work window
     "deep_work":          ( 7, 15, 0.12),   # 7am–3pm work window
-    "commute_mix":        ( 7, 10, 0.10),   # morning commute
+    "commute_mix":        ( 6,  9, 0.10),   # morning commute
     "sunday_morning":     ( 7, 14, 0.08),   # any morning (day-of-week not tracked)
     "lazy_sunday":        (11, 18, 0.07),   # any quiet afternoon
-    "evening_unwind":     (20, 23, 0.15),   # 8pm–11pm (dinner-to-late-night gap)
+    "evening_unwind":     (19, 23, 0.15),   # 7pm–11pm (dinner-to-late-night gap)
     "pre_party":          (17, 23, 0.12),   # 5pm–11pm evenings
     "cooking_mix":        (17, 20, 0.10),   # 5pm–8pm dinner-prep window
 }
@@ -1641,11 +1645,12 @@ _WEEKDAY_RESTRICTED = {
 # window. (start_hour, end_hour) in 0–23; if start > end the window wraps past midnight.
 # Profiles not listed here are always eligible.
 _HOUR_RESTRICTED = {
-    "after_work":       (15, 22),   # 3pm-10pm only
+    "after_work":       (15, 20),   # 3pm-8pm only
     "brunch_mix":       ( 8, 13),   # 8am-1pm only
+    "commute_mix":      ( 6,  9),   # morning commute
     "focus":            ( 5, 17),   # 5am–5pm only
     "deep_work":        ( 5, 17),   # 5am–5pm only
-    "fresh_start":      ( 4, 14),   # 4am–2pm — morning motivation only
+    "fresh_start":      ( 4, 10),   # 4am–10am — morning motivation only
     "workout":          ( 5, 22),   # 5am–10pm — no gym music in the small hours
     "running":          ( 5, 22),   # 5am–10pm
     "evening_unwind":   (17,  2),   # 5pm–2am — evening only
@@ -1727,159 +1732,159 @@ _PROFILE_CATEGORY = {
 # Tracks with matching positive tags get a distance boost; conflicting tags get a penalty.
 # Profiles where emotional character is the key distinguishing feature benefit most.
 _PROFILE_MOOD_SIGNALS = {
-    "melancholy":  (["sad", "melanchol", "melancholy", "bittersweet", "somber", "mournful", "despair",
-                     "lonely", "depressing", "heartbreak"],
-                   ["happy", "euphoric", "upbeat", "energetic", "fun"]),
-    "happy":       (["happy", "upbeat", "euphoric", "joyful", "cheerful", "feel good",
+    "melancholy":  (["sad", "melancholy", "bittersweet", "somber", "plaintive", "elegiac",
+                     "lonely", "gloomy", "poignant"],
+                   ["happy", "euphoric", "lively", "energetic", "fun"]),
+    "happy":       (["happy", "lively", "euphoric", "joyous", "cheerful", "jovial",
                      "carefree", "fun", "positive"],
-                   ["sad", "melanchol", "melancholy", "dark", "depressing"]),
+                   ["sad", "melancholy", "dark", "gloomy"]),
     "workout":     (["energetic", "aggressive", "powerful", "intense", "triumphant",
-                     "motivating", "adrenaline"],
-                   ["calm", "peaceful", "sad", "melanchol"]),
-    "running":     (["energetic", "powerful", "upbeat", "motivating"],
+                     "rousing", "athletic"],
+                   ["calm", "peaceful", "sad", "melancholy"]),
+    "running":     (["energetic", "powerful", "lively", "rousing", "driving"],
                    ["calm", "peaceful"]),
-    "party":       (["party", "energetic", "euphoric", "fun", "carefree", "celebrat"],
-                   ["sad", "calm", "melanchol"]),
-    "focus":       (["calm", "peaceful", "meditat", "relaxing", "ambient", "tranquil"],
-                   ["aggressive", "intense", "party"]),
-    "chill":       (["calm", "laid-back", "mellow", "relaxing", "peaceful", "easy"],
+    "party":       (["celebratory", "energetic", "euphoric", "fun", "carefree", "boisterous"],
+                   ["sad", "calm", "melancholy"]),
+    "focus":       (["calm", "peaceful", "meditative", "relaxed", "atmospheric", "cerebral"],
+                   ["aggressive", "intense", "boisterous"]),
+    "chill":       (["calm", "laid-back", "mellow", "relaxed", "peaceful", "easygoing"],
                    ["aggressive", "intense", "angry"]),
-    "sleep":       (["calm", "peaceful", "dreamy", "ambient", "tranquil", "meditat"],
-                   ["energetic", "aggressive", "upbeat"]),
-    "late_night":  (["dark", "introspective", "moody", "atmospheric", "hypnotic"],
-                   ["happy", "upbeat", "fun"]),
-    "morning":     (["uplifting", "cheerful", "calm", "peaceful", "gentle", "fresh"],
+    "sleep":       (["calm", "peaceful", "dreamy", "soothing", "languid", "meditative"],
+                   ["energetic", "aggressive", "lively"]),
+    "late_night":  (["dark", "introspective", "brooding", "atmospheric", "hypnotic", "nocturnal"],
+                   ["happy", "cheerful", "fun"]),
+    "morning":     (["cheerful", "calm", "peaceful", "gentle", "springlike", "bright"],
                    ["dark", "aggressive", "sad"]),
     "dinner":      (["romantic", "sophisticated", "elegant", "smooth", "mellow"],
                    ["aggressive", "intense", "angry"]),
-    "rainy_day":        (["melanchol", "melancholy", "bittersweet", "introspective", "nostalgic", "wistful"],
-                        ["upbeat", "energetic", "euphoric"]),
-    "sunny":            (["happy", "upbeat", "carefree", "fun", "joyful", "cheerful"],
-                        ["sad", "dark", "melanchol"]),
-    "cosy":             (["calm", "peaceful", "warm", "comfort", "nostalgic", "gentle"],
+    "rainy_day":        (["melancholy", "bittersweet", "introspective", "nostalgic", "wistful", "plaintive", "poignant", "somber", "reflective"],
+                        ["lively", "energetic", "euphoric"]),
+    "sunny":            (["happy", "lively", "carefree", "fun", "joyous", "cheerful", "summery"],
+                        ["sad", "dark", "melancholy"]),
+    "cosy":             (["calm", "peaceful", "warm", "reassuring", "nostalgic", "gentle"],
                         ["aggressive", "intense", "energetic"]),
     # New profiles
-    "nostalgia_mix":    (["nostalgic", "wistful", "bittersweet", "sentimental", "reminiscent"],
+    "nostalgia_mix":    (["nostalgic", "wistful", "bittersweet", "sentimental", "autumnal"],
                         ["aggressive", "energetic", "euphoric"]),
-    "dreamy_mix":       (["dreamy", "ethereal", "atmospheric", "ambient", "surreal"],
+    "dreamy_mix":       (["dreamy", "ethereal", "atmospheric", "spacey", "trippy"],
                         ["aggressive", "intense", "angry"]),
-    "moody_mix":        (["dark", "introspective", "moody", "brooding", "melanchol"],
-                        ["happy", "upbeat", "fun", "euphoric"]),
-    "emotional":        (["emotional", "heartbreak", "bittersweet", "intense", "powerful"],
+    "moody_mix":        (["dark", "introspective", "brooding", "melancholy", "gloomy"],
+                        ["happy", "lively", "fun", "euphoric"]),
+    "emotional":        (["passionate", "poignant", "bittersweet", "intense", "powerful", "cathartic"],
                         []),
-    "bittersweet":      (["bittersweet", "nostalgic", "wistful", "sad", "melanchol"],
-                        ["upbeat", "energetic", "euphoric"]),
-    "cathartic":        (["intense", "powerful", "dramatic", "triumphant", "emotional"],
-                        ["calm", "peaceful", "ambient"]),
-    "confidence_boost": (["confident", "powerful", "upbeat", "bold", "assertive"],
-                        ["sad", "melanchol", "melancholy", "dark"]),
-    "empowering":       (["empowering", "triumphant", "powerful", "motivating", "inspirational"],
-                        ["sad", "melanchol", "melancholy", "dark"]),
-    "angst_mix":        (["angry", "aggressive", "intense", "restless", "rebellious"],
-                        ["calm", "peaceful", "happy", "upbeat"]),
-    "romantic_mix":     (["romantic", "love", "tender", "intimate", "affectionate"],
+    "bittersweet":      (["bittersweet", "nostalgic", "wistful", "sad", "melancholy", "poignant"],
+                        ["lively", "energetic", "euphoric"]),
+    "cathartic":        (["intense", "powerful", "dramatic", "triumphant", "passionate", "cathartic", "anguished", "visceral", "fiery"],
+                        ["calm", "peaceful", "soothing"]),
+    "confidence_boost": (["confident", "powerful", "lively", "gutsy", "swaggering", "bravado", "stylish"],
+                        ["sad", "melancholy", "dark"]),
+    "empowering":       (["triumphant", "powerful", "rousing", "anthemic", "mighty", "heroic"],
+                        ["sad", "melancholy", "dark"]),
+    "angst_mix":        (["angry", "aggressive", "intense", "nervous", "rebellious"],
+                        ["calm", "peaceful", "happy", "cheerful"]),
+    "romantic_mix":     (["romantic", "passionate", "tender", "intimate", "sensual"],
                         ["aggressive", "angry", "intense"]),
-    "daydreaming":      (["dreamy", "ambient", "calm", "peaceful", "ethereal"],
+    "daydreaming":      (["dreamy", "atmospheric", "calm", "peaceful", "ethereal"],
                         ["energetic", "aggressive", "intense"]),
-    "fresh_start":      (["uplifting", "hopeful", "optimistic", "cheerful", "bright"],
+    "fresh_start":      (["optimistic", "idealistic", "cheerful", "bright", "springlike"],
                         ["dark", "aggressive", "sad"]),
-    "euphoric":         (["euphoric", "ecstatic", "upbeat", "carefree", "exhilarating"],
-                        ["sad", "dark", "melanchol"]),
-    "beach_vibes":      (["happy", "carefree", "upbeat", "relaxing", "fun"],
+    "euphoric":         (["euphoric", "ecstatic", "lively", "carefree", "thrilling"],
+                        ["sad", "dark", "melancholy"]),
+    "beach_vibes":      (["happy", "carefree", "summery", "relaxed", "fun", "sunny"],
                         ["sad", "dark", "aggressive"]),
-    "autumn_mix":       (["nostalgic", "wistful", "melanchol", "melancholy", "introspective", "bittersweet"],
-                        ["upbeat", "euphoric", "energetic"]),
-    "winter_mix":       (["calm", "peaceful", "melanchol", "melancholy", "atmospheric", "nostalgic"],
-                        ["energetic", "aggressive", "upbeat"]),
-    "spring_mix":       (["uplifting", "hopeful", "cheerful", "fresh", "optimistic"],
+    "autumn_mix":       (["nostalgic", "wistful", "melancholy", "introspective", "bittersweet", "autumnal"],
+                        ["lively", "euphoric", "energetic"]),
+    "winter_mix":       (["calm", "peaceful", "melancholy", "atmospheric", "nostalgic", "wintry"],
+                        ["energetic", "aggressive", "lively"]),
+    "spring_mix":       (["optimistic", "cheerful", "springlike", "bright", "sunny"],
                         ["dark", "sad", "aggressive"]),
-    "love_songs":       (["romantic", "love", "tender", "heartfelt", "sincere"],
+    "love_songs":       (["romantic", "passionate", "tender", "poignant", "earnest"],
                         ["aggressive", "angry"]),
-    "slow_dance":       (["romantic", "tender", "intimate", "love", "affectionate"],
+    "slow_dance":       (["romantic", "tender", "intimate", "sensual", "passionate"],
                         ["aggressive", "energetic", "intense"]),
     "candlelight":      (["romantic", "elegant", "peaceful", "gentle", "intimate"],
                         ["aggressive", "intense", "energetic"]),
-    "acoustic_romance": (["romantic", "love", "acoustic", "tender", "sincere"],
+    "acoustic_romance": (["romantic", "earnest", "tender", "organic", "intimate"],
                         ["aggressive", "angry"]),
-    "indie_romance":    (["romantic", "dreamy", "melanchol", "melancholy", "bittersweet", "indie"],
+    "indie_romance":    (["romantic", "dreamy", "melancholy", "bittersweet", "wistful"],
                         ["aggressive", "intense"]),
-    "modern_romance":   (["romantic", "love", "tender", "heartfelt", "longing"],
-                        ["aggressive", "angry", "party", "energetic"]),
-    "late_night_romance":(["romantic", "intimate", "sensual", "longing", "dark"],
-                        ["energetic", "upbeat", "fun", "party"]),
+    "modern_romance":   (["romantic", "passionate", "tender", "poignant", "yearning"],
+                        ["aggressive", "angry", "boisterous", "energetic"]),
+    "late_night_romance":(["romantic", "intimate", "sensual", "yearning", "dark"],
+                        ["energetic", "lively", "fun", "boisterous"]),
     "romantic_dinner":  (["romantic", "elegant", "sophisticated", "smooth", "intimate"],
-                        ["aggressive", "intense", "energetic", "party"]),
-    "first_date":       (["romantic", "hopeful", "sweet", "tender", "gentle", "heartfelt"],
+                        ["aggressive", "intense", "energetic", "boisterous"]),
+    "first_date":       (["romantic", "optimistic", "sweet", "tender", "gentle", "poignant"],
                         ["aggressive", "intense", "angry"]),
     "romantic_jazz":    (["romantic", "sophisticated", "smooth", "elegant", "intimate"],
                         ["aggressive", "intense", "energetic"]),
-    "jazz_dinner":      (["sophisticated", "elegant", "smooth", "mellow", "relaxing"],
+    "jazz_dinner":      (["sophisticated", "elegant", "smooth", "mellow", "relaxed"],
                         ["aggressive", "intense", "energetic", "angry"]),
-    "string_quartet":   (["classical", "elegant", "orchestral", "sophisticated", "graceful"],
+    "string_quartet":   (["elegant", "graceful", "sophisticated", "refined", "stately"],
                         ["aggressive", "intense", "energetic", "angry"]),
-    "strings_romance":  (["romantic", "orchestral", "elegant", "cinematic", "sweeping"],
+    "strings_romance":  (["romantic", "elegant", "graceful", "majestic", "lush"],
                         ["aggressive", "intense", "energetic"]),
-    "piano_romance":    (["romantic", "peaceful", "tender", "intimate", "gentle", "heartfelt"],
+    "piano_romance":    (["romantic", "peaceful", "tender", "intimate", "gentle", "poignant"],
                         ["aggressive", "intense", "energetic", "angry"]),
-    "synthpop_romance": (["romantic", "dreamy", "nostalgic", "longing", "heartfelt"],
+    "synthpop_romance": (["romantic", "dreamy", "nostalgic", "yearning", "poignant"],
                         ["aggressive", "angry", "intense"]),
-    "party_throwback":  (["party", "energetic", "fun", "carefree", "celebrat"],
-                        ["sad", "calm", "melanchol"]),
-    "heartbreak":       (["heartbreak", "sad", "longing", "lonely", "loss", "despair", "grief"],
-                        ["happy", "upbeat", "euphoric", "carefree"]),
-    "pre_party":        (["energetic", "fun", "carefree", "upbeat", "party", "celebrat"],
-                        ["sad", "melanchol", "melancholy", "calm", "peaceful"]),
-    "celebration":      (["celebrat", "triumphant", "happy", "euphoric", "upbeat", "joyful"],
-                        ["sad", "melanchol", "melancholy", "dark"]),
-    "folk_acoustic":    (["acoustic", "folk", "earthy", "organic", "natural", "singer-songwriter"],
-                        ["aggressive", "intense", "electronic"]),
-    "deep_work":        (["calm", "ambient", "meditat", "peaceful", "tranquil", "focus"],
-                        ["aggressive", "intense", "party", "energetic"]),
-    "evening_unwind":   (["calm", "peaceful", "mellow", "relaxing", "smooth", "easy"],
+    "party_throwback":  (["celebratory", "energetic", "fun", "carefree", "boisterous"],
+                        ["sad", "calm", "melancholy"]),
+    "heartbreak":       (["sad", "yearning", "lonely", "anguished", "tragic", "bleak", "desperate"],
+                        ["happy", "lively", "euphoric", "carefree"]),
+    "pre_party":        (["energetic", "fun", "carefree", "lively", "celebratory", "boisterous"],
+                        ["sad", "melancholy", "calm", "peaceful"]),
+    "celebration":      (["celebratory", "triumphant", "happy", "euphoric", "lively", "joyous"],
+                        ["sad", "melancholy", "dark"]),
+    "folk_acoustic":    (["earthy", "organic", "rustic", "pastoral", "earnest"],
+                        ["aggressive", "intense", "brash"]),
+    "deep_work":        (["calm", "atmospheric", "meditative", "peaceful", "soothing", "cerebral"],
+                        ["aggressive", "intense", "boisterous", "energetic"]),
+    "evening_unwind":   (["calm", "peaceful", "mellow", "relaxed", "smooth", "easygoing"],
                         ["aggressive", "intense", "energetic"]),
-    "cool_down":        (["calm", "relaxing", "peaceful", "mellow", "gentle"],
+    "cool_down":        (["calm", "relaxed", "peaceful", "mellow", "gentle"],
                         ["aggressive", "intense", "angry"]),
-    "cooking_mix":      (["upbeat", "happy", "carefree", "fun", "cheerful"],
-                        ["sad", "intense", "aggressive", "melanchol"]),
+    "cooking_mix":      (["lively", "happy", "carefree", "fun", "cheerful"],
+                        ["sad", "intense", "aggressive", "melancholy"]),
     # Time-of-day / lifestyle
-    "after_work":       (["upbeat", "relaxing", "mellow", "laid-back", "easy"],
+    "after_work":       (["lively", "relaxed", "mellow", "laid-back", "easygoing"],
                         ["aggressive", "intense", "angry"]),
-    "after_dark":       (["dark", "moody", "atmospheric", "nocturnal", "brooding", "hypnotic"],
-                        ["happy", "upbeat", "cheerful", "fun"]),
-    "brunch_mix":       (["happy", "cheerful", "upbeat", "carefree", "fun"],
-                        ["sad", "dark", "aggressive", "melanchol"]),
-    "sunday_morning":   (["calm", "peaceful", "gentle", "warm", "relaxing", "cosy"],
+    "after_dark":       (["dark", "brooding", "atmospheric", "nocturnal", "sensual", "hypnotic"],
+                        ["happy", "cheerful", "fun"]),
+    "brunch_mix":       (["happy", "cheerful", "lively", "carefree", "fun"],
+                        ["sad", "dark", "aggressive", "melancholy"]),
+    "sunday_morning":   (["calm", "peaceful", "gentle", "warm", "relaxed", "soothing"],
                         ["aggressive", "energetic", "intense"]),
-    "lazy_sunday":      (["calm", "peaceful", "relaxing", "laid-back", "easy", "mellow"],
+    "lazy_sunday":      (["calm", "peaceful", "relaxed", "laid-back", "easygoing", "mellow"],
                         ["aggressive", "energetic", "intense"]),
-    "golden_hour":      (["nostalgic", "wistful", "warm", "hopeful", "uplifting"],
+    "golden_hour":      (["nostalgic", "wistful", "warm", "optimistic", "summery"],
                         ["aggressive", "angry", "intense"]),
     "sunset_mix":       (["nostalgic", "wistful", "bittersweet", "mellow", "introspective"],
-                        ["aggressive", "upbeat", "energetic"]),
-    "summer_evening":   (["warm", "carefree", "relaxing", "uplifting", "mellow"],
+                        ["aggressive", "lively", "energetic"]),
+    "summer_evening":   (["warm", "carefree", "relaxed", "summery", "mellow"],
                         ["aggressive", "intense", "dark"]),
-    "friday_night":     (["fun", "energetic", "carefree", "upbeat", "celebrat", "party"],
-                        ["sad", "melanchol", "melancholy", "calm"]),
-    "weekend_mix":      (["upbeat", "happy", "carefree", "relaxing", "fun", "cheerful"],
+    "friday_night":     (["fun", "energetic", "carefree", "lively", "celebratory", "boisterous"],
+                        ["sad", "melancholy", "calm"]),
+    "weekend_mix":      (["lively", "happy", "carefree", "relaxed", "fun", "cheerful"],
                         ["aggressive", "angry", "sad"]),
     "date_night":       (["romantic", "intimate", "smooth", "elegant", "tender"],
                         ["aggressive", "intense", "energetic"]),
     # Activity / driving
-    "driving_mix":      (["energetic", "upbeat", "powerful", "confident", "driving"],
-                        ["calm", "peaceful", "melanchol"]),
-    "night_drive":      (["dark", "moody", "atmospheric", "introspective", "nocturnal"],
-                        ["happy", "upbeat", "fun", "cheerful"]),
-    "driving_singalong":(["upbeat", "fun", "energetic", "carefree", "cheerful"],
-                        ["sad", "dark", "melanchol"]),
-    "road_trip":        (["upbeat", "energetic", "carefree", "fun", "optimistic"],
-                        ["sad", "melanchol", "melancholy", "dark"]),
-    "commute_mix":      (["upbeat", "engaging", "mellow", "laid-back", "easy"],
+    "driving_mix":      (["energetic", "lively", "powerful", "confident", "driving"],
+                        ["calm", "peaceful", "melancholy"]),
+    "night_drive":      (["dark", "brooding", "atmospheric", "introspective", "nocturnal"],
+                        ["happy", "lively", "fun", "cheerful"]),
+    "driving_singalong":(["lively", "fun", "energetic", "carefree", "cheerful"],
+                        ["sad", "dark", "melancholy"]),
+    "road_trip":        (["lively", "energetic", "carefree", "fun", "optimistic"],
+                        ["sad", "melancholy", "dark"]),
+    "commute_mix":      (["lively", "mellow", "laid-back", "easygoing", "relaxed"],
                         ["aggressive", "angry"]),
-    "walking_mix":      (["upbeat", "energetic", "carefree", "optimistic", "fun"],
+    "walking_mix":      (["lively", "energetic", "carefree", "optimistic", "fun"],
                         ["aggressive", "intense", "angry"]),
     # Aesthetic
-    "main_character":   (["confident", "dramatic", "powerful", "bold", "triumphant", "inspirational"],
-                        ["sad", "melanchol", "melancholy", "dark", "depressing"]),
+    "main_character":   (["confident", "dramatic", "powerful", "swaggering", "triumphant", "theatrical"],
+                        ["sad", "melancholy", "dark", "gloomy"]),
 }
 
 
@@ -2215,8 +2220,18 @@ def fetch_full_history(music, lookback_days=548):
     return entries
 
 
+MAX_TRACK_MS = 15 * 60 * 1000   # exclude tracks longer than 15 minutes from all playlists
+
+
+def _too_long(track):
+    """True if a track exceeds the 15-minute cap (excluded from every playlist)."""
+    return (getattr(track, "duration", 0) or 0) > MAX_TRACK_MS
+
+
 def resolve_tracks_by_keys(plex, rating_keys, workers=16):
-    """Parallel fetchItem for a list of ratingKeys. Returns {rk_str: Track}."""
+    """Parallel fetchItem for a list of ratingKeys. Returns {rk_str: Track}.
+    Tracks over the 15-minute cap are dropped here — the single choke-point feeding
+    every extras builder (callers already skip rks missing from the map)."""
     keys = list(dict.fromkeys(str(k) for k in rating_keys))  # deduplicate, preserve order
     result = {}
 
@@ -2231,7 +2246,7 @@ def resolve_tracks_by_keys(plex, rating_keys, workers=16):
         futures = {ex.submit(_fetch, rk): rk for rk in keys}
         for f in concurrent.futures.as_completed(futures):
             rk, t = f.result()
-            if t:
+            if t and not _too_long(t):
                 result[rk] = t
     return result
 
@@ -2313,39 +2328,123 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
 # arousal columns while those are still being generated: when a track has no TF value,
 # we estimate it from its mood tags so the per-profile valence/arousal targets in
 # _MOOD_PROFILES still discriminate. Real TF values, once present, always take precedence.
+# Exact, lower-cased map of every Plex/AllMusic mood in the library (338) → (valence, arousal)
+# on Russell's circumplex: valence = pleasant↔unpleasant, arousal = activated↔calm.
 _MOOD_AFFECT = {
-    "happy": (0.90, 0.65), "joyful": (0.92, 0.68), "cheerful": (0.88, 0.62),
-    "uplifting": (0.85, 0.62), "upbeat": (0.80, 0.70), "euphoric": (0.92, 0.85),
-    "ecstatic": (0.93, 0.88), "exhilarat": (0.88, 0.85), "carefree": (0.82, 0.55),
-    "fun": (0.82, 0.65), "celebrat": (0.88, 0.78), "triumphant": (0.80, 0.78),
-    "hopeful": (0.75, 0.50), "optimistic": (0.80, 0.55), "bright": (0.78, 0.58),
-    "playful": (0.80, 0.62), "warm": (0.70, 0.40), "comfort": (0.68, 0.32),
-    "cosy": (0.68, 0.30), "cozy": (0.68, 0.30), "calm": (0.62, 0.22),
-    "peaceful": (0.65, 0.20), "gentle": (0.63, 0.28), "relax": (0.62, 0.25),
-    "mellow": (0.58, 0.30), "laid-back": (0.62, 0.30), "easy": (0.60, 0.30),
-    "smooth": (0.60, 0.35), "soothing": (0.63, 0.20), "tranquil": (0.62, 0.15),
-    "meditat": (0.55, 0.15), "dreamy": (0.58, 0.25), "ethereal": (0.55, 0.25),
-    "ambient": (0.50, 0.18), "atmospheric": (0.45, 0.32), "hypnotic": (0.45, 0.45),
-    "romantic": (0.68, 0.40), "tender": (0.65, 0.32), "intimate": (0.62, 0.35),
-    "sensual": (0.60, 0.45), "affectionate": (0.70, 0.40), "love": (0.68, 0.42),
-    "sweet": (0.75, 0.45), "heartfelt": (0.60, 0.45), "sincere": (0.60, 0.40),
-    "sentimental": (0.50, 0.35), "nostalgic": (0.48, 0.35), "wistful": (0.42, 0.32),
-    "bittersweet": (0.42, 0.38), "longing": (0.40, 0.42), "yearning": (0.40, 0.45),
-    "introspective": (0.42, 0.30), "reflective": (0.45, 0.28), "melanchol": (0.25, 0.30),
-    "sad": (0.18, 0.30), "somber": (0.25, 0.25), "sombre": (0.25, 0.25),
-    "moody": (0.32, 0.42), "brooding": (0.28, 0.45), "dark": (0.28, 0.46),
-    "haunting": (0.30, 0.45), "nocturnal": (0.38, 0.45), "lonely": (0.18, 0.32),
-    "heartbreak": (0.15, 0.45), "loss": (0.15, 0.38), "grief": (0.12, 0.40),
-    "despair": (0.10, 0.45), "depress": (0.12, 0.30), "angry": (0.20, 0.85),
-    "aggressive": (0.22, 0.88), "intense": (0.35, 0.82), "rebellious": (0.35, 0.80),
-    "restless": (0.38, 0.72), "anxious": (0.28, 0.70), "energetic": (0.65, 0.85),
-    "powerful": (0.55, 0.80), "driving": (0.55, 0.80), "epic": (0.60, 0.78),
-    "dramatic": (0.45, 0.70), "motivating": (0.72, 0.78), "inspirational": (0.75, 0.70),
-    "confident": (0.70, 0.68), "bold": (0.68, 0.72), "empowering": (0.75, 0.75),
-    "groovy": (0.72, 0.65), "funky": (0.75, 0.70), "sexy": (0.62, 0.55),
-    "quirky": (0.72, 0.58), "sophisticated": (0.55, 0.40), "elegant": (0.58, 0.35),
-    "graceful": (0.60, 0.32), "cinematic": (0.50, 0.50), "earthy": (0.55, 0.35),
-    "organic": (0.58, 0.35), "fresh": (0.75, 0.55), "spiritual": (0.55, 0.30),
+    "rousing": (0.72, 0.80), "dramatic": (0.45, 0.70), "energetic": (0.65, 0.85),
+    "reflective": (0.45, 0.28), "stylish": (0.62, 0.45), "confident": (0.70, 0.62),
+    "yearning": (0.40, 0.45), "playful": (0.80, 0.62), "passionate": (0.62, 0.72),
+    "atmospheric": (0.45, 0.32), "earnest": (0.55, 0.40), "intense": (0.40, 0.82),
+    "theatrical": (0.55, 0.65), "exuberant": (0.85, 0.80), "intimate": (0.62, 0.32),
+    "bittersweet": (0.42, 0.38), "fun": (0.82, 0.65), "bright": (0.78, 0.58),
+    "amiable/good-natured": (0.78, 0.45), "lively": (0.78, 0.72), "brooding": (0.28, 0.45),
+    "sophisticated": (0.58, 0.40), "warm": (0.72, 0.40), "celebratory": (0.85, 0.78),
+    "wistful": (0.42, 0.32), "freewheeling": (0.72, 0.62), "hypnotic": (0.45, 0.40),
+    "laid-back/mellow": (0.60, 0.28), "ambitious": (0.62, 0.62), "sentimental": (0.52, 0.35),
+    "searching": (0.42, 0.42), "romantic": (0.68, 0.42), "nocturnal": (0.40, 0.42),
+    "poignant": (0.32, 0.35), "aggressive": (0.25, 0.88), "swaggering": (0.60, 0.65),
+    "dreamy": (0.58, 0.25), "urgent": (0.42, 0.82), "tense/anxious": (0.25, 0.72),
+    "melancholy": (0.25, 0.30), "brash": (0.52, 0.78), "cathartic": (0.45, 0.72),
+    "boisterous": (0.75, 0.82), "slick": (0.60, 0.50), "literate": (0.55, 0.38),
+    "quirky": (0.72, 0.55), "gentle": (0.65, 0.25), "exciting": (0.72, 0.82),
+    "sensual": (0.62, 0.45), "smooth": (0.62, 0.35), "refined": (0.60, 0.38),
+    "summery": (0.80, 0.55), "carefree": (0.82, 0.52), "cheerful": (0.88, 0.60),
+    "plaintive": (0.30, 0.30), "bravado": (0.58, 0.70), "sweet": (0.78, 0.45),
+    "organic": (0.58, 0.38), "confrontational": (0.30, 0.80), "soothing": (0.65, 0.18),
+    "eerie": (0.30, 0.45), "earthy": (0.55, 0.38), "lush": (0.62, 0.40),
+    "elegant": (0.60, 0.35), "detached": (0.42, 0.30), "angst-ridden": (0.25, 0.62),
+    "relaxed": (0.65, 0.25), "visceral": (0.42, 0.78), "happy": (0.90, 0.62),
+    "street-smart": (0.55, 0.58), "whimsical": (0.75, 0.52), "trippy": (0.50, 0.45),
+    "sexy": (0.65, 0.55), "volatile": (0.30, 0.78), "rollicking": (0.78, 0.75),
+    "cerebral": (0.50, 0.35), "fiery": (0.45, 0.82), "ominous": (0.22, 0.55),
+    "pulsing": (0.50, 0.70), "introspective": (0.42, 0.30), "autumnal": (0.45, 0.32),
+    "complex": (0.50, 0.45), "somber": (0.25, 0.25), "rambunctious": (0.72, 0.82),
+    "light": (0.72, 0.45), "strong": (0.58, 0.62), "provocative": (0.45, 0.62),
+    "sparkling": (0.80, 0.62), "witty": (0.72, 0.52), "uplifting": (0.85, 0.62),
+    "melodic": (0.65, 0.45), "raucous": (0.55, 0.82), "flowing": (0.58, 0.40),
+    "thrilling": (0.72, 0.85), "suspenseful": (0.35, 0.62), "joyous": (0.90, 0.72),
+    "elaborate": (0.55, 0.48), "calm/peaceful": (0.65, 0.15), "irreverent": (0.62, 0.60),
+    "delicate": (0.60, 0.25), "gritty": (0.40, 0.62), "wry": (0.55, 0.42),
+    "rowdy": (0.62, 0.82), "rebellious": (0.40, 0.78), "ethereal": (0.55, 0.25),
+    "menacing": (0.22, 0.62), "druggy": (0.45, 0.40), "uncompromising": (0.42, 0.65),
+    "gutsy": (0.55, 0.68), "driving": (0.55, 0.80), "soft/quiet": (0.60, 0.18),
+    "hedonistic": (0.68, 0.65), "self-conscious": (0.42, 0.40), "animated": (0.75, 0.70),
+    "enigmatic": (0.45, 0.40), "innocent": (0.72, 0.40), "bleak": (0.18, 0.30),
+    "agreeable": (0.72, 0.42), "spacey": (0.50, 0.25), "sad": (0.18, 0.28),
+    "austere": (0.38, 0.28), "nostalgic": (0.48, 0.35), "sexual": (0.60, 0.55),
+    "restrained": (0.48, 0.30), "humorous": (0.78, 0.55), "kinetic": (0.62, 0.80),
+    "ironic": (0.50, 0.45), "explosive": (0.45, 0.88), "cynical/sarcastic": (0.35, 0.50),
+    "powerful": (0.55, 0.78), "epic": (0.58, 0.75), "gloomy": (0.20, 0.30),
+    "effervescent": (0.82, 0.65), "shimmering": (0.68, 0.45), "thoughtful": (0.52, 0.32),
+    "fierce": (0.38, 0.82), "eccentric": (0.60, 0.52), "clinical": (0.45, 0.32),
+    "weary": (0.30, 0.25), "sprawling": (0.50, 0.45), "positive": (0.82, 0.55),
+    "anguished/distraught": (0.18, 0.65), "indulgent": (0.58, 0.48), "spooky": (0.28, 0.48),
+    "reckless": (0.45, 0.75), "knotty": (0.45, 0.50), "tough": (0.45, 0.65),
+    "euphoric": (0.92, 0.82), "spiritual": (0.58, 0.30), "nervous/jittery": (0.30, 0.72),
+    "angry": (0.20, 0.85), "fractured": (0.35, 0.55), "bombastic": (0.52, 0.78),
+    "bitter": (0.22, 0.50), "flashy": (0.62, 0.62), "gleeful": (0.88, 0.70),
+    "brassy": (0.62, 0.70), "paranoid": (0.25, 0.62), "crunchy": (0.50, 0.62),
+    "confessional": (0.42, 0.40), "acerbic": (0.35, 0.52), "lyrical": (0.58, 0.40),
+    "dark": (0.25, 0.45), "pastoral": (0.58, 0.28), "striding": (0.58, 0.60),
+    "airy": (0.65, 0.32), "harsh": (0.28, 0.70), "reserved": (0.48, 0.28),
+    "campy": (0.65, 0.58), "fantastic/fantasy-like": (0.60, 0.45), "reverent": (0.55, 0.30),
+    "precious": (0.62, 0.38), "serious": (0.42, 0.40), "springlike": (0.78, 0.50),
+    "optimistic": (0.82, 0.55), "snide": (0.38, 0.48), "technical": (0.50, 0.45),
+    "anthemic": (0.70, 0.75), "graceful": (0.62, 0.32), "brittle": (0.38, 0.40),
+    "turbulent": (0.32, 0.72), "wintry": (0.40, 0.28), "narrative": (0.52, 0.40),
+    "giddy": (0.85, 0.72), "sleazy": (0.42, 0.52), "sparse": (0.45, 0.25),
+    "hostile": (0.20, 0.78), "sugary": (0.82, 0.55), "manic": (0.55, 0.85),
+    "triumphant": (0.80, 0.78), "defiant": (0.45, 0.72), "circular": (0.50, 0.40),
+    "cold": (0.35, 0.30), "vulnerable": (0.35, 0.35), "tender": (0.65, 0.30),
+    "marching": (0.55, 0.62), "ebullient": (0.85, 0.72), "extroverted": (0.75, 0.65),
+    "insular": (0.42, 0.30), "swinging": (0.72, 0.62), "outrageous": (0.62, 0.70),
+    "unsettling": (0.28, 0.55), "languid": (0.50, 0.20), "mysterious": (0.42, 0.40),
+    "cosmopolitan": (0.60, 0.45), "meandering": (0.48, 0.30), "belligerent": (0.25, 0.78),
+    "lonely": (0.20, 0.30), "silly": (0.78, 0.58), "ramshackle": (0.52, 0.50),
+    "threatening": (0.22, 0.65), "rustic": (0.55, 0.35), "nihilistic": (0.22, 0.50),
+    "reassuring/consoling": (0.65, 0.28), "bouncy": (0.80, 0.65), "understated": (0.52, 0.32),
+    "grim": (0.20, 0.42), "meditative": (0.55, 0.15), "hungry": (0.48, 0.62),
+    "scary": (0.22, 0.62), "devotional": (0.58, 0.32), "ecstatic": (0.93, 0.85),
+    "angular": (0.45, 0.55), "capricious": (0.58, 0.55), "majestic": (0.65, 0.62),
+    "stately": (0.58, 0.45), "sarcastic": (0.38, 0.48), "declamatory": (0.50, 0.58),
+    "spicy": (0.62, 0.62), "trashy": (0.48, 0.58), "naive": (0.65, 0.42),
+    "vulgar": (0.42, 0.58), "pure": (0.68, 0.35), "greasy": (0.45, 0.52),
+    "lazy": (0.55, 0.22), "opulent": (0.62, 0.45), "exploratory": (0.55, 0.45),
+    "mighty": (0.58, 0.72), "messy": (0.45, 0.55), "rhapsodic": (0.62, 0.55),
+    "improvisatory": (0.55, 0.48), "philosophical": (0.50, 0.32), "malevolent": (0.18, 0.62),
+    "cartoonish": (0.70, 0.62), "outraged": (0.22, 0.80), "sardonic": (0.38, 0.48),
+    "dignified/noble": (0.58, 0.42), "sunny": (0.88, 0.58), "narcotic": (0.45, 0.20),
+    "virile": (0.55, 0.65), "hyper": (0.62, 0.88), "motoric": (0.52, 0.72),
+    "monumental": (0.58, 0.68), "poetic": (0.55, 0.35), "difficult": (0.40, 0.45),
+    "suffocating": (0.20, 0.55), "heroic": (0.65, 0.70), "elegiac": (0.30, 0.32),
+    "scattered": (0.45, 0.48), "feverish": (0.42, 0.78), "resolute": (0.55, 0.55),
+    "severe": (0.30, 0.55), "desperate": (0.20, 0.68), "erotic": (0.60, 0.55),
+    "exotic": (0.58, 0.48), "dissonant": (0.35, 0.58), "jovial": (0.85, 0.62),
+    "ornate": (0.58, 0.45), "perky": (0.82, 0.65), "seductive": (0.62, 0.50),
+    "mechanical": (0.42, 0.48), "child-like": (0.75, 0.50), "magical": (0.70, 0.50),
+    "sprightly": (0.80, 0.65), "loose": (0.58, 0.45), "mystical": (0.52, 0.35),
+    "apocalyptic": (0.20, 0.70), "regretful": (0.28, 0.35), "macabre": (0.25, 0.50),
+    "radiant": (0.82, 0.58), "satirical": (0.50, 0.50), "feral": (0.35, 0.78),
+    "athletic": (0.62, 0.78), "concise": (0.52, 0.45), "spontaneous": (0.65, 0.62),
+    "benevolent": (0.72, 0.40), "savage": (0.25, 0.82), "transparent/translucent": (0.55, 0.30),
+    "spacious": (0.55, 0.28), "heavy": (0.35, 0.65), "patriotic": (0.62, 0.60),
+    "arid": (0.40, 0.30), "tight": (0.50, 0.55), "tragic": (0.18, 0.45),
+    "negative": (0.22, 0.40), "demonic": (0.15, 0.72), "comic": (0.78, 0.58),
+    "martial": (0.48, 0.68), "sacred": (0.58, 0.30), "hymn-like": (0.58, 0.28),
+    "quaint": (0.62, 0.35), "energetic yearning": (0.45, 0.62), "funereal": (0.18, 0.25),
+    "cute": (0.80, 0.50), "swingin'": (0.72, 0.62), "dreamy brooding": (0.38, 0.35),
+    "charming": (0.78, 0.48), "easygoing": (0.68, 0.32), "mannered": (0.52, 0.42),
+    "energetic melancholy": (0.35, 0.60), "heavy brooding": (0.28, 0.55),
+    "energetic anxious": (0.32, 0.72), "dramatic emotion": (0.45, 0.65), "suave": (0.62, 0.45),
+    "sultry": (0.58, 0.45), "euphoric energy": (0.90, 0.85), "evocative": (0.52, 0.40),
+    "intriguing": (0.55, 0.45), "edgy": (0.42, 0.62), "aggressive power": (0.28, 0.85),
+    "wild": (0.50, 0.82), "depressed": (0.12, 0.25), "solemn": (0.35, 0.30),
+    "upbeat pop groove": (0.82, 0.68), "dark pop intensity": (0.35, 0.68),
+    "awakening": (0.65, 0.50), "dark urgent": (0.28, 0.72), "fiery groove": (0.55, 0.75),
+    "wary": (0.35, 0.50), "energetic abstract groove": (0.55, 0.70),
+    "energetic dreamy": (0.55, 0.55), "dreamy pulse": (0.55, 0.45), "other": (0.50, 0.45),
+    "idealistic": (0.68, 0.50), "stirring": (0.62, 0.62), "sober": (0.42, 0.32),
+    "determined": (0.58, 0.62), "happy excitement": (0.88, 0.78),
 }
 
 # Valence/arousal define a "mood", so the emotional axis dominates the acoustic distance
@@ -2356,20 +2455,18 @@ _AROUSAL_WEIGHT = 2.0
 
 
 def _entry_affect_proxy(entry):
-    """(valence, arousal) estimated from an entry's mood tags, or (None, None) when no
-    tags match the lexicon. Memoised on the entry. Only consulted as a fallback when the
-    track's TF valence/arousal are absent."""
+    """(valence, arousal) estimated from an entry's mood tags, or (None, None) when none
+    match. _MOOD_AFFECT covers the full Plex mood vocabulary exactly, so a plain lookup
+    suffices. Memoised on the entry; only a fallback for absent TF valence/arousal."""
     cached = entry.get("_affect_proxy")
     if cached is not None:
         return cached
     vs, as_ = [], []
     for m in (entry.get("moods") or []):
-        ml = m.lower()
-        for sub, (v, a) in _MOOD_AFFECT.items():
-            if sub in ml:
-                vs.append(v)
-                as_.append(a)
-                break
+        va = _MOOD_AFFECT.get(m.strip().lower())
+        if va is not None:
+            vs.append(va[0])
+            as_.append(va[1])
     result = (sum(vs) / len(vs), sum(as_) / len(as_)) if vs else (None, None)
     try:
         entry["_affect_proxy"] = result
@@ -3375,7 +3472,9 @@ _MS_CODEPOINTS = {
     "center_focus_strong": 0xE3B4, "self_improvement": 0xEA78, "spa": 0xEB4C, "cloud": 0xF15C,
     "directions_car": 0xEFF7, "route": 0xEACD, "directions_walk": 0xE536, "star_shine": 0xF31D,
     "weekend": 0xE16B, "repeat": 0xE040, "replay": 0xE042, "radar": 0xF04E,
-    "travel_explore": 0xE2DB, "explore": 0xE87A, "history": 0xE8B3, "album": 0xE019,
+    "travel_explore": 0xE2DB, "explore": 0xE87A, "history": 0xE8B3,
+    "moon_stars": 0xF34F, "partly_cloudy_night": 0xEA46, "local_bar": 0xE540,
+    "brunch_dining": 0xEA73, "flare": 0xE3E4,
 }
 
 _MS_FONT_CACHE = {}
@@ -3395,32 +3494,42 @@ def _load_ms_font(size):
     return font
 
 
-def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0):
-    """Render a Material Symbol glyph centred at (cx, cy) at `size` px em, tilted `tilt`°,
-    compositing onto RGBA `layer` via its own tile (so it can rotate)."""
+def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
+                stroke_width=0, stroke_fill=None):
+    """Render a Material Symbol glyph centred at (cx, cy) at `size` px em, optionally tilted,
+    mirrored (flip = horizontal) and outlined (stroke), compositing onto RGBA `layer` via its
+    own tile (so it can rotate/mirror freely)."""
     cp = _MS_CODEPOINTS.get(icon_name)
     if cp is None or not _PIL_AVAILABLE:
         return
     ch   = chr(cp)
     font = _load_ms_font(max(8, int(round(size))))
-    l, t, r, b = font.getbbox(ch)                       # ink bounds, to centre precisely
+    l, t, r, b = font.getbbox(ch, stroke_width=stroke_width)     # ink bounds, to centre
     gw, gh = max(1, r - l), max(1, b - t)
-    pad = max(8, int(size * 0.10))
+    pad = max(8, int(size * 0.10) + stroke_width)
     tile = Image.new("RGBA", (gw + 2 * pad, gh + 2 * pad), (0, 0, 0, 0))
-    ImageDraw.Draw(tile).text((pad - l, pad - t), ch, font=font, fill=fill)
+    ImageDraw.Draw(tile).text((pad - l, pad - t), ch, font=font, fill=fill,
+                              stroke_width=stroke_width, stroke_fill=stroke_fill)
+    if flip:
+        tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
     if tilt:
         tile = tile.rotate(tilt, resample=Image.BICUBIC, expand=True)
     layer.alpha_composite(tile, (int(round(cx - tile.width / 2)),
                                  int(round(cy - tile.height / 2))))
 
 
-def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3):
+def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3, stroke=None):
     """Composed constellation: one anchor glyph plus (n-1) satellites at 55–70% size on a
-    balanced ring around it, with gentle varied tilts. `names` is cycled across glyphs
-    (e.g. ["music_note","music_note_2"]) or repeated (["favorite"])."""
-    def pick(i):
-        return names[i % len(names)]
-    _draw_glyph(layer, pick(0), cx, cy, anchor_size, fill, tilt=rng.uniform(-8, 8))
+    balanced ring around it, gentle varied tilts. Overlapping shapes get an outline
+    (`stroke` = (width_fraction, fill)) so they stay legible. `names` is cycled across glyphs
+    (e.g. ["music_note","music_note_2"]) or repeated (["favorite"], ["flare"])."""
+    sw, sf = stroke or (0, None)
+
+    def g(name, gx, gy, gsize, gtilt):
+        _draw_glyph(layer, name, gx, gy, gsize, fill, tilt=gtilt,
+                    stroke_width=int(round(gsize * sw)) if sw else 0, stroke_fill=sf)
+
+    g(names[0], cx, cy, anchor_size, rng.uniform(-8, 8))
     if n <= 1:
         return
     ring   = anchor_size * 0.50
@@ -3428,8 +3537,27 @@ def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3):
     for i in range(1, n):
         ang   = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.25, 0.25)
         ssize = anchor_size * rng.uniform(0.55, 0.70)
-        _draw_glyph(layer, pick(i), cx + ring * math.cos(ang), cy + ring * math.sin(ang),
-                    ssize, fill, tilt=rng.uniform(-15, 15))
+        g(names[i % len(names)], cx + ring * math.cos(ang), cy + ring * math.sin(ang),
+          ssize, rng.uniform(-15, 15))
+
+
+def _draw_falling_cluster(layer, cloud_name, flake_name, cx, cy, size, rng, fill, stroke=None):
+    """A cloud near the top with several flakes falling below it (downward spread, varied
+    size and tilt) — used for Winter. `size` is the cloud's em size; cluster centred on (cx,cy)."""
+    sw, sf = stroke or (0, None)
+
+    def g(name, gx, gy, gsize, gtilt):
+        _draw_glyph(layer, name, gx, gy, gsize, fill, tilt=gtilt,
+                    stroke_width=int(round(gsize * sw)) if sw else 0, stroke_fill=sf)
+
+    cloud_y = cy - size * 0.42
+    g(cloud_name, cx, cloud_y, size, rng.uniform(-6, 6))
+    n = rng.randint(4, 6)
+    for i in range(n):
+        fx    = cx + rng.uniform(-0.62, 0.62) * size
+        fy    = cloud_y + size * (0.32 + 0.60 * (i + rng.uniform(0, 1)) / n)
+        fsize = size * rng.uniform(0.26, 0.42)
+        g(flake_name, fx, fy, fsize, rng.uniform(-20, 20))
 
 
 def _icon_dark(c, f=0.42):
@@ -3501,17 +3629,30 @@ def _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, shadow=True, bg_lum
     return Image.alpha_composite(base, overlay)
 
 
+def _draw_ripples_below(layer, cx, cy, size, rgb, alpha):
+    """A few faint concentric ripple ellipses just below a rain-cloud icon (Rainy Day)."""
+    draw = ImageDraw.Draw(layer)
+    ry   = cy + size * 0.42
+    a0   = max(40, int(alpha * 0.55))
+    lw   = max(2, int(size * 0.012))
+    for k, rr in enumerate((size * 0.30, size * 0.46, size * 0.62)):
+        draw.ellipse([cx - rr, ry - rr * 0.34, cx + rr, ry + rr * 0.34],
+                     outline=(*rgb, max(28, a0 - k * 16)), width=lw)
+
+
 def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     """Composite a profile-specific Material Symbol glyph onto img (RGBA). Returns RGBA.
 
     The glyph is the topmost art below the title text: rendered at a prominent hero size,
     placed off-centre and gently tilted per profile (seeded by the weekly rng) within a
     safe zone clear of the title bar and badge, with a contrast drop-shadow so it reads on
-    any background. Romance/music profiles render a composed cluster (anchor + satellites).
+    any background. Some profiles render a composed cluster (anchor+satellites, or falling).
     """
     icon_name = _PROFILE_ICON.get(key)
     if not icon_name or not _PIL_AVAILABLE:
         return img
+    if key in _PROFILE_ICON_ROTATE:                      # weekly rotation (e.g. date_night)
+        icon_name = rng.choice(_PROFILE_ICON_ROTATE[key])
 
     W, H = img.size
     base = img.convert("RGBA")
@@ -3519,19 +3660,26 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     meta = dict(_ICON_DEFAULT_META)
     meta.update(_ICON_META.get(icon_name, {}))
     meta.update(_ICON_PROFILE_OVERRIDE.get(key, {}))
-    kind = meta["kind"]
 
-    # Romance profiles render a favourite-heart arrangement; solitary = single, else cluster.
-    heart_mode = None
-    if key in _HEART_MODE:
-        heart_mode = _HEART_MODE.get(key) or rng.choice(["solitary", "pair", "trio", "cluster"])
-        kind = "single" if heart_mode == "solitary" else "cluster"
+    # Cluster dispatch — romance hearts / music notes / celebration flares (ring), winter (falling).
+    heart_mode = _HEART_MODE.get(key) if key in _HEART_MODE else None
+    cluster_mode, cluster_names, cluster_n = None, None, 0
+    if heart_mode and heart_mode != "solitary":
+        cluster_mode, cluster_names = "ring", ["favorite"]
+        cluster_n = {"pair": 2, "trio": 3, "cluster": 5}.get(heart_mode, 3)
+    elif icon_name == "music_note":
+        cluster_mode, cluster_names, cluster_n = "ring", ["music_note", "music_note_2"], rng.randint(3, 4)
+    elif icon_name == "flare":
+        cluster_mode, cluster_names, cluster_n = "ring", ["flare"], rng.randint(4, 6)
+    elif key == "winter_mix":
+        cluster_mode = "falling"
+    kind = "cluster" if cluster_mode else "single"
 
     scale = meta["base_scale"] * rng.uniform(0.92, 1.12)
 
     # Off-centre placement, clamped clear of the bottom title bar (22%) and the badge.
     R       = meta["extent"] * scale
-    R_clamp = R * (1.18 if kind == "cluster" else 1.0)   # clusters spread wider than R
+    R_clamp = R * (1.20 if kind == "cluster" else 1.0)   # clusters spread wider than R
     margin  = 40
     bar_top = int(H * 0.78)
     ax, ay  = meta["anchor"]
@@ -3544,29 +3692,36 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     cx, cy = int(round(cx)), int(round(cy))
     bg_lum = _bg_luminance(base, cx, cy, R)
 
-    # Glyph colour: the icon's own mood-appropriate colour where defined, else an in-hue
-    # tint of the cover palette (abstract concept icons). Then guard contrast vs. the bg.
+    # Glyph colour: the icon's own mood colour where defined, else an in-hue tint; guard contrast.
     base_rgb = _PROFILE_ICON_COLOR.get(key) or _ICON_COLOR.get(icon_name)
     if base_rgb is None:
         base_rgb = _icon_dark(color_top) if bg_lum >= 150 else _icon_light(color_top, f=0.50)[:3]
-    fill = (*_ensure_icon_contrast(base_rgb, bg_lum), 240)
-    size = max(40, int(round(2 * R)))            # font em size → prominent, hero proportion
+    rgb   = _ensure_icon_contrast(base_rgb, bg_lum)
+    alpha = meta.get("alpha", 240)
+    fill  = (*rgb, alpha)
+    size  = max(40, int(round(2 * R)))               # font em size → prominent hero proportion
 
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    if kind == "cluster":
-        if heart_mode:                           # composed cluster of favourite hearts
-            names = ["favorite"]
-            n = {"pair": 2, "trio": 3, "cluster": 5}.get(heart_mode, 3)
-        else:                                    # music-note cluster mixes the two note styles
-            names = ["music_note", "music_note_2"]
-            n = rng.randint(3, 4)
-        _draw_glyph_cluster(overlay, names, cx, cy, anchor_size=size * 0.60, rng=rng, fill=fill, n=n)
+    if cluster_mode:
+        # Outline so overlapping shapes stay legible — contrast vs. the fill.
+        fl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+        stroke_rgb = tuple(int(c * 0.28) for c in rgb) if fl >= 110 \
+            else tuple(min(255, int(c + (255 - c) * 0.75)) for c in rgb)
+        stroke = (0.045, (*stroke_rgb, alpha))
+        if cluster_mode == "falling":
+            _draw_falling_cluster(overlay, "cloud", "snowflake", cx, cy, size * 0.46, rng, fill, stroke=stroke)
+        else:
+            _draw_glyph_cluster(overlay, cluster_names, cx, cy, anchor_size=size * 0.60,
+                                rng=rng, fill=fill, n=cluster_n, stroke=stroke)
     else:
         angle = rng.uniform(-meta["tilt"], meta["tilt"])
-        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle)
+        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False))
+        if key == "rainy_day":                       # little ripples landing below the cloud
+            _draw_ripples_below(overlay, cx, cy, size, rgb, alpha)
 
     # The glyph is the topmost art (below the title text); _place_icon adds the drop-shadow.
-    return _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, bg_lum=bg_lum)
+    return _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0,
+                       shadow=meta.get("shadow", True), bg_lum=bg_lum)
 
 
 def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="default"):
