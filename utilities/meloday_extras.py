@@ -369,132 +369,132 @@ _COVER_BG_STYLES = {
 # Per-profile icon overlay — drawn on top of the background before text.
 # Keys not listed here get no icon (plain background only).
 _PROFILE_ICON = {
-    # Romantic / love — arrangement (solitary / pair / trio / cluster) set by _HEART_MODE
-    "romantic_mix":      "hearts",
-    "modern_romance":    "hearts",
-    "late_night_romance":"hearts",
-    "romantic_dinner":   "wine_glass",
-    "love_songs":        "hearts",
-    "slow_dance":        "hearts",
-    "date_night":        "hearts",
-    "first_date":        "hearts",
-    "acoustic_romance":  "hearts",
-    "indie_romance":     "hearts",
-    "synthpop_romance":  "hearts",
-    "heartbreak":        "broken_heart",
+    # Romance / love — favourite hearts; arrangement (solitary/pair/trio/cluster) via _HEART_MODE
+    "romantic_mix":      "favorite",
+    "modern_romance":    "favorite",
+    "late_night_romance":"favorite",
+    "romantic_dinner":   "wine_bar",
+    "love_songs":        "favorite",
+    "slow_dance":        "favorite",
+    "date_night":        "wine_bar",
+    "first_date":        "favorite",
+    "acoustic_romance":  "favorite",
+    "indie_romance":     "favorite",
+    "synthpop_romance":  "favorite",
+    "heartbreak":        "heart_broken",
     "candlelight":       "candle",
-    # Musical / instrumental
-    "piano_romance":     "music_note",
+    # Musical / instrumental — note glyph clusters mix music_note + music_note_2
+    "piano_romance":     "piano",
     "romantic_jazz":     "music_note",
     "string_quartet":    "music_note",
     "strings_romance":   "music_note",
     "folk_acoustic":     "music_note",
     # Drinks / food
-    "dinner":            "wine_glass",
-    "jazz_dinner":       "wine_glass",
-    "cosy":              "mug",
-    "brunch_mix":        "mug",
+    "dinner":            "restaurant",
+    "jazz_dinner":       "restaurant",
+    "cooking_mix":       "skillet",
+    "cosy":              "local_cafe",
+    "brunch_mix":        "local_cafe",
     # Night / sleep
-    "sleep":             "moon_stars",
-    "late_night":        "moon",
-    "night_drive":       "moon",
-    "after_dark":        "stars",
+    "sleep":             "bedtime",
+    "late_night":        "bedtime",
+    "night_drive":       "bedtime",
+    "after_dark":        "dark_mode",
     # Weather / atmosphere
-    "rainy_day":         "raindrops",
-    "melancholy":        "raindrops_light",
-    "bittersweet":       "raindrop_single",
+    "rainy_day":         "rainy",
+    "melancholy":        "water_drop",
+    "bittersweet":       "water_drop",
+    "moody_mix":         "dark_mode",
+    "dreamy_mix":        "cloud",
     # Sun / day
-    "morning":           "sun",
-    "sunny":             "sun",
-    "golden_hour":       "sun",
-    "sunday_morning":    "sun",
-    "summer_evening":    "sun",
-    "sunset_mix":        "sun",
-    "beach_vibes":       "sun",
+    "morning":           "wb_sunny",
+    "sunny":             "wb_sunny",
+    "golden_hour":       "wb_sunny",
+    "sunday_morning":    "wb_sunny",
+    "summer_evening":    "wb_sunny",
+    "sunset_mix":        "wb_sunny",
+    "fresh_start":       "clear_day",
+    "beach_vibes":       "beach_access",
     # Season
     "winter_mix":        "snowflake",
-    "autumn_mix":        "leaf",
-    "spring_mix":        "flower",
-    # Energy / power — tailored per profile (cathartic & angst_mix intentionally icon-free)
-    "workout":           "dumbbell",
-    "running":           "motion_streaks",
-    "empowering":        "flame",
-    "confidence_boost":  "boost",
-    # Calm / dreamy
+    "autumn_mix":        "forest",
+    "spring_mix":        "local_florist",
+    # Energy / power
+    "workout":           "fitness_center",
+    "running":           "directions_run",
+    "empowering":        "local_fire_department",
+    "confidence_boost":  "trending_up",
+    "cathartic":         "whatshot",
+    "angst_mix":         "thunderstorm",
+    # Calm / dreamy / focus
     "daydreaming":       "cloud",
     "lazy_sunday":       "cloud",
-    # Party / celebration (weekend_mix & happy left icon-free — backgrounds carry them)
-    "party":             "sparkles",
-    "pre_party":         "sparkles",
-    "friday_night":      "sparkles",
-    "celebration":       "sparkles",
-    "party_throwback":   "sparkles",
-    "euphoric":          "sparkles",
+    "focus":             "center_focus_strong",
+    "deep_work":         "center_focus_strong",
+    "evening_unwind":    "self_improvement",
+    "cool_down":         "spa",
+    # Party / celebration
+    "party":             "celebration",
+    "pre_party":         "nightlife",
+    "friday_night":      "nightlife",
+    "celebration":       "celebration",
+    "party_throwback":   "festival",
+    "euphoric":          "festival",
+    "happy":             "mood",
+    "weekend_mix":       "weekend",
+    # Driving / activity
+    "driving_mix":       "directions_car",
+    "commute_mix":       "directions_car",
+    "driving_singalong": "directions_car",
+    "road_trip":         "route",
+    "walking_mix":       "directions_walk",
     # Spotlight
-    "main_character":    "star",
-    # Non-mood extras (concept-driven icons only)
-    "on_repeat":         "repeat_loop",
-    "repeat_rewind":     "repeat_loop_ccw",
-    "release_radar":     "radar_pulse",
-    "rediscovery":       "magnifying_glass",
-    "time_capsule":      "clock",
-    "deep_cuts":         "vinyl",
+    "main_character":    "star_shine",
+    # Non-mood extras (concept glyphs)
+    "on_repeat":         "repeat",
+    "repeat_rewind":     "replay",
+    "release_radar":     "radar",
+    "rediscovery":       "travel_explore",
+    "discover_weekly":   "explore",
+    "time_capsule":      "history",
+    "deep_cuts":         "album",
 }
 
-# Per-icon placement metadata for _draw_icon_overlay.
-#   extent     ≈ icon radius in px at scale 1.0 (drives the safe-zone clamp)
-#   base_scale default size multiplier (hero icons larger, accents smaller)
-#   tilt       max |rotation| in degrees for single-object icons (0 = upright/symmetric)
-#   anchor     preferred centre as (x, y) fractions of the canvas (off-centre by design)
-#   kind       "single" (scale+tilt), "cluster" (scaled cloud, no global tilt),
-#              "scatter" (self-positioned, no global scale/tilt)
-_ICON_DEFAULT_META = {"extent": 130, "base_scale": 1.1, "tilt": 12, "anchor": (0.50, 0.40), "kind": "single"}
+# Per-glyph placement metadata for _draw_icon_overlay.
+#   extent     ≈ glyph radius in px at scale 1.0 (size = 2*extent*scale → hero proportion)
+#   base_scale size multiplier; tilt = max |rotation|° (0 = upright); anchor = (x,y) fractions
+#   kind       "single" or "cluster" (music notes). Romance clusters are set via _HEART_MODE.
+_ICON_DEFAULT_META = {"extent": 205, "base_scale": 1.0, "tilt": 10, "anchor": (0.50, 0.40), "kind": "single"}
 _ICON_META = {
-    "hearts":            {"extent": 180, "base_scale": 1.05, "tilt": 14, "anchor": (0.48, 0.40), "kind": "single"},
-    "broken_heart":      {"extent":  80, "base_scale": 1.25, "tilt": 12, "anchor": (0.50, 0.40), "kind": "single"},
-    "wine_glass":        {"extent": 125, "base_scale": 1.15, "tilt": 10, "anchor": (0.42, 0.38), "kind": "single"},
-    "candle":            {"extent": 130, "base_scale": 1.10, "tilt":  0, "anchor": (0.50, 0.42), "kind": "single"},
-    "music_note":        {"extent": 130, "base_scale": 1.00, "tilt": 16, "anchor": (0.50, 0.40), "kind": "cluster"},
-    "mug":               {"extent": 125, "base_scale": 1.20, "tilt": 10, "anchor": (0.45, 0.40), "kind": "single"},
-    "moon":              {"extent": 200, "base_scale": 1.00, "tilt": 10, "anchor": (0.55, 0.38), "kind": "single"},
-    "moon_stars":        {"extent": 210, "base_scale": 1.00, "tilt":  8, "anchor": (0.50, 0.38), "kind": "single"},
-    "stars":             {"extent": 200, "base_scale": 1.00, "tilt":  0, "anchor": (0.50, 0.38), "kind": "cluster"},
-    "star":              {"extent": 140, "base_scale": 1.35, "tilt": 16, "anchor": (0.50, 0.36), "kind": "single"},
-    "raindrops":         {"extent": 200, "base_scale": 1.00, "tilt":  0, "anchor": (0.50, 0.40), "kind": "scatter"},
-    "raindrops_light":   {"extent": 200, "base_scale": 1.00, "tilt":  0, "anchor": (0.50, 0.40), "kind": "scatter"},
-    "raindrop_single":   {"extent":  55, "base_scale": 1.30, "tilt":  0, "anchor": (0.48, 0.40), "kind": "single"},
-    "sun":               {"extent": 158, "base_scale": 1.15, "tilt":  0, "anchor": (0.50, 0.34), "kind": "single"},
-    "snowflake":         {"extent": 150, "base_scale": 1.10, "tilt": 12, "anchor": (0.50, 0.38), "kind": "single"},
-    "leaf":              {"extent": 140, "base_scale": 1.15, "tilt": 18, "anchor": (0.55, 0.40), "kind": "single"},
-    "flower":            {"extent": 110, "base_scale": 1.20, "tilt": 12, "anchor": (0.50, 0.40), "kind": "single"},
-    "dumbbell":          {"extent": 120, "base_scale": 1.20, "tilt": 16, "anchor": (0.50, 0.40), "kind": "single"},
-    "flame":             {"extent": 110, "base_scale": 1.20, "tilt":  8, "anchor": (0.50, 0.42), "kind": "single"},
-    "motion_streaks":    {"extent": 140, "base_scale": 1.15, "tilt":  0, "anchor": (0.45, 0.42), "kind": "single"},
-    "boost":             {"extent": 110, "base_scale": 1.20, "tilt":  8, "anchor": (0.50, 0.38), "kind": "single"},
-    "cloud":             {"extent": 135, "base_scale": 1.25, "tilt":  6, "anchor": (0.50, 0.40), "kind": "single"},
-    "sparkles":          {"extent": 175, "base_scale": 1.00, "tilt":  0, "anchor": (0.50, 0.40), "kind": "cluster"},
-    # Concept / logo icons — emblematic, kept near-upright and more central.
-    "repeat_loop":       {"extent": 135, "base_scale": 1.10, "tilt":  6, "anchor": (0.50, 0.42), "kind": "single"},
-    "repeat_loop_ccw":   {"extent": 135, "base_scale": 1.10, "tilt":  6, "anchor": (0.50, 0.42), "kind": "single"},
-    "radar_pulse":       {"extent": 225, "base_scale": 0.95, "tilt":  0, "anchor": (0.50, 0.42), "kind": "single"},
-    "magnifying_glass":  {"extent": 150, "base_scale": 1.10, "tilt":  0, "anchor": (0.50, 0.42), "kind": "single"},
-    "clock":             {"extent": 145, "base_scale": 1.05, "tilt":  0, "anchor": (0.50, 0.42), "kind": "single"},
-    "vinyl":             {"extent": 155, "base_scale": 1.10, "tilt":  0, "anchor": (0.50, 0.42), "kind": "single"},
+    # Music profiles render a composed note cluster (mixes music_note + music_note_2).
+    "music_note":          {"kind": "cluster", "extent": 215},
+    # Concept / informational glyphs — upright, a touch more central.
+    "repeat":              {"tilt": 0, "anchor": (0.50, 0.42)},
+    "replay":              {"tilt": 0, "anchor": (0.50, 0.42)},
+    "radar":               {"tilt": 0, "anchor": (0.50, 0.42)},
+    "history":             {"tilt": 0, "anchor": (0.50, 0.42)},
+    "album":               {"tilt": 4, "anchor": (0.50, 0.42)},
+    "travel_explore":      {"tilt": 0, "anchor": (0.50, 0.42)},
+    "explore":             {"tilt": 0, "anchor": (0.50, 0.42)},
+    "center_focus_strong": {"tilt": 0},
+    "trending_up":         {"tilt": 6},
+    "candle":              {"extent": 185, "tilt": 0},   # tall, narrow glyph
+    "star_shine":          {"extent": 220},
 }
 
-# Per-profile overrides (merged over _ICON_META) — placement that complements the
-# background's focal point, or a deliberate spread across same-icon siblings.
+# Per-profile overrides (merged over _ICON_META) — a deliberate placement spread across
+# same-glyph siblings (sun / moon profiles) or a bespoke size.
 _ICON_PROFILE_OVERRIDE = {
-    "main_character": {"anchor": (0.50, 0.33), "base_scale": 1.45},  # top-centre spotlight
-    "night_drive":    {"anchor": (0.66, 0.38)},                      # rays from left → moon right
-    "late_night":     {"anchor": (0.63, 0.41)},                      # off-centre ambient glow
-    "sleep":          {"anchor": (0.50, 0.35)},
-    "morning":        {"anchor": (0.40, 0.33)},
-    "sunny":          {"anchor": (0.58, 0.33)},
-    "golden_hour":    {"anchor": (0.40, 0.34)},
-    "sunset_mix":     {"anchor": (0.50, 0.30)},                      # glow from bottom → sun high
-    "beach_vibes":    {"anchor": (0.62, 0.34)},
-    "summer_evening": {"anchor": (0.38, 0.34)},
+    "main_character": {"anchor": (0.50, 0.37), "base_scale": 1.12},
+    "night_drive":    {"anchor": (0.62, 0.40)},
+    "late_night":     {"anchor": (0.62, 0.41)},
+    "sleep":          {"anchor": (0.50, 0.38)},
+    "morning":        {"anchor": (0.40, 0.37)},
+    "sunny":          {"anchor": (0.58, 0.37)},
+    "golden_hour":    {"anchor": (0.40, 0.37)},
+    "sunset_mix":     {"anchor": (0.50, 0.36)},
+    "beach_vibes":    {"anchor": (0.60, 0.37)},
+    "summer_evening": {"anchor": (0.40, 0.37)},
 }
 
 # Heart arrangement per romance profile — deliberately spread so no two covers match.
@@ -3297,47 +3297,84 @@ def _icon_light(c, f=0.45, alpha=200):
             alpha)
 
 
-def _heart_polygon(cx, cy, scale):
-    """Parametric heart (16sin³t, 13cost−5cos2t−2cos3t−cos4t). scale=pixels/unit."""
-    pts = []
-    for i in range(120):
-        t = 2 * math.pi * i / 120
-        x = cx + scale * 16 * math.sin(t) ** 3
-        y = cy - scale * (13 * math.cos(t) - 5 * math.cos(2 * t)
-                          - 2 * math.cos(3 * t) - math.cos(4 * t))
-        pts.append((x, y))
-    return pts
+# --- Material Symbols icon font (variable; rendered by codepoint) ---------------
+MS_ICON_FONT = os.path.join(
+    _BASE_DIR, "assets", "Material_Symbols_Rounded",
+    "MaterialSymbolsRounded-VariableFont_FILL,GRAD,opsz,wght.ttf")
+
+# Material Symbol name → codepoint (extracted from the font's cmap). Extend as needed.
+_MS_CODEPOINTS = {
+    "favorite": 0xE87E, "heart_broken": 0xEAC2, "candle": 0xF588, "music_note": 0xE405,
+    "music_note_2": 0xFFFD8, "piano": 0xE521, "graphic_eq": 0xE1B8, "bedtime": 0xF159,
+    "dark_mode": 0xE51C, "wb_sunny": 0xE430, "clear_day": 0xF157, "beach_access": 0xEB3E,
+    "rainy": 0xF176, "water_drop": 0xE798, "local_cafe": 0xEB44, "restaurant": 0xE56C,
+    "wine_bar": 0xF1E8, "skillet": 0xF543, "fitness_center": 0xEB43, "directions_run": 0xE566,
+    "local_fire_department": 0xEF55, "trending_up": 0xE8E5, "whatshot": 0xE80E,
+    "thunderstorm": 0xEBDB, "celebration": 0xEA65, "nightlife": 0xEA62, "festival": 0xEA68,
+    "mood": 0xEA22, "snowflake": 0xED5B, "forest": 0xEA99, "local_florist": 0xE545,
+    "center_focus_strong": 0xE3B4, "self_improvement": 0xEA78, "spa": 0xEB4C, "cloud": 0xF15C,
+    "directions_car": 0xEFF7, "route": 0xEACD, "directions_walk": 0xE536, "star_shine": 0xF31D,
+    "weekend": 0xE16B, "repeat": 0xE040, "replay": 0xE042, "radar": 0xF04E,
+    "travel_explore": 0xE2DB, "explore": 0xE87A, "history": 0xE8B3, "album": 0xE019,
+}
+
+_MS_FONT_CACHE = {}
 
 
-def _star_polygon(cx, cy, n_points, outer_r, inner_r, start_deg=-90):
-    """Regular n-pointed star polygon."""
-    pts = []
-    for i in range(n_points * 2):
-        r = outer_r if i % 2 == 0 else inner_r
-        a = math.radians(start_deg + i * 180 / n_points)
-        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
-    return pts
+def _load_ms_font(size):
+    """Material Symbols variable font at `size` px em, set to Filled / heavy / opsz 48.
+    Cached by size. layout_engine is left default (codepoint render needs no shaping)."""
+    font = _MS_FONT_CACHE.get(size)
+    if font is None:
+        font = ImageFont.truetype(MS_ICON_FONT, size)
+        try:
+            font.set_variation_by_axes([1, 0, 48, 700])  # FILL, GRAD, opsz, wght
+        except Exception:
+            pass
+        _MS_FONT_CACHE[size] = font
+    return font
+
+
+def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0):
+    """Render a Material Symbol glyph centred at (cx, cy) at `size` px em, tilted `tilt`°,
+    compositing onto RGBA `layer` via its own tile (so it can rotate)."""
+    cp = _MS_CODEPOINTS.get(icon_name)
+    if cp is None or not _PIL_AVAILABLE:
+        return
+    ch   = chr(cp)
+    font = _load_ms_font(max(8, int(round(size))))
+    l, t, r, b = font.getbbox(ch)                       # ink bounds, to centre precisely
+    gw, gh = max(1, r - l), max(1, b - t)
+    pad = max(8, int(size * 0.10))
+    tile = Image.new("RGBA", (gw + 2 * pad, gh + 2 * pad), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).text((pad - l, pad - t), ch, font=font, fill=fill)
+    if tilt:
+        tile = tile.rotate(tilt, resample=Image.BICUBIC, expand=True)
+    layer.alpha_composite(tile, (int(round(cx - tile.width / 2)),
+                                 int(round(cy - tile.height / 2))))
+
+
+def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3):
+    """Composed constellation: one anchor glyph plus (n-1) satellites at 55–70% size on a
+    balanced ring around it, with gentle varied tilts. `names` is cycled across glyphs
+    (e.g. ["music_note","music_note_2"]) or repeated (["favorite"])."""
+    def pick(i):
+        return names[i % len(names)]
+    _draw_glyph(layer, pick(0), cx, cy, anchor_size, fill, tilt=rng.uniform(-8, 8))
+    if n <= 1:
+        return
+    ring   = anchor_size * 0.50
+    base_a = rng.uniform(0, 2 * math.pi)
+    for i in range(1, n):
+        ang   = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.25, 0.25)
+        ssize = anchor_size * rng.uniform(0.55, 0.70)
+        _draw_glyph(layer, pick(i), cx + ring * math.cos(ang), cy + ring * math.sin(ang),
+                    ssize, fill, tilt=rng.uniform(-15, 15))
 
 
 def _icon_dark(c, f=0.42):
     """Deepened (darkened) variant of colour c — used for icons on bright backgrounds."""
     return tuple(max(8, int(x * f)) for x in c[:3])
-
-
-def _rotate_pts(pts, cx, cy, deg):
-    """Rotate a list of (x, y) points by deg degrees about (cx, cy)."""
-    if not deg:
-        return pts
-    a = math.radians(deg)
-    ca, sa = math.cos(a), math.sin(a)
-    return [(cx + (x - cx) * ca - (y - cy) * sa,
-             cy + (x - cx) * sa + (y - cy) * ca) for x, y in pts]
-
-
-def _ellipse_pts(cx, cy, rx, ry, n=28):
-    """Approximate an ellipse as an n-point polygon (so it can be rotated)."""
-    return [(cx + rx * math.cos(2 * math.pi * i / n),
-             cy + ry * math.sin(2 * math.pi * i / n)) for i in range(n)]
 
 
 def _bg_luminance(base, cx, cy, R):
@@ -3390,512 +3427,68 @@ def _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, shadow=True, bg_lum
     return Image.alpha_composite(base, overlay)
 
 
-def _scatter_cluster(draw, shape_fn, cx, cy, n, spread, size_range, tilt_range, rng, fill):
-    """Place n copies of shape_fn(draw, x, y, size, tilt, fill) around (cx, cy) with
-    varied position, size and tilt — a loose cloud rather than a fixed pattern."""
-    placed = []
-    min_sz = size_range[0]
-    for _ in range(n):
-        ox = oy = 0.0
-        for _try in range(6):
-            ox = rng.uniform(-spread[0], spread[0])
-            oy = rng.uniform(-spread[1], spread[1])
-            if all((ox - px) ** 2 + (oy - py) ** 2 > (min_sz * 0.85) ** 2 for px, py in placed):
-                break
-        placed.append((ox, oy))
-        size = rng.uniform(size_range[0], size_range[1])
-        tilt = rng.uniform(-tilt_range, tilt_range)
-        shape_fn(draw, cx + ox, cy + oy, size, tilt, fill)
-
-
-def _heart_shape(draw, x, y, size, tilt, fill):
-    """One heart of pixel half-width ≈ size, tilted by `tilt` degrees, centred at (x, y)."""
-    pts = _heart_polygon(x, y, size / 16.0)
-    draw.polygon(_rotate_pts(pts, x, y, tilt), fill=fill)
-
-
-def _sparkle_shape(draw, x, y, size, tilt, fill):
-    """A 4-point sparkle of outer radius `size`."""
-    pts = _star_polygon(x, y, 4, size, size * 0.4)
-    draw.polygon(_rotate_pts(pts, x, y, tilt), fill=fill)
-
-
-def _star5_shape(draw, x, y, size, tilt, fill):
-    """A 5-point star of outer radius `size`, rotated by `tilt`."""
-    draw.polygon(_star_polygon(x, y, 5, size, size * 0.42, start_deg=-90 + tilt), fill=fill)
-
-
-def _draw_note(draw, x, y, size, tilt, fill):
-    """A single musical note (head + stem + flag) centred at (x, y), scaled so the note
-    spans roughly `size` px, tilted by `tilt` degrees."""
-    s = size / 100.0
-    a = math.radians(tilt)
-    ca, sa = math.cos(a), math.sin(a)
-
-    def rot(pts):
-        return [(x + px * ca - py * sa, y + px * sa + py * ca) for px, py in pts]
-
-    head_cx, head_cy = -18 * s, 62 * s
-    head = _ellipse_pts(head_cx, head_cy, 38 * s, 24 * s)
-    stem = [(head_cx + 36 * s, head_cy), (36 * s, -75 * s)]
-    flag = [(36 * s, -75 * s), (98 * s, -47 * s), (76 * s, -17 * s)]
-    draw.polygon(rot(head), fill=fill)
-    rs = rot(stem)
-    draw.line([rs[0], rs[1]], fill=fill, width=max(3, int(round(14 * s))))
-    draw.polygon(rot(flag), fill=fill)
-
-
-def _draw_candle_overlay(W, H, cx):
-    """Build a transparent overlay with a stylised candle + glowing flame at horizontal
-    position `cx`. Returns an RGBA layer (the caller composites / transforms it)."""
-    bw    = 74           # body half-width
-    btop  = int(H * 0.40)
-    bbot  = int(H * 0.70)
-    fw    = 38           # flame half-width at widest point
-    fh    = 90           # flame height
-    wlen  = 20           # wick length
-
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw    = ImageDraw.Draw(overlay)
-
-    # Body
-    body_color = (245, 235, 210, 220)
-    try:
-        draw.rounded_rectangle([cx - bw, btop, cx + bw, bbot], radius=10, fill=body_color)
-    except AttributeError:
-        draw.rectangle([cx - bw, btop, cx + bw, bbot], fill=body_color)
-
-    # Wax drip detail on left side
-    drip_x = cx - bw + bw // 2
-    draw.ellipse([drip_x - 9, btop - 6, drip_x + 9, btop + 16], fill=body_color)
-
-    # Wick
-    draw.line([(cx, btop), (cx, btop - wlen)], fill=(60, 40, 20, 220), width=3)
-
-    # Flame — 9-point polygon, wide at mid-height, tapering to tip and base
-    fb = btop - wlen    # flame base y
-    ft = fb - fh        # flame tip y
-    flame_pts = [
-        (cx,              ft),
-        (cx + fw * 0.35,  ft + fh * 0.18),
-        (cx + fw,         ft + fh * 0.48),
-        (cx + fw * 0.65,  fb - fh * 0.08),
-        (cx + fw * 0.32,  fb + 4),
-        (cx - fw * 0.32,  fb + 4),
-        (cx - fw * 0.65,  fb - fh * 0.08),
-        (cx - fw,         ft + fh * 0.48),
-        (cx - fw * 0.35,  ft + fh * 0.18),
-    ]
-    draw.polygon(flame_pts, fill=(255, 140, 30, 235))
-
-    # Inner flame — bright yellow
-    iw = fw * 0.52
-    inner_pts = [
-        (cx,              ft + fh * 0.10),
-        (cx + iw * 0.8,   ft + fh * 0.48),
-        (cx + iw * 0.4,   fb - fh * 0.05),
-        (cx - iw * 0.4,   fb - fh * 0.05),
-        (cx - iw * 0.8,   ft + fh * 0.48),
-    ]
-    draw.polygon(inner_pts, fill=(255, 245, 160, 245))
-
-    # Hot glint at core
-    draw.ellipse([cx - 7, ft + fh * 0.08, cx + 7, ft + fh * 0.08 + 14],
-                 fill=(255, 255, 240, 220))
-
-    # Blurred glow halo around flame
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    gd   = ImageDraw.Draw(glow)
-    gr   = 80
-    gd.ellipse([cx - gr, ft - gr // 3, cx + gr, fb + gr // 2], fill=(255, 155, 40, 95))
-    glow = glow.filter(ImageFilter.GaussianBlur(radius=32))
-
-    return Image.alpha_composite(glow, overlay)
-
-
 def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
-    """Composite a profile-specific icon onto img (RGBA). Returns RGBA image.
+    """Composite a profile-specific Material Symbol glyph onto img (RGBA). Returns RGBA.
 
-    Each icon is scaled, placed off-centre and gently tilted per profile (seeded by the
-    weekly rng) within a safe zone clear of the title bar and badge, with a contrast
-    shadow so it reads against any background. Multi-element icons (hearts, sparkles,
-    stars, notes) use varied counts/arrangements rather than one fixed pattern.
+    The glyph is the topmost art below the title text: rendered at a prominent hero size,
+    placed off-centre and gently tilted per profile (seeded by the weekly rng) within a
+    safe zone clear of the title bar and badge, with a contrast drop-shadow so it reads on
+    any background. Romance/music profiles render a composed cluster (anchor + satellites).
     """
-    icon_type = _PROFILE_ICON.get(key)
-    if not icon_type or not _PIL_AVAILABLE:
+    icon_name = _PROFILE_ICON.get(key)
+    if not icon_name or not _PIL_AVAILABLE:
         return img
 
     W, H = img.size
     base = img.convert("RGBA")
 
     meta = dict(_ICON_DEFAULT_META)
-    meta.update(_ICON_META.get(icon_type, {}))
+    meta.update(_ICON_META.get(icon_name, {}))
     meta.update(_ICON_PROFILE_OVERRIDE.get(key, {}))
     kind = meta["kind"]
 
-    # Hearts choose an arrangement → solitary is a single object, the rest are clusters.
+    # Romance profiles render a favourite-heart arrangement; solitary = single, else cluster.
     heart_mode = None
-    if icon_type == "hearts":
+    if key in _HEART_MODE:
         heart_mode = _HEART_MODE.get(key) or rng.choice(["solitary", "pair", "trio", "cluster"])
         kind = "single" if heart_mode == "solitary" else "cluster"
 
-    scale = meta["base_scale"] * rng.uniform(0.9, 1.25)
-
-    # Candle is a tall self-contained composite — place it specially (upright, lower).
-    if icon_type == "candle":
-        cmargin = 60
-        cxc = int(max(cmargin, min(W - cmargin, 0.50 * W + rng.uniform(-0.10 * W, 0.10 * W))))
-        overlay = _draw_candle_overlay(W, H, cxc)
-        bg_lum  = _bg_luminance(base, cxc, int(H * 0.45), 130)
-        return _place_icon(base, overlay, cxc, int(H * 0.55),
-                           scale=max(0.9, min(1.12, scale)), angle=0.0, shadow=False, bg_lum=bg_lum)
+    scale = meta["base_scale"] * rng.uniform(0.92, 1.12)
 
     # Off-centre placement, clamped clear of the bottom title bar (22%) and the badge.
     R       = meta["extent"] * scale
+    R_clamp = R * (1.18 if kind == "cluster" else 1.0)   # clusters spread wider than R
     margin  = 40
     bar_top = int(H * 0.78)
     ax, ay  = meta["anchor"]
-    cx = ax * W + rng.uniform(-0.13 * W, 0.13 * W)
-    cy = ay * H + rng.uniform(-0.07 * H, 0.07 * H)
-    cx = max(margin + R, min(W - margin - R, cx))
-    cy = max(margin + R, min(bar_top - 18 - R, cy))
-    if cy - R < 120 and cx - R < 250:            # avoid the top-left Meloday+ badge
-        cx = min(W - margin - R, 250 + R)
+    cx = ax * W + rng.uniform(-0.12 * W, 0.12 * W)
+    cy = ay * H + rng.uniform(-0.06 * H, 0.06 * H)
+    cx = max(margin + R_clamp, min(W - margin - R_clamp, cx))
+    cy = max(margin + R_clamp, min(bar_top - 18 - R_clamp, cy))
+    if cy - R_clamp < 100 and cx - R_clamp < 240:        # avoid the top-left Meloday+ badge
+        cx = min(W - margin - R_clamp, 240 + R_clamp)
     cx, cy = int(round(cx)), int(round(cy))
     bg_lum = _bg_luminance(base, cx, cy, R)
 
+    # Adaptive glyph colour: lighten on dark backgrounds, deepen on bright ones.
+    rgb  = _icon_dark(color_top) if bg_lum >= 150 else _icon_light(color_top, f=0.50)[:3]
+    fill = (*rgb, 240)
+    size = max(40, int(round(2 * R)))            # font em size → prominent, hero proportion
+
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw    = ImageDraw.Draw(overlay)
-
-    def rrect(box, radius, fill):
-        try:
-            draw.rounded_rectangle(box, radius=radius, fill=fill)
-        except AttributeError:
-            draw.rectangle(box, fill=fill)
-
-    # Adaptive body colour: lighten on dark backgrounds, deepen on bright ones.
-    lc = _icon_dark(color_top) if bg_lum >= 150 else _icon_light(color_top, f=0.45)[:3]
-
-    if icon_type == "hearts":
-        heart_fill = (238, 100, 130, 222)
-        if heart_mode == "solitary":
-            draw.polygon(_heart_polygon(cx, cy, 82 / 16), fill=heart_fill)
-        elif heart_mode == "pair":
-            _heart_shape(draw, cx + 40, cy - 28, 50, rng.uniform(-14, 2), (238, 100, 130, 200))
-            _heart_shape(draw, cx - 26, cy + 16, 78, rng.uniform(-4, 16), heart_fill)
-        elif heart_mode == "trio":
-            for hx, hy, sz in ((cx - 8, cy - 20, 64), (cx + 72, cy + 30, 46), (cx - 78, cy + 40, 40)):
-                _heart_shape(draw, hx, hy, sz, rng.uniform(-18, 18), heart_fill)
-        else:  # cluster — a little cloud of small hearts
-            _scatter_cluster(draw, _heart_shape, cx, cy,
-                             rng.randint(4, 7), (132, 104), (24, 44), 22, rng, heart_fill)
-
-    elif icon_type == "broken_heart":
-        heart_fill = (200, 65, 90, 215)
-        draw.polygon(_heart_polygon(cx, cy, 60 / 16), fill=heart_fill)
-        crack = [
-            (cx - 4,  cy - 80), (cx + 14, cy - 45), (cx - 10, cy - 25),
-            (cx + 16, cy + 20), (cx,      cy + 50),
-            (cx + 4,  cy + 50), (cx + 20, cy + 20), (cx - 6,  cy - 25),
-            (cx + 18, cy - 45), (cx,      cy - 80),
-        ]
-        draw.polygon(crack, fill=(28, 10, 18, 240))
-
-    elif icon_type in ("raindrops", "raindrops_light", "raindrop_single"):
-        drop_alpha = 190 if icon_type == "raindrops" else 140
-        drop_fill  = (*lc, drop_alpha)
-        if icon_type == "raindrop_single":
-            drops = [(cx, cy, 36)]
-        elif icon_type == "raindrops_light":
-            drops = [(rng.randint(W // 5, 4 * W // 5), rng.randint(H // 6, 2 * H // 3),
-                      rng.randint(10, 16)) for _ in range(7)]
-        else:
-            drops = [(rng.randint(W // 5, 4 * W // 5), rng.randint(H // 6, 2 * H // 3),
-                      rng.randint(12, 22)) for _ in range(12)]
-        for rx, ry, rs in drops:
-            draw.ellipse([rx - rs, ry, rx + rs, ry + rs * 1.5], fill=drop_fill)
-            draw.polygon([(rx - rs * 0.6, ry + rs * 0.4),
-                           (rx + rs * 0.6, ry + rs * 0.4),
-                           (rx, ry - rs * 1.8)], fill=drop_fill)
-
-    elif icon_type in ("moon", "moon_stars"):
-        moon_rgb = (255, 246, 200)
-        if _NUMPY_AVAILABLE:
-            arr = np.zeros((H, W, 4), dtype=np.uint8)
-            yy, xx = np.mgrid[0:H, 0:W]
-            outer   = (xx - cx) ** 2 + (yy - cy) ** 2 <= 120 ** 2
-            inner   = (xx - (cx + 72)) ** 2 + (yy - (cy - 10)) ** 2 <= 102 ** 2
-            arr[outer & ~inner] = [*moon_rgb, 215]
-            overlay.alpha_composite(Image.fromarray(arr, "RGBA"))
-        else:
-            draw.ellipse([cx - 120, cy - 120, cx + 120, cy + 120], fill=(*moon_rgb, 200))
-        if icon_type == "moon_stars":
-            sc = (*moon_rgb, 185)
-            for sx, sy, sr in ((cx + 195, cy - 115, 14), (cx - 195, cy - 45, 10),
-                                (cx + 95, cy + 160, 9)):
-                draw.polygon(_star_polygon(sx, sy, 5, sr, int(sr * 0.42)), fill=sc)
-
-    elif icon_type == "stars":
-        sc = (*lc, 212)
-        _scatter_cluster(draw, _star5_shape, cx, cy,
-                         rng.randint(4, 6), (150, 112), (14, 26), 30, rng, sc)
-
-    elif icon_type == "star":
-        draw.polygon(_star_polygon(cx, cy, 5, 135, 57), fill=(*lc, 225))
-
-    elif icon_type == "sun":
-        sc = (*lc, 210)
-        draw.ellipse([cx - 90, cy - 90, cx + 90, cy + 90], fill=sc)
-        for i in range(12):
-            a = math.radians(i * 30)
-            draw.line([(cx + 100 * math.cos(a), cy + 100 * math.sin(a)),
-                       (cx + 158 * math.cos(a), cy + 158 * math.sin(a))], fill=sc, width=6)
-
-    elif icon_type == "snowflake":
-        sc = (240, 250, 255, 215)
-        draw.ellipse([cx - 14, cy - 14, cx + 14, cy + 14], fill=sc)
-        for arm in range(6):
-            a = math.radians(arm * 60)
-            ex, ey = cx + 145 * math.cos(a), cy + 145 * math.sin(a)
-            draw.line([(cx, cy), (ex, ey)], fill=sc, width=5)
-            for frac, blen in ((0.38, 46), (0.68, 32)):
-                bx = cx + 145 * frac * math.cos(a)
-                by = cy + 145 * frac * math.sin(a)
-                for ba in (a + math.radians(60), a - math.radians(60)):
-                    draw.line([(bx, by), (bx + blen * math.cos(ba),
-                                          by + blen * math.sin(ba))], fill=sc, width=4)
-
-    elif icon_type == "leaf":
-        leaf_rgb = (195, 110, 35)
-        a = math.radians(22)
-        cos_a, sin_a = math.cos(a), math.sin(a)
-        pts = []
-        for i in range(80):
-            t = 2 * math.pi * i / 80
-            x, y = 135 * math.cos(t), 52 * math.sin(t)
-            pts.append((cx + x * cos_a - y * sin_a, cy + x * sin_a + y * cos_a))
-        draw.polygon(pts, fill=(*leaf_rgb, 215))
-        draw.line([(cx - 130 * cos_a, cy - 130 * sin_a),
-                   (cx + 130 * cos_a, cy + 130 * sin_a)],
-                  fill=(*_icon_light(leaf_rgb, 0.5)[:3], 180), width=3)
-
-    elif icon_type == "flower":
-        petal = (*lc, 200)
-        for i in range(6):
-            a = math.radians(i * 60)
-            px, py = cx + 68 * math.cos(a), cy + 68 * math.sin(a)
-            draw.ellipse([px - 40, py - 40, px + 40, py + 40], fill=petal)
-        draw.ellipse([cx - 35, cy - 35, cx + 35, cy + 35],
-                     fill=_icon_light(color_top, 0.75, 235))
-
-    elif icon_type == "music_note":
-        nc = (*lc, 218)
-        # Always a small cluster (never a lone note); varied count, size and tilt.
-        _scatter_cluster(draw, _draw_note, cx, cy,
-                         rng.randint(2, 4), (66, 54), (62, 96), 20, rng, nc)
-
-    elif icon_type == "wine_glass":
-        gc = (*lc, 200)
-        w, s = 120, 9
-        top, neck = cy - 115, cy + 10
-        base_top, base_bot = cy + 95, cy + 118
-        draw.polygon([
-            (cx - w,          top),
-            (cx + w,          top),
-            (cx + w * 0.14,   neck),
-            (cx + w * 0.55,   base_top),
-            (cx + w * 0.55,   base_bot),
-            (cx - w * 0.55,   base_bot),
-            (cx - w * 0.55,   base_top),
-            (cx - w * 0.14,   neck),
-        ], fill=gc)
-
-    elif icon_type == "mug":
-        mc = (*lc, 212)
-        bw, bh = 54, 60                       # cup body half-width / half-height
-        top    = cy - bh
-        # C-handle first (behind the body), opening toward the cup so it reads as attached
-        hx0 = cx + bw - 26
-        draw.arc([hx0, cy - 36, hx0 + 64, cy + 36], start=-140, end=140, fill=mc, width=15)
-        # tapered cup body with a rounded base
-        draw.polygon([
-            (cx - bw,        top + 4),
-            (cx + bw,        top + 4),
-            (cx + bw * 0.9,  cy + bh - 14),
-            (cx + bw * 0.6,  cy + bh),
-            (cx - bw * 0.6,  cy + bh),
-            (cx - bw * 0.9,  cy + bh - 14),
-        ], fill=mc)
-        # rim / opening as a flat ellipse
-        draw.ellipse([cx - bw, top - 9, cx + bw, top + 17], fill=mc)
-        # two short steam wisps rising just above the rim
-        steam = (*lc, 140)
-        for ox in (-16, 16):
-            pts_s = [(cx + ox + 7 * math.sin(j * 1.2), top - 12 - j * 14) for j in range(4)]
-            for j in range(len(pts_s) - 1):
-                draw.line([pts_s[j], pts_s[j + 1]], fill=steam, width=4)
-
-    elif icon_type == "dumbbell":
-        dc = (*lc, 224)
-        half = 138
-        draw.rectangle([cx - (half - 34), cy - 11, cx + (half - 34), cy + 11], fill=dc)  # bar
-        for sx in (-1, 1):
-            inner_x = cx + sx * (half - 34)
-            outer_x = cx + sx * half
-            rrect([inner_x - 16, cy - 46, inner_x + 16, cy + 46], 8, dc)   # inner plate
-            rrect([outer_x - 16, cy - 64, outer_x + 16, cy + 64], 10, dc)  # outer plate
-
-    elif icon_type == "flame":
-        fw, fh = 76, 156
-        ftip, fbas = cy - fh * 0.55, cy + fh * 0.45
-        draw.polygon([
-            (cx,            ftip),
-            (cx + fw * 0.42, ftip + fh * 0.22),
-            (cx + fw,        cy + fh * 0.05),
-            (cx + fw * 0.55, fbas),
-            (cx,             fbas + fh * 0.06),
-            (cx - fw * 0.55, fbas),
-            (cx - fw,        cy + fh * 0.05),
-            (cx - fw * 0.42, ftip + fh * 0.22),
-        ], fill=(*lc, 222))
-        ic = _icon_light(color_top, 0.78)[:3]   # bright inner core
-        iw, ih = fw * 0.5, fh * 0.62
-        draw.polygon([
-            (cx,           cy - ih * 0.40),
-            (cx + iw,      cy + ih * 0.10),
-            (cx + iw * 0.5, fbas - fh * 0.06),
-            (cx - iw * 0.5, fbas - fh * 0.06),
-            (cx - iw,      cy + ih * 0.10),
-        ], fill=(*ic, 232))
-
-    elif icon_type == "motion_streaks":
-        for i, (oy, ln, th) in enumerate(((-58, 226, 24), (4, 286, 30), (66, 196, 22))):
-            y  = cy + oy
-            x2 = cx + ln / 2
-            draw.line([(cx - ln / 2, y), (x2, y)], fill=(*lc, 150 + i * 22), width=th)
-            draw.ellipse([x2 - th / 2, y - th / 2, x2 + th / 2, y + th / 2], fill=(*lc, 215))
-
-    elif icon_type == "boost":
-        th = 30
-        for i, oy in enumerate((46, -14, -74)):    # three upward chevrons rising = "boost"
-            y = cy + oy
-            w = 96 - i * 8
-            a = 188 + i * 22
-            draw.line([(cx - w, y), (cx, y - 66)], fill=(*lc, a), width=th)
-            draw.line([(cx, y - 66), (cx + w, y)], fill=(*lc, a), width=th)
-
-    elif icon_type == "cloud":
-        cc = (*lc, 205)
-        for bx, by, br in (
-            (cx - 80, cy + 18, 51), (cx, cy - 10, 69),
-            (cx + 80, cy + 18, 51), (cx - 38, cy + 42, 49), (cx + 38, cy + 42, 49),
-        ):
-            draw.ellipse([bx - br, by - br, bx + br, by + br], fill=cc)
-
-    elif icon_type == "sparkles":
-        sc = (*lc, 218)
-        _scatter_cluster(draw, _sparkle_shape, cx, cy,
-                         rng.randint(3, 6), (122, 92), (18, 54), 30, rng, sc)
-
-    elif icon_type in ("repeat_loop", "repeat_loop_ccw"):
-        # Two bold arcs forming a ring with a clear gap top-right and bottom-left; a filled
-        # arrowhead caps each leading end so it reads as a repeat (CW) / rewind (CCW) loop.
-        rc   = (*lc, 224)
-        r    = 116
-        lw   = 22
-        ccw  = icon_type == "repeat_loop_ccw"
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=-60, end=100, fill=rc, width=lw)
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=120, end=280, fill=rc, width=lw)
-        ah = 36
-        for a_deg in ((100, 280) if not ccw else (-60, 120)):
-            a      = math.radians(a_deg)
-            tipdir = 1 if not ccw else -1
-            tx, ty = -math.sin(a) * tipdir, math.cos(a) * tipdir   # tangent = flow direction
-            rx, ry = math.cos(a), math.sin(a)                      # radial
-            px, py = cx + r * math.cos(a), cy + r * math.sin(a)
-            draw.polygon([
-                (px + tx * ah,                          py + ty * ah),                          # tip
-                (px - tx * ah * 0.25 + rx * ah * 0.92,  py - ty * ah * 0.25 + ry * ah * 0.92),  # outer corner
-                (px - tx * ah * 0.25 - rx * ah * 0.92,  py - ty * ah * 0.25 - ry * ah * 0.92),  # inner corner
-            ], fill=rc)
-
-    elif icon_type == "radar_pulse":
-        # Concentric rings with a sweep line — sonar/radar look.
-        rc = (*lc, 215)
-        for radius, alpha in ((55, 210), (95, 170), (135, 125), (180, 80), (220, 40)):
-            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
-                         outline=(*lc, alpha), width=3)
-        # Centre dot
-        draw.ellipse([cx - 6, cy - 6, cx + 6, cy + 6], fill=rc)
-        # Sweep line at 45°
-        sa    = math.radians(45)
-        sweep = 215
-        draw.line([(cx, cy), (cx + sweep * math.cos(sa), cy + sweep * math.sin(sa))],
-                  fill=(*lc, 175), width=3)
-        # Blip arc near sweep line (simulating a detected release)
-        blip_r = 135
-        draw.arc([cx - blip_r, cy - blip_r, cx + blip_r, cy + blip_r],
-                 start=30, end=60, fill=(*lc, 220), width=8)
-
-    elif icon_type == "magnifying_glass":
-        # Circle (lens) outline + angled handle.
-        rc       = (*lc, 210)
-        lens_r   = 100
-        lw2      = 15
-        lx, ly   = cx - 18, cy - 18        # lens centre, offset slightly up-left
-        draw.ellipse([lx - lens_r, ly - lens_r, lx + lens_r, ly + lens_r],
-                     outline=rc, width=lw2)
-        ha    = math.radians(135)           # handle goes to lower-right
-        hx0   = lx + lens_r * math.cos(ha)
-        hy0   = ly + lens_r * math.sin(ha)
-        hlen  = 105
-        draw.line([(hx0, hy0), (hx0 + hlen * math.cos(ha), hy0 + hlen * math.sin(ha))],
-                  fill=rc, width=lw2)
-
-    elif icon_type == "clock":
-        # Clock face outline + 12 tick marks + two hands set to 10:10.
-        rc   = (*lc, 210)
-        r    = 140
-        lw2  = 12
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=rc, width=lw2)
-        for i in range(12):
-            a     = math.radians(i * 30 - 90)    # -90° = top (12 o'clock)
-            inner = r * 0.78
-            outer = r * 0.93
-            draw.line([(cx + inner * math.cos(a), cy + inner * math.sin(a)),
-                       (cx + outer * math.cos(a), cy + outer * math.sin(a))],
-                      fill=rc, width=5 if i % 3 == 0 else 3)
-        # Hour hand at 10 o'clock: 270° + (10/12)*360° = 210° in PIL space
-        h_ang = math.radians(210)
-        draw.line([(cx, cy), (cx + r * 0.50 * math.cos(h_ang),
-                               cy + r * 0.50 * math.sin(h_ang))], fill=rc, width=lw2)
-        # Minute hand at 10 minutes (pointing to 2): 270° + (10/60)*360° = 330°
-        m_ang = math.radians(330)
-        draw.line([(cx, cy), (cx + r * 0.70 * math.cos(m_ang),
-                               cy + r * 0.70 * math.sin(m_ang))], fill=rc, width=lw2 // 2)
-        draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=rc)
-
-    elif icon_type == "vinyl":
-        # Vinyl record: outer edge + groove rings + label disc + spindle hole.
-        rc  = (*lc, 205)
-        R   = 150
-        draw.ellipse([cx - R, cy - R, cx + R, cy + R], outline=rc, width=4)
-        for frac in (0.86, 0.71, 0.57, 0.44):
-            r2 = int(R * frac)
-            draw.ellipse([cx - r2, cy - r2, cx + r2, cy + r2], outline=rc, width=2)
-        # Label (filled centre disc)
-        r_label = int(R * 0.28)
-        draw.ellipse([cx - r_label, cy - r_label, cx + r_label, cy + r_label], fill=rc)
-        # Spindle hole
-        draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=(15, 8, 8, 230))
-
-    # Transform + composite. Single objects get the per-profile tilt; clusters keep their
-    # own per-element tilts (no global rotation); scatter icons are self-positioned.
-    if kind == "single":
+    if kind == "cluster":
+        if heart_mode:                           # composed cluster of favourite hearts
+            names = ["favorite"]
+            n = {"pair": 2, "trio": 3, "cluster": 5}.get(heart_mode, 3)
+        else:                                    # music-note cluster mixes the two note styles
+            names = ["music_note", "music_note_2"]
+            n = rng.randint(3, 4)
+        _draw_glyph_cluster(overlay, names, cx, cy, anchor_size=size * 0.60, rng=rng, fill=fill, n=n)
+    else:
         angle = rng.uniform(-meta["tilt"], meta["tilt"])
-        return _place_icon(base, overlay, cx, cy, scale=scale, angle=angle, bg_lum=bg_lum)
-    elif kind == "cluster":
-        return _place_icon(base, overlay, cx, cy, scale=scale, angle=0.0, bg_lum=bg_lum)
+        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle)
+
+    # The glyph is the topmost art (below the title text); _place_icon adds the drop-shadow.
     return _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, bg_lum=bg_lum)
 
 
