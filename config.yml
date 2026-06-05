@@ -108,6 +108,7 @@ extras:
   lastfm_api_secret:            # Optional: required alongside lastfm_api_key
   top_songs_start_year: 2020    # Earliest year to generate a Top Songs playlist for (set to the year you started using Plex)
   mood_mix_count: 5             # Number of mood/activity mixes to show at once (from 73 profiles, rotates based on listening + time + weather)
+  mood_mix_rotations_per_day: 6 # How many times a day the general mood mixes rotate to a fresh set (run the generator at least this often; default 6 = every ~4h)
   weather_location:             # Optional: city name, coordinates, or airport code (e.g. "Sydney") — enables weather-triggered mood mixes
 
 files:

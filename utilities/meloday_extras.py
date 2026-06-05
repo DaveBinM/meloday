@@ -109,6 +109,7 @@ config = load_config()
 _extras = config.get("extras", {})
 
 DAILY_MIX_COUNT          = int(_extras.get("daily_mix_count", 6))
+MOOD_MIX_ROTATIONS_PER_DAY = max(1, int(_extras.get("mood_mix_rotations_per_day", 6)))
 DISCOVER_WEEKLY_SIZE      = int(_extras.get("discover_weekly_size", 30))
 RELEASE_RADAR_START_DAYS  = int(_extras.get("release_radar_start_days", 14))
 RELEASE_RADAR_STEP_DAYS   = int(_extras.get("release_radar_step_days", 7))
@@ -5173,6 +5174,11 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
     return selected[:n_active]
 
 
+def _rotation_slot(hour):
+    """Index (0 .. MOOD_MIX_ROTATIONS_PER_DAY-1) of the current intra-day rotation slot."""
+    return (hour % 24) * MOOD_MIX_ROTATIONS_PER_DAY // 24
+
+
 def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                      n_active=5, mix_size=50, reselect=False, time_context=False,
                      existing_playlists=None):
@@ -5244,90 +5250,33 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         window = _HOUR_RESTRICTED.get(k)
         return _in_time_window(current_hour, window) if window else True
 
-    if not reselect:
-        active_general = [
-            name_to_key[name]
-            for name in existing
-            if name in name_to_key and name_to_key[name] in _GENERAL_PROFILES
-        ]
-        # Evict any profile that is restricted to a different day of the week
-        # or is outside its allowed time-of-day window
-        day_expired = [k for k in active_general
-                       if today_wd not in _WEEKDAY_RESTRICTED.get(k, {today_wd})]
-        hour_expired = [k for k in active_general if not _hour_allowed(k)]
-        expired = list(dict.fromkeys(day_expired + hour_expired))
-        if expired:
-            for k in expired:
-                active_general.remove(k)
-            xlog(f"[INFO] mood_mixes: time-restricted profiles expired: {expired} — reselecting")
-            reselect = True
-        elif not active_general:
-            xlog("[INFO] mood_mixes: no general mixes found, running initial selection")
-            reselect = True
-
-    if reselect:
-        now = datetime.now(tz=timezone.utc)
-        recent_entries  = [e for e in history_entries
-                           if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
-        recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
-        if recent_centroid.get("bpm"):
-            scored = sorted(
-                (_mood_rotation_score(
-                     k,
-                     _acoustic_distance_to_centroid(target, recent_centroid),
-                     current_hour, weather
-                 ), k)
-                for k, target in _MOOD_PROFILES.items()
-                if k in _GENERAL_PROFILES
-                and today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
-                and _hour_allowed(k)
-            )
-            n_cats      = len(set(_PROFILE_CATEGORY.values()))
-            max_per_cat = max(1, math.ceil(n_active / n_cats))
-            active_general = _select_diverse_profiles(scored, n_active, max_per_category=max_per_cat)
-        else:
-            active_general = list(_GENERAL_PROFILES)[:n_active]
-        xlog(f"[INFO] mood_mixes: reselected general profiles = {active_general}")
+    # ---- General mixes: intra-day time-slot rotation ----
+    # A fresh, well-fitting, diverse subset surfaces each rotation slot, so the mixes change
+    # several times a day when this runs on a sub-daily cron. Deterministic within a slot
+    # (re-running the same slot reproduces the same set), reshuffling at each slot boundary.
+    now             = datetime.now(tz=timezone.utc)
+    recent_entries  = [e for e in history_entries
+                       if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
+    recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
+    eligible = [k for k in _GENERAL_PROFILES
+                if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)]
+    if recent_centroid.get("bpm") and eligible:
+        scored = sorted(
+            (_mood_rotation_score(
+                 k, _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
+                 current_hour, weather), k)
+            for k in eligible
+        )
+        pool = [k for _, k in scored[:min(len(scored), max(n_active * 3, 12))]]  # best-fitting pool
     else:
-        xlog(f"[INFO] mood_mixes: content refresh for general = {active_general}")
-        # Gentle daily check: if the worst-fit active profile is significantly
-        # outscored by the best inactive one, do a single swap so rotation stays
-        # responsive between weekly reselections.
-        now             = datetime.now(tz=timezone.utc)
-        recent_entries  = [e for e in history_entries
-                           if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
-        recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
-        if recent_centroid.get("bpm") and len(active_general) == n_active:
-            eligible = {k for k in _GENERAL_PROFILES
-                        if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
-                        and _hour_allowed(k)}
-            all_scored = {
-                k: _mood_rotation_score(
-                    k,
-                    _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
-                    current_hour, weather
-                )
-                for k in eligible
-            }
-            active_set        = set(active_general)
-            worst_active      = max(active_set,   key=lambda k: all_scored.get(k, 1.0))
-            candidates        = sorted((all_scored[k], k) for k in eligible
-                                       if k not in active_set)
-            if candidates:
-                best_score, best_inactive = candidates[0]
-                if best_score < all_scored[worst_active] - 0.20:
-                    incoming_cat = _PROFILE_CATEGORY.get(best_inactive, "other")
-                    n_cats       = len(set(_PROFILE_CATEGORY.values()))
-                    max_per_cat  = max(1, math.ceil(n_active / n_cats))
-                    remaining_cats = Counter(
-                        _PROFILE_CATEGORY.get(k, "other")
-                        for k in active_set if k != worst_active
-                    )
-                    if remaining_cats[incoming_cat] < max_per_cat:
-                        active_general.remove(worst_active)
-                        active_general.append(best_inactive)
-                        xlog(f"[INFO] mood_mixes: daily swap {worst_active} → {best_inactive} "
-                             f"(scores {all_scored[worst_active]:.3f} vs {best_score:.3f})")
+        pool = list(eligible)
+    slot = _rotation_slot(current_hour)
+    random.Random((datetime.now().date().toordinal(), slot)).shuffle(pool)
+    n_cats      = len(set(_PROFILE_CATEGORY.values()))
+    max_per_cat = max(1, math.ceil(n_active / n_cats))
+    active_general = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
+                                              n_active, max_per_category=max_per_cat)
+    xlog(f"[INFO] mood_mixes: slot {slot + 1}/{MOOD_MIX_ROTATIONS_PER_DAY} rotation → {active_general}")
 
     # Work-hours guarantee — Mon-Fri 7am-3pm: ensure at least one focus/work profile is active.
     if 0 <= today_wd <= 4 and 7 <= current_hour < 15:
@@ -5374,11 +5323,10 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
             excluded_album_keys, mix_size, plex)
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
-    # On reselect, remove general mixes that rotated out
-    if reselect:
-        for name, key in name_to_key.items():
-            if key in _GENERAL_PROFILES and key not in active_general and name in existing:
-                to_remove.append(key)
+    # Remove general mixes that rotated out of this slot's selection
+    for name, key in name_to_key.items():
+        if key in _GENERAL_PROFILES and key not in active_general and name in existing:
+            to_remove.append(key)
 
     return mixes, to_remove
 
