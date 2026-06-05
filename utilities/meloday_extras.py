@@ -2321,6 +2321,46 @@ _TIME_SOFT_BOOSTS = {
     "evening_unwind":     (19, 23, 0.15),   # 7pm–11pm (dinner-to-late-night gap)
     "pre_party":          (17, 23, 0.12),   # 5pm–11pm evenings
     "cooking_mix":        (17, 20, 0.10),   # 5pm–8pm dinner-prep window
+    # --- new mood/vibe mixes: daypart leans (hard-gated ones get their in-window pull) ---
+    "sunrise":            ( 5,  9, 0.20),
+    "blue_hour":          (17, 20, 0.12),
+    "golden_afternoon":   (12, 17, 0.12),
+    "midnight":           (22,  3, 0.15),
+    "three_am":           ( 0,  4, 0.15),
+    "witching_hour":      (22,  4, 0.12),
+    "starlit":            (21,  4, 0.12),
+    "wind_down":          (19, 23, 0.15),
+    "dinner_party":       (18, 22, 0.15),
+    "power_nap":          (13, 16, 0.12),
+    "study_session":      ( 8, 17, 0.12),
+    "spa_bath":           (19, 23, 0.12),
+    "yoga_stretch":       ( 6, 10, 0.08),
+    "meditation":         ( 6, 10, 0.06),
+    "monday_motivation":  ( 6, 11, 0.15),
+    "friday_feeling":     (12, 18, 0.15),
+    "sunday_scaries":     (16, 22, 0.12),
+    # new-romance evening lean
+    "crush":              (18, 24, 0.08),
+    "slow_burn":          (18, 24, 0.08),
+    "loved_up":           (18, 24, 0.08),
+    "long_distance":      (18, 24, 0.08),
+    "flirty":             (18, 24, 0.08),
+    "devotion":           (18, 24, 0.08),
+    # weekend/social evening + daytime windows
+    "throwback_anthems":  (18,  1, 0.08),
+    "old_friends":        (12, 23, 0.06),
+    "game_night":         (18, 23, 0.08),
+    "singalong":          (18,  1, 0.06),
+    "treat_yourself":     (17, 24, 0.10),
+    "housework_hustle":   ( 9, 15, 0.10),
+    "cookout":            (12, 18, 0.10),
+    "gospel":             ( 8, 12, 0.08),   # Sunday-service morning lean (+ {6} weekday boost)
+    # genre mixes with a clear daypart
+    "lofi_beats":         ( 9, 18, 0.10),
+    "smooth_jazz":        (18, 23, 0.12),
+    "ambient_drift":      (21,  5, 0.12),
+    "downtempo":          (21,  3, 0.10),
+    "deep_house":         (21,  4, 0.10),
 }
 
 # Day-of-week boosts — applied on top of soft time boosts for profiles with a natural weekday.
@@ -2336,6 +2376,19 @@ _WEEKDAY_BOOSTS = {
     "party_throwback": ({4, 5},  0.06),   # Fri/Sat (slight)
     "focus":           ({0, 1, 2, 3, 4}, 0.12),  # Mon-Fri work boost
     "deep_work":       ({0, 1, 2, 3, 4}, 0.10),  # Mon-Fri work boost
+    # --- new day-bound / weekend-social mixes ---
+    "monday_motivation": ({0},     0.18),   # Monday
+    "friday_feeling":    ({4},     0.15),   # Friday
+    "sunday_scaries":    ({6},     0.12),   # Sunday
+    "midweek_reset":     ({2, 3},  0.10),   # Wed/Thu
+    "throwback_anthems": ({4, 5},  0.10),   # Fri/Sat
+    "old_friends":       ({5, 6},  0.08),   # weekend
+    "game_night":        ({4, 5},  0.10),   # Fri/Sat
+    "singalong":         ({4, 5},  0.08),   # Fri/Sat
+    "treat_yourself":    ({4, 5},  0.08),   # Fri/Sat
+    "housework_hustle":  ({5, 6},  0.10),   # weekend chores
+    "cookout":           ({5, 6},  0.10),   # weekend
+    "gospel":            ({6},     0.10),   # Sunday
 }
 
 # Hard day-of-week gates — profiles excluded from the pool entirely on the wrong day.
@@ -2350,6 +2403,10 @@ _WEEKDAY_RESTRICTED = {
     "lazy_sunday":    {6},               # Sunday only
     "after_work":     {0, 1, 2, 3, 4},  # Mon–Fri only
     "commute_mix":    {0, 1, 2, 3, 4},  # Mon–Fri only
+    # --- new day-bound mixes ---
+    "monday_motivation": {0},            # Monday only
+    "friday_feeling":    {4},            # Friday only
+    "sunday_scaries":    {6},            # Sunday only
 }
 
 # Hard time-of-day gates — profiles excluded from the pool entirely outside their
@@ -2369,6 +2426,17 @@ _HOUR_RESTRICTED = {
     "night_drive":      (19,  4),   # 7pm–4am — night driving only
     "after_dark":       (20,  6),   # 8pm–6am — after dark by definition
     "late_night_romance":(19,  4),  # 7pm–4am — evening/night only
+    # --- new mood/vibe mixes with a hard daypart (only eligible in-window) ---
+    "sunrise":           ( 4, 10),  # dawn only
+    "blue_hour":         (16, 21),  # dusk
+    "midnight":          (22,  4),  # late night
+    "three_am":          (23,  5),  # small hours only
+    "witching_hour":     (21,  5),  # night only
+    "wind_down":         (18,  2),  # evening wind-down
+    "dinner_party":      (17, 23),  # evening
+    "monday_motivation": ( 5, 12),  # Monday morning (+ _WEEKDAY_RESTRICTED {0})
+    "friday_feeling":    (11, 19),  # Friday afternoon/evening (+ {4})
+    "sunday_scaries":    (15, 23),  # Sunday afternoon/evening (+ {6})
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
@@ -6352,7 +6420,12 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
         if len(selected) >= n_active:
             break
         cat = _PROFILE_CATEGORY.get(key, "other")
-        if cat_count[cat] >= max_per_category or (key in _MOOD_PROFILES and _too_similar(key)):
+        # Category cap is hard. The similarity guard only blocks a *second* pick from an
+        # already-represented category — it must never stop a new category (vibe) from being
+        # shown, since category is the primary diversity axis (centroids are coarse while
+        # valence/arousal are unpopulated, and same-category near-dupes are capped anyway).
+        if cat_count[cat] >= max_per_category or (
+            cat_count[cat] > 0 and key in _MOOD_PROFILES and _too_similar(key)):
             deferred.append(key)
             continue
         selected.append(key)
@@ -6459,6 +6532,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
     eligible = [k for k in _GENERAL_PROFILES
                 if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)]
+    n_cats = len(set(_PROFILE_CATEGORY.values()))
     if recent_centroid.get("bpm") and eligible:
         scored = sorted(
             (_mood_rotation_score(
@@ -6466,13 +6540,21 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                  current_hour, weather), k)
             for k in eligible
         )
-        pool = [k for _, k in scored[:min(len(scored), max(n_active * 3, 12))]]  # best-fitting pool
+        # Stratify by category: keep the best-fitting few from EACH category, not just the
+        # global best-fitting. This makes the slate a balanced "one per vibe" set instead of
+        # 12 near-clones of the current mood when recent listening is narrow.
+        per_cat = max(2, math.ceil(n_active * 4 / max(1, n_cats)))
+        seen, pool = Counter(), []
+        for _, k in scored:
+            cat = _PROFILE_CATEGORY.get(k, "other")
+            if seen[cat] < per_cat:
+                seen[cat] += 1
+                pool.append(k)
     else:
         pool = list(eligible)
     slot = _rotation_slot(current_hour)
     # int seed (Random() rejects tuples on Py3.11+); hash of an int-tuple is stable across runs
     random.Random(hash((datetime.now().date().toordinal(), slot))).shuffle(pool)
-    n_cats      = len(set(_PROFILE_CATEGORY.values()))
     max_per_cat = max(1, math.ceil(n_active / n_cats))
     active_general = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
                                               n_active, max_per_category=max_per_cat)
