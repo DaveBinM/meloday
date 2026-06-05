@@ -169,6 +169,31 @@ _CENTROID_PLAYLISTS = {"release_radar", "discover_weekly"}
 # Cover Art — gradient colour palette (top RGB, bottom RGB) per playlist
 # ---------------------------------------------------------------------------
 _EXTRAS_COVER_COLORS = {
+    "stormy": ((60, 70, 95), (20, 24, 40)),
+    "foggy": ((150, 158, 168), (70, 76, 88)),
+    "snow_day": ((214, 228, 244), (140, 160, 196)),
+    "heatwave": ((255, 150, 70), (200, 80, 60)),
+    "frosty": ((210, 232, 240), (120, 170, 200)),
+    "grey_skies": ((130, 135, 145), (64, 67, 76)),
+    "windy": ((40, 150, 150), (18, 80, 90)),
+    "clear_night": ((30, 40, 80), (150, 160, 200)),
+    "festive": ((200, 40, 50), (30, 120, 60)),
+    "spring_bloom": ((120, 200, 120), (240, 150, 180)),
+    "spring_acoustic": ((150, 190, 120), (80, 120, 70)),
+    "spring_strings": ((180, 210, 190), (110, 150, 170)),
+    "spring_jangle": ((140, 200, 170), (200, 160, 200)),
+    "summer_heat": ((255, 120, 160), (150, 40, 120)),
+    "summer_breeze": ((255, 200, 120), (120, 180, 200)),
+    "summer_roadtrip": ((255, 160, 60), (60, 150, 200)),
+    "summer_tropical": ((255, 140, 60), (40, 170, 150)),
+    "autumn_leaves": ((200, 120, 50), (110, 60, 30)),
+    "autumn_jazz": ((180, 110, 60), (90, 50, 40)),
+    "autumn_rain": ((110, 100, 110), (55, 50, 60)),
+    "autumn_embers": ((190, 90, 40), (80, 40, 30)),
+    "winter_frost": ((200, 224, 236), (110, 150, 185)),
+    "winter_cosy": ((180, 90, 90), (80, 40, 50)),
+    "winter_nights": ((40, 50, 90), (18, 22, 45)),
+    "winter_jazz": ((150, 130, 170), (70, 55, 90)),
     "hopeful": ((240, 180, 80), (70, 110, 160)),
     "yearning": ((90, 110, 150), (40, 50, 80)),
     "triumphant": ((220, 160, 50), (150, 30, 40)),
@@ -410,6 +435,31 @@ _EXTRAS_COVER_COLORS = {
 # 13 style families: geometric, circles, radial, waves, floating_circles, rays,
 #   arc_sweep, aurora, triangles, diamond, starburst, chevrons, spiral
 _COVER_BG_STYLES = {
+    "stormy": ("aurora", 6),
+    "foggy": ("waves", 6),
+    "snow_day": ("aurora", 1),
+    "heatwave": ("rays", 3),
+    "frosty": ("triangles", 6),
+    "grey_skies": ("waves", 7),
+    "windy": ("chevrons", 2),
+    "clear_night": ("aurora", 8),
+    "festive": ("starburst", 1),
+    "spring_bloom": ("rays", 2),
+    "spring_acoustic": ("waves", 3),
+    "spring_strings": ("aurora", 2),
+    "spring_jangle": ("floating_circles", 2),
+    "summer_heat": ("floating_circles", 4),
+    "summer_breeze": ("rays", 4),
+    "summer_roadtrip": ("chevrons", 6),
+    "summer_tropical": ("starburst", 2),
+    "autumn_leaves": ("waves", 9),
+    "autumn_jazz": ("spiral", 5),
+    "autumn_rain": ("waves", 1),
+    "autumn_embers": ("rays", 13),
+    "winter_frost": ("aurora", 3),
+    "winter_cosy": ("waves", 12),
+    "winter_nights": ("aurora", 7),
+    "winter_jazz": ("spiral", 6),
     "hopeful": ("rays", 1),
     "yearning": ("waves", 1),
     "triumphant": ("rays", 14),
@@ -642,6 +692,14 @@ _COVER_BG_STYLES = {
 # Per-profile icon overlay — drawn on top of the background before text.
 # Keys not listed here get no icon (plain background only).
 _PROFILE_ICON = {
+    "stormy": "thunderstorm",
+    "foggy": "foggy",
+    "snow_day": "snowflake",
+    "frosty": "ac_unit",
+    "grey_skies": "cloud",
+    "windy": "air",
+    "clear_night": "moon_stars",
+    "festive": "celebration",
     "sunrise": "wb_twilight",
     "study_session": "menu_book",
     "meditation": "self_improvement",
@@ -811,6 +869,9 @@ _HEART_MODE = {
 # natural colour, so they fall back to an in-hue tint of the cover palette. _ensure_icon_contrast
 # then nudges whatever colour is chosen just enough to stay legible on the background.
 _ICON_COLOR = {
+    "ac_unit": (180, 215, 235),
+    "air": (190, 220, 220),
+    "foggy": (170, 178, 190),
     "bedtime": (170, 160, 210),
     "hot_tub": (110, 200, 205),
     "menu_book": (210, 180, 130),
@@ -941,6 +1002,31 @@ _TOP_SONGS_STYLE_POOL = [
 # Playlist descriptions — picked randomly each run for variety
 # ---------------------------------------------------------------------------
 _DESCRIPTIONS = {
+    "stormy": ["For when the sky cracks open.", "Thunder, lightning and drama.", "Big, dark, electric skies."],
+    "foggy": ["Lost in the mist.", "Soft-focus, low-visibility calm.", "Music for a world gone grey and still."],
+    "snow_day": ["Snow's falling — stay in.", "Hushed, white-blanket calm.", "Watch the flakes come down."],
+    "heatwave": ["Too hot to move.", "Shimmering, sun-baked and slow.", "Melt into the heat."],
+    "frosty": ["Cold, clear and crystalline.", "Frost on the glass, breath in the air.", "Crisp and bright and freezing."],
+    "grey_skies": ["Flat grey overhead.", "Muted music for a colourless day.", "Cloud cover, inside and out."],
+    "windy": ["Lean into the gusts.", "Blustery, restless and brisk.", "The wind's really up."],
+    "clear_night": ["Cloudless, starlit and still.", "Look up — the whole sky's out.", "A calm, clear night."],
+    "festive": ["Deck the halls.", "All the Christmas classics.", "'Tis the season — holiday favourites."],
+    "spring_bloom": ["Everything's in bloom.", "Bright, fresh spring pop.", "The first warm days, in song."],
+    "spring_acoustic": ["Acoustic songs for a spring morning.", "Folk, fresh air and new leaves.", "Unplugged and budding."],
+    "spring_strings": ["Strings to greet the thaw.", "Graceful, hopeful, orchestral spring.", "Music blooming like the season."],
+    "spring_jangle": ["Jangly guitars and spring sun.", "Indie-pop with a skip in its step.", "Twee, bright and blooming."],
+    "summer_heat": ["Dancefloor in the sun.", "Disco-funk summer heat.", "Sweat it out under the lights."],
+    "summer_breeze": ["Top down, breeze blowing.", "Smooth, sun-warmed soft rock.", "Easy yacht-rock summer."],
+    "summer_roadtrip": ["Windows down, full volume.", "Summer singalongs for the open road.", "Every chorus, top of your lungs."],
+    "summer_tropical": ["Palm trees and warm rhythms.", "Latin, reggae and tropical heat.", "Beach-bar summer grooves."],
+    "autumn_leaves": ["Crunching leaves and cardigans.", "Folk songs for falling leaves.", "Acoustic, amber autumn."],
+    "autumn_jazz": ["Warm jazz for cool evenings.", "Smoky, soulful autumn.", "A glass of red and a saxophone."],
+    "autumn_rain": ["Rain on falling leaves.", "Moody, grey-skied autumn.", "Wistful songs for wet windows."],
+    "autumn_embers": ["Bonfires and worn-in rock.", "Heartland rock for autumn nights.", "Warm, gritty and golden."],
+    "winter_frost": ["Icy, weightless and still.", "Ambient frost and clear air.", "Crystalline winter calm."],
+    "winter_cosy": ["Fireside warmth and soul.", "Cosy, intimate winter R&B.", "Blankets, candles and slow jams."],
+    "winter_nights": ["Long, dark, electronic nights.", "Downtempo for the deep midwinter.", "Hypnotic after-dark winter."],
+    "winter_jazz": ["Cool jazz for cold nights.", "Smooth, snowed-in standards.", "A nightcap and a slow tune."],
     "hopeful": ["Songs that look on the bright side.", "A lift when you need one — bright and hopeful.", "Optimism, one track at a time."],
     "yearning": ["For when you want what you can't quite reach.", "Aching, wistful, full of longing.", "The sound of quiet yearning."],
     "triumphant": ["Chest-out, fists-up victory songs.", "The comeback, the win, the big finish.", "Music for your montage moment."],
@@ -1679,6 +1765,32 @@ def _pick_description(playlist_id, era=None, styles=None):
 # Mood / Activity Mix profiles — acoustic target fingerprints
 # ---------------------------------------------------------------------------
 _MOOD_PROFILES = {
+    # ---- 25 weather/seasonal mixes ----
+    "stormy": {"bpm": 80, "energy": -12, "danceability": 0.3, "brightness": 0.12, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.45, "valence": 0.35, "vocal_presence": 0.45},
+    "foggy": {"bpm": 78, "energy": -16, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.45, "vocal_presence": 0.45},
+    "snow_day": {"bpm": 88, "energy": -15, "danceability": 0.3, "brightness": 0.3, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.35, "valence": 0.65, "vocal_presence": 0.5},
+    "heatwave": {"bpm": 92, "energy": -13, "danceability": 0.4, "brightness": 0.4, "beat_confidence": 0.5, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.58, "vocal_presence": 0.5},
+    "frosty": {"bpm": 82, "energy": -15, "danceability": 0.28, "brightness": 0.32, "beat_confidence": 0.48, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.55, "vocal_presence": 0.45},
+    "grey_skies": {"bpm": 82, "energy": -15, "danceability": 0.26, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.4, "vocal_presence": 0.6},
+    "windy": {"bpm": 110, "energy": -11, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.55, "arousal": 0.62, "valence": 0.55, "vocal_presence": 0.6},
+    "clear_night": {"bpm": 76, "energy": -16, "danceability": 0.25, "brightness": 0.16, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.62, "arousal": 0.2, "valence": 0.55, "vocal_presence": 0.45},
+    "festive": {"bpm": 100, "energy": -11, "danceability": 0.45, "brightness": 0.4, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.55, "valence": 0.78, "vocal_presence": 0.7},
+    "spring_bloom": {"bpm": 105, "energy": -12, "danceability": 0.48, "brightness": 0.42, "beat_confidence": 0.65, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.75, "vocal_presence": 0.65},
+    "spring_acoustic": {"bpm": 95, "energy": -14, "danceability": 0.32, "brightness": 0.28, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.4, "valence": 0.65, "vocal_presence": 0.7},
+    "spring_strings": {"bpm": 92, "energy": -14, "danceability": 0.28, "brightness": 0.3, "beat_confidence": 0.52, "onset_rate": 3.5, "dynamic_complexity": 0.68, "arousal": 0.45, "valence": 0.62, "vocal_presence": 0.35},
+    "spring_jangle": {"bpm": 110, "energy": -12, "danceability": 0.45, "brightness": 0.32, "beat_confidence": 0.68, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.68, "vocal_presence": 0.7},
+    "summer_heat": {"bpm": 118, "energy": -10, "danceability": 0.72, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.55},
+    "summer_breeze": {"bpm": 100, "energy": -13, "danceability": 0.45, "brightness": 0.4, "beat_confidence": 0.58, "onset_rate": 4, "dynamic_complexity": 0.52, "arousal": 0.45, "valence": 0.7, "vocal_presence": 0.65},
+    "summer_roadtrip": {"bpm": 116, "energy": -11, "danceability": 0.55, "brightness": 0.4, "beat_confidence": 0.74, "onset_rate": 5.5, "dynamic_complexity": 0.48, "arousal": 0.65, "valence": 0.78, "vocal_presence": 0.72},
+    "summer_tropical": {"bpm": 102, "energy": -11, "danceability": 0.62, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.6, "valence": 0.78, "vocal_presence": 0.62},
+    "autumn_leaves": {"bpm": 90, "energy": -14, "danceability": 0.32, "brightness": 0.26, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.6, "arousal": 0.4, "valence": 0.55, "vocal_presence": 0.7},
+    "autumn_jazz": {"bpm": 92, "energy": -13, "danceability": 0.38, "brightness": 0.24, "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.62, "arousal": 0.42, "valence": 0.6, "vocal_presence": 0.55},
+    "autumn_rain": {"bpm": 84, "energy": -14, "danceability": 0.28, "brightness": 0.16, "beat_confidence": 0.52, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.35, "valence": 0.42, "vocal_presence": 0.62},
+    "autumn_embers": {"bpm": 108, "energy": -11, "danceability": 0.45, "brightness": 0.28, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.52, "arousal": 0.6, "valence": 0.55, "vocal_presence": 0.65},
+    "winter_frost": {"bpm": 80, "energy": -16, "danceability": 0.26, "brightness": 0.3, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.66, "arousal": 0.25, "valence": 0.55, "vocal_presence": 0.3},
+    "winter_cosy": {"bpm": 88, "energy": -14, "danceability": 0.42, "brightness": 0.24, "beat_confidence": 0.58, "onset_rate": 4, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.62, "vocal_presence": 0.78},
+    "winter_nights": {"bpm": 92, "energy": -14, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.32, "valence": 0.5, "vocal_presence": 0.45},
+    "winter_jazz": {"bpm": 90, "energy": -14, "danceability": 0.38, "brightness": 0.24, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.32, "valence": 0.6, "vocal_presence": 0.55},
     # ---- 50 added mood/vibe mixes (emotional & contextual) ----
     "hopeful": {"bpm": 95, "energy": -13, "danceability": 0.35, "brightness": 0.3, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.65},
     "yearning": {"bpm": 88, "energy": -15, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.42, "valence": 0.45, "vocal_presence": 0.7},
@@ -2070,6 +2182,31 @@ _MOOD_PROFILES = {
 }
 
 _MOOD_MIX_NAMES = {
+    "stormy": "Stormy Mix • Meloday+",
+    "foggy": "Foggy Mix • Meloday+",
+    "snow_day": "Snow Day Mix • Meloday+",
+    "heatwave": "Heatwave Mix • Meloday+",
+    "frosty": "Frosty Mix • Meloday+",
+    "grey_skies": "Grey Skies Mix • Meloday+",
+    "windy": "Windy Mix • Meloday+",
+    "clear_night": "Clear Night Mix • Meloday+",
+    "festive": "Festive Mix • Meloday+",
+    "spring_bloom": "Spring Bloom Mix • Meloday+",
+    "spring_acoustic": "Spring Acoustic Mix • Meloday+",
+    "spring_strings": "Spring Strings Mix • Meloday+",
+    "spring_jangle": "Spring Jangle Mix • Meloday+",
+    "summer_heat": "Summer Heat Mix • Meloday+",
+    "summer_breeze": "Summer Breeze Mix • Meloday+",
+    "summer_roadtrip": "Summer Roadtrip Mix • Meloday+",
+    "summer_tropical": "Summer Tropical Mix • Meloday+",
+    "autumn_leaves": "Autumn Leaves Mix • Meloday+",
+    "autumn_jazz": "Autumn Jazz Mix • Meloday+",
+    "autumn_rain": "Autumn Rain Mix • Meloday+",
+    "autumn_embers": "Autumn Embers Mix • Meloday+",
+    "winter_frost": "Winter Frost Mix • Meloday+",
+    "winter_cosy": "Winter Cosy Mix • Meloday+",
+    "winter_nights": "Winter Nights Mix • Meloday+",
+    "winter_jazz": "Winter Jazz Mix • Meloday+",
     "hopeful": "Hopeful Mix • Meloday+",
     "yearning": "Yearning Mix • Meloday+",
     "triumphant": "Triumphant Mix • Meloday+",
@@ -2446,10 +2583,10 @@ _HOUR_RESTRICTED = {
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
-_WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes"}
+_WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes", "stormy", "foggy", "snow_day", "heatwave", "frosty", "grey_skies", "windy", "clear_night"}
 
 # Season-conditional profiles — triggered by current calendar season; no weather API needed.
-_SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"}
+_SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening", "festive"}
 
 # Work-hours focus guarantee — at least one of these is always active Mon-Fri 7am-3pm.
 _WORK_FOCUS_PROFILES = {"focus", "deep_work"}
@@ -2462,6 +2599,31 @@ _GENERAL_PROFILES = (set(_MOOD_PROFILES)
 
 # Category labels for diversity-aware rotation (max 2 per category in active slots).
 _PROFILE_CATEGORY = {
+    "stormy": "atmospheric",
+    "foggy": "atmospheric",
+    "snow_day": "calm",
+    "heatwave": "atmospheric",
+    "frosty": "calm",
+    "grey_skies": "emotional",
+    "windy": "energy",
+    "clear_night": "atmospheric",
+    "festive": "seasonal",
+    "spring_bloom": "seasonal",
+    "spring_acoustic": "seasonal",
+    "spring_strings": "seasonal",
+    "spring_jangle": "seasonal",
+    "summer_heat": "seasonal",
+    "summer_breeze": "seasonal",
+    "summer_roadtrip": "seasonal",
+    "summer_tropical": "seasonal",
+    "autumn_leaves": "seasonal",
+    "autumn_jazz": "seasonal",
+    "autumn_rain": "seasonal",
+    "autumn_embers": "seasonal",
+    "winter_frost": "seasonal",
+    "winter_cosy": "seasonal",
+    "winter_nights": "seasonal",
+    "winter_jazz": "seasonal",
     "hopeful": "emotional",
     "yearning": "emotional",
     "triumphant": "emotional",
@@ -2653,6 +2815,31 @@ _PROFILE_CATEGORY = {
 # Tracks with matching positive tags get a distance boost; conflicting tags get a penalty.
 # Profiles where emotional character is the key distinguishing feature benefit most.
 _PROFILE_MOOD_SIGNALS = {
+    "stormy": (["dramatic", "ominous", "brooding", "volatile", "intense"], []),
+    "foggy": (["soothing", "mysterious", "atmospheric", "eerie", "dreamy"], []),
+    "snow_day": (["soothing", "gentle", "delicate", "playful"], []),
+    "heatwave": (["languid", "sultry", "sparkling", "mellow", "dreamy"], []),
+    "frosty": (["delicate", "austere", "refined", "gentle"], []),
+    "grey_skies": (["melancholy", "reflective", "austere", "somber", "introspective"], []),
+    "windy": (["nervous", "driving", "volatile", "energetic"], []),
+    "clear_night": (["soothing", "nocturnal", "ethereal", "dreamy", "spacious"], []),
+    "festive": (["joyous", "warm", "nostalgic", "celebratory", "cheerful"], []),
+    "spring_bloom": (["bright", "joyous", "sunny", "lively"], []),
+    "spring_acoustic": (["warm", "earthy", "gentle", "pastoral", "wistful"], []),
+    "spring_strings": (["graceful", "uplifting", "elegant", "optimistic", "soothing"], []),
+    "spring_jangle": (["wistful", "charming", "lively", "wry", "bright"], []),
+    "summer_heat": (["lively", "exuberant", "sexy", "carefree", "euphoric"], []),
+    "summer_breeze": (["mellow", "warm", "smooth", "easygoing", "sunny"], []),
+    "summer_roadtrip": (["carefree", "exuberant", "anthemic", "rousing", "joyous"], []),
+    "summer_tropical": (["warm", "sunny", "lively", "sensual", "carefree"], []),
+    "autumn_leaves": (["warm", "nostalgic", "wistful", "rustic", "mellow"], []),
+    "autumn_jazz": (["smooth", "warm", "sophisticated", "mellow", "sultry"], []),
+    "autumn_rain": (["melancholy", "wistful", "reflective", "brooding", "somber"], []),
+    "autumn_embers": (["warm", "rousing", "earthy", "gritty", "nostalgic"], []),
+    "winter_frost": (["delicate", "ethereal", "atmospheric", "soothing", "austere"], []),
+    "winter_cosy": (["warm", "intimate", "smooth", "tender", "sensual"], []),
+    "winter_nights": (["nocturnal", "hypnotic", "atmospheric", "mellow", "dreamy"], []),
+    "winter_jazz": (["smooth", "warm", "mellow", "sophisticated", "intimate"], []),
     "hopeful": (["optimistic", "uplifting", "bright", "innocent"], []),
     "yearning": (["yearning", "wistful", "tender", "plaintive"], []),
     "triumphant": (["triumphant", "rousing", "majestic", "anthemic", "epic"], []),
@@ -2977,6 +3164,20 @@ def _mood_tag_boost(entry, profile_key):
 # classical / indie mixes) the positives are REQUIRED: _build_mix_tracks keeps only tracks
 # carrying one of them, so the mix is genre-pure. The rest (focus/deep_work) are a soft nudge.
 _PROFILE_STYLE_SIGNALS = {
+    "festive": (["christmas", "holidays"], []),
+    "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
+    "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
+    "spring_jangle": (["indie pop", "jangle pop", "dream pop", "twee pop"], []),
+    "summer_heat": (["disco", "funk", "house", "club/dance"], []),
+    "summer_breeze": (["soft rock", "am pop", "adult contemporary"], []),
+    "summer_tropical": (["latin", "reggae", "afro", "tropical", "bossa"], []),
+    "autumn_leaves": (["folk", "singer/songwriter", "americana"], []),
+    "autumn_jazz": (["jazz", "soul", "smooth jazz"], []),
+    "autumn_embers": (["album rock", "heartland", "americana", "roots rock"], []),
+    "winter_frost": (["ambient", "modern composition", "classical", "experimental ambient"], []),
+    "winter_cosy": (["soul", "neo-soul", "quiet storm", "smooth soul"], []),
+    "winter_nights": (["downtempo", "ambient techno", "electronica", "trip-hop"], []),
+    "winter_jazz": (["smooth jazz", "jazz", "lounge", "vocal jazz"], []),
     "dinner_party": (["vocal jazz", "soul", "lounge", "bossa nova", "smooth"], []),
     "study_session": (["instrumental", "classical", "ambient", "post-rock", "score"], []),
     "yoga_stretch": (["ambient", "new age", "instrumental", "classical", "downtempo"], []),
@@ -3121,6 +3322,20 @@ _PROFILE_STYLE_SIGNALS = {
 # Profiles whose identity IS a genre — positives above are required (the candidate pool is
 # hard-filtered to them in _build_mix_tracks). focus/deep_work stay a soft nudge.
 _STYLE_DEFINED_PROFILES = {
+    "festive",
+    "spring_acoustic",
+    "spring_strings",
+    "spring_jangle",
+    "summer_heat",
+    "summer_breeze",
+    "summer_tropical",
+    "autumn_leaves",
+    "autumn_jazz",
+    "autumn_embers",
+    "winter_frost",
+    "winter_cosy",
+    "winter_nights",
+    "winter_jazz",
     # mood mixes where genre purity IS the right vibe (ambient/acoustic/sophisticated)
     "meditation", "spa_bath", "yoga_stretch", "power_nap", "study_session", "deep_reading",
     "campfire", "dinner_party",
@@ -3331,6 +3546,7 @@ def _get_weather(location):
             "temp_c":    int(current.get("temp_C", 20)),
             "condition": current.get("weatherDesc", [{}])[0].get("value", "").lower(),
             "code":      int(current.get("weatherCode", 113)),
+            "wind_kmph": int(current.get("windspeedKmph", 0)),
             "lat":       float(lat_str),
         }
     except Exception as e:
@@ -3362,7 +3578,10 @@ def _current_season(lat):
 # wttr.in weather codes (subset)
 _RAIN_CODES  = {176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 353, 356, 359}
 _SNOW_CODES  = {179, 182, 185, 227, 230, 323, 326, 329, 332, 335, 338, 368, 371, 374}
-_CLEAR_CODES = {113}  # sunny/clear
+_CLEAR_CODES = {113}                  # sunny/clear
+_STORM_CODES = {200, 386, 389, 392, 395}        # thundery
+_FOG_CODES   = {143, 248, 260}                  # mist / fog / freezing fog
+_CLOUD_CODES = {119, 122}                        # cloudy / overcast (116 = partly cloudy, left mild)
 
 def _weather_boost(profile_key, weather):
     """
@@ -3397,6 +3616,24 @@ def _weather_boost(profile_key, weather):
     elif profile_key == "beach_vibes":
         if code in _CLEAR_CODES and temp > warm_threshold + 5: return -0.40  # hot & sunny
         if code in _RAIN_CODES:                               return +0.20
+    elif profile_key == "stormy":
+        if code in _STORM_CODES:                              return -0.40
+    elif profile_key == "foggy":
+        if code in _FOG_CODES:                                return -0.40
+    elif profile_key == "snow_day":
+        if code in _SNOW_CODES:                               return -0.40
+    elif profile_key == "heatwave":
+        if code in _CLEAR_CODES and temp > warm_threshold + 10: return -0.40  # genuinely hot
+    elif profile_key == "frosty":
+        if temp <= cold_threshold - 6:                        return -0.40   # genuinely freezing
+        if code in _SNOW_CODES:                               return -0.30
+    elif profile_key == "grey_skies":
+        if code in _CLOUD_CODES:                              return -0.35
+    elif profile_key == "windy":
+        if weather.get("wind_kmph", 0) > 28:                  return -0.35   # blustery
+    elif profile_key == "clear_night":
+        hour = datetime.now().hour
+        if code in _CLEAR_CODES and (hour >= 21 or hour < 5): return -0.40   # clear & after dark
 
     return 0.0
 
@@ -3407,6 +3644,8 @@ def _season_active(profile_key, lat=0.0):
     Does not require a weather API call — uses local date only.
     Latitude (from weather data when available) adjusts for hemisphere.
     """
+    if profile_key == "festive":                       # Christmas/Holiday window, not a season
+        return _in_christmas_window(datetime.now())
     season = _current_season(lat)
     return {
         "autumn_mix":     season == "autumn",
@@ -3414,6 +3653,22 @@ def _season_active(profile_key, lat=0.0):
         "spring_mix":     season == "spring",
         "summer_evening": season == "summer",
     }.get(profile_key, False)
+
+
+# Season each rotating seasonal-style mix belongs to — eligible only when in season, so it
+# rotates within the general pool during its season and disappears off-season.
+_PROFILE_SEASON = {
+    "spring_bloom": "spring", "spring_acoustic": "spring", "spring_strings": "spring", "spring_jangle": "spring",
+    "summer_heat": "summer", "summer_breeze": "summer", "summer_roadtrip": "summer", "summer_tropical": "summer",
+    "autumn_leaves": "autumn", "autumn_jazz": "autumn", "autumn_rain": "autumn", "autumn_embers": "autumn",
+    "winter_frost": "winter", "winter_cosy": "winter", "winter_nights": "winter", "winter_jazz": "winter",
+}
+
+
+def _profile_season_ok(profile_key, lat=0.0):
+    """A seasonal-style profile is only eligible in its season; everything else is always eligible."""
+    s = _PROFILE_SEASON.get(profile_key)
+    return s is None or _current_season(lat) == s
 
 
 def _mood_rotation_score(profile_key, acoustic_dist, current_hour, weather):
@@ -3478,6 +3733,12 @@ def _parse_args():
         help="Only add/remove time-of-day mood mixes based on current hour. "
              "Runs at each time boundary (5am, noon, 5pm, 9pm, 10pm, 2am, 4am). "
              "Does not touch general or weather mixes.",
+    )
+    p.add_argument(
+        "--weather-context", action="store_true",
+        help="Only add/remove weather mood mixes based on current conditions. "
+             "Cheap — run hourly so weather mixes track the weather through the day. "
+             "Does not touch general, seasonal, or time mixes.",
     )
     args, _ = p.parse_known_args()
     return args
@@ -4784,6 +5045,9 @@ MS_ICON_FONT = os.path.join(
 
 # Material Symbol name → codepoint (extracted from the font's cmap). Extend as needed.
 _MS_CODEPOINTS = {
+    "ac_unit": 0xEB3B,
+    "air": 0xEFD8,
+    "foggy": 0xE818,
     "bedtime": 0xF159,
     "hot_tub": 0xEB46,
     "menu_book": 0xEA19,
@@ -6503,13 +6767,17 @@ def _rotation_slot(hour):
 
 def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                      n_active=5, mix_size=50, reselect=False, time_context=False,
-                     existing_playlists=None):
+                     weather_context=False, existing_playlists=None):
     """
-    Three operating modes:
+    Operating modes:
 
     time_context=True  (boundary cron — 5am, noon, 5pm, 9pm, 10pm, 2am, 4am):
         Only adds/removes hard time-of-day playlists (Morning, Dinner, Late Night, Sleep).
         Does NOT touch general, weather, or seasonal mixes.
+
+    weather_context=True  (hourly cron):
+        Only adds/removes weather playlists to match the current conditions. Cheap to run
+        often so weather mixes track the weather through the day. Does NOT touch the rest.
 
     reselect=False (default, daily 6am):
         Refreshes content for existing general mixes. Checks weather and season;
@@ -6555,6 +6823,26 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return mixes, list(to_remove)
 
     # ------------------------------------------------------------------
+    # MODE 0: Weather-context — only manage weather mixes (hourly cron)
+    # ------------------------------------------------------------------
+    if weather_context:
+        loc     = _extras.get("weather_location")
+        weather = _get_weather(loc) if loc else None
+        active  = {k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0}
+        current = {name_to_key[name] for name in existing
+                   if name in name_to_key and name_to_key[name] in _WEATHER_PROFILES}
+        to_add, to_remove = active - current, current - active
+        cond = weather["condition"] if weather else "n/a"
+        xlog(f"[INFO] mood_mixes (weather): {cond} → add={sorted(to_add)} remove={sorted(to_remove)}")
+        mixes = []
+        for profile_key in to_add:
+            tracks = _build_mix_tracks(
+                profile_key, essentia_cache, history_entries,
+                excluded_album_keys, mix_size, plex)
+            mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
+        return mixes, list(to_remove)
+
+    # ------------------------------------------------------------------
     # MODE 2 / 3: General + weather + seasonal mixes
     # ------------------------------------------------------------------
     weather_location = _extras.get("weather_location")
@@ -6581,7 +6869,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                        if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
     recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
     eligible = [k for k in _GENERAL_PROFILES
-                if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)]
+                if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)
+                and _profile_season_ok(k, lat)]
     n_cats = len(set(_PROFILE_CATEGORY.values()))
     if recent_centroid.get("bpm") and eligible:
         scored = sorted(
@@ -6765,7 +7054,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
 # ===========================================================================
 
 def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys,
-                  existing_playlists=None, reselect_moods=False, time_context=False):
+                  existing_playlists=None, reselect_moods=False, time_context=False,
+                  weather_context=False):
     ep = existing_playlists  # shorthand
 
     if playlist_id == "on_repeat":
@@ -6861,7 +7151,7 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
         mixes, to_remove = build_mood_mixes(
             plex, history, ec, excluded_album_keys, n_active=n_active,
             reselect=reselect_moods, time_context=time_context,
-            existing_playlists=ep)
+            weather_context=weather_context, existing_playlists=ep)
         for profile_key in to_remove:
             name = _MOOD_MIX_NAMES[profile_key]
             pl   = (ep or {}).get(name)
@@ -6934,7 +7224,8 @@ def main():
         jan1 = datetime(start_year, 1, 1, tzinfo=timezone.utc)
         return (datetime.now(tz=timezone.utc) - jan1).days + 1
 
-    time_context_mode = getattr(args, "time_context", False)
+    time_context_mode    = getattr(args, "time_context", False)
+    weather_context_mode = getattr(args, "weather_context", False)
 
     def _lookback_for(pid):
         if pid == "time_capsule" and BIRTH_YEAR:
@@ -6943,7 +7234,7 @@ def main():
             return _top_songs_lookback()
         if pid == "all_time_favourites":
             return 0   # uses track.viewCount — no history needed
-        if pid == "mood_mixes" and time_context_mode:
+        if pid == "mood_mixes" and (time_context_mode or weather_context_mode):
             return 30  # only needs recent plays for mix content weighting
         return _HISTORY_LOOKBACK_DAYS.get(pid, 180)
 
@@ -6975,7 +7266,8 @@ def main():
             _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_album_keys,
                           existing_playlists=existing_playlists,
                           reselect_moods=reselect_moods,
-                          time_context=time_context_mode)
+                          time_context=time_context_mode,
+                          weather_context=weather_context_mode)
         except Exception:
             xlog(f"[ERROR] {playlist_id} failed:\n{traceback.format_exc()}")
 
