@@ -683,7 +683,7 @@ _PROFILE_ICON = {
     "dinner":            "restaurant",
     "jazz_dinner":       "restaurant",
     "cosy":              "local_cafe",
-    "brunch_mix":        "local_cafe",
+    "brunch_mix":        "brunch_dining",  # rotates with bakery_dining / egg_alt
     # Night / sleep
     "sleep":             "moon_stars",
     "late_night":        "partly_cloudy_night",
@@ -712,8 +712,6 @@ _PROFILE_ICON = {
     # Calm / dreamy / focus
     "daydreaming":       "cloud",
     "lazy_sunday":       "cloud",
-    "focus":             "center_focus_strong",
-    "deep_work":         "center_focus_strong",
     "evening_unwind":    "self_improvement",
     "cool_down":         "spa",
     # Party / celebration
@@ -745,6 +743,7 @@ _PROFILE_ICON = {
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
 _PROFILE_ICON_ROTATE = {
     "date_night": ["wine_bar", "local_bar", "brunch_dining"],
+    "brunch_mix": ["brunch_dining", "bakery_dining", "egg_alt"],
 }
 
 # Per-glyph placement metadata for _draw_icon_overlay.
@@ -785,6 +784,11 @@ _ICON_PROFILE_OVERRIDE = {
     "release_radar":  {"anchor": (0.74, 0.60), "base_scale": 0.45, "alpha": 120, "shadow": False},
     # Rainy Day — cloud up in the top-right, mirrored (rain falls left), ripples drawn below it.
     "rainy_day":      {"anchor": (0.72, 0.31), "flip": True},
+    # Party — Pre-Party lower-left, Friday Night lower-right (with scattered music notes).
+    "pre_party":      {"anchor": (0.30, 0.62)},
+    "friday_night":   {"anchor": (0.70, 0.62)},
+    # Winter — cloud sits in the top-right quadrant; flakes fall below it (cloud drawn on top).
+    "winter_mix":     {"anchor": (0.66, 0.33)},
 }
 
 # Heart arrangement per romance profile — deliberately spread so no two covers match.
@@ -823,6 +827,8 @@ _ICON_COLOR = {
     "wine_bar":              (214, 116, 138),   # wine rose
     "local_bar":             (224, 140, 110),   # cocktail amber
     "brunch_dining":         (236, 196, 140),   # brunch warm
+    "bakery_dining":         (232, 186, 128),   # pastry gold
+    "egg_alt":               (246, 210, 150),   # sunny yolk
     # Fire / energy — orange-red
     "local_fire_department": (255, 125,  55),
     "whatshot":              (255, 135,  60),
@@ -4801,23 +4807,33 @@ _MS_CODEPOINTS = {
     "weekend": 0xE16B, "repeat": 0xE040, "replay": 0xE042, "radar": 0xF04E,
     "travel_explore": 0xE2DB, "explore": 0xE87A, "history": 0xE8B3,
     "moon_stars": 0xF34F, "partly_cloudy_night": 0xEA46, "local_bar": 0xE540,
-    "brunch_dining": 0xEA73, "flare": 0xE3E4,
+    "brunch_dining": 0xEA73, "bakery_dining": 0xEA53, "egg_alt": 0xEAC8, "flare": 0xE3E4,
+}
+
+# Glyphs rendered FILL=0 (outlined) instead of solid — their interior detail (a screen,
+# pages, a cup, a glass…) reads as a second tone via the background, matching the canonical
+# two-tone Material look. Solid symbols (heart, note, star, sun, drop) stay FILL=1.
+_TWO_TONE_GLYPHS = {
+    "movie", "menu_book", "local_cafe", "restaurant", "stadia_controller", "headphones",
+    "wine_bar", "local_bar", "brunch_dining", "bakery_dining", "egg_alt", "piano", "weekend",
+    "hot_tub",
 }
 
 _MS_FONT_CACHE = {}
 
 
-def _load_ms_font(size):
-    """Material Symbols variable font at `size` px em, set to Filled / heavy / opsz 48.
-    Cached by size. layout_engine is left default (codepoint render needs no shaping)."""
-    font = _MS_FONT_CACHE.get(size)
+def _load_ms_font(size, fill=1):
+    """Material Symbols variable font at `size` px em, heavy / opsz 48. `fill` selects the
+    FILL axis (1 = solid, 0 = outlined two-tone). Cached by (size, fill)."""
+    key = (size, fill)
+    font = _MS_FONT_CACHE.get(key)
     if font is None:
         font = ImageFont.truetype(MS_ICON_FONT, size)
         try:
-            font.set_variation_by_axes([1, 0, 48, 700])  # FILL, GRAD, opsz, wght
+            font.set_variation_by_axes([fill, 0, 48, 700])  # FILL, GRAD, opsz, wght
         except Exception:
             pass
-        _MS_FONT_CACHE[size] = font
+        _MS_FONT_CACHE[key] = font
     return font
 
 
@@ -4830,7 +4846,7 @@ def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
     if cp is None or not _PIL_AVAILABLE:
         return
     ch   = chr(cp)
-    font = _load_ms_font(max(8, int(round(size))))
+    font = _load_ms_font(max(8, int(round(size))), 0 if icon_name in _TWO_TONE_GLYPHS else 1)
     l, t, r, b = font.getbbox(ch, stroke_width=stroke_width)     # ink bounds, to centre
     gw, gh = max(1, r - l), max(1, b - t)
     pad = max(8, int(size * 0.10) + stroke_width)
@@ -4845,11 +4861,13 @@ def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
                                  int(round(cy - tile.height / 2))))
 
 
-def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3, stroke=None):
-    """Composed constellation: one anchor glyph plus (n-1) satellites at 55–70% size on a
-    balanced ring around it, gentle varied tilts. Overlapping shapes get an outline
-    (`stroke` = (width_fraction, fill)) so they stay legible. `names` is cycled across glyphs
-    (e.g. ["music_note","music_note_2"]) or repeated (["favorite"], ["flare"])."""
+def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3, stroke=None,
+                        ring_mult=0.50, sat_lo=0.55, sat_hi=0.70):
+    """Composed constellation: one anchor glyph plus (n-1) satellites on a balanced ring
+    around it (radius = anchor_size*ring_mult, satellites sat_lo–sat_hi of the anchor), gentle
+    varied tilts. Overlapping shapes get an outline (`stroke` = (width_fraction, fill)) so they
+    stay legible. `names` is cycled across glyphs (["music_note","music_note_2"]) or repeated
+    (["favorite"], ["flare"]). Widen ring_mult / shrink satellites to keep sparks from overlapping."""
     sw, sf = stroke or (0, None)
 
     def g(name, gx, gy, gsize, gtilt):
@@ -4859,32 +4877,33 @@ def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3, strok
     g(names[0], cx, cy, anchor_size, rng.uniform(-8, 8))
     if n <= 1:
         return
-    ring   = anchor_size * 0.50
+    ring   = anchor_size * ring_mult
     base_a = rng.uniform(0, 2 * math.pi)
     for i in range(1, n):
-        ang   = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.25, 0.25)
-        ssize = anchor_size * rng.uniform(0.55, 0.70)
+        ang   = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.18, 0.18)
+        ssize = anchor_size * rng.uniform(sat_lo, sat_hi)
         g(names[i % len(names)], cx + ring * math.cos(ang), cy + ring * math.sin(ang),
           ssize, rng.uniform(-15, 15))
 
 
 def _draw_falling_cluster(layer, cloud_name, flake_name, cx, cy, size, rng, fill, stroke=None):
-    """A cloud near the top with several flakes falling below it (downward spread, varied
-    size and tilt) — used for Winter. `size` is the cloud's em size; cluster centred on (cx,cy)."""
+    """A cloud with 7–8 flakes falling below it — used for Winter. Flakes are drawn FIRST so the
+    cloud is composited ON TOP of them; flakes fall further and spread wider. `size` is the
+    cloud's em size; the cloud sits high and flakes fall down through the centre."""
     sw, sf = stroke or (0, None)
 
     def g(name, gx, gy, gsize, gtilt):
         _draw_glyph(layer, name, gx, gy, gsize, fill, tilt=gtilt,
                     stroke_width=int(round(gsize * sw)) if sw else 0, stroke_fill=sf)
 
-    cloud_y = cy - size * 0.42
-    g(cloud_name, cx, cloud_y, size, rng.uniform(-6, 6))
-    n = rng.randint(4, 6)
-    for i in range(n):
-        fx    = cx + rng.uniform(-0.62, 0.62) * size
-        fy    = cloud_y + size * (0.32 + 0.60 * (i + rng.uniform(0, 1)) / n)
-        fsize = size * rng.uniform(0.26, 0.42)
-        g(flake_name, fx, fy, fsize, rng.uniform(-20, 20))
+    cloud_y = cy - size * 0.70
+    n = rng.randint(7, 8)
+    for i in range(n):                                   # flakes first → cloud drawn over them
+        fx    = cx + rng.uniform(-0.85, 0.85) * size
+        fy    = cloud_y + size * (0.55 + 1.45 * (i + rng.uniform(0, 1)) / n)
+        fsize = size * rng.uniform(0.22, 0.38)
+        g(flake_name, fx, fy, fsize, rng.uniform(-22, 22))
+    g(cloud_name, cx, cloud_y, size, rng.uniform(-6, 6))  # cloud composited on top
 
 
 def _icon_dark(c, f=0.42):
@@ -4967,6 +4986,30 @@ def _draw_ripples_below(layer, cx, cy, size, rgb, alpha):
                      outline=(*rgb, max(28, a0 - k * 16)), width=lw)
 
 
+def _draw_scattered_notes(layer, W, H, avoid, rng, fill, stroke, note_size, target=4):
+    """Scatter a few music_note / music_note_2 glyphs at non-overlapping positions, clear of
+    `avoid` ((x, y, r) footprints), the title bar and the top-left Meloday+ badge — used to
+    dress the Friday Night cover around its hero glyph."""
+    sw, sf = stroke or (0, None)
+    placed  = list(avoid)
+    names   = ["music_note", "music_note_2"]
+    margin  = 60
+    bar_top = int(H * 0.78)
+    k = tries = 0
+    while k < target and tries < 240:
+        tries += 1
+        x = rng.uniform(margin + note_size * 0.5, W - margin - note_size * 0.5)
+        y = rng.uniform(150, bar_top - 30 - note_size * 0.5)
+        r = note_size * 0.62
+        if x - r < 250 and y - r < 150:                  # top-left Meloday+ badge
+            continue
+        if all((x - px) ** 2 + (y - py) ** 2 > (r + pr) ** 2 for px, py, pr in placed):
+            _draw_glyph(layer, names[k % 2], x, y, note_size, fill, tilt=rng.uniform(-18, 18),
+                        stroke_width=int(round(note_size * sw)) if sw else 0, stroke_fill=sf)
+            placed.append((x, y, r))
+            k += 1
+
+
 def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     """Composite a profile-specific Material Symbol glyph onto img (RGBA). Returns RGBA.
 
@@ -4997,7 +5040,7 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     elif icon_name == "music_note":
         cluster_mode, cluster_names, cluster_n = "ring", ["music_note", "music_note_2"], rng.randint(3, 4)
     elif icon_name == "flare":
-        cluster_mode, cluster_names, cluster_n = "ring", ["flare"], rng.randint(4, 6)
+        cluster_mode, cluster_names, cluster_n = "ring", ["flare"], rng.randint(4, 5)
     elif key == "winter_mix":
         cluster_mode = "falling"
     kind = "cluster" if cluster_mode else "single"
@@ -5037,6 +5080,10 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
         stroke = (0.045, (*stroke_rgb, alpha))
         if cluster_mode == "falling":
             _draw_falling_cluster(overlay, "cloud", "snowflake", cx, cy, size * 0.46, rng, fill, stroke=stroke)
+        elif icon_name == "flare":                   # spread the sparks so none overlap
+            _draw_glyph_cluster(overlay, cluster_names, cx, cy, anchor_size=size * 0.44,
+                                rng=rng, fill=fill, n=cluster_n, stroke=stroke,
+                                ring_mult=0.98, sat_lo=0.52, sat_hi=0.66)
         else:
             _draw_glyph_cluster(overlay, cluster_names, cx, cy, anchor_size=size * 0.60,
                                 rng=rng, fill=fill, n=cluster_n, stroke=stroke)
@@ -5045,6 +5092,9 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
         _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False))
         if key == "rainy_day":                       # little ripples landing below the cloud
             _draw_ripples_below(overlay, cx, cy, size, rgb, alpha)
+        elif key == "friday_night":                  # scatter non-overlapping music notes around it
+            _draw_scattered_notes(overlay, W, H, [(cx, cy, R)], rng, fill, stroke=None,
+                                  note_size=size * 0.32)
 
     # The glyph is the topmost art (below the title text); _place_icon adds the drop-shadow.
     return _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0,
