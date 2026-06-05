@@ -1914,23 +1914,82 @@ def _mood_tag_boost(entry, profile_key):
     return boost
 
 
-# Genre/style signals for profiles where instrumental vs vocal content matters.
-# Checked against entry["styles"] + entry["genres"] — available without TF models.
+# Style/genre signals per profile: (positive_substrings, negative_substrings), matched as
+# substrings against the AllMusic styles in entry["styles"] (+ entry["genres"]).
+# For STYLE-DEFINED profiles (a genre *is* the identity — the synth-pop / folk / jazz /
+# classical / indie mixes) the positives are REQUIRED: _build_mix_tracks keeps only tracks
+# carrying one of them, so the mix is genre-pure. The rest (focus/deep_work) are a soft nudge.
 _PROFILE_STYLE_SIGNALS = {
+    # ----- style-defined genre mixes (positives required) -----
+    "synthpop_romance": (["synth pop", "synthwave", "new romantic", "new wave",
+                          "indie electronic", "dance-pop", "sophisti-pop", "dream pop",
+                          "left-field pop", "neo-electro"],
+                         ["metal", "rap", "country", "folk", "jazz", "punk", "hardcore", "blues"]),
+    "folk_acoustic":    (["indie folk", "contemporary folk", "folk-rock", "folk-pop",
+                          "singer/songwriter", "americana", "new acoustic", "alt-country",
+                          "anti-folk", "folk revival", "neo-traditional folk", "folk"],
+                         ["metal", "rap", "edm", "techno", "house", "club/dance", "synth"]),
+    "acoustic_romance": (["singer/songwriter", "indie folk", "contemporary folk", "folk-pop",
+                          "new acoustic", "americana", "folk-rock"],
+                         ["metal", "rap", "edm", "club/dance", "techno", "house", "punk", "hardcore"]),
+    "indie_romance":    (["indie rock", "indie pop", "dream pop", "indie folk", "indie electronic",
+                          "twee pop", "chamber pop", "sadcore", "shoegaze", "slowcore",
+                          "jangle pop", "noise pop", "alternative singer/songwriter"],
+                         ["metal", "rap", "edm", "country", "hardcore", "club/dance"]),
+    "romantic_jazz":    (["vocal jazz", "smooth jazz", "cool", "piano jazz", "crossover jazz",
+                          "jazz-pop", "torch songs", "bossa nova", "standards", "lounge",
+                          "saxophone jazz", "post-bop", "swing", "jazz blues"],
+                         ["jazz-rap", "jazz-rock", "rap", "metal", "punk", "edm"]),
+    "jazz_dinner":      (["vocal jazz", "jazz", "cool", "smooth jazz", "crossover jazz",
+                          "piano jazz", "standards", "lounge", "bossa nova", "traditional pop",
+                          "swing", "cocktail", "post-bop"],
+                         ["jazz-rap", "jazz-rock", "rap", "metal", "punk", "hardcore", "edm"]),
+    "string_quartet":   (["chamber music", "classical crossover", "orchestral", "neo-classical",
+                          "modern composition", "concerto", "chamber pop", "baroque pop",
+                          "symphony", "modal music"],
+                         ["rap", "metal", "edm", "punk", "club/dance"]),
+    "strings_romance":  (["orchestral", "chamber music", "classical crossover", "neo-classical",
+                          "modern composition", "chamber pop", "baroque pop"],
+                         ["rap", "metal", "edm", "punk", "club/dance"]),
+    "piano_romance":    (["piano jazz", "neo-classical", "modern composition",
+                          "contemporary instrumental", "keyboard", "classical crossover",
+                          "instrumental pop", "chamber music"],
+                         ["metal", "rap", "punk", "edm", "club/dance", "hardcore"]),
+    # ----- soft style preference (instrumental focus; not required) -----
     "focus":     (["orchestral", "instrumental", "ambient", "classical", "score",
-                   "soundtrack", "new age", "cinematic", "post-rock"],
-                  ["singer-songwriter"]),
+                   "soundtrack", "new age", "film music", "post-rock"],
+                  ["singer/songwriter"]),
     "deep_work": (["orchestral", "instrumental", "ambient", "classical", "score",
-                   "soundtrack", "new age", "cinematic", "post-rock"],
-                  ["singer-songwriter"]),
+                   "soundtrack", "new age", "film music", "post-rock"],
+                  ["singer/songwriter"]),
 }
+
+# Profiles whose identity IS a genre — positives above are required (the candidate pool is
+# hard-filtered to them in _build_mix_tracks). focus/deep_work stay a soft nudge.
+_STYLE_DEFINED_PROFILES = {
+    "synthpop_romance", "folk_acoustic", "acoustic_romance", "indie_romance",
+    "romantic_jazz", "jazz_dinner", "string_quartet", "strings_romance", "piano_romance",
+}
+
+
+def _has_required_style(entry, profile_key):
+    """True if the track carries one of the profile's required (positive) styles. Untagged
+    tracks return False so genre-defined mixes never include unconfirmable tracks."""
+    sig = _PROFILE_STYLE_SIGNALS.get(profile_key)
+    if not sig:
+        return True
+    positive_subs = sig[0]
+    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    if not tags:
+        return False
+    return any(sub in tag for tag in tags for sub in positive_subs)
 
 
 def _style_tag_boost(entry, profile_key):
     """
-    Distance adjustment from genre/style tag compatibility.
-    Complements _mood_tag_boost for profiles where instrumental vs vocal content
-    is the primary selection axis — particularly focus and deep_work.
+    Distance adjustment from genre/style tag compatibility. Orders tracks within a profile by
+    how well their styles fit. Style-defined profiles get a stronger positive pull (the hard
+    pool filter already guarantees purity); soft profiles (focus/deep_work) get a gentle nudge.
     Returns 0.0 for profiles with no style signal defined.
     """
     signals = _PROFILE_STYLE_SIGNALS.get(profile_key)
@@ -1946,9 +2005,9 @@ def _style_tag_boost(entry, profile_key):
 
     boost = 0.0
     if _matches(positive_subs):
-        boost -= 0.12
+        boost -= 0.18 if profile_key in _STYLE_DEFINED_PROFILES else 0.12
     if _matches(negative_subs):
-        boost += 0.08
+        boost += 0.10
     return boost
 
 
@@ -5348,7 +5407,15 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         key=_combined_score
     )
 
-    n_history = int(mix_size * 0.40)
+    # Style-defined mixes (Synth-Pop Romance, Folk & Acoustic, the jazz/classical/indie
+    # mixes): keep only tracks whose styles match the genre, so the mix stays genre-pure.
+    if profile_key in _STYLE_DEFINED_PROFILES:
+        history_rks = [rk for rk in history_rks
+                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
+        library_rks = [rk for rk in library_rks
+                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
+
+    n_history = min(int(mix_size * 0.40), len(history_rks))
     n_library  = mix_size - n_history
     candidate_rks = list(dict.fromkeys(
         history_rks[:n_history * 3] + library_rks[:n_library * 3]
