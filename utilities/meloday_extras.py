@@ -4036,6 +4036,7 @@ _MOOD_AFFECT = {
 # behaviour is correct now and once TF columns are populated.
 _VALENCE_WEIGHT = 4.0
 _AROUSAL_WEIGHT = 2.0
+_VOCAL_WEIGHT   = 1.0   # instrumental↔vocal axis (TF value, or genre/style proxy as fallback)
 
 
 def _entry_affect_proxy(entry):
@@ -4054,6 +4055,40 @@ def _entry_affect_proxy(entry):
     result = (sum(vs) / len(vs), sum(as_) / len(as_)) if vs else (None, None)
     try:
         entry["_affect_proxy"] = result
+    except (TypeError, AttributeError):
+        pass
+    return result
+
+
+# Genre/style cues for a vocal-presence estimate, used only until a track's TF vocal_presence
+# is computed (the real value always wins). Vocal-forward genres read high, instrumental ones
+# low, everything else mid (most popular music is vocal-led).
+_VOCAL_CUES = (
+    "a cappella", "choral", "gospel", "doo wop", "vocal jazz", "barbershop",
+    "singer/songwriter", "spoken word",
+)
+_INSTRUMENTAL_CUES = (
+    "instrumental", "ambient", "new age", "drone", "modern composition", "chamber",
+    "orchestral", "film score", "original score", "soundtrack", "post-rock", "math rock",
+    "video game", "chiptune", "classical", "exotica", "minimal techno", "ambient techno",
+)
+
+
+def _entry_vocal_proxy(entry):
+    """Coarse vocal-presence estimate from an entry's genres/styles — only a fallback for
+    tracks that don't yet have a TF vocal_presence value. Memoised on the entry."""
+    cached = entry.get("_vocal_proxy")
+    if cached is not None:
+        return cached
+    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    if any(cue in t for t in tags for cue in _VOCAL_CUES):
+        result = 0.88
+    elif any(cue in t for t in tags for cue in _INSTRUMENTAL_CUES):
+        result = 0.18
+    else:
+        result = 0.60
+    try:
+        entry["_vocal_proxy"] = result
     except (TypeError, AttributeError):
         pass
     return result
@@ -4105,8 +4140,13 @@ def _acoustic_distance_to_centroid(entry, centroid):
             _add((ev - centroid["valence"]) ** 2, _VALENCE_WEIGHT)
         if ea is not None and centroid.get("arousal") is not None:
             _add((ea - centroid["arousal"]) ** 2, _AROUSAL_WEIGHT)
-    if entry.get("vocal_presence") is not None and centroid.get("vocal_presence") is not None:
-        _add((entry["vocal_presence"] - centroid["vocal_presence"]) ** 2, 1.0)
+    # Vocal axis — TF value preferred, genre/style proxy as fallback until TF data lands.
+    if centroid.get("vocal_presence") is not None:
+        ev = entry.get("vocal_presence")
+        if ev is None:
+            ev = _entry_vocal_proxy(entry)
+        if ev is not None:
+            _add((ev - centroid["vocal_presence"]) ** 2, _VOCAL_WEIGHT)
     if den == 0:
         return 0.5
     return min(math.sqrt(num / den), 1.0)
