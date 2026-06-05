@@ -6793,6 +6793,16 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     name_to_key = {v: k for k, v in _MOOD_MIX_NAMES.items()}
     existing     = existing_playlists or {}
 
+    # Recently-played exclusion for variety (configurable; 0 disables). Tracks heard in the
+    # last N days are kept out of every mix this run, so the slate keeps turning over instead
+    # of resurfacing the same songs.
+    _excl_days = int(_extras.get("mood_mix_exclude_played_days", 3))
+    recent_rks = set()
+    if _excl_days > 0 and history_entries:
+        _cut = datetime.now(tz=timezone.utc) - timedelta(days=_excl_days)
+        recent_rks = {str(e.ratingKey) for e in history_entries
+                      if e.viewedAt and e.viewedAt >= _cut}
+
     # ------------------------------------------------------------------
     # MODE 1: Time-context — only manage hard time-of-day mixes
     # ------------------------------------------------------------------
@@ -6817,7 +6827,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         for profile_key in to_add:
             tracks = _build_mix_tracks(
                 profile_key, essentia_cache, history_entries,
-                excluded_album_keys, mix_size, plex)
+                excluded_album_keys, mix_size, plex, exclude_rks=recent_rks)
             mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
         return mixes, list(to_remove)
@@ -6838,7 +6848,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         for profile_key in to_add:
             tracks = _build_mix_tracks(
                 profile_key, essentia_cache, history_entries,
-                excluded_album_keys, mix_size, plex)
+                excluded_album_keys, mix_size, plex, exclude_rks=recent_rks)
             mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
         return mixes, list(to_remove)
 
@@ -6938,10 +6948,12 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
          f"+ weather{active_weather} + seasonal{active_seasonal}")
 
     mixes = []
+    seen_rks = set(recent_rks)           # recently-played + cross-mix dedupe accumulator
     for profile_key in active_profiles:
         tracks = _build_mix_tracks(
             profile_key, essentia_cache, history_entries,
-            excluded_album_keys, mix_size, plex)
+            excluded_album_keys, mix_size, plex, exclude_rks=seen_rks)
+        seen_rks.update(str(t.ratingKey) for t in tracks)   # no song repeats across the slate
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
     # Remove general mixes that rotated out of this slot's selection
@@ -6953,8 +6965,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
-                      excluded_album_keys, mix_size, plex):
-    """Build the 50-track list for a single mood mix profile."""
+                      excluded_album_keys, mix_size, plex, exclude_rks=None):
+    """Build the 50-track list for a single mood mix profile.
+
+    `exclude_rks` is an optional set of rating keys to leave out for variety — tracks played
+    in the last few days plus tracks already used by other mixes in this run — applied only
+    while enough tracks remain that the mix still fills (otherwise filling wins over variety).
+    """
     target       = _MOOD_PROFILES[profile_key]
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
 
@@ -6992,6 +7009,14 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _l = [rk for rk in library_rks if _year_in_window(essentia_cache.get(rk, {}), _yw)]
         history_rks = _h or history_rks
         library_rks = _l or library_rks
+
+    # Variety: drop recently-played + already-used-this-run tracks, but only while enough
+    # remain that the mix still fills (so a thin genre pool isn't starved).
+    if exclude_rks:
+        fh = [rk for rk in history_rks if rk not in exclude_rks]
+        fl = [rk for rk in library_rks if rk not in exclude_rks]
+        if len(fh) + len(fl) >= mix_size:
+            history_rks, library_rks = fh, fl
 
     n_history = min(int(mix_size * 0.40), len(history_rks))
     n_library  = mix_size - n_history
