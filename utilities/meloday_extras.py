@@ -6470,7 +6470,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     else:
         pool = list(eligible)
     slot = _rotation_slot(current_hour)
-    random.Random((datetime.now().date().toordinal(), slot)).shuffle(pool)
+    # int seed (Random() rejects tuples on Py3.11+); hash of an int-tuple is stable across runs
+    random.Random(hash((datetime.now().date().toordinal(), slot))).shuffle(pool)
     n_cats      = len(set(_PROFILE_CATEGORY.values()))
     max_per_cat = max(1, math.ceil(n_active / n_cats))
     active_general = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
