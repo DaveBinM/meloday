@@ -3670,6 +3670,58 @@ def _lastfm_tag_boost(entry, profile_key):
 
 
 # ---------------------------------------------------------------------------
+# Geographic origin (MusicBrainz hierarchy, with a Last.fm scene-tag fallback)
+# ---------------------------------------------------------------------------
+_ORIGIN_WEIGHT  = 0.50   # strong pull toward local artists in a city/region mix
+_ORIGIN_PENALTY = 0.15   # gentle push-out of confirmed non-local artists (keeps the genre though)
+
+# City mixes -> origin spec. Auto-built from the glasgow_/london_/melbourne_ prefixes; add
+# explicit entries here for country/region/continent mixes (e.g. {"country_code": "GB"}).
+_PROFILE_ORIGIN = {}
+for _pk in _MOOD_PROFILES:
+    for _pre, _city in (("glasgow_", "glasgow"), ("london_", "london"), ("melbourne_", "melbourne")):
+        if _pk.startswith(_pre):
+            _PROFILE_ORIGIN[_pk] = {"city": _city}
+
+
+def _origin_match(entry, spec):
+    """True if the track's artist matches the origin spec, by MusicBrainz place hierarchy first
+    (union of begin-area + area chains) then a Last.fm scene-tag fallback (catches artists whose
+    MB origin is a birthplace, not their scene). spec keys: city / region / country / country_code."""
+    o = entry.get("artist_origin") or {}
+    places = set(o.get("places") or [])
+    if spec.get("city") and spec["city"] in places:
+        return True
+    if spec.get("region") and spec["region"] in places:
+        return True
+    if spec.get("country"):
+        want = {spec["country"]} if isinstance(spec["country"], str) else set(spec["country"])
+        if want & places:
+            return True
+    if spec.get("country_code") and (o.get("country_code") or "").upper() == spec["country_code"].upper():
+        return True
+    # Last.fm scene-tag fallback (e.g. an artist tagged "melbourne"/"glasgow")
+    target = spec.get("city") or spec.get("region")
+    if target:
+        lf = list((entry.get("lastfm_artist_tags") or {})) + list((entry.get("lastfm_track_tags") or {}))
+        if any(target in t for t in lf):
+            return True
+    return False
+
+
+def _origin_boost(entry, profile_key):
+    """Strongly favour local artists in a city/region mix; gently push out confirmed non-local
+    ones. Tracks with no origin data yet are neutral (no-op), so it switches on as the geo syncs."""
+    spec = _PROFILE_ORIGIN.get(profile_key)
+    if not spec:
+        return 0.0
+    if _origin_match(entry, spec):
+        return -_ORIGIN_WEIGHT
+    # known origin but not a match -> mild penalty; unknown origin -> neutral
+    return _ORIGIN_PENALTY if entry.get("artist_origin") else 0.0
+
+
+# ---------------------------------------------------------------------------
 # Mood Mix Context Helpers — time-of-day and weather
 # ---------------------------------------------------------------------------
 
@@ -7259,6 +7311,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _moodtheme_boost(entry, profile_key)
             + _moodclass_boost(entry, profile_key)
             + _lastfm_tag_boost(entry, profile_key)
+            + _origin_boost(entry, profile_key)
         )
 
     history_rks = sorted(

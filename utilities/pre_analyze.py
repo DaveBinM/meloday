@@ -93,7 +93,7 @@ def load_essentia_cache_exclusive():
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
-            "lastfm_artist_tags, lastfm_track_tags "
+            "lastfm_artist_tags, lastfm_track_tags, artist_origin "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -105,7 +105,7 @@ def load_essentia_cache_exclusive():
                 arousal, valence, vocal_presence, \
                 mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
                 mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
-                lastfm_artist_j, lastfm_track_j in rows:
+                lastfm_artist_j, lastfm_track_j, artist_origin_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -130,6 +130,7 @@ def load_essentia_cache_exclusive():
                 "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
                 "lastfm_artist_tags": json.loads(lastfm_artist_j) if lastfm_artist_j else None,
                 "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
+                "artist_origin": json.loads(artist_origin_j) if artist_origin_j else None,
             }
         return result
     except Exception:
@@ -151,9 +152,9 @@ def upsert_essentia_cache_entries(entries):
              arousal, valence, vocal_presence,
              mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
              mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
-             lastfm_artist_tags, lastfm_track_tags)
+             lastfm_artist_tags, lastfm_track_tags, artist_origin)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -171,7 +172,8 @@ def upsert_essentia_cache_entries(entries):
              json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
              d.get("emb_effnet"), d.get("emb_musicnn"),
              json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
-             json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None)
+             json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None,
+             json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None)
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -805,10 +807,121 @@ def sync_lastfm_tags(limit=None):
     log_msg("\n[INFO] Last.fm tag sync complete.")
 
 
+# --- METADATA SYNC: MusicBrainz artist origin (full place hierarchy; per-artist; rate-limited) ---
+_MB_UA = "meloday/1.0 (https://github.com/meloday)"
+_CITY_TYPES = {"City", "District", "Town", "Municipality", "Borough", "Village"}
+
+def _mb_get(path):
+    req = urllib.request.Request("https://musicbrainz.org/ws/2/" + path, headers={"User-Agent": _MB_UA})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                data = json.loads(r.read().decode("utf-8", "ignore"))
+            time.sleep(1.1)   # MusicBrainz asks for <= 1 req/s
+            return data
+        except Exception:
+            time.sleep(2.0 if attempt < 2 else 1.1)
+    return {}
+
+_mb_area_chain = {}   # area_mbid -> [(name, type, codes)] from the part-of parent walk (cached)
+def _resolve_area_chain(mbid):
+    if mbid in _mb_area_chain:
+        return _mb_area_chain[mbid]
+    chain, cur, seen = [], mbid, set()
+    while cur and cur not in seen:
+        seen.add(cur)
+        d = _mb_get(f"area/{cur}?inc=area-rels&fmt=json")
+        if not d:
+            break
+        chain.append((d.get("name"), d.get("type"),
+                      (d.get("iso-3166-1-codes") or []) + (d.get("iso-3166-2-codes") or [])))
+        par = [r for r in d.get("relations", [])
+               if r.get("type") == "part of" and r.get("direction") == "backward"]
+        cur = par[0]["area"]["id"] if par else None
+    _mb_area_chain[mbid] = chain
+    return chain
+
+def _artist_origin(name):
+    """Resolve an artist's full place hierarchy from MusicBrainz — the union of the begin-area and
+    area parent chains (whichever exist), plus the country code. {} if not found."""
+    q = urllib.parse.quote('artist:"%s"' % name.replace('"', ""))
+    a = (_mb_get(f"artist/?query={q}&fmt=json&limit=1").get("artists") or [{}])[0]
+    if not a:
+        return {}
+    begin, area = a.get("begin-area") or {}, a.get("area") or {}
+    cc = a.get("country")
+    places, city, region, country = set(), None, None, None
+    for ar in (begin, area):                       # union both chains (data is inconsistent)
+        if not ar.get("id"):
+            continue
+        for nm, ty, codes in _resolve_area_chain(ar["id"]):
+            if nm:
+                places.add(nm.lower())
+            if ty in _CITY_TYPES and not city:
+                city = nm
+            elif ty == "Subdivision" and not region:
+                region = nm
+            elif ty == "Country":
+                country = nm or country
+    if not (begin.get("id") or area.get("id")) and not cc:
+        return {}
+    return {
+        "begin_area": begin.get("name"), "area": area.get("name"),
+        "city": city, "region": region, "country": country, "country_code": cc,
+        "places": sorted(places), "mbid": a.get("id"),
+    }
+
+def sync_artist_origin(limit=None):
+    """Fetch each artist's MusicBrainz origin (cached per artist) and write artist_origin to all
+    their cached tracks via targeted UPDATE. Resumable; area chains cached per area MBID."""
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
+    music = plex.library.section(MUSIC_LIBRARY)
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
+    done   = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache WHERE artist_origin IS NOT NULL")}
+    log_msg("Fetching tracks from Plex...")
+    tracks = music.search(libtype='track', container_size=5000)
+    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    if limit:
+        todo = todo[:int(limit)]
+    verbose = bool(limit) and int(limit) <= 25
+    log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} tracks to do ({len(done)} already done).")
+    origin_cache, pending, start = {}, [], time.time()
+    for i, t in enumerate(todo):
+        artist = getattr(t, "grandparentTitle", "") or ""
+        if artist and artist not in origin_cache:
+            origin_cache[artist] = _artist_origin(artist)
+        o = origin_cache.get(artist) or {}
+        pending.append((json.dumps(o) if o else None, str(t.ratingKey)))
+        if len(pending) >= 25 or i == len(todo) - 1:
+            conn.executemany("UPDATE essentia_cache SET artist_origin=? WHERE rating_key=?", pending)
+            conn.commit()
+            pending = []
+        if verbose and artist in origin_cache:
+            log_msg(f"   {artist[:22]:22} -> city={o.get('city')} region={o.get('region')} "
+                    f"country={o.get('country')} places={o.get('places')}")
+        else:
+            avg = (time.time() - start) / max(1, i + 1)
+            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
+            log_msg(f"MB: [{i + 1}/{len(todo)}] {len(origin_cache)} artists | ETA {eta} ", end='\r')
+    conn.close()
+    log_msg("\n[INFO] MusicBrainz origin sync complete.")
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
-    if "--sync-metadata" in sys.argv:
+    if "--sync-geo" in sys.argv:
+        _lim = None
+        if "--limit" in sys.argv:
+            try:
+                _lim = int(sys.argv[sys.argv.index("--limit") + 1])
+            except Exception:
+                _lim = None
+        sync_artist_origin(limit=_lim)
+    elif "--sync-metadata" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:
             try:
