@@ -842,7 +842,76 @@ def _load_lastfm_key():
     except Exception:
         return None
 
+import threading as _threading
+
+class _RateLimiter:
+    """Spaces calls across threads to a max average rate (req/s): each caller reserves the next
+    time-slot under a lock, then sleeps to it — so N workers still respect a strict API limit."""
+    def __init__(self, rate):
+        self._interval = 1.0 / rate
+        self._lock = _threading.Lock()
+        self._next = 0.0
+    def wait(self):
+        with self._lock:
+            now = time.monotonic()
+            slot = self._next if self._next > now else now
+            self._next = slot + self._interval
+        delay = slot - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+
+_LF_RL = None   # Last.fm rate limiter (set during sync_lastfm_tags)
+_MB_RL = None   # MusicBrainz rate limiter (set during sync_artist_origin)
+
+
+def _workers_arg(default):
+    if "--workers" in sys.argv:
+        try:
+            return max(1, int(sys.argv[sys.argv.index("--workers") + 1]))
+        except Exception:
+            pass
+    return default
+
+
+def _run_concurrent(todo, fetch_fn, update_sql, workers, label, verbose=False):
+    """Generic concurrent metadata sync: worker pool calls fetch_fn(item)->(row, disp); a single
+    writer thread (own DB connection) batches `update_sql`. The rate limiter inside the HTTP wrapper
+    (not the worker count) caps the request rate, so this is safe for rate-limited APIs."""
+    import concurrent.futures, queue as _queue
+    q = _queue.Queue(maxsize=4000); STOP = object(); cnt = {"n": 0}; start = time.time()
+
+    def _writer():
+        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
+        batch = []
+        while True:
+            it = q.get()
+            if it is STOP:
+                break
+            row, disp = it; batch.append(row); cnt["n"] += 1
+            if len(batch) >= 100:
+                wc.executemany(update_sql, batch); wc.commit(); batch = []
+            if verbose:
+                log_msg(f"   {disp}")
+            elif cnt["n"] % 200 == 0:
+                rate = cnt["n"] / max(0.1, time.time() - start)
+                eta = timedelta(seconds=int((len(todo) - cnt["n"]) / max(0.1, rate)))
+                log_msg(f"{label}: [{cnt['n']}/{len(todo)}] {rate:.1f}/s | ETA {eta} ", end='\r')
+        if batch:
+            wc.executemany(update_sql, batch); wc.commit()
+        wc.close()
+
+    wt = _threading.Thread(target=_writer, daemon=True); wt.start()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(lambda it: q.put(fetch_fn(it)), todo))
+    finally:
+        q.put(STOP); wt.join()
+    return cnt["n"]
+
+
 def _lf_get(params, key):
+    if _LF_RL:
+        _LF_RL.wait()
     url = "http://ws.audioscrobbler.com/2.0/?" + urllib.parse.urlencode(
         {**params, "api_key": key, "format": "json", "autocorrect": 1})
     for attempt in range(3):
@@ -900,30 +969,26 @@ def sync_lastfm_tags(limit=None):
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
     log_msg(f"[INFO] Last.fm sync: {len(todo)} due of {len(rows)} cached.")
-    pending, start = [], time.time()
-    for i, (rk, artist, title) in enumerate(todo):
+    conn.close()   # setup done; the writer thread uses its own connection
+    global _LF_RL
+    _LF_RL = _RateLimiter(5.0)        # Last.fm: <=5 req/s averaged (limiter spans all workers)
+    workers = _workers_arg(6)
+    log_msg(f"[INFO] fetching with {workers} concurrent workers (capped at 5 req/s).")
+
+    def _fetch(item):
+        rk, artist, title = item
         artist, title = artist or "", title or ""
         at = _lf_artist_tags(artist, key) if artist else {}
         info = (_lf_get({"method": "track.getInfo", "artist": artist, "track": title}, key).get("track")
                 or {}) if (artist and title) else {}
-        tt = _lf_parse(info)
-        listeners = int(info.get("listeners") or 0)
-        pending.append((json.dumps(at), json.dumps(tt), listeners, time.time(), rk))
-        time.sleep(0.2)   # be polite to Last.fm (~5 req/s)
-        if len(pending) >= 50 or i == len(todo) - 1:
-            conn.executemany(
-                "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=?, "
-                "lastfm_listeners=?, lastfm_synced_at=? WHERE rating_key=?", pending)
-            conn.commit()
-            pending = []
-        if verbose:
-            log_msg(f"   {artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}")
-        else:
-            avg = (time.time() - start) / max(1, i + 1)
-            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
-            log_msg(f"Last.fm: [{i + 1}/{len(todo)}] {avg:.2f}s/trk | ETA {eta} ", end='\r')
-    conn.close()
-    log_msg("\n[INFO] Last.fm sync complete.")
+        tt = _lf_parse(info); listeners = int(info.get("listeners") or 0)
+        disp = f"{artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}"
+        return (json.dumps(at), json.dumps(tt), listeners, time.time(), rk), disp
+
+    n = _run_concurrent(todo, _fetch,
+        "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=?, lastfm_listeners=?, "
+        "lastfm_synced_at=? WHERE rating_key=?", workers, "Last.fm", verbose)
+    log_msg(f"\n[INFO] Last.fm sync complete: {n} tracks.")
 
 
 # --- METADATA SYNC: MusicBrainz artist origin (full place hierarchy; per-artist; rate-limited) ---
@@ -931,12 +996,15 @@ _MB_UA = "meloday/1.0 (https://github.com/meloday)"
 _CITY_TYPES = {"City", "District", "Town", "Municipality", "Borough", "Village"}
 
 def _mb_get(path):
+    if _MB_RL:
+        _MB_RL.wait()                 # strict <=1 req/s, spaced across workers
     req = urllib.request.Request("https://musicbrainz.org/ws/2/" + path, headers={"User-Agent": _MB_UA})
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
                 data = json.loads(r.read().decode("utf-8", "ignore"))
-            time.sleep(1.1)   # MusicBrainz asks for <= 1 req/s
+            if not _MB_RL:
+                time.sleep(1.1)       # sequential fallback when no limiter is set
             return data
         except Exception:
             time.sleep(2.0 if attempt < 2 else 1.1)
@@ -1012,26 +1080,52 @@ def sync_artist_origin(limit=None):
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
     log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} due of {len(rows)} cached.")
-    origin_cache, pending, start = {}, [], time.time()
-    for i, (rk, artist) in enumerate(todo):
-        artist = artist or ""
-        if artist and artist not in origin_cache:
-            origin_cache[artist] = _artist_origin(artist)
-        o = origin_cache.get(artist) or {}
-        pending.append((json.dumps(o) if o else None, time.time(), rk))
-        if len(pending) >= 25 or i == len(todo) - 1:
-            conn.executemany("UPDATE essentia_cache SET artist_origin=?, geo_synced_at=? WHERE rating_key=?", pending)
-            conn.commit()
-            pending = []
-        if verbose and artist in origin_cache:
-            log_msg(f"   {artist[:22]:22} -> city={o.get('city')} region={o.get('region')} "
-                    f"country={o.get('country')} places={o.get('places')}")
-        else:
-            avg = (time.time() - start) / max(1, i + 1)
-            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
-            log_msg(f"MB: [{i + 1}/{len(todo)}] {len(origin_cache)} artists | ETA {eta} ", end='\r')
-    conn.close()
-    log_msg("\n[INFO] MusicBrainz origin sync complete.")
+    conn.close()   # setup done; the writer thread uses its own connection
+    global _MB_RL
+    _MB_RL = _RateLimiter(0.95)       # MusicBrainz: strict <=1 req/s — small margin to avoid 503s
+    workers = _workers_arg(3)
+    import concurrent.futures, queue as _queue
+    from collections import defaultdict
+    artist_tracks = defaultdict(list)
+    for rk, art in todo:
+        artist_tracks[art or ""].append(rk)
+    artists = [a for a in artist_tracks if a]
+    log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s).")
+    q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time()
+    now2 = time.time()
+
+    def _writer():
+        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
+        batch = []
+        while True:
+            it = q.get()
+            if it is STOP:
+                break
+            artist, origin = it
+            oj = json.dumps(origin) if origin else None
+            for rk in artist_tracks[artist]:
+                batch.append((oj, now2, rk)); cnt["t"] += 1
+            cnt["a"] += 1
+            if len(batch) >= 300:
+                wc.executemany("UPDATE essentia_cache SET artist_origin=?, geo_synced_at=? WHERE rating_key=?", batch); wc.commit(); batch = []
+            if verbose:
+                log_msg(f"   {artist[:22]:22} -> city={(origin or {}).get('city')} "
+                        f"region={(origin or {}).get('region')} country={(origin or {}).get('country')}")
+            elif cnt["a"] % 50 == 0:
+                rate = cnt["a"] / max(0.1, time.time() - start)
+                eta = timedelta(seconds=int((len(artists) - cnt["a"]) / max(0.1, rate)))
+                log_msg(f"MB: [{cnt['a']}/{len(artists)} artists] {rate:.2f}/s | ETA {eta} ", end='\r')
+        if batch:
+            wc.executemany("UPDATE essentia_cache SET artist_origin=?, geo_synced_at=? WHERE rating_key=?", batch); wc.commit()
+        wc.close()
+
+    wt = _threading.Thread(target=_writer, daemon=True); wt.start()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(lambda a: q.put((a, _artist_origin(a))), artists))
+    finally:
+        q.put(STOP); wt.join()
+    log_msg(f"\n[INFO] MusicBrainz origin sync complete: {cnt['a']} artists, {cnt['t']} tracks.")
 
 
 # --- METADATA SYNC: lyrics (LRCLIB; sentiment + theme keywords + language) ---
