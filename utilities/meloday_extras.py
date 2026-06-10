@@ -3700,6 +3700,73 @@ def _moodclass_boost(entry, profile_key):
     return -_MOODCLASS_WEIGHT * (total / n) if n else 0.0
 
 
+# --- Broaden the two universal Essentia signals to EVERY profile, derived from its own intent
+# (Plex mood signals + centroid). Hand-mapped entries above are preserved as overrides, so this
+# only fills the gaps. Also lifts Last.fm coverage, since _lastfm_tag_boost reuses _PROFILE_MOODTHEME.
+_MOOD_TO_THEME = {   # Plex mood signal -> mtg_jamendo moodtheme tags
+    "lively": ["energetic"], "energetic": ["energetic"], "rousing": ["energetic", "powerful"],
+    "exuberant": ["energetic", "fun", "happy"], "driving": ["energetic", "powerful"],
+    "brash": ["energetic", "powerful"], "euphoric": ["uplifting", "energetic"],
+    "playful": ["fun", "happy"], "fun": ["fun"], "carefree": ["fun", "happy"],
+    "cheerful": ["happy", "fun"], "joyous": ["happy", "uplifting"], "bright": ["happy", "positive"],
+    "sunny": ["happy", "summer"], "optimistic": ["hopeful", "positive", "uplifting"],
+    "hopeful": ["hopeful", "uplifting"], "celebratory": ["party", "happy"],
+    "confident": ["powerful", "cool"], "swaggering": ["cool", "powerful"], "powerful": ["powerful"],
+    "intense": ["powerful", "dramatic"], "dramatic": ["dramatic", "epic"],
+    "aggressive": ["heavy", "powerful", "dark"], "rebellious": ["powerful", "heavy"],
+    "gritty": ["dark", "powerful"], "warm": ["positive", "soft"], "stylish": ["cool"],
+    "sophisticated": ["cool"], "elegant": ["cool", "soft"], "smooth": ["cool", "relaxing"],
+    "laid-back": ["relaxing", "calm", "cool"], "mellow": ["relaxing", "calm"],
+    "calm": ["calm", "relaxing"], "relaxed": ["relaxing", "calm"],
+    "soothing": ["calm", "relaxing", "soft"], "peaceful": ["calm", "meditative"],
+    "gentle": ["soft", "calm"], "spiritual": ["meditative", "uplifting"],
+    "atmospheric": ["soundscape", "dream"], "ethereal": ["dream", "soundscape", "soft"],
+    "dreamy": ["dream", "soft"], "hypnotic": ["dream", "deep"], "nocturnal": ["dark", "calm"],
+    "dark": ["dark"], "brooding": ["dark", "melancholic"], "nervous": ["dark", "dramatic"],
+    "tender": ["soft", "emotional"], "intimate": ["love", "soft", "sexy"], "sensual": ["sexy", "love"],
+    "romantic": ["love", "romantic"], "passionate": ["emotional", "powerful", "love"],
+    "wistful": ["melancholic", "emotional"], "melancholy": ["melancholic", "sad"],
+    "poignant": ["emotional", "melancholic"], "bittersweet": ["melancholic", "emotional"],
+    "yearning": ["emotional", "melancholic"], "reflective": ["melancholic", "meditative", "emotional"],
+    "introspective": ["melancholic", "meditative", "emotional"], "earnest": ["emotional"],
+    "nostalgic": ["retro", "melancholic"], "earthy": ["calm", "nature"],
+}
+
+
+def _derive_essentia_signals():
+    """Fill moodtheme + mood-class leans for every profile that wasn't hand-mapped, from its own
+    intent: moodtheme from its Plex mood signals (via _MOOD_TO_THEME), mood classes from its
+    centroid (the calibrated valence/arousal/danceability axes)."""
+    for k in _MOOD_PROFILES:
+        if k not in _PROFILE_MOODTHEME:
+            tags = []
+            for m in _PROFILE_MOOD_SIGNALS.get(k, ([], []))[0]:
+                for t in _MOOD_TO_THEME.get(m.lower(), []):
+                    if t not in tags:
+                        tags.append(t)
+            if tags:
+                _PROFILE_MOODTHEME[k] = tags[:4]
+        if k not in _PROFILE_MOODCLASS:
+            c = _MOOD_PROFILES[k]
+            v, a, d = c.get("valence", 0.55), c.get("arousal", 0.5), c.get("danceability", 0.45)
+            spec = {}
+            if v >= 0.66:
+                spec["mood_happy"] = 1
+            elif v <= 0.50:
+                spec["mood_sad"] = 1
+            if a >= 0.58 and v <= 0.58:
+                spec["mood_aggressive"] = 1
+            elif a <= 0.42:
+                spec["mood_relaxed"] = 1
+            if d >= 0.50 and a >= 0.52:
+                spec["mood_party"] = 1
+            if spec:
+                _PROFILE_MOODCLASS[k] = spec
+
+
+_derive_essentia_signals()
+
+
 _LASTFM_WEIGHT = 0.30   # pull toward tracks whose Last.fm community tags match the mix's theme
 
 # Last.fm-specific tag words — the occasion/activity/era folksonomy the 56 model tags miss
@@ -3800,13 +3867,19 @@ _POP_WEIGHT = 0.20
 # Profile -> lean: +1 wants well-known/hits, -1 wants deep cuts/obscure. Most mixes are neutral
 # (no entry). The decade mixes lean to the hits people remember; focus/underground mixes dig deep.
 _PROFILE_POPULARITY = {
+    # hits — the recognisable, well-known songs (decades, throwbacks, parties, sing-alongs, motivation)
     "decade_60s": 1, "decade_70s": 1, "decade_80s": 1, "decade_90s": 1, "decade_00s": 1,
     "decade_10s": 1, "decade_20s": 1,
-    "throwback_anthems": 1, "party": 1, "celebration": 1, "friday_night": 1, "pre_party": 1,
-    "singalong": 1, "happy": 1, "main_character": 1, "confidence_boost": 1, "party_throwback": 1,
-    "road_trip": 1, "driving_singalong": 1, "euphoric": 1,
+    "throwback_anthems": 1, "party_throwback": 1, "memory_lane": 1, "school_days": 1, "old_friends": 1,
+    "party": 1, "celebration": 1, "friday_night": 1, "friday_feeling": 1, "pre_party": 1, "singalong": 1,
+    "happy": 1, "euphoric": 1, "main_character": 1, "confidence_boost": 1, "monday_motivation": 1,
+    "road_trip": 1, "driving_singalong": 1, "driving_mix": 1, "summer_heat": 1, "cookout": 1,
+    "workout": 1, "running": 1, "housework_hustle": 1, "wedding_day": 1,
+    # deep cuts — discovery / focus / ambient / underground, where obscurity is a feature
     "deep_work": -1, "focus": -1, "study_session": -1, "deep_reading": -1, "creative_flow": -1,
-    "ambient_drift": -1, "meditation": -1, "glasgow_underground": -1, "melbourne_techno": -1,
+    "ambient_drift": -1, "meditation": -1, "spa_bath": -1, "yoga_stretch": -1, "power_nap": -1,
+    "sleep": -1, "lofi_beats": -1, "vaporwave": -1, "downtempo": -1, "post_rock": -1, "starlit": -1,
+    "three_am": -1, "witching_hour": -1, "glasgow_underground": -1, "melbourne_techno": -1,
 }
 
 
@@ -3852,6 +3925,12 @@ _PROFILE_LYRIC_THEMES = {
     "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "celebration": ["party"],
     "heartbreak": ["heartbreak"], "grief_release": ["heartbreak"], "melancholy": ["heartbreak"],
     "rainy_day": ["rain"], "stormy": ["rain"],
+    # romance / date — songs whose lyrics are actually about love
+    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"], "date_night": ["love"],
+    "late_night_romance": ["love"], "romantic_dinner": ["love"], "slow_dance": ["love"], "first_date": ["love"],
+    "crush": ["love"], "loved_up": ["love"], "flirty": ["love"], "devotion": ["love"], "tender": ["love"],
+    "slow_burn": ["love"], "wedding_day": ["love"], "romantic_jazz": ["love"], "strings_romance": ["love"],
+    "piano_romance": ["love"], "acoustic_romance": ["love"], "indie_romance": ["love"], "synthpop_romance": ["love"],
 }
 # Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
 _PROFILE_LYRIC_VALENCE = {

@@ -1057,6 +1057,9 @@ _LYRIC_THEMES = {
     "road": ["highway", "on the road", "road trip", "driving down", "behind the wheel", "miles away", "open road"],
     "party": ["dance floor", "party all", "hands up", "let's dance", "all night long", "turn it up"],
     "rain": ["raining", "the rain", "thunder", "storm"],
+    # romance — distinctive love-song phrasing (>=2 hits), not the incidental "love" that's everywhere
+    "love": ["i love you", "fall in love", "in love with", "be mine", "be my", "hold me", "kiss me",
+             "my baby", "my love", "i need you", "i want you", "make love", "valentine", "all of me"],
 }
 
 def _lrclib_search(artist, title):
