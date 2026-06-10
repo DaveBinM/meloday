@@ -3336,8 +3336,10 @@ _STYLE_DEFINED_PROFILES = {
     "winter_cosy",
     "winter_nights",
     "winter_jazz",
-    # mood mixes where genre purity IS the right vibe (ambient/acoustic/sophisticated)
-    "meditation", "spa_bath", "yoga_stretch", "power_nap", "study_session", "deep_reading",
+    # genre-character mood mixes. The instrumental ones (meditation/spa/yoga/power_nap/study/
+    # deep_reading) were relaxed once TF vocal_presence landed — they now lean instrumental via a
+    # heavier per-profile vocal weight (_INSTRUMENTAL_VOCAL) + soft _PROFILE_STYLE_SIGNALS, for
+    # more cross-genre variety. campfire/dinner_party stay gated (vocal genres, not instrumental).
     "campfire", "dinner_party",
     "funk_disco",
     "neo_soul",
@@ -4039,6 +4041,59 @@ _AROUSAL_WEIGHT = 2.0
 _VOCAL_WEIGHT   = 1.0   # instrumental↔vocal axis (TF value, or genre/style proxy as fallback)
 
 
+# --- Target calibration --------------------------------------------------------------------
+# The DEAM TF **arousal** clusters tightly mid-scale (μ0.50 σ0.10, ~0.31–0.66), so hand-set
+# targets that assumed a full 0–1 spread were off-scale and the arousal axis stopped
+# discriminating (every high-energy mix targeted 0.85, unreachable). Z-score-remap arousal onto
+# the real distribution — preserving each profile's relative ordering but fitting the reachable
+# range. Only arousal is remapped: valence already matches the real spread (rescaling it just
+# shifts targets away from where mood-boosted selections land), and vocal_presence is bimodal
+# (a z-score overshoots into extremes a blended mix can't reach — handled via _VOCAL_WEIGHT
+# instead). Stored targets stay readable as "intent"; this runs once at import.
+_REAL_DIST = {   # feature: (mean, sd, clamp_lo≈p1, clamp_hi≈p99), measured from the live cache
+    "arousal": (0.50, 0.10, 0.28, 0.70),
+}
+_CALIB = {}   # feature -> (intended_mean, intended_sd, real_mean, real_sd, lo, hi)
+
+
+def _calibrate_value(feature, v):
+    """Map an intended-scale value (a hand-set target or a proxy estimate) onto the real cache
+    distribution, so targets, real TF values and proxy fallbacks all share one scale."""
+    c = _CALIB.get(feature)
+    if c is None or v is None:
+        return v
+    imu, isd, rmu, rsd, lo, hi = c
+    return min(hi, max(lo, rmu + (v - imu) * (rsd / isd)))
+
+
+def _calibrate_targets():
+    """Rescale every profile's valence/arousal/vocal_presence target onto the real distribution
+    (runs once at import). Records the per-feature transform in _CALIB so the proxies match."""
+    for feature, (rmu, rsd, lo, hi) in _REAL_DIST.items():
+        vals = [p[feature] for p in _MOOD_PROFILES.values() if p.get(feature) is not None]
+        if not vals:
+            continue
+        imu = sum(vals) / len(vals)
+        isd = (sum((v - imu) ** 2 for v in vals) / len(vals)) ** 0.5 or 1.0
+        _CALIB[feature] = (imu, isd, rmu, rsd, lo, hi)
+        for p in _MOOD_PROFILES.values():
+            if p.get(feature) is not None:
+                p[feature] = _calibrate_value(feature, p[feature])
+
+
+_calibrate_targets()
+
+# Instrumental-intent profiles weight the (now real) vocal axis more heavily, so they lean
+# instrumental on the data instead of a hard genre gate — relaxing them to any low-vocal track
+# (more variety) while still staying mostly instrumental. Per-profile so the other ~225 mixes,
+# which read vocal at the normal _VOCAL_WEIGHT, are untouched.
+_INSTRUMENTAL_VOCAL = {"meditation", "spa_bath", "yoga_stretch", "power_nap", "study_session",
+                       "deep_reading", "focus", "deep_work", "sleep"}
+for _k in _INSTRUMENTAL_VOCAL:
+    if _k in _MOOD_PROFILES:
+        _MOOD_PROFILES[_k]["vocal_weight"] = 3.0
+
+
 def _entry_affect_proxy(entry):
     """(valence, arousal) estimated from an entry's mood tags, or (None, None) when none
     match. _MOOD_AFFECT covers the full Plex mood vocabulary exactly, so a plain lookup
@@ -4052,7 +4107,8 @@ def _entry_affect_proxy(entry):
         if va is not None:
             vs.append(va[0])
             as_.append(va[1])
-    result = (sum(vs) / len(vs), sum(as_) / len(as_)) if vs else (None, None)
+    result = ((_calibrate_value("valence", sum(vs) / len(vs)),
+               _calibrate_value("arousal", sum(as_) / len(as_))) if vs else (None, None))
     try:
         entry["_affect_proxy"] = result
     except (TypeError, AttributeError):
@@ -4087,6 +4143,7 @@ def _entry_vocal_proxy(entry):
         result = 0.18
     else:
         result = 0.60
+    result = _calibrate_value("vocal_presence", result)
     try:
         entry["_vocal_proxy"] = result
     except (TypeError, AttributeError):
@@ -4146,7 +4203,7 @@ def _acoustic_distance_to_centroid(entry, centroid):
         if ev is None:
             ev = _entry_vocal_proxy(entry)
         if ev is not None:
-            _add((ev - centroid["vocal_presence"]) ** 2, _VOCAL_WEIGHT)
+            _add((ev - centroid["vocal_presence"]) ** 2, centroid.get("vocal_weight", _VOCAL_WEIGHT))
     if den == 0:
         return 0.5
     return min(math.sqrt(num / den), 1.0)
@@ -6745,10 +6802,11 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
 
 
 # Two mood mixes whose (valence-weighted) centroids are closer than this select overly
-# similar tracks — don't surface them at the same time. Tuned against the live cache so
-# near-duplicate pairs (happy/sunny, workout/running, chill/lazy_sunday, focus/sleep) are
-# caught while genuinely-distinct pairs (rainy_day/cosy) are not.
-_SIM_GUARD_DISTANCE = 0.12
+# similar tracks — don't surface them at the same time. Re-tuned against the now-calibrated
+# centroids (real TF valence/arousal/vocal): tightened to catch only true near-duplicate
+# profiles — the city/genre twins (uk_garage≈london_garage, melbourne_techno≈glasgow_underground
+# at ~0.00) — while keeping a full ~12/13-category slate. Above this, sonic adjacency is fine.
+_SIM_GUARD_DISTANCE = 0.06
 
 
 def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
@@ -6774,12 +6832,11 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
         if len(selected) >= n_active:
             break
         cat = _PROFILE_CATEGORY.get(key, "other")
-        # Category cap is hard. The similarity guard only blocks a *second* pick from an
-        # already-represented category — it must never stop a new category (vibe) from being
-        # shown, since category is the primary diversity axis (centroids are coarse while
-        # valence/arousal are unpopulated, and same-category near-dupes are capped anyway).
-        if cat_count[cat] >= max_per_category or (
-            cat_count[cat] > 0 and key in _MOOD_PROFILES and _too_similar(key)):
+        # Category cap is hard. With calibrated centroids the similarity guard is trustworthy
+        # again, so it blocks a near-duplicate twin even across categories (at the tight
+        # _SIM_GUARD_DISTANCE this only catches genuine twins and still fills ~12/13 categories;
+        # deferred picks backfill the rest).
+        if cat_count[cat] >= max_per_category or (key in _MOOD_PROFILES and _too_similar(key)):
             deferred.append(key)
             continue
         selected.append(key)
