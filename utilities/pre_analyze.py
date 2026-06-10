@@ -1057,9 +1057,16 @@ _LYRIC_THEMES = {
     "road": ["highway", "on the road", "road trip", "driving down", "behind the wheel", "miles away", "open road"],
     "party": ["dance floor", "party all", "hands up", "let's dance", "all night long", "turn it up"],
     "rain": ["raining", "the rain", "thunder", "storm"],
-    # romance — distinctive love-song phrasing (>=2 hits), not the incidental "love" that's everywhere
-    "love": ["i love you", "fall in love", "in love with", "be mine", "be my", "hold me", "kiss me",
-             "my baby", "my love", "i need you", "i want you", "make love", "valentine", "all of me"],
+    # love, split into sub-feelings so romance mixes don't collapse to one theme (>=2 hits each)
+    "love": ["i love you", "fall in love", "in love with", "my love", "be mine", "all of me", "my baby"],
+    "devotion": ["forever", "marry me", "i do", "grow old", "by your side", "spend my life",
+                 "promise you", "always be there", "till the end", "for the rest of"],
+    "desire": ["all night long", "hold you close", "your body", "make love", "your touch",
+               "your lips", "on your skin", "in the dark", "i need your body", "take you home"],
+    "new_love": ["butterflies", "can't stop thinking", "head over heels", "falling for you",
+                 "first time i saw", "got a crush", "weak in the knees", "nervous"],
+    "longing": ["miss you", "far away", "without you", "come back to me", "wish you were",
+                "miles apart", "long distance", "thinking of you"],
 }
 
 def _lrclib_search(artist, title):

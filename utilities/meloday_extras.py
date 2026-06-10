@@ -3766,6 +3766,22 @@ def _derive_essentia_signals():
 
 _derive_essentia_signals()
 
+# Specific romance/date criteria — these mixes share "love" but feel genuinely different, so each
+# gets its own moodtheme + lyric sub-feeling to stay distinct (their centroids already differ:
+# Flirty is fast/playful, Slow Dance slow/intimate, Wedding joyous, Late Night sultry, Indie wistful).
+_PROFILE_MOODTHEME.update({
+    "romantic_mix": ["love", "romantic", "emotional"], "love_songs": ["love", "romantic"],
+    "modern_romance": ["love", "romantic", "positive"], "date_night": ["love", "cool", "sexy"],
+    "late_night_romance": ["sexy", "love", "dark"], "romantic_dinner": ["love", "cool", "relaxing"],
+    "slow_dance": ["love", "romantic", "soft"], "first_date": ["love", "happy", "hopeful"],
+    "crush": ["happy", "fun", "love"], "loved_up": ["love", "happy", "uplifting"],
+    "flirty": ["sexy", "fun"], "devotion": ["love", "emotional", "soft"],
+    "tender": ["soft", "emotional", "love"], "slow_burn": ["sexy", "emotional", "dark"],
+    "wedding_day": ["love", "happy", "party"], "romantic_jazz": ["love", "cool", "soft"],
+    "piano_romance": ["love", "calm", "soft"], "acoustic_romance": ["love", "soft", "emotional"],
+    "indie_romance": ["love", "melancholic", "dream"], "synthpop_romance": ["love", "retro", "dream"],
+})
+
 
 _LASTFM_WEIGHT = 0.30   # pull toward tracks whose Last.fm community tags match the mix's theme
 
@@ -3925,12 +3941,14 @@ _PROFILE_LYRIC_THEMES = {
     "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "celebration": ["party"],
     "heartbreak": ["heartbreak"], "grief_release": ["heartbreak"], "melancholy": ["heartbreak"],
     "rainy_day": ["rain"], "stormy": ["rain"],
-    # romance / date — songs whose lyrics are actually about love
-    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"], "date_night": ["love"],
-    "late_night_romance": ["love"], "romantic_dinner": ["love"], "slow_dance": ["love"], "first_date": ["love"],
-    "crush": ["love"], "loved_up": ["love"], "flirty": ["love"], "devotion": ["love"], "tender": ["love"],
-    "slow_burn": ["love"], "wedding_day": ["love"], "romantic_jazz": ["love"], "strings_romance": ["love"],
-    "piano_romance": ["love"], "acoustic_romance": ["love"], "indie_romance": ["love"], "synthpop_romance": ["love"],
+    # romance / date — split into love sub-feelings so each mix is distinct (not all "love")
+    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"],
+    "romantic_dinner": ["love"], "slow_dance": ["love"], "tender": ["love"], "romantic_jazz": ["love"],
+    "acoustic_romance": ["love"], "synthpop_romance": ["love"], "strings_romance": ["love"],
+    "date_night": ["desire"], "late_night_romance": ["desire"], "flirty": ["desire"], "slow_burn": ["desire"],
+    "crush": ["new_love"], "first_date": ["new_love"],
+    "wedding_day": ["devotion"], "loved_up": ["devotion"], "devotion": ["devotion"],
+    "indie_romance": ["longing"], "long_distance": ["longing"],
 }
 # Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
 _PROFILE_LYRIC_VALENCE = {
