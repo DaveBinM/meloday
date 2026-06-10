@@ -19,6 +19,7 @@ from meloday import (
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED,
+    _mood_models, _moodtheme_model, _genre_model,
 )
 
 # --- LOGGING SETUP ---
@@ -664,15 +665,26 @@ def bulk_analyze():
     # Single-threaded but memory-safe. Saves every 200 tracks so it is fully interruptible:
     # Ctrl+C to pause, re-run pre_analyze.py to resume from where it left off.
     if _TF_MODELS_LOADED:
+        # A track needs the post-pass if it's missing the base TF features OR (when the
+        # high-level heads are present) the mood/theme/genre fields. Mirrors needs_tf in
+        # _fill_missing_acoustic so the existing library backfills the new columns.
+        def _row_needs_tf(data):
+            return (any(data.get(f) is None for f in ("arousal", "valence", "vocal_presence"))
+                    or (bool(_mood_models) and data.get("mood_happy") is None)
+                    or (_moodtheme_model is not None and data.get("moodtheme") is None)
+                    or (_genre_model is not None and data.get("genre_discogs") is None))
         tf_todo = [
             (rk, data["file_path"])
             for rk, data in _essentia_cache.items()
             if data.get("energy") is not None
             and data.get("file_path")
-            and any(data.get(f) is None for f in ("arousal", "valence", "vocal_presence"))
+            and _row_needs_tf(data)
         ]
         if tf_todo:
-            log_msg(f"\n[INFO] TF post-pass: {len(tf_todo)} tracks need arousal/valence/vocal_presence.")
+            log_msg(f"\n[INFO] TF post-pass: {len(tf_todo)} tracks need TF features "
+                    f"(high-level heads loaded: {len(_mood_models)} mood/danceability"
+                    f"{', moodtheme' if _moodtheme_model is not None else ''}"
+                    f"{', genre400' if _genre_model is not None else ''}).")
             log_msg(f"[INFO] Running single-threaded in main process. Ctrl+C pauses; re-run to resume.")
             tf_pending = {}
             tf_start = time.time()
