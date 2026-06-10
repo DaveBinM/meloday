@@ -7385,6 +7385,25 @@ def _rotation_slot(hour):
     return (hour % 24) * MOOD_MIX_ROTATIONS_PER_DAY // 24
 
 
+def _external_used_rks(existing_playlists, building_names):
+    """Rating keys already used by EXISTING dedup-eligible Meloday+ mixes built by OTHER cron runs,
+    so the no-repeat invariant holds across runs (a track in the Morning mix won't be reused by a
+    mood mix built this run, and vice versa). EXEMPT: decade/era mixes (category 'era') and the
+    separate stats/discovery playlists (On Repeat, Top Songs, …) which aren't in _MOOD_MIX_NAMES.
+    Mixes being rebuilt/removed this run (`building_names`) are skipped — their tracks are transient."""
+    used = set()
+    nk = {v: k for k, v in _MOOD_MIX_NAMES.items()}
+    for name, pl in (existing_playlists or {}).items():
+        key = nk.get(name)
+        if key is None or _PROFILE_CATEGORY.get(key) == "era" or name in building_names:
+            continue
+        try:
+            used.update(str(t.ratingKey) for t in pl.items())
+        except Exception:
+            pass
+    return used
+
+
 def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                      n_active=5, mix_size=50, reselect=False, time_context=False,
                      weather_context=False, existing_playlists=None):
@@ -7457,11 +7476,14 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         xlog(f"[INFO] mood_mixes (time): hour={current_hour} "
              f"add={sorted(to_add)} remove={sorted(to_remove)}")
 
+        building = {_MOOD_MIX_NAMES[k] for k in (to_add | to_remove)}
+        seen_rks = set(recent_rks) | _external_used_rks(existing, building)   # cross-run dedup
         mixes = []
-        for profile_key in to_add:
+        for profile_key in sorted(to_add):
             tracks = _build_mix_tracks(
                 profile_key, essentia_cache, history_entries,
-                excluded_album_keys, mix_size, plex, exclude_rks=recent_rks)
+                excluded_album_keys, mix_size, plex, hard_exclude_rks=seen_rks)
+            seen_rks.update(str(t.ratingKey) for t in tracks)
             mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
         return mixes, list(to_remove)
@@ -7478,11 +7500,14 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         to_add, to_remove = active - current, current - active
         cond = weather["condition"] if weather else "n/a"
         xlog(f"[INFO] mood_mixes (weather): {cond} → add={sorted(to_add)} remove={sorted(to_remove)}")
+        building = {_MOOD_MIX_NAMES[k] for k in (to_add | to_remove)}
+        seen_rks = set(recent_rks) | _external_used_rks(existing, building)   # cross-run dedup
         mixes = []
-        for profile_key in to_add:
+        for profile_key in sorted(to_add):
             tracks = _build_mix_tracks(
                 profile_key, essentia_cache, history_entries,
-                excluded_album_keys, mix_size, plex, exclude_rks=recent_rks)
+                excluded_album_keys, mix_size, plex, hard_exclude_rks=seen_rks)
+            seen_rks.update(str(t.ratingKey) for t in tracks)
             mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
         return mixes, list(to_remove)
 
@@ -7576,35 +7601,43 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         [k for k in inactive_weather  if _MOOD_MIX_NAMES[k] in existing] +
         [k for k in inactive_seasonal if _MOOD_MIX_NAMES[k] in existing]
     )
+    # general mixes that rotated out of this slot's selection are also removed (computed up-front so
+    # `building` below knows everything this run will delete — their tracks must not block new mixes)
+    to_remove += [k for name, k in name_to_key.items()
+                  if k in _GENERAL_PROFILES and k not in active_general and name in existing]
 
     active_profiles = active_general + active_weather + active_seasonal
     xlog(f"[INFO] mood_mixes: active = general{active_general} "
          f"+ weather{active_weather} + seasonal{active_seasonal}")
 
+    # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g.
+    # the time-of-day mixes), but NOT the mixes we rebuild/remove now, decades, or the stats lists.
+    building = ({_MOOD_MIX_NAMES[k] for k in active_profiles}
+                | {_MOOD_MIX_NAMES[k] for k in to_remove})
+    seen_rks = set(recent_rks) | _external_used_rks(existing, building)
     mixes = []
-    seen_rks = set(recent_rks)           # recently-played + cross-mix dedupe accumulator
     for profile_key in active_profiles:
+        is_era = _PROFILE_CATEGORY.get(profile_key) == "era"   # decade mixes are EXEMPT from cross-mix dedup
         tracks = _build_mix_tracks(
             profile_key, essentia_cache, history_entries,
-            excluded_album_keys, mix_size, plex, exclude_rks=seen_rks)
-        seen_rks.update(str(t.ratingKey) for t in tracks)   # no song repeats across the slate
+            excluded_album_keys, mix_size, plex,
+            hard_exclude_rks=(recent_rks if is_era else seen_rks))
+        if not is_era:
+            seen_rks.update(str(t.ratingKey) for t in tracks)   # no repeats across dedup-eligible mixes
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
-
-    # Remove general mixes that rotated out of this slot's selection
-    for name, key in name_to_key.items():
-        if key in _GENERAL_PROFILES and key not in active_general and name in existing:
-            to_remove.append(key)
 
     return mixes, to_remove
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
-                      excluded_album_keys, mix_size, plex, exclude_rks=None):
-    """Build the 50-track list for a single mood mix profile.
+                      excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
+    """Build the mix_size-track list for a single mix profile.
 
-    `exclude_rks` is an optional set of rating keys to leave out for variety — tracks played
-    in the last few days plus tracks already used by other mixes in this run — applied only
-    while enough tracks remain that the mix still fills (otherwise filling wins over variety).
+    `hard_exclude_rks` (tracks played in the last N days + tracks already used by other
+    dedup-eligible mixes this run / cross-run) is excluded UNCONDITIONALLY and never re-admitted.
+    Length is reached instead by a wide candidate pool and by relaxing only the in-mix artist cap
+    (prefer 1 per artist -> 2 -> 3 -> unlimited). A hard-gated genre mix whose eligible pool is
+    genuinely too small returns short rather than re-using excluded tracks or breaking its genre.
     """
     target       = _MOOD_PROFILES[profile_key]
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
@@ -7651,61 +7684,55 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks = _h or history_rks
         library_rks = _l or library_rks
 
-    # Variety: drop recently-played + already-used-this-run tracks, but only while enough
-    # remain that the mix still fills (so a thin genre pool isn't starved).
-    if exclude_rks:
-        fh = [rk for rk in history_rks if rk not in exclude_rks]
-        fl = [rk for rk in library_rks if rk not in exclude_rks]
-        if len(fh) + len(fl) >= mix_size:
-            history_rks, library_rks = fh, fl
+    # HARD exclusion — recently-played + tracks used by other dedup-eligible mixes. UNconditional:
+    # never re-admitted to reach length (we widen the pool / relax the artist cap instead).
+    if hard_exclude_rks:
+        history_rks = [rk for rk in history_rks if rk not in hard_exclude_rks]
+        library_rks = [rk for rk in library_rks if rk not in hard_exclude_rks]
 
     n_history = min(int(mix_size * 0.40), len(history_rks))
-    n_library  = mix_size - n_history
+    n_library = mix_size - n_history
+    # Wide-but-bounded candidate pool (8x target) so the artist ladder can prefer distinct artists
+    # while still filling to mix_size; the slice is from the already-hard-filtered, score-sorted rks.
     candidate_rks = list(dict.fromkeys(
-        history_rks[:n_history * 3] + library_rks[:n_library * 3]
+        history_rks[:n_history * 8] + library_rks[:n_library * 8]
     ))
-    track_map    = resolve_tracks_by_keys(plex, candidate_rks)
-    artist_limit = max(2, int(mix_size * ARTIST_RATIO))
-    artist_count = Counter()
-    seen_songs   = set()  # shared across history and library pools
+    track_map  = resolve_tracks_by_keys(plex, candidate_rks)
+    seen_songs   = set()       # shared across history + library (in-mix song dedup)
+    artist_count = Counter()   # shared across history + library (in-mix artist cap)
+    BASE_ARTIST_LIMIT = 1      # <=1 track per artist per mix, relaxed only to reach length
+
+    def _take(rks, want, artist_limit, out):
+        for rk in rks:
+            if len(out) >= want:
+                break
+            t = track_map.get(rk)
+            if not t or is_low_rated(t):
+                continue
+            if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
+                continue
+            sk = _song_key(t)
+            if sk in seen_songs:
+                continue
+            ak = _artist_key(t)
+            if artist_count[ak] >= artist_limit:
+                continue
+            seen_songs.add(sk)
+            artist_count[ak] += 1
+            out.append(t)
+
+    def _fill(out, rks, want):
+        # Prefer 1 per artist; relax the cap (2 -> 3 -> unlimited) only as far as needed to reach
+        # `want`. Hard excludes / album / rating / song-dedup are NEVER relaxed.
+        for lim in (BASE_ARTIST_LIMIT, BASE_ARTIST_LIMIT + 1, BASE_ARTIST_LIMIT + 2, mix_size):
+            if len(out) >= want:
+                break
+            _take(rks, want, lim, out)
 
     history_tracks = []
-    for rk in history_rks:
-        if len(history_tracks) >= n_history:
-            break
-        t = track_map.get(rk)
-        if not t or is_low_rated(t):
-            continue
-        if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
-            continue
-        sk = _song_key(t)
-        if sk in seen_songs:
-            continue
-        ak = _artist_key(t)
-        if artist_count[ak] >= artist_limit:
-            continue
-        seen_songs.add(sk)
-        artist_count[ak] += 1
-        history_tracks.append(t)
-
+    _fill(history_tracks, history_rks, n_history)
     library_tracks = []
-    for rk in library_rks:
-        if len(library_tracks) >= n_library:
-            break
-        t = track_map.get(rk)
-        if not t or is_low_rated(t):
-            continue
-        if str(getattr(t, "parentRatingKey", "")) in excluded_album_keys:
-            continue
-        sk = _song_key(t)
-        if sk in seen_songs:
-            continue
-        ak = _artist_key(t)
-        if artist_count[ak] >= artist_limit:
-            continue
-        seen_songs.add(sk)
-        artist_count[ak] += 1
-        library_tracks.append(t)
+    _fill(library_tracks, library_rks, mix_size - len(history_tracks))   # library covers any history shortfall
 
     combined = history_tracks + library_tracks
     combined.sort(key=lambda t: (
