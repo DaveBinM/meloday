@@ -198,9 +198,16 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
 
                 # Optional high-level heads (downloaded into models_dir separately). Each runs
                 # on the embeddings already extracted above; missing files are skipped.
-                def _ld_head(_base, _out):
+                def _ld_head(_base, _out, _inp=None):
                     _p = os.path.join(_models_dir, _base + ".pb")
-                    return es.TensorflowPredict2D(graphFilename=_p, output=_out) if os.path.isfile(_p) else None
+                    if not os.path.isfile(_p):
+                        return None
+                    try:  # per-head guard so one bad model can't skip the others
+                        if _inp:
+                            return es.TensorflowPredict2D(graphFilename=_p, input=_inp, output=_out)
+                        return es.TensorflowPredict2D(graphFilename=_p, output=_out)
+                    except Exception:
+                        return None
 
                 def _ld_classes(_base):
                     try:
@@ -215,7 +222,8 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
                         _mood_models[_field] = (_h, _emb, _idx)
                 _moodtheme_model   = _ld_head("mtg_jamendo_moodtheme-discogs-effnet-1", "model/Sigmoid")
                 _MOODTHEME_CLASSES = _ld_classes("mtg_jamendo_moodtheme-discogs-effnet-1")
-                _genre_model       = _ld_head("genre_discogs400-discogs-effnet-1", "PartitionedCall:0")
+                _genre_model       = _ld_head("genre_discogs400-discogs-effnet-1", "PartitionedCall:0",
+                                              "serving_default_model_Placeholder")
                 _GENRE400_CLASSES  = _ld_classes("genre_discogs400-discogs-effnet-1")
     except Exception:
         pass
