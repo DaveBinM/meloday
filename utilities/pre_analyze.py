@@ -93,7 +93,7 @@ def load_essentia_cache_exclusive():
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
-            "lastfm_artist_tags, lastfm_track_tags, artist_origin "
+            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -105,7 +105,7 @@ def load_essentia_cache_exclusive():
                 arousal, valence, vocal_presence, \
                 mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
                 mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
-                lastfm_artist_j, lastfm_track_j, artist_origin_j in rows:
+                lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -131,6 +131,7 @@ def load_essentia_cache_exclusive():
                 "lastfm_artist_tags": json.loads(lastfm_artist_j) if lastfm_artist_j else None,
                 "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
                 "artist_origin": json.loads(artist_origin_j) if artist_origin_j else None,
+                "lastfm_listeners": lastfm_listeners,
             }
         return result
     except Exception:
@@ -152,9 +153,9 @@ def upsert_essentia_cache_entries(entries):
              arousal, valence, vocal_presence,
              mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
              mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
-             lastfm_artist_tags, lastfm_track_tags, artist_origin)
+             lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -173,7 +174,8 @@ def upsert_essentia_cache_entries(entries):
              d.get("emb_effnet"), d.get("emb_musicnn"),
              json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
              json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None,
-             json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None)
+             json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None,
+             d.get("lastfm_listeners"))
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -813,7 +815,7 @@ def sync_lastfm_tags(limit=None):
     _ensure_db_schema(conn)
     cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
     done   = {rk for (rk,) in conn.execute(
-        "SELECT rating_key FROM essentia_cache WHERE lastfm_artist_tags IS NOT NULL")}
+        "SELECT rating_key FROM essentia_cache WHERE lastfm_listeners IS NOT NULL")}
     log_msg("Fetching tracks from Plex...")
     tracks = music.search(libtype='track', container_size=5000)
     todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
@@ -826,18 +828,22 @@ def sync_lastfm_tags(limit=None):
         artist = getattr(t, "grandparentTitle", "") or ""
         title  = getattr(t, "title", "") or ""
         at = _lf_artist_tags(artist, key) if artist else {}
-        tt = _lf_parse(_lf_get({"method": "track.gettoptags", "artist": artist, "track": title}, key)) \
-            if (artist and title) else {}
-        pending.append((json.dumps(at), json.dumps(tt), str(t.ratingKey)))
+        # track.getInfo returns the track's top tags AND its global listener count in one call.
+        info = (_lf_get({"method": "track.getInfo", "artist": artist, "track": title}, key).get("track")
+                or {}) if (artist and title) else {}
+        tt = _lf_parse(info)
+        listeners = int(info.get("listeners") or 0)
+        pending.append((json.dumps(at), json.dumps(tt), listeners, str(t.ratingKey)))
         time.sleep(0.2)   # be polite to Last.fm (~5 req/s)
         if len(pending) >= 50 or i == len(todo) - 1:
             conn.executemany(
-                "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=? WHERE rating_key=?",
-                pending)
+                "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=?, "
+                "lastfm_listeners=? WHERE rating_key=?", pending)
             conn.commit()
             pending = []
         if verbose:
-            log_msg(f"   {artist[:18]:18} - {title[:22]:22} | artist:{list(at)[:4]} track:{list(tt)[:4]}")
+            log_msg(f"   {artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} "
+                    f"track:{list(tt)[:3]}")
         else:
             avg = (time.time() - start) / max(1, i + 1)
             eta = timedelta(seconds=int((len(todo) - i - 1) * avg))

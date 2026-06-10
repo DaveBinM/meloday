@@ -3794,6 +3794,36 @@ def _origin_boost(entry, profile_key):
 
 
 # ---------------------------------------------------------------------------
+# Popularity lean (Last.fm global listeners) — hits vs deep cuts
+# ---------------------------------------------------------------------------
+_POP_WEIGHT = 0.20
+# Profile -> lean: +1 wants well-known/hits, -1 wants deep cuts/obscure. Most mixes are neutral
+# (no entry). The decade mixes lean to the hits people remember; focus/underground mixes dig deep.
+_PROFILE_POPULARITY = {
+    "decade_60s": 1, "decade_70s": 1, "decade_80s": 1, "decade_90s": 1, "decade_00s": 1,
+    "decade_10s": 1, "decade_20s": 1,
+    "throwback_anthems": 1, "party": 1, "celebration": 1, "friday_night": 1, "pre_party": 1,
+    "singalong": 1, "happy": 1, "main_character": 1, "confidence_boost": 1, "party_throwback": 1,
+    "road_trip": 1, "driving_singalong": 1, "euphoric": 1,
+    "deep_work": -1, "focus": -1, "study_session": -1, "deep_reading": -1, "creative_flow": -1,
+    "ambient_drift": -1, "meditation": -1, "glasgow_underground": -1, "melbourne_techno": -1,
+}
+
+
+def _popularity_boost(entry, profile_key):
+    """Lean a mix toward well-known tracks (+1) or deep cuts (-1). lastfm_listeners is log-scaled
+    (~10k listeners ~ 0.6, a few million ~ 1.0). No-op for neutral profiles / missing data."""
+    lean = _PROFILE_POPULARITY.get(profile_key)
+    if not lean:
+        return 0.0
+    listeners = entry.get("lastfm_listeners")
+    if not listeners:
+        return 0.0
+    pop = min(1.0, math.log10(listeners + 1) / 6.5)
+    return -_POP_WEIGHT * (pop if lean > 0 else (1.0 - pop))
+
+
+# ---------------------------------------------------------------------------
 # Mood Mix Context Helpers — time-of-day and weather
 # ---------------------------------------------------------------------------
 
@@ -7384,6 +7414,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _moodclass_boost(entry, profile_key)
             + _lastfm_tag_boost(entry, profile_key)
             + _origin_boost(entry, profile_key)
+            + _popularity_boost(entry, profile_key)
         )
 
     history_rks = sorted(
