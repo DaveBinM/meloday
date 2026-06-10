@@ -3824,6 +3824,19 @@ def _popularity_boost(entry, profile_key):
 
 
 # ---------------------------------------------------------------------------
+# Listening-hour affinity — nudge toward tracks you usually play around now
+# ---------------------------------------------------------------------------
+_HOUR_WEIGHT = 0.10
+_HOUR_AFFINITY = {}   # rating_key -> 0..1 share of plays near the current hour (set per build)
+
+
+def _listening_hour_boost(rk):
+    """Small nudge toward tracks the user usually plays around this hour (computed from play
+    history in build_mood_mixes). No-op for tracks with no such history."""
+    return -_HOUR_WEIGHT * _HOUR_AFFINITY.get(rk, 0.0)
+
+
+# ---------------------------------------------------------------------------
 # Mood Mix Context Helpers — time-of-day and weather
 # ---------------------------------------------------------------------------
 
@@ -7231,6 +7244,20 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         recent_rks = {str(e.ratingKey) for e in history_entries
                       if e.viewedAt and e.viewedAt >= _cut}
 
+    # Listening-hour affinity (build-time): the share of each track's plays that fall within
+    # ~2h of the current local hour, so the rotating mixes lean toward what you actually play now.
+    _HOUR_AFFINITY.clear()
+    if history_entries:
+        _now_h = datetime.now().hour
+        _hp = {}
+        for e in history_entries:
+            if e.viewedAt:
+                _hp.setdefault(str(e.ratingKey), []).append(e.viewedAt.astimezone().hour)
+        for _rk, _hours in _hp.items():
+            _near = sum(1 for h in _hours if min((h - _now_h) % 24, (_now_h - h) % 24) <= 2)
+            if _near:
+                _HOUR_AFFINITY[_rk] = _near / len(_hours)
+
     # ------------------------------------------------------------------
     # MODE 1: Time-context — only manage hard time-of-day mixes
     # ------------------------------------------------------------------
@@ -7415,6 +7442,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _lastfm_tag_boost(entry, profile_key)
             + _origin_boost(entry, profile_key)
             + _popularity_boost(entry, profile_key)
+            + _listening_hour_boost(rk)
         )
 
     history_rks = sorted(
