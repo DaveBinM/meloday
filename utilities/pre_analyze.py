@@ -1193,33 +1193,76 @@ def sync_lyrics(limit=None, force=False):
     verbose = bool(limit) and int(limit) <= 25
     log_msg(f"[INFO] Lyrics sync: {len(todo)} due of {len(rows)} cached. "
             f"sentiment={'on' if _vader else 'off'}, lang={'on' if _detect_lang else 'off'}")
-    pending, start = [], time.time()
-    for i, (rk, artist, title) in enumerate(todo):
+    conn.close()   # setup done; the writer thread below uses its own connection
+    # ---- concurrent fetch: the work is just waiting on LRCLIB, so N workers ~= N x faster.
+    # Workers fetch+analyse and queue results; a single writer thread (own conn) batches the UPDATEs.
+    import concurrent.futures, threading, queue as _queue
+    workers = 8
+    if "--workers" in sys.argv:
+        try:
+            workers = max(1, int(sys.argv[sys.argv.index("--workers") + 1]))
+        except Exception:
+            pass
+    log_msg(f"[INFO] fetching with {workers} concurrent workers.")
+    q = _queue.Queue(maxsize=4000)
+    _STOP = object()
+    _nlp_lock = threading.Lock()       # vaderSentiment/langdetect aren't guaranteed thread-safe
+    cnt = {"n": 0, "lyr": 0}
+    start = time.time()
+
+    def _writer():
+        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        wc.execute("PRAGMA journal_mode=WAL")
+        batch = []
+        while True:
+            item = q.get()
+            if item is _STOP:
+                break
+            row, had, disp = item
+            batch.append(row)
+            cnt["n"] += 1
+            cnt["lyr"] += 1 if had else 0
+            if len(batch) >= 100:
+                wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
+                               "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
+                wc.commit(); batch = []
+            if verbose:
+                log_msg(f"   {disp}")
+            elif cnt["n"] % 200 == 0:
+                rate = cnt["n"] / max(0.1, time.time() - start)
+                eta = timedelta(seconds=int((len(todo) - cnt["n"]) / max(0.1, rate)))
+                log_msg(f"Lyrics: [{cnt['n']}/{len(todo)}] {rate:.1f}/s | ETA {eta} ", end='\r')
+        if batch:
+            wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
+                           "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
+            wc.commit()
+        wc.close()
+
+    wt = threading.Thread(target=_writer, daemon=True)
+    wt.start()
+
+    def _fetch(item):
+        rk, artist, title = item
         artist, title = artist or "", title or ""
-        valence, themes, lang = None, [], "none"   # 'none' = no lyrics found (still marks done)
+        valence, themes, lang, had = None, [], "none", False
         d = _lrclib_search(artist, title) if (artist and title) else None
         if d:
             if d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
                 lang = "instrumental"
             else:
-                valence, themes, _lang = _analyze_lyrics(d["plainLyrics"])
-                lang = _lang or "unknown"
-        pending.append((valence, json.dumps(themes), lang, time.time(), rk))
-        time.sleep(0.15)   # be polite to LRCLIB
-        if len(pending) >= 50 or i == len(todo) - 1:
-            conn.executemany(
-                "UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_lang=?, "
-                "lyrics_synced_at=? WHERE rating_key=?", pending)
-            conn.commit()
-            pending = []
-        if verbose:
-            log_msg(f"   {artist[:16]:16} - {title[:20]:20} | valence={valence} themes={themes} lang={lang}")
-        else:
-            avg = (time.time() - start) / max(1, i + 1)
-            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
-            log_msg(f"Lyrics: [{i + 1}/{len(todo)}] {avg:.2f}s/trk | ETA {eta} ", end='\r')
-    conn.close()
-    log_msg("\n[INFO] Lyrics sync complete.")
+                with _nlp_lock:
+                    valence, themes, _lang = _analyze_lyrics(d["plainLyrics"])
+                lang = _lang or "unknown"; had = True
+        disp = f"{artist[:16]:16} - {title[:20]:20} | valence={valence} themes={themes} lang={lang}"
+        q.put(((valence, json.dumps(themes), lang, time.time(), rk), had, disp))
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(_fetch, todo))
+    finally:
+        q.put(_STOP)
+        wt.join()
+    log_msg(f"\n[INFO] Lyrics sync complete: {cnt['n']} processed, {cnt['lyr']} with lyrics.")
 
 
 # --- 4. EXECUTION ---
