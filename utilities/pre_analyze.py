@@ -94,7 +94,8 @@ def load_essentia_cache_exclusive():
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
-            "lyric_valence, lyric_themes, lyric_lang "
+            "lyric_valence, lyric_themes, lyric_lang, "
+            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -107,7 +108,8 @@ def load_essentia_cache_exclusive():
                 mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
                 mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
                 lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
-                lyric_valence, lyric_themes_j, lyric_lang in rows:
+                lyric_valence, lyric_themes_j, lyric_lang, \
+                title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -137,6 +139,9 @@ def load_essentia_cache_exclusive():
                 "lyric_valence": lyric_valence,
                 "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
                 "lyric_lang": lyric_lang,
+                "title": title, "release_date": release_date,
+                "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
+                "lyrics_synced_at": lyrics_synced_at,
             }
         return result
     except Exception:
@@ -159,9 +164,11 @@ def upsert_essentia_cache_entries(entries):
              mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
              mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
              lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
-             lyric_valence, lyric_themes, lyric_lang)
+             lyric_valence, lyric_themes, lyric_lang,
+             title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -183,7 +190,8 @@ def upsert_essentia_cache_entries(entries):
              json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None,
              d.get("lastfm_listeners"), d.get("lyric_valence"),
              json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
-             d.get("lyric_lang"))
+             d.get("lyric_lang"), d.get("title"), d.get("release_date"),
+             d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"))
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -766,8 +774,65 @@ def bulk_analyze():
     log_msg(f"\n--- Success! Analysis and Sync complete. ---")
     log_msg(f"Total tracks in cache: {len(_essentia_cache)}")
 
-# --- METADATA SYNC: Last.fm community tags (no audio; targeted UPDATEs; resumable) ---
+# --- METADATA REFRESH: cache-driven; adaptive cadence by release age + data presence ---
 import urllib.parse, urllib.request
+
+def _release_age_days(release_date, year, now):
+    """Days since original release — precise from release_date (unix), else year (Jan 1)."""
+    if release_date:
+        return (now - release_date) / 86400.0
+    if year:
+        try:
+            return (now - datetime(int(year), 1, 1).timestamp()) / 86400.0
+        except Exception:
+            pass
+    return 1e9
+
+def _refresh_due(synced_at, release_date, year, has_data, source, now):
+    """Should this track's <source> data be (re)fetched? Never-synced -> yes. Otherwise the
+    cadence adapts: missing data on a young release retries soon (MB/LRCLIB may not have had it
+    yet); Last.fm refreshes fast for new releases (listeners/tags evolve) and slows as it ages;
+    geo/lyrics settle to yearly once found (origin + lyrics are static)."""
+    if synced_at is None:
+        return True
+    age = (now - synced_at) / 86400.0
+    rel = _release_age_days(release_date, year, now)
+    if not has_data:
+        threshold = 21 if rel < 365 else 180
+    elif source == "lastfm":
+        threshold = 14 if rel < 90 else (45 if rel < 730 else 120)
+    else:   # geo / lyrics
+        threshold = 365
+    return age >= threshold
+
+def _ensure_meta_fields(conn):
+    """Populate title + release_date for cached tracks that lack a title, via ONE bulk Plex
+    search (metadata only). Runs only while such tracks exist (first run / newly-analysed
+    tracks); afterwards the syncs are fully cache-driven and never touch Plex."""
+    n = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE title IS NULL").fetchone()[0]
+    if n == 0:
+        return
+    log_msg(f"[INFO] Populating title/release_date for {n} tracks (one-time, then cache-driven)...")
+    null_rks = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache WHERE title IS NULL")}
+    music = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600).library.section(MUSIC_LIBRARY)
+    pend = []
+    for t in music.search(libtype='track', container_size=5000):
+        rk = str(t.ratingKey)
+        if rk not in null_rks:
+            continue
+        oaa = getattr(t, "originallyAvailableAt", None)
+        rd = oaa.timestamp() if oaa else None
+        pend.append((t.title or "", rd, rk))
+        if len(pend) >= 500:
+            conn.executemany("UPDATE essentia_cache SET title=?, release_date=? WHERE rating_key=?", pend)
+            conn.commit()
+            pend = []
+    if pend:
+        conn.executemany("UPDATE essentia_cache SET title=?, release_date=? WHERE rating_key=?", pend)
+        conn.commit()
+
+
+# --- METADATA SYNC: Last.fm community tags (cache-driven; targeted UPDATEs; refresh cadence) ---
 
 def _load_lastfm_key():
     try:
@@ -810,54 +875,55 @@ def _lf_artist_tags(artist, key):
     return _lf_artist_cache[k]
 
 def sync_lastfm_tags(limit=None):
-    """Fetch Last.fm artist + track tags for every cached track that lacks them and write them via
-    targeted UPDATEs (audio columns untouched). Resumable; artist tags cached per artist."""
+    """Refresh Last.fm artist+track tags + per-track listeners for every cached track whose data is
+    missing or stale (cache-driven via _refresh_due; no Plex per run). Artist tags cached per
+    artist; targeted UPDATE sets lastfm_synced_at."""
     key = _load_lastfm_key()
     if not key:
         log_msg("[ERROR] No extras.lastfm_api_key in config — cannot sync Last.fm tags.", level="error")
         return
-    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
-    music = plex.library.section(MUSIC_LIBRARY)
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     _ensure_db_schema(conn)
-    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
-    done   = {rk for (rk,) in conn.execute(
-        "SELECT rating_key FROM essentia_cache WHERE lastfm_listeners IS NOT NULL")}
-    log_msg("Fetching tracks from Plex...")
-    tracks = music.search(libtype='track', container_size=5000)
-    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    _ensure_meta_fields(conn)
+    now = time.time()
+    # migrate: stamp pre-existing data so it refreshes on cadence, not all at once on first run
+    conn.execute("UPDATE essentia_cache SET lastfm_synced_at=? "
+                 "WHERE lastfm_listeners IS NOT NULL AND lastfm_synced_at IS NULL", (now,))
+    conn.commit()
+    rows = conn.execute(
+        "SELECT rating_key, artist, title, release_date, year, lastfm_synced_at, lastfm_listeners "
+        "FROM essentia_cache WHERE title IS NOT NULL").fetchall()
+    todo = [(rk, art, tit) for rk, art, tit, rd, yr, syn, data in rows
+            if _refresh_due(syn, rd, yr, data is not None, "lastfm", now)]
     if limit:
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
-    log_msg(f"[INFO] Last.fm tag sync: {len(todo)} tracks to do ({len(done)} already done).")
+    log_msg(f"[INFO] Last.fm sync: {len(todo)} due of {len(rows)} cached.")
     pending, start = [], time.time()
-    for i, t in enumerate(todo):
-        artist = getattr(t, "grandparentTitle", "") or ""
-        title  = getattr(t, "title", "") or ""
+    for i, (rk, artist, title) in enumerate(todo):
+        artist, title = artist or "", title or ""
         at = _lf_artist_tags(artist, key) if artist else {}
-        # track.getInfo returns the track's top tags AND its global listener count in one call.
         info = (_lf_get({"method": "track.getInfo", "artist": artist, "track": title}, key).get("track")
                 or {}) if (artist and title) else {}
         tt = _lf_parse(info)
         listeners = int(info.get("listeners") or 0)
-        pending.append((json.dumps(at), json.dumps(tt), listeners, str(t.ratingKey)))
+        pending.append((json.dumps(at), json.dumps(tt), listeners, time.time(), rk))
         time.sleep(0.2)   # be polite to Last.fm (~5 req/s)
         if len(pending) >= 50 or i == len(todo) - 1:
             conn.executemany(
                 "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=?, "
-                "lastfm_listeners=? WHERE rating_key=?", pending)
+                "lastfm_listeners=?, lastfm_synced_at=? WHERE rating_key=?", pending)
             conn.commit()
             pending = []
         if verbose:
-            log_msg(f"   {artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} "
-                    f"track:{list(tt)[:3]}")
+            log_msg(f"   {artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}")
         else:
             avg = (time.time() - start) / max(1, i + 1)
             eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
             log_msg(f"Last.fm: [{i + 1}/{len(todo)}] {avg:.2f}s/trk | ETA {eta} ", end='\r')
     conn.close()
-    log_msg("\n[INFO] Last.fm tag sync complete.")
+    log_msg("\n[INFO] Last.fm sync complete.")
 
 
 # --- METADATA SYNC: MusicBrainz artist origin (full place hierarchy; per-artist; rate-limited) ---
@@ -925,31 +991,36 @@ def _artist_origin(name):
     }
 
 def sync_artist_origin(limit=None):
-    """Fetch each artist's MusicBrainz origin (cached per artist) and write artist_origin to all
-    their cached tracks via targeted UPDATE. Resumable; area chains cached per area MBID."""
-    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
-    music = plex.library.section(MUSIC_LIBRARY)
+    """Refresh each artist's MusicBrainz origin for cached tracks whose origin is missing or stale
+    (cache-driven; per-artist, cached). Targeted UPDATE sets geo_synced_at; unresolved artists are
+    retried on a cadence (not every run) via _refresh_due."""
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     _ensure_db_schema(conn)
-    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
-    done   = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache WHERE artist_origin IS NOT NULL")}
-    log_msg("Fetching tracks from Plex...")
-    tracks = music.search(libtype='track', container_size=5000)
-    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    _ensure_meta_fields(conn)
+    now = time.time()
+    # migrate: stamp already-resolved origins so they refresh yearly, not all at once
+    conn.execute("UPDATE essentia_cache SET geo_synced_at=? "
+                 "WHERE artist_origin IS NOT NULL AND geo_synced_at IS NULL", (now,))
+    conn.commit()
+    rows = conn.execute(
+        "SELECT rating_key, artist, release_date, year, geo_synced_at, artist_origin "
+        "FROM essentia_cache WHERE artist IS NOT NULL").fetchall()
+    todo = [(rk, art) for rk, art, rd, yr, syn, data in rows
+            if _refresh_due(syn, rd, yr, data is not None, "geo", now)]
     if limit:
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
-    log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} tracks to do ({len(done)} already done).")
+    log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} due of {len(rows)} cached.")
     origin_cache, pending, start = {}, [], time.time()
-    for i, t in enumerate(todo):
-        artist = getattr(t, "grandparentTitle", "") or ""
+    for i, (rk, artist) in enumerate(todo):
+        artist = artist or ""
         if artist and artist not in origin_cache:
             origin_cache[artist] = _artist_origin(artist)
         o = origin_cache.get(artist) or {}
-        pending.append((json.dumps(o) if o else None, str(t.ratingKey)))
+        pending.append((json.dumps(o) if o else None, time.time(), rk))
         if len(pending) >= 25 or i == len(todo) - 1:
-            conn.executemany("UPDATE essentia_cache SET artist_origin=? WHERE rating_key=?", pending)
+            conn.executemany("UPDATE essentia_cache SET artist_origin=?, geo_synced_at=? WHERE rating_key=?", pending)
             conn.commit()
             pending = []
         if verbose and artist in origin_cache:
@@ -988,14 +1059,17 @@ _LYRIC_THEMES = {
     "rain": ["raining", "the rain", "thunder", "storm"],
 }
 
-def _lrclib_get(artist, title, album, duration):
-    url = "https://lrclib.net/api/get?" + urllib.parse.urlencode(
-        {"artist_name": artist, "track_name": title, "album_name": album or "", "duration": int(duration or 0)})
+def _lrclib_search(artist, title):
+    """Top LRCLIB match by artist+title (no duration needed → cache-driven). Lyrics are
+    version-invariant, so the top fuzzy match is fine. None if no result/error."""
+    url = "https://lrclib.net/api/search?" + urllib.parse.urlencode(
+        {"artist_name": artist, "track_name": title})
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": _LRCLIB_UA}), timeout=15) as r:
-            return json.loads(r.read().decode("utf-8", "ignore"))
+            res = json.loads(r.read().decode("utf-8", "ignore"))
+        return res[0] if isinstance(res, list) and res else None
     except Exception:
-        return None   # 404 (no match) or network error
+        return None
 
 def _analyze_lyrics(text):
     """(valence 0-1 or None, [themes], lang or None) from plain lyrics. VADER averaged per line
@@ -1016,46 +1090,47 @@ def _analyze_lyrics(text):
     return valence, themes, lang
 
 def sync_lyrics(limit=None):
-    """Fetch lyrics from LRCLIB and derive sentiment + themes + language per cached track.
-    Targeted UPDATE; resumable (done = lyric_lang set, incl. 'instrumental'/'none' sentinels)."""
+    """Refresh lyrics-derived sentiment/themes/language for cached tracks whose data is missing or
+    stale (cache-driven; LRCLIB /search by artist+title). Targeted UPDATE sets lyrics_synced_at."""
     if _vader is None:
         log_msg("[WARN] vaderSentiment not installed — lyric_valence will be null (themes/lang only). "
                 "pip install vaderSentiment langdetect for the full version.")
-    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
-    music = plex.library.section(MUSIC_LIBRARY)
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     _ensure_db_schema(conn)
-    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
-    done = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache WHERE lyric_lang IS NOT NULL")}
-    log_msg("Fetching tracks from Plex...")
-    tracks = music.search(libtype='track', container_size=5000)
-    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    _ensure_meta_fields(conn)
+    now = time.time()
+    # migrate: stamp pre-existing lyric data so it refreshes on cadence, not all at once
+    conn.execute("UPDATE essentia_cache SET lyrics_synced_at=? "
+                 "WHERE lyric_lang IS NOT NULL AND lyrics_synced_at IS NULL", (now,))
+    conn.commit()
+    rows = conn.execute(
+        "SELECT rating_key, artist, title, release_date, year, lyrics_synced_at, lyric_lang "
+        "FROM essentia_cache WHERE title IS NOT NULL").fetchall()
+    todo = [(rk, art, tit) for rk, art, tit, rd, yr, syn, data in rows
+            if _refresh_due(syn, rd, yr, data is not None, "lyrics", now)]
     if limit:
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
-    log_msg(f"[INFO] Lyrics sync: {len(todo)} tracks to do ({len(done)} already done). "
+    log_msg(f"[INFO] Lyrics sync: {len(todo)} due of {len(rows)} cached. "
             f"sentiment={'on' if _vader else 'off'}, lang={'on' if _detect_lang else 'off'}")
     pending, start = [], time.time()
-    for i, t in enumerate(todo):
-        artist = getattr(t, "grandparentTitle", "") or ""
-        title = getattr(t, "title", "") or ""
-        album = getattr(t, "parentTitle", "") or ""
-        dur = int((getattr(t, "duration", 0) or 0) / 1000)
+    for i, (rk, artist, title) in enumerate(todo):
+        artist, title = artist or "", title or ""
         valence, themes, lang = None, [], "none"   # 'none' = no lyrics found (still marks done)
-        d = _lrclib_get(artist, title, album, dur) if (artist and title) else None
+        d = _lrclib_search(artist, title) if (artist and title) else None
         if d:
             if d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
                 lang = "instrumental"
             else:
                 valence, themes, _lang = _analyze_lyrics(d["plainLyrics"])
                 lang = _lang or "unknown"
-        pending.append((valence, json.dumps(themes), lang, str(t.ratingKey)))
+        pending.append((valence, json.dumps(themes), lang, time.time(), rk))
         time.sleep(0.15)   # be polite to LRCLIB
         if len(pending) >= 50 or i == len(todo) - 1:
             conn.executemany(
-                "UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_lang=? WHERE rating_key=?",
-                pending)
+                "UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_lang=?, "
+                "lyrics_synced_at=? WHERE rating_key=?", pending)
             conn.commit()
             pending = []
         if verbose:
