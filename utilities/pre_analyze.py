@@ -1159,9 +1159,10 @@ def _analyze_lyrics(text):
             lang = None
     return valence, themes, lang
 
-def sync_lyrics(limit=None):
+def sync_lyrics(limit=None, force=False):
     """Refresh lyrics-derived sentiment/themes/language for cached tracks whose data is missing or
-    stale (cache-driven; LRCLIB /search by artist+title). Targeted UPDATE sets lyrics_synced_at."""
+    stale (cache-driven; LRCLIB /search by artist+title). Targeted UPDATE sets lyrics_synced_at.
+    force=True re-does every track (use after the lyric vocabulary changes)."""
     if _vader is None:
         log_msg("[WARN] vaderSentiment not installed — lyric_valence will be null (themes/lang only). "
                 "pip install vaderSentiment langdetect for the full version.")
@@ -1170,9 +1171,14 @@ def sync_lyrics(limit=None):
     _ensure_db_schema(conn)
     _ensure_meta_fields(conn)
     now = time.time()
-    # migrate: stamp pre-existing lyric data so it refreshes on cadence, not all at once
-    conn.execute("UPDATE essentia_cache SET lyrics_synced_at=? "
-                 "WHERE lyric_lang IS NOT NULL AND lyrics_synced_at IS NULL", (now,))
+    if force:
+        # re-derive everything (the lyric vocabulary changed): clear stamps so all are due
+        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=NULL")
+        log_msg("[INFO] --force: re-deriving lyric themes for the whole library.")
+    else:
+        # migrate: stamp pre-existing lyric data so it refreshes on cadence, not all at once
+        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=? "
+                     "WHERE lyric_lang IS NOT NULL AND lyrics_synced_at IS NULL", (now,))
     conn.commit()
     rows = conn.execute(
         "SELECT rating_key, artist, title, release_date, year, lyrics_synced_at, lyric_lang "
@@ -1223,7 +1229,7 @@ if __name__ == "__main__":
                 _lim = int(sys.argv[sys.argv.index("--limit") + 1])
             except Exception:
                 _lim = None
-        sync_lyrics(limit=_lim)
+        sync_lyrics(limit=_lim, force="--force" in sys.argv)
     elif "--sync-geo" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:
