@@ -715,7 +715,106 @@ def bulk_analyze():
     log_msg(f"\n--- Success! Analysis and Sync complete. ---")
     log_msg(f"Total tracks in cache: {len(_essentia_cache)}")
 
+# --- METADATA SYNC: Last.fm community tags (no audio; targeted UPDATEs; resumable) ---
+import urllib.parse, urllib.request
+
+def _load_lastfm_key():
+    try:
+        import yaml
+        cfg = yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml")))
+        return (cfg.get("extras") or {}).get("lastfm_api_key")
+    except Exception:
+        return None
+
+def _lf_get(params, key):
+    url = "http://ws.audioscrobbler.com/2.0/?" + urllib.parse.urlencode(
+        {**params, "api_key": key, "format": "json", "autocorrect": 1})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:
+                return json.loads(r.read().decode("utf-8", "ignore"))
+        except Exception:
+            if attempt < 2:
+                time.sleep(1.0)
+    return {}
+
+def _lf_parse(data):
+    """{tag: count 1-100} from a Last.fm gettoptags response (top 20, dropping zero-count tags)."""
+    tags = (data.get("toptags") or {}).get("tag") or []
+    if isinstance(tags, dict):
+        tags = [tags]
+    out = {}
+    for t in tags[:20]:
+        name = (t.get("name") or "").lower().strip()
+        cnt = int(t.get("count") or 0)
+        if name and cnt > 0:
+            out[name] = cnt
+    return out
+
+_lf_artist_cache = {}   # artist_lower -> tags (one fetch serves all the artist's tracks)
+def _lf_artist_tags(artist, key):
+    k = artist.lower().strip()
+    if k not in _lf_artist_cache:
+        _lf_artist_cache[k] = _lf_parse(_lf_get({"method": "artist.gettoptags", "artist": artist}, key))
+    return _lf_artist_cache[k]
+
+def sync_lastfm_tags(limit=None):
+    """Fetch Last.fm artist + track tags for every cached track that lacks them and write them via
+    targeted UPDATEs (audio columns untouched). Resumable; artist tags cached per artist."""
+    key = _load_lastfm_key()
+    if not key:
+        log_msg("[ERROR] No extras.lastfm_api_key in config — cannot sync Last.fm tags.", level="error")
+        return
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
+    music = plex.library.section(MUSIC_LIBRARY)
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
+    done   = {rk for (rk,) in conn.execute(
+        "SELECT rating_key FROM essentia_cache WHERE lastfm_artist_tags IS NOT NULL")}
+    log_msg("Fetching tracks from Plex...")
+    tracks = music.search(libtype='track', container_size=5000)
+    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    if limit:
+        todo = todo[:int(limit)]
+    verbose = bool(limit) and int(limit) <= 25
+    log_msg(f"[INFO] Last.fm tag sync: {len(todo)} tracks to do ({len(done)} already done).")
+    pending, start = [], time.time()
+    for i, t in enumerate(todo):
+        artist = getattr(t, "grandparentTitle", "") or ""
+        title  = getattr(t, "title", "") or ""
+        at = _lf_artist_tags(artist, key) if artist else {}
+        tt = _lf_parse(_lf_get({"method": "track.gettoptags", "artist": artist, "track": title}, key)) \
+            if (artist and title) else {}
+        pending.append((json.dumps(at), json.dumps(tt), str(t.ratingKey)))
+        time.sleep(0.2)   # be polite to Last.fm (~5 req/s)
+        if len(pending) >= 50 or i == len(todo) - 1:
+            conn.executemany(
+                "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=? WHERE rating_key=?",
+                pending)
+            conn.commit()
+            pending = []
+        if verbose:
+            log_msg(f"   {artist[:18]:18} - {title[:22]:22} | artist:{list(at)[:4]} track:{list(tt)[:4]}")
+        else:
+            avg = (time.time() - start) / max(1, i + 1)
+            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
+            log_msg(f"Last.fm: [{i + 1}/{len(todo)}] {avg:.2f}s/trk | ETA {eta} ", end='\r')
+    conn.close()
+    log_msg("\n[INFO] Last.fm tag sync complete.")
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
-    bulk_analyze()
+    if "--sync-metadata" in sys.argv:
+        _lim = None
+        if "--limit" in sys.argv:
+            try:
+                _lim = int(sys.argv[sys.argv.index("--limit") + 1])
+            except Exception:
+                _lim = None
+        sync_lastfm_tags(limit=_lim)
+    else:
+        bulk_analyze()
