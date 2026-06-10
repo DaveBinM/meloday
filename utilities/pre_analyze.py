@@ -1172,9 +1172,12 @@ def sync_lyrics(limit=None, force=False):
     _ensure_meta_fields(conn)
     now = time.time()
     if force:
-        # re-derive everything (the lyric vocabulary changed): clear stamps so all are due
-        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=NULL")
-        log_msg("[INFO] --force: re-deriving lyric themes for the whole library.")
+        # re-derive everything (the lyric vocabulary changed): clear lyric data + stamps so all are
+        # due. Clearing lyric_lang too means a plain --sync-lyrics re-run resumes cleanly (the
+        # cadence-migration below won't re-stamp half-done tracks). Run --force ONCE, then plain.
+        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=NULL, lyric_lang=NULL, "
+                     "lyric_themes=NULL, lyric_valence=NULL")
+        log_msg("[INFO] --force: cleared lyric data; re-deriving for the whole library.")
     else:
         # migrate: stamp pre-existing lyric data so it refreshes on cadence, not all at once
         conn.execute("UPDATE essentia_cache SET lyrics_synced_at=? "
