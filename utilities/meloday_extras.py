@@ -169,6 +169,14 @@ _CENTROID_PLAYLISTS = {"release_radar", "discover_weekly"}
 # Cover Art — gradient colour palette (top RGB, bottom RGB) per playlist
 # ---------------------------------------------------------------------------
 _EXTRAS_COVER_COLORS = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": ((240, 150, 60), (200, 70, 120)),
+    "decade_70s": ((230, 160, 50), (150, 70, 40)),
+    "decade_80s": ((255, 70, 180), (60, 200, 230)),
+    "decade_90s": ((120, 90, 200), (40, 160, 150)),
+    "decade_00s": ((80, 140, 240), (180, 100, 220)),
+    "decade_10s": ((40, 200, 190), (255, 110, 120)),
+    "decade_20s": ((150, 120, 255), (90, 200, 220)),
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -435,6 +443,14 @@ _EXTRAS_COVER_COLORS = {
 # 13 style families: geometric, circles, radial, waves, floating_circles, rays,
 #   arc_sweep, aurora, triangles, diamond, starburst, chevrons, spiral
 _COVER_BG_STYLES = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": ("spiral", 3),
+    "decade_70s": ("rays", 5),
+    "decade_80s": ("triangles", 7),
+    "decade_90s": ("geometric", 4),
+    "decade_00s": ("circles", 6),
+    "decade_10s": ("waves", 8),
+    "decade_20s": ("arc_sweep", 2),
     "stormy": ("aurora", 6),
     "foggy": ("waves", 6),
     "snow_day": ("aurora", 1),
@@ -692,6 +708,14 @@ _COVER_BG_STYLES = {
 # Per-profile icon overlay — drawn on top of the background before text.
 # Keys not listed here get no icon (plain background only).
 _PROFILE_ICON = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": "history",
+    "decade_70s": "replay",
+    "decade_80s": "music_note_2",
+    "decade_90s": "headphones",
+    "decade_00s": "graphic_eq",
+    "decade_10s": "music_note",
+    "decade_20s": "star_shine",
     "stormy": "thunderstorm",
     "foggy": "foggy",
     "snow_day": "snowflake",
@@ -1002,6 +1026,14 @@ _TOP_SONGS_STYLE_POOL = [
 # Playlist descriptions — picked randomly each run for variety
 # ---------------------------------------------------------------------------
 _DESCRIPTIONS = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": ["The sound of the sixties.", "Where it all kicked off.", "Sixties gold."],
+    "decade_70s": ["Seventies grooves and gold.", "Flares, funk and rock.", "The sound of the seventies."],
+    "decade_80s": ["Big hair, bigger choruses.", "Synths, neon and shoulder pads.", "Pure eighties.", "The decade that never left."],
+    "decade_90s": ["Nineties, all day.", "The sound of the nineties.", "Back to the '90s."],
+    "decade_00s": ["The sound of the noughties.", "Two-thousands throwbacks.", "Y2K and beyond."],
+    "decade_10s": ["The 2010s on repeat.", "Last decade's biggest.", "The sound of the 2010s."],
+    "decade_20s": ["The sound of right now.", "This decade so far.", "Twenty-twenties fresh."],
     "stormy": ["For when the sky cracks open.", "Thunder, lightning and drama.", "Big, dark, electric skies."],
     "foggy": ["Lost in the mist.", "Soft-focus, low-visibility calm.", "Music for a world gone grey and still."],
     "snow_day": ["Snow's falling — stay in.", "Hushed, white-blanket calm.", "Watch the flakes come down."],
@@ -1765,6 +1797,14 @@ def _pick_description(playlist_id, era=None, styles=None):
 # Mood / Activity Mix profiles — acoustic target fingerprints
 # ---------------------------------------------------------------------------
 _MOOD_PROFILES = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
+    "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
+    "decade_80s": {"bpm": 122, "energy": -9, "danceability": 0.6, "brightness": 0.42, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.7, "vocal_presence": 0.74},
+    "decade_90s": {"bpm": 110, "energy": -9, "danceability": 0.56, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.6, "vocal_presence": 0.74},
+    "decade_00s": {"bpm": 116, "energy": -8, "danceability": 0.6, "brightness": 0.43, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.62, "vocal_presence": 0.76},
+    "decade_10s": {"bpm": 114, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.6, "vocal_presence": 0.74},
+    "decade_20s": {"bpm": 112, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.6, "valence": 0.58, "vocal_presence": 0.74},
     # ---- 25 weather/seasonal mixes ----
     "stormy": {"bpm": 80, "energy": -12, "danceability": 0.3, "brightness": 0.12, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.45, "valence": 0.35, "vocal_presence": 0.45},
     "foggy": {"bpm": 78, "energy": -16, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.45, "vocal_presence": 0.45},
@@ -2182,6 +2222,14 @@ _MOOD_PROFILES = {
 }
 
 _MOOD_MIX_NAMES = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": "60s Mix • Meloday+",
+    "decade_70s": "70s Mix • Meloday+",
+    "decade_80s": "80s Mix • Meloday+",
+    "decade_90s": "90s Mix • Meloday+",
+    "decade_00s": "00s Mix • Meloday+",
+    "decade_10s": "10s Mix • Meloday+",
+    "decade_20s": "20s Mix • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -2599,6 +2647,14 @@ _GENERAL_PROFILES = (set(_MOOD_PROFILES)
 
 # Category labels for diversity-aware rotation (max 2 per category in active slots).
 _PROFILE_CATEGORY = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": "era",
+    "decade_70s": "era",
+    "decade_80s": "era",
+    "decade_90s": "era",
+    "decade_00s": "era",
+    "decade_10s": "era",
+    "decade_20s": "era",
     "stormy": "atmospheric",
     "foggy": "atmospheric",
     "snow_day": "calm",
@@ -2815,6 +2871,14 @@ _PROFILE_CATEGORY = {
 # Tracks with matching positive tags get a distance boost; conflicting tags get a penalty.
 # Profiles where emotional character is the key distinguishing feature benefit most.
 _PROFILE_MOOD_SIGNALS = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_70s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_80s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_90s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_00s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_10s": (["rousing", "energetic", "stylish", "playful"], []),
+    "decade_20s": (["rousing", "energetic", "stylish", "playful"], []),
     "stormy": (["dramatic", "ominous", "brooding", "volatile", "intense"], []),
     "foggy": (["soothing", "mysterious", "atmospheric", "eerie", "dreamy"], []),
     "snow_day": (["soothing", "gentle", "delicate", "playful"], []),
@@ -3459,6 +3523,14 @@ def _has_required_style(entry, profile_key):
 # the current year so the window never goes stale. (None = open end.)
 _NOW_YEAR = date.today().year
 _PROFILE_YEAR_WINDOW = {
+    # ---- 7 decade mixes (era) ----
+    "decade_60s": (1960, 1969),
+    "decade_70s": (1970, 1979),
+    "decade_80s": (1980, 1989),
+    "decade_90s": (1990, 1999),
+    "decade_00s": (2000, 2009),
+    "decade_10s": (2010, 2019),
+    "decade_20s": (2020, 2029),
     "throwback_anthems": (None, _NOW_YEAR - 12),   # nothing from the last ~12 years
     "old_friends":       (None, _NOW_YEAR - 8),
     "memory_lane":       (None, _NOW_YEAR - 10),
