@@ -181,6 +181,43 @@ def upsert_essentia_cache_entries(entries):
     except Exception as e:
         log_msg(f"[ERROR] Cache upsert failed: {e}", level="error")
 
+
+def update_analysis_columns(entries):
+    """Write ONLY the analysis-derived columns (acoustic + TF + mood + embeddings) via targeted
+    UPDATE, never the metadata or sync columns. Used by the TF post-pass so it can run alongside
+    the Last.fm / MusicBrainz syncs without clobbering their writes (INSERT OR REPLACE would carry
+    this process's start-of-run snapshot of those columns and overwrite concurrent sync updates)."""
+    if not entries:
+        return
+    try:
+        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
+        _ensure_db_schema(conn)
+        conn.executemany("""
+            UPDATE essentia_cache SET
+              bpm=?, key=?, energy=?, danceability=?, brightness=?,
+              beat_confidence=?, integrated_loudness=?, onset_rate=?, dynamic_complexity=?,
+              arousal=?, valence=?, vocal_presence=?,
+              mood_happy=?, mood_sad=?, mood_aggressive=?, mood_relaxed=?, mood_party=?,
+              mood_acoustic=?, mood_electronic=?, danceability_hl=?, moodtheme=?, genre_discogs=?,
+              emb_effnet=?, emb_musicnn=?
+            WHERE rating_key=?
+        """, [
+            (d.get("bpm"), d.get("key"), d.get("energy"), d.get("danceability"), d.get("brightness"),
+             d.get("beat_confidence"), d.get("integrated_loudness"), d.get("onset_rate"), d.get("dynamic_complexity"),
+             d.get("arousal"), d.get("valence"), d.get("vocal_presence"),
+             d.get("mood_happy"), d.get("mood_sad"), d.get("mood_aggressive"), d.get("mood_relaxed"),
+             d.get("mood_party"), d.get("mood_acoustic"), d.get("mood_electronic"), d.get("danceability_hl"),
+             json.dumps(d["moodtheme"]) if d.get("moodtheme") is not None else None,
+             json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
+             d.get("emb_effnet"), d.get("emb_musicnn"), rk)
+            for rk, d in entries.items()
+        ])
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        log_msg(f"[ERROR] Analysis-column update failed: {e}", level="error")
+
 # --- 2. WORKER WRAPPER ---
 
 def _sigalrm_handler(signum, frame):
@@ -706,7 +743,9 @@ def bulk_analyze():
                 _essentia_cache[rk] = data
                 tf_pending[rk] = data
                 if len(tf_pending) >= 200 or tf_i == len(tf_todo) - 1:
-                    upsert_essentia_cache_entries(tf_pending)
+                    # targeted UPDATE (analysis columns only) so a concurrent Last.fm/MB sync
+                    # isn't clobbered; the post-pass only touches tracks already in the cache.
+                    update_analysis_columns(tf_pending)
                     tf_pending.clear()
                 tf_elapsed = time.time() - tf_start
                 tf_avg = tf_elapsed / max(1, tf_i + 1)
