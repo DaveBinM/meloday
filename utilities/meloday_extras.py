@@ -3432,6 +3432,16 @@ _STYLE_DEFINED_PROFILES = {
 }
 
 
+def _track_style_tags(entry):
+    """Lowercased style/genre tags for matching: Plex styles + genres, plus the Discogs-400
+    genre classifier (each 'Category---Style' split into both parts), so style matching sees the
+    richer taxonomy once a track is analysed (falls back to the Plex tags before then)."""
+    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    for k in (entry.get("genre_discogs") or {}):
+        tags += [p.lower() for p in k.split("---")]
+    return tags
+
+
 def _has_required_style(entry, profile_key):
     """True if the track carries one of the profile's required (positive) styles. Untagged
     tracks return False so genre-defined mixes never include unconfirmable tracks."""
@@ -3439,7 +3449,7 @@ def _has_required_style(entry, profile_key):
     if not sig:
         return True
     positive_subs = sig[0]
-    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    tags = _track_style_tags(entry)
     if not tags:
         return False
     return any(sub in tag for tag in tags for sub in positive_subs)
@@ -3477,7 +3487,7 @@ def _style_tag_boost(entry, profile_key):
     if not signals:
         return 0.0
     positive_subs, negative_subs = signals
-    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    tags = _track_style_tags(entry)
     if not tags:
         return 0.0
 
@@ -3490,6 +3500,132 @@ def _style_tag_boost(entry, profile_key):
     if _matches(negative_subs):
         boost += 0.10
     return boost
+
+
+# ---------------------------------------------------------------------------
+# Essentia high-level mood/theme scoring (calibrated per-track classifiers)
+# ---------------------------------------------------------------------------
+_MOODTHEME_WEIGHT = 0.40   # pull toward tracks whose mood/theme tags match the mix's theme
+_MOODCLASS_WEIGHT = 0.25   # pull on the calibrated production-quality mood classes
+
+# Profile -> mtg_jamendo mood/theme tags it wants (from the 56-tag model vocabulary). A track
+# scoring high in these tags is pulled into the mix. Only profiles with a clear theme are listed.
+_PROFILE_MOODTHEME = {
+    # Seasonal / weather
+    "festive": ["christmas", "holiday"], "summer_heat": ["summer", "party"],
+    "summer_breeze": ["summer", "relaxing"], "summer_roadtrip": ["summer", "travel"],
+    "summer_tropical": ["summer", "groovy"], "summer_evening": ["summer", "relaxing"],
+    "beach_vibes": ["summer", "relaxing"], "cookout": ["summer", "fun"],
+    "sunny": ["happy", "summer", "upbeat"], "spring_bloom": ["happy", "positive"],
+    "autumn_rain": ["melancholic", "calm"], "winter_nights": ["dark", "calm"],
+    "rainy_day": ["melancholic", "calm", "relaxing"], "cosy": ["calm", "soft", "relaxing"],
+    # Romance
+    "romantic_mix": ["love", "romantic"], "love_songs": ["love", "romantic"],
+    "modern_romance": ["love", "romantic"], "late_night_romance": ["love", "romantic", "sexy"],
+    "slow_dance": ["love", "romantic"], "first_date": ["love", "happy"],
+    "romantic_dinner": ["love", "romantic"], "acoustic_romance": ["love", "romantic"],
+    "indie_romance": ["love", "romantic"], "synthpop_romance": ["love", "romantic"],
+    "piano_romance": ["love", "romantic", "emotional"], "romantic_jazz": ["love", "romantic"],
+    "crush": ["love", "happy", "fun"], "slow_burn": ["sexy", "romantic", "love"],
+    "loved_up": ["love", "happy", "romantic"], "long_distance": ["love", "melancholic", "emotional"],
+    "flirty": ["sexy", "fun", "love"], "devotion": ["love", "romantic", "emotional"],
+    "wedding_day": ["love", "happy", "romantic"], "moving_on": ["hopeful", "emotional"],
+    "heartbreak": ["sad", "melancholic", "emotional"],
+    # Emotional
+    "grief_release": ["sad", "melancholic", "emotional"], "melancholy": ["melancholic", "sad"],
+    "triumphant": ["epic", "powerful", "motivational", "uplifting"],
+    "hopeful": ["hopeful", "uplifting", "inspiring"], "yearning": ["melancholic", "emotional"],
+    "serene": ["calm", "relaxing"], "tender": ["soft", "emotional", "love"],
+    "defiant": ["powerful", "heavy", "energetic"], "vulnerable": ["emotional", "sad", "soft"],
+    "awe_wonder": ["epic", "dream", "space"], "bittersweet": ["melancholic", "emotional"],
+    "empowering": ["powerful", "motivational", "uplifting"], "angst_mix": ["dark", "heavy", "emotional"],
+    "moody_mix": ["dark", "melancholic"], "euphoric": ["uplifting", "energetic", "party"],
+    "nostalgia_mix": ["retro", "melancholic"], "cathartic": ["powerful", "emotional", "energetic"],
+    # Activity
+    "meditation": ["meditative", "calm", "relaxing"], "yoga_stretch": ["calm", "relaxing", "meditative"],
+    "spa_bath": ["relaxing", "calm", "soft"], "power_nap": ["calm", "soft", "dream"],
+    "workout": ["sport", "energetic", "motivational"], "running": ["sport", "energetic", "motivational"],
+    "gaming": ["action", "energetic", "epic"], "study_session": ["background", "calm"],
+    "deep_reading": ["background", "calm"], "creative_flow": ["inspiring", "motivational"],
+    "cooking_mix": ["fun", "upbeat"], "cool_down": ["calm", "relaxing"],
+    "gardening": ["calm", "nature", "happy"], "housework_hustle": ["fun", "upbeat", "energetic"],
+    # Cinematic / atmospheric
+    "cinematic_epic": ["epic", "film", "movie", "action", "trailer"], "post_rock": ["epic", "dramatic"],
+    "ambient_drift": ["soundscape", "calm", "space"], "dreamy_mix": ["dream", "soft", "calm"],
+    "midnight": ["dark", "calm"], "three_am": ["dark", "calm", "melancholic"],
+    "witching_hour": ["dark", "dramatic"], "sunrise": ["hopeful", "calm", "uplifting"],
+    "golden_afternoon": ["summer", "relaxing"], "starlit": ["space", "dream", "calm"],
+    "blue_hour": ["melancholic", "calm"], "overcast": ["melancholic", "calm"],
+    "after_dark": ["dark", "sexy"], "night_drive": ["dark", "energetic"],
+    # Party / upbeat / occasion
+    "party": ["party", "fun", "energetic"], "celebration": ["party", "happy", "fun"],
+    "friday_night": ["party", "fun", "energetic"], "pre_party": ["party", "energetic"],
+    "happy": ["happy", "fun", "positive"], "friday_feeling": ["fun", "happy", "upbeat"],
+    "party_throwback": ["party", "retro", "fun"], "main_character": ["powerful", "energetic", "cool"],
+    "confidence_boost": ["powerful", "motivational", "energetic"],
+    "monday_motivation": ["motivational", "energetic", "uplifting"],
+    "sunday_scaries": ["melancholic", "calm"], "wind_down": ["calm", "relaxing"],
+    "treat_yourself": ["sexy", "fun", "cool"], "midweek_reset": ["motivational", "positive"],
+    "dinner_party": ["cool", "groovy"], "evening_unwind": ["calm", "relaxing"],
+    # Social / nostalgia / travel
+    "throwback_anthems": ["retro", "fun", "energetic"], "old_friends": ["happy", "fun"],
+    "campfire": ["calm", "nature", "soft"], "singalong": ["fun", "energetic", "upbeat"],
+    "memory_lane": ["retro", "melancholic"], "school_days": ["retro", "fun"],
+    "game_night": ["fun", "funny"], "road_trip": ["travel", "fun", "energetic"],
+    "driving_mix": ["travel", "energetic"], "driving_singalong": ["travel", "fun", "upbeat"],
+    "walking_mix": ["calm", "happy"], "commute_mix": ["energetic", "motivational"],
+    # Genre mixes with a clear theme
+    "bossa_samba": ["relaxing", "summer"], "reggae_dub": ["relaxing", "groovy"],
+    "afrobeat": ["groovy", "energetic"], "smooth_jazz": ["relaxing", "calm"],
+    "gospel": ["uplifting", "inspiring", "powerful"], "lofi_beats": ["calm", "relaxing", "background"],
+    "celtic_folk": ["nature", "epic"], "latin_heat": ["party", "energetic", "groovy"],
+}
+
+# Profile -> {calibrated mood-class field: 1 to want high / 0 to want low}. Captures production
+# qualities (acoustic, aggressive, electronic, danceable) the 56 theme tags don't.
+_PROFILE_MOODCLASS = {
+    "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
+    "folk_acoustic": {"mood_acoustic": 1}, "spring_acoustic": {"mood_acoustic": 1},
+    "celtic_folk": {"mood_acoustic": 1}, "country_roads": {"mood_acoustic": 1},
+    "bluegrass": {"mood_acoustic": 1},
+    "heavy_riffs": {"mood_aggressive": 1}, "punk_energy": {"mood_aggressive": 1},
+    "angst_mix": {"mood_aggressive": 1}, "defiant": {"mood_aggressive": 1},
+    "stoner_rock": {"mood_aggressive": 1}, "garage_grunge": {"mood_aggressive": 1},
+    "industrial": {"mood_aggressive": 1, "mood_electronic": 1},
+    "techno": {"mood_electronic": 1}, "deep_house": {"mood_electronic": 1},
+    "trance": {"mood_electronic": 1}, "synthwave": {"mood_electronic": 1},
+    "dnb": {"mood_electronic": 1}, "house_party": {"danceability_hl": 1, "mood_party": 1},
+    "funk_disco": {"danceability_hl": 1}, "summer_heat": {"danceability_hl": 1, "mood_party": 1},
+    "uk_garage": {"danceability_hl": 1, "mood_electronic": 1},
+    "meditation": {"mood_relaxed": 1, "mood_aggressive": 0}, "spa_bath": {"mood_relaxed": 1},
+    "sleep": {"mood_relaxed": 1, "mood_aggressive": 0}, "yoga_stretch": {"mood_relaxed": 1},
+}
+
+
+def _moodtheme_boost(entry, profile_key):
+    """Pull tracks whose Essentia mood/theme tags match the profile's theme. `moodtheme` is
+    {tag: prob}; returns 0.0 when either side is absent (so it no-ops until tracks are analysed)."""
+    wanted = _PROFILE_MOODTHEME.get(profile_key)
+    mt = entry.get("moodtheme")
+    if not wanted or not mt:
+        return 0.0
+    return -_MOODTHEME_WEIGHT * min(1.0, sum(mt.get(t, 0.0) for t in wanted))
+
+
+def _moodclass_boost(entry, profile_key):
+    """Pull on the calibrated mood-class fields a profile cares about (high or low). No-ops for
+    profiles without a spec or tracks without the data."""
+    spec = _PROFILE_MOODCLASS.get(profile_key)
+    if not spec:
+        return 0.0
+    total, n = 0.0, 0
+    for field, want_high in spec.items():
+        v = entry.get(field)
+        if v is None:
+            continue
+        total += v if want_high else (1.0 - v)
+        n += 1
+    return -_MOODCLASS_WEIGHT * (total / n) if n else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -7079,6 +7215,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             _acoustic_distance_to_centroid(entry, target)
             + _mood_tag_boost(entry, profile_key)
             + _style_tag_boost(entry, profile_key)
+            + _moodtheme_boost(entry, profile_key)
+            + _moodclass_boost(entry, profile_key)
         )
 
     history_rks = sorted(
