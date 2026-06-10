@@ -1049,24 +1049,137 @@ except Exception:
 
 # Distinctive lyric themes (>=2 keyword hits to fire). Generic words like "love" are excluded —
 # the audio mood models cover emotion; lyrics add lyrically-specific themes the audio can't know.
-_LYRIC_THEMES = {
-    "christmas": ["christmas", "santa", "sleigh", "jingle", "mistletoe", "reindeer", "silent night", "merry"],
-    "summer": ["summertime", "summer", "sunshine", "beach", "heatwave", "by the pool"],
-    "heartbreak": ["broken heart", "heartbreak", "in tears", "crying", "miss you", "without you",
-                   "left me", "say goodbye", "so lonely"],
-    "road": ["highway", "on the road", "road trip", "driving down", "behind the wheel", "miles away", "open road"],
-    "party": ["dance floor", "party all", "hands up", "let's dance", "all night long", "turn it up"],
-    "rain": ["raining", "the rain", "thunder", "storm"],
-    # love, split into sub-feelings so romance mixes don't collapse to one theme (>=2 hits each)
-    "love": ["i love you", "fall in love", "in love with", "my love", "be mine", "all of me", "my baby"],
-    "devotion": ["forever", "marry me", "i do", "grow old", "by your side", "spend my life",
-                 "promise you", "always be there", "till the end", "for the rest of"],
-    "desire": ["all night long", "hold you close", "your body", "make love", "your touch",
-               "your lips", "on your skin", "in the dark", "i need your body", "take you home"],
-    "new_love": ["butterflies", "can't stop thinking", "head over heels", "falling for you",
-                 "first time i saw", "got a crush", "weak in the knees", "nervous"],
-    "longing": ["miss you", "far away", "without you", "come back to me", "wish you were",
-                "miles apart", "long distance", "thinking of you"],
+_LYRIC_THEMES = {   # >=2 distinctive phrase hits to fire; phrases kept theme-specific to avoid cross-firing
+    # --- seasonal / weather ---
+    "christmas": ["christmas", "santa", "sleigh", "jingle", "mistletoe", "reindeer", "silent night", "merry christmas",
+                  "deck the halls", "north pole", "winter wonderland", "yuletide", "christmas tree", "ho ho ho",
+                  "season's greetings", "under the tree", "christmas eve", "sleigh bells", "st nick", "auld lang"],
+    "summer": ["summertime", "summer night", "sunshine", "on the beach", "heatwave", "by the pool", "hot summer",
+               "in the sun", "ocean breeze", "tan lines", "endless summer", "sunny days", "summer love", "school's out",
+               "barefoot", "beach party", "waves crash", "catching a tan", "poolside", "long summer"],
+    "winter": ["snow falling", "cold winter", "frozen", "winter night", "snowflakes", "icy", "bundle up", "cold outside",
+               "winter chill", "snowstorm", "freezing", "first snow", "the snow falls", "winter's cold"],
+    "rain": ["raining", "the rain", "thunder", "storm", "pouring", "rainy day", "drops of rain", "umbrella", "downpour",
+             "wet streets", "after the rain", "rain falls", "grey skies", "rain on the", "thunderstorm"],
+    # --- love ---
+    "love": ["i love you", "in love with", "my love", "all of me", "be mine", "my baby", "my darling", "you're the one",
+             "love of my life", "you complete me", "my everything", "i'm yours", "two hearts", "made for me", "you and i",
+             "love you more", "my one true", "forever in love", "my sweetheart", "i adore you", "you're my world",
+             "i'm in love", "need you", "be with you", "you're mine", "you belong with me", "i love the way",
+             "loving you", "my heart belongs", "you and me", "all i need is you", "i'm falling in love"],
+    "new_love": ["love at first sight", "butterflies", "can't stop thinking", "head over heels", "falling for you",
+                 "first time i saw", "got a crush", "weak in the knees", "swept off my feet", "fell for you", "smitten",
+                 "you had me at", "heart skips a beat", "knock me off my feet", "crushing on", "never felt this way",
+                 "the moment i saw", "stars in my eyes", "out of my head", "love struck", "fall for you"],
+    "desire": ["your body", "make love", "your touch", "your lips", "on your skin", "in the dark",
+               "i need your body", "take you home", "hold you close", "between the sheets", "turn me on", "want you bad",
+               "pull you closer", "feel your skin", "hot and heavy", "under the covers", "tangled up", "your fingertips",
+               "skin to skin", "all over me", "come a little closer"],
+    "devotion": ["marry", "i do", "grow old", "spend my life", "spend the rest", "for the rest of my life",
+                 "never let you go", "through thick and thin", "my one and only", "vows",
+                 "ever after", "for better or worse", "till death do", "on one knee", "a ring",
+                 "be my wife", "be my husband", "you're the one i", "love you till", "spend forever with you",
+                 "wedding", "by my side forever", "grow old with"],
+    "longing": ["miss you", "far away", "without you", "come back to me", "wish you were here", "miles apart",
+                "long distance", "thinking of you", "count the days", "can't wait to see", "ache for you", "yearn for",
+                "come home to me", "the distance between", "every mile", "wishing you were", "pining", "i long for",
+                "missing you tonight", "so far from"],
+    # --- heartbreak / sadness ---
+    "heartbreak": ["broken heart", "heartbreak", "you left me", "we're over", "breaking up", "the end of us",
+                   "tore us apart", "you cheated", "used to love", "picking up the pieces", "last goodbye", "walk away",
+                   "set you free", "our love is gone", "you broke me", "said goodbye", "love gone wrong", "you don't love",
+                   "heart in two", "should have stayed", "you walked out", "torn apart", "left me here", "without your love",
+                   "you don't want me", "let you down", "lost your love", "breaking my heart", "you're leaving",
+                   "love we had", "fell apart", "hurt me"],
+    "grief": ["gone too soon", "rest in peace", "watching over me", "never see you again", "heaven needed another",
+              "in my heart you'll stay", "gone forever", "look down on me", "saying goodbye forever", "in a better place",
+              "fly high", "rest easy", "the angels", "see you on the other side", "you're in heaven", "gone but not forgotten",
+              "your memory lives", "miss you every day", "till we meet again", "your spirit"],
+    "loneliness": ["all alone", "so lonely", "by myself", "empty room", "on my own", "lonely night", "four walls",
+                   "talking to myself", "alone again", "no one to call", "nobody here", "lonely heart", "all by myself",
+                   "no one around", "empty house", "feeling so alone", "isolated"],
+    "sad": ["crying", "in tears", "so sad", "the blues", "hurts so bad", "can't stop crying", "tears fall", "drowning in",
+            "heavy heart", "broken inside", "dark days", "the pain inside", "tears in my eyes", "crying myself", "so much pain",
+            "drowning in tears", "crying again", "tears keep falling", "my sorrow"],
+    "regret": ["i'm sorry", "my mistake", "should have", "wish i could", "what i've done", "take it back", "if i could",
+               "i regret", "my fault", "too late now", "looking back", "the things i said", "should've known",
+               "my biggest mistake", "i was wrong", "wish i never", "can't undo"],
+    "moving_on": ["moving on", "better off", "over you", "let you go", "i'm free now", "new chapter", "find myself",
+                  "stronger now", "no more tears", "done with you", "getting over you", "brand new start", "my own two feet",
+                  "moved on", "done crying", "i don't need you", "better without you", "time to let go", "i'm done"],
+    # --- empowerment / motivation ---
+    "empowerment": ["rise up", "stronger", "unstoppable", "can't hold me down", "take on the world", "my time",
+                    "on top of the world", "never give up", "stand tall", "conquer", "unbreakable", "born to win",
+                    "light it up", "i am the one", "rise above", "nothing can stop", "time to shine", "i'm a fighter",
+                    "invincible", "stronger than", "i won't quit", "born this way", "i'm beautiful", "shine bright",
+                    "no one can stop me", "i believe in", "won't back down", "rise like", "i am strong",
+                    "the champion", "we are the", "warrior"],
+    "confidence": ["like a boss", "that girl", "on fire", "can't touch this", "run the world", "look at me now", "swagger",
+                   "feeling myself", "own it", "head held high", "unbothered", "main character", "watch me", "i'm the one",
+                   "bow down", "i run this", "do it my way", "i'm that", "best of the best", "no one like me"],
+    "resilience": ["keep going", "survive", "get back up", "weather the storm", "never break", "made it through", "fight on",
+                   "hold on", "don't give up", "push through", "i came back", "stand my ground", "won't back down",
+                   "against all odds", "i will survive", "still standing", "through the pain", "not breaking", "carry on"],
+    "freedom": ["break free", "set me free", "run away", "no chains", "fly away", "breaking out", "wild and free",
+                "my own way", "no rules", "born to run", "can't cage me", "break these chains", "running free",
+                "let me be free", "free at last", "break away", "spread my wings", "no limits"],
+    # --- travel ---
+    "road": ["highway", "on the road", "road trip", "behind the wheel", "miles away", "open road", "gasoline", "the freeway",
+             "windows down", "cruising", "full tank", "headlights", "drive all night", "leaving town", "rolling down",
+             "hit the road", "down the highway", "engine running", "two lane", "tail lights", "out on the road"],
+    "wanderlust": ["around the world", "wanderlust", "leave it all behind", "new horizons", "somewhere new", "pack my bags",
+                   "see the world", "on the move", "chasing horizons", "no destination", "far off places", "wherever the wind",
+                   "adventure awaits", "take a chance on", "running away to", "find a new", "across the ocean"],
+    "homesick": ["going home", "take me home", "my home town", "where i belong", "sweet home", "country roads", "back home again",
+                 "miss my home", "homeward", "home sweet home", "place i call home", "my old home", "heading home", "my roots"],
+    # --- party / nightlife ---
+    "party": ["dance floor", "party all", "hands up", "let's dance", "turn it up", "in the club", "get down",
+              "drop the beat", "lose control", "dance all night", "on the dance floor", "throw your hands", "tonight we party",
+              "move your body", "party people", "til the morning", "turn the music up", "raise the roof", "the dj"],
+    "celebration": ["celebrate", "raise a glass", "cheers", "here's to", "good times", "time of our lives", "we made it",
+                    "champagne", "the best night", "unforgettable night", "let's celebrate", "toast to", "living it up",
+                    "this is our night", "memories tonight", "on top of the world", "what a night"],
+    "drinking": ["whiskey", "tequila", "shots", "drunk", "the bar", "one more drink", "bottle of", "hangover", "last call",
+                 "pour me", "honky tonk", "bar stool", "another round", "getting drunk", "drink away", "cheap wine",
+                 "double shot", "sippin", "neon lights", "down the bottle"],
+    # --- reflection / nostalgia ---
+    "nostalgia": ["the good old days", "back in the day", "remember when", "those days", "best days of my life",
+                  "glory days", "way back when", "like we used to", "take me back", "reminisce", "the way we were",
+                  "faded photographs", "younger days", "those were the days", "back when we", "long time ago",
+                  "those were the best", "memories of us", "the old days", "how it used to be", "i was younger",
+                  "when i was young", "we were young", "back then", "those summer days", "used to know",
+                  "the days when", "still remember", "memory of", "where did the time"],
+    "youth": ["young and free", "teenage", "growing up", "when we were young", "forever young", "my youth", "high school",
+              "coming of age", "young hearts", "reckless", "those teenage", "wild youth", "seventeen", "young and wild",
+              "kids again", "our younger", "back in school"],
+    # --- spiritual / hope ---
+    "faith": ["praise the lord", "my lord", "i pray to", "jesus", "the gospel", "salvation", "on my knees praying",
+              "god above", "saved my soul", "holy spirit", "oh happy day", "washed my sins", "in the name of the lord",
+              "thank you lord", "sweet jesus", "the good lord", "the preacher", "hallelujah amen", "praise his name"],
+    "hope": ["better days", "brighter days", "the sun will", "never lose hope", "keep the faith", "light at the end",
+             "a new dawn", "things will get better", "rise again", "silver lining", "hold on to hope", "tomorrow will",
+             "new day", "brighter tomorrow", "keep believing", "light will come", "we'll be alright", "hold on",
+             "we'll make it", "gonna be alright", "everything's gonna be", "keep your head up", "the sun'll come",
+             "don't give up", "hold my hand", "make it through", "it'll be okay", "the dawn", "brighter side"],
+    "gratitude": ["thankful", "grateful", "count my blessings", "lucky to have", "give thanks", "so blessed",
+                  "appreciate you", "thank you for", "blessings", "grateful for", "i'm so lucky"],
+    # --- social ---
+    "friendship": ["my friends", "ride or die", "by my side", "through it all", "best friends", "my crew", "day ones",
+                   "we got each other", "friends forever", "my people", "ride for you", "always have my back",
+                   "through thick", "stick together", "real ones", "my squad", "till the end my friends"],
+    "money": ["money", "racks", "getting paid", "the bag", "stacks", "diamonds", "designer", "flex", "bands", "big money",
+              "ballin", "hundred dollar", "make it rain", "my paper", "counting money", "gold chains", "new money",
+              "rich", "cash flow", "bentley"],
+    "hustle": ["the grind", "hustle", "work hard", "come up", "started from", "self made", "chase the dream", "rise to the top",
+               "grind don't stop", "put in work", "on my grind", "no days off", "earn it", "work for it", "building empire",
+               "from the bottom", "grinding", "stack my paper"],
+    # --- anger / rebellion ---
+    "rebellion": ["fight the power", "the system", "revolution", "break the rules", "anarchy", "rage against", "burn it down",
+                  "no justice", "tear it down", "take to the streets", "riot", "fight back", "resist", "power to the people",
+                  "won't comply", "stand and fight", "rebel", "up against the", "no peace"],
+    "angst": ["screaming", "can't take it", "sick of", "fed up", "breaking down", "i hate this", "against the world",
+              "misunderstood", "nobody gets me", "losing it", "tear it apart", "no one understands", "wanna scream",
+              "i'm not okay", "numb inside", "can't breathe", "on the edge"],
 }
 
 def _lrclib_search(artist, title):
@@ -1085,7 +1198,11 @@ def _analyze_lyrics(text):
     """(valence 0-1 or None, [themes], lang or None) from plain lyrics. VADER averaged per line
     (the whole-song compound saturates); themes from distinctive keyword counts."""
     tl = text.lower()
-    themes = [th for th, kws in _LYRIC_THEMES.items() if sum(tl.count(k) for k in kws) >= 2]
+    # Fire a theme on >=2 DISTINCT phrases, OR one phrase repeated >=4x (a chorus hook like the
+    # "christmas" in Last Christmas). Distinct-matching stops a repeated colloquialism (e.g.
+    # "hallelujah" x3 in a funk song) from tripping a theme; the >=4 rule keeps single-hook songs.
+    themes = [th for th, kws in _LYRIC_THEMES.items()
+              if sum(1 for k in kws if k in tl) >= 2 or any(tl.count(k) >= 4 for k in kws)]
     valence = None
     if _vader:
         comps = [_vader.polarity_scores(l)["compound"] for l in text.splitlines() if l.strip()]

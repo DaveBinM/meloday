@@ -3780,6 +3780,13 @@ _PROFILE_MOODTHEME.update({
     "wedding_day": ["love", "happy", "party"], "romantic_jazz": ["love", "cool", "soft"],
     "piano_romance": ["love", "calm", "soft"], "acoustic_romance": ["love", "soft", "emotional"],
     "indie_romance": ["love", "melancholic", "dream"], "synthpop_romance": ["love", "retro", "dream"],
+    # subtle differentiation of the calm/melancholic, calm/relaxing and summer-chill clusters
+    "autumn_rain": ["melancholic", "calm", "soft"], "blue_hour": ["melancholic", "dream", "calm"],
+    "overcast": ["melancholic", "calm", "soundscape"], "sunday_scaries": ["melancholic", "dark", "calm"],
+    "serene": ["calm", "meditative", "soft"], "wind_down": ["calm", "relaxing"],
+    "evening_unwind": ["calm", "relaxing", "soft"], "cool_down": ["calm", "relaxing", "positive"],
+    "golden_afternoon": ["summer", "relaxing", "happy"], "beach_vibes": ["summer", "relaxing", "fun"],
+    "summer_evening": ["summer", "relaxing", "soft"],
 })
 
 
@@ -3933,22 +3940,57 @@ _LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and ove
 
 # Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
 _PROFILE_LYRIC_THEMES = {
+    # Only mixes whose IDENTITY is about what the songs are *about* get a lyric theme; instrumental
+    # and pure-sound/texture mixes (meditation, ambient, techno, jazz, the decades, etc.) get none.
+    # --- seasonal / weather ---
     "festive": ["christmas"],
-    "summer_heat": ["summer"], "summer_breeze": ["summer"], "summer_tropical": ["summer"],
-    "summer_evening": ["summer"], "beach_vibes": ["summer"], "cookout": ["summer"], "sunny": ["summer"],
-    "summer_roadtrip": ["summer", "road"], "road_trip": ["road"], "driving_mix": ["road"],
-    "driving_singalong": ["road"], "night_drive": ["road"],
-    "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "celebration": ["party"],
-    "heartbreak": ["heartbreak"], "grief_release": ["heartbreak"], "melancholy": ["heartbreak"],
-    "rainy_day": ["rain"], "stormy": ["rain"],
-    # romance / date — split into love sub-feelings so each mix is distinct (not all "love")
-    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"],
-    "romantic_dinner": ["love"], "slow_dance": ["love"], "tender": ["love"], "romantic_jazz": ["love"],
-    "acoustic_romance": ["love"], "synthpop_romance": ["love"], "strings_romance": ["love"],
+    "summer_heat": ["summer"], "summer_breeze": ["summer"], "summer_tropical": ["summer"], "summer_evening": ["summer"],
+    "beach_vibes": ["summer"], "sunny": ["summer"], "cookout": ["summer", "party"], "summer_roadtrip": ["summer", "road"],
+    "rainy_day": ["rain"], "stormy": ["rain"], "autumn_rain": ["rain"],
+    "winter_nights": ["winter"], "winter_cosy": ["winter"],
+    "autumn_leaves": ["nostalgia"], "autumn_embers": ["nostalgia"], "spring_bloom": ["hope"],
+    # --- travel ---
+    "road_trip": ["road"], "driving_mix": ["road"], "night_drive": ["road"], "driving_singalong": ["road", "nostalgia"],
+    "commute_mix": ["road"], "country_roads": ["homesick", "road"],
+    # --- love / romance (each its own sub-feeling) ---
+    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"], "romantic_dinner": ["love"],
+    "slow_dance": ["love"], "tender": ["love"], "romantic_jazz": ["love"], "acoustic_romance": ["love"],
+    "synthpop_romance": ["love"], "candlelight": ["love"],
     "date_night": ["desire"], "late_night_romance": ["desire"], "flirty": ["desire"], "slow_burn": ["desire"],
+    "after_dark": ["desire"], "after_hours_rnb": ["love", "desire"],
     "crush": ["new_love"], "first_date": ["new_love"],
     "wedding_day": ["devotion"], "loved_up": ["devotion"], "devotion": ["devotion"],
-    "indie_romance": ["longing"], "long_distance": ["longing"],
+    "indie_romance": ["longing"], "long_distance": ["longing"], "yearning": ["longing"],
+    # soul / bossa lean to love lyrics
+    "neo_soul": ["love"], "motown_soul": ["love"], "london_soul": ["love"], "glasgow_soul": ["love"],
+    "melbourne_soul": ["love"], "bossa_samba": ["love"],
+    # --- heartbreak / sadness ---
+    "heartbreak": ["heartbreak"], "grief_release": ["grief"], "melancholy": ["sad"], "moody_mix": ["sad"],
+    "grey_skies": ["sad"], "vulnerable": ["sad", "loneliness"], "bittersweet": ["nostalgia", "longing"],
+    "moving_on": ["moving_on"], "blues_bar": ["heartbreak", "drinking"], "emo_poppunk": ["angst", "heartbreak"],
+    # --- empowerment / motivation / hope ---
+    "triumphant": ["empowerment"], "empowering": ["empowerment"], "monday_motivation": ["empowerment"],
+    "workout": ["empowerment"], "running": ["empowerment"], "cathartic": ["resilience", "empowerment"],
+    "confidence_boost": ["confidence"], "main_character": ["confidence"], "treat_yourself": ["confidence"],
+    "defiant": ["resilience", "rebellion"], "hopeful": ["hope"], "midweek_reset": ["hope"], "morning": ["hope"],
+    "fresh_start": ["hope"], "conscious_flow": ["hope", "resilience"],
+    # --- party / nightlife / celebration ---
+    "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "euphoric": ["party"],
+    "house_party": ["party"], "uk_garage": ["party"], "glasgow_house": ["party"], "london_garage": ["party"],
+    "afrobeat": ["party"], "celebration": ["celebration"], "friday_feeling": ["party", "celebration"],
+    "weekend_mix": ["party", "celebration"], "funk_disco": ["party", "celebration"], "party_throwback": ["party", "nostalgia"],
+    "latin_heat": ["party", "desire"],
+    # --- nostalgia / youth / friendship ---
+    "throwback_anthems": ["nostalgia"], "memory_lane": ["nostalgia"], "nostalgia_mix": ["nostalgia"],
+    "school_days": ["youth", "nostalgia"], "old_friends": ["friendship", "nostalgia"], "campfire": ["friendship"],
+    # --- anger / rebellion / freedom ---
+    "angst_mix": ["angst"], "punk_energy": ["rebellion", "angst"], "garage_grunge": ["angst"],
+    "outlaw_country": ["rebellion", "drinking"], "reggae_dub": ["freedom"],
+    # --- hip-hop: money / hustle ---
+    "trap_mode": ["money", "hustle"], "g_funk": ["money", "hustle"], "boom_bap": ["hustle", "nostalgia"],
+    "london_grime": ["hustle", "money"], "melbourne_hiphop": ["hustle", "money"],
+    # --- faith / home ---
+    "gospel": ["faith"], "celtic_folk": ["homesick"], "bluegrass": ["homesick"],
 }
 # Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
 _PROFILE_LYRIC_VALENCE = {
