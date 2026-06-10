@@ -878,7 +878,7 @@ def _run_concurrent(todo, fetch_fn, update_sql, workers, label, verbose=False):
     writer thread (own DB connection) batches `update_sql`. The rate limiter inside the HTTP wrapper
     (not the worker count) caps the request rate, so this is safe for rate-limited APIs."""
     import concurrent.futures, queue as _queue
-    q = _queue.Queue(maxsize=4000); STOP = object(); cnt = {"n": 0}; start = time.time()
+    q = _queue.Queue(maxsize=4000); STOP = object(); cnt = {"n": 0}; start = time.time(); _last = [0.0]
 
     def _writer():
         wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
@@ -890,10 +890,12 @@ def _run_concurrent(todo, fetch_fn, update_sql, workers, label, verbose=False):
             row, disp = it; batch.append(row); cnt["n"] += 1
             if len(batch) >= 100:
                 wc.executemany(update_sql, batch); wc.commit(); batch = []
+            t = time.time()
             if verbose:
                 log_msg(f"   {disp}")
-            elif cnt["n"] % 200 == 0:
-                rate = cnt["n"] / max(0.1, time.time() - start)
+            elif t - _last[0] >= 1.0:                 # repaint ~1x/sec so the count moves smoothly
+                _last[0] = t
+                rate = cnt["n"] / max(0.1, t - start)
                 eta = timedelta(seconds=int((len(todo) - cnt["n"]) / max(0.1, rate)))
                 log_msg(f"{label}: [{cnt['n']}/{len(todo)}] {rate:.1f}/s | ETA {eta} ", end='\r')
         if batch:
@@ -1091,7 +1093,7 @@ def sync_artist_origin(limit=None):
         artist_tracks[art or ""].append(rk)
     artists = [a for a in artist_tracks if a]
     log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s).")
-    q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time()
+    q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time(); _last = [0.0]
     now2 = time.time()
 
     def _writer():
@@ -1111,7 +1113,8 @@ def sync_artist_origin(limit=None):
             if verbose:
                 log_msg(f"   {artist[:22]:22} -> city={(origin or {}).get('city')} "
                         f"region={(origin or {}).get('region')} country={(origin or {}).get('country')}")
-            elif cnt["a"] % 50 == 0:
+            elif time.time() - _last[0] >= 1.0:
+                _last[0] = time.time()
                 rate = cnt["a"] / max(0.1, time.time() - start)
                 eta = timedelta(seconds=int((len(artists) - cnt["a"]) / max(0.1, rate)))
                 log_msg(f"MB: [{cnt['a']}/{len(artists)} artists] {rate:.2f}/s | ETA {eta} ", end='\r')
@@ -1303,6 +1306,7 @@ def sync_lyrics(limit=None, force=False):
     _nlp_lock = threading.Lock()       # vaderSentiment/langdetect aren't guaranteed thread-safe
     cnt = {"n": 0, "lyr": 0}
     start = time.time()
+    _last = [0.0]
 
     def _writer():
         wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
@@ -1322,7 +1326,8 @@ def sync_lyrics(limit=None, force=False):
                 wc.commit(); batch = []
             if verbose:
                 log_msg(f"   {disp}")
-            elif cnt["n"] % 200 == 0:
+            elif time.time() - _last[0] >= 1.0:
+                _last[0] = time.time()
                 rate = cnt["n"] / max(0.1, time.time() - start)
                 eta = timedelta(seconds=int((len(todo) - cnt["n"]) / max(0.1, rate)))
                 log_msg(f"Lyrics: [{cnt['n']}/{len(todo)}] {rate:.1f}/s | ETA {eta} ", end='\r')
