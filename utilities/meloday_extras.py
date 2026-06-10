@@ -3628,6 +3628,47 @@ def _moodclass_boost(entry, profile_key):
     return -_MOODCLASS_WEIGHT * (total / n) if n else 0.0
 
 
+_LASTFM_WEIGHT = 0.30   # pull toward tracks whose Last.fm community tags match the mix's theme
+
+# Last.fm-specific tag words — the occasion/activity/era folksonomy the 56 model tags miss
+# (a track tagged "workout"/"rainy day"/"makeout" won't contain the model words sport/melancholic/
+# sexy). Merged with _PROFILE_MOODTHEME when matching the community tags.
+_PROFILE_LASTFM = {
+    "rainy_day": ["rain"], "workout": ["workout", "gym"], "running": ["running"],
+    "study_session": ["study", "concentration", "focus"], "deep_reading": ["reading", "study"],
+    "road_trip": ["road trip", "driving"], "driving_mix": ["driving", "road trip"],
+    "driving_singalong": ["driving", "road trip"], "night_drive": ["night drive", "driving"],
+    "sleep": ["sleep"], "chill": ["chill"], "lazy_sunday": ["lazy sunday", "chill"],
+    "cosy": ["cosy", "chill"], "late_night_romance": ["makeout", "sensual"],
+    "slow_burn": ["makeout", "sensual"], "flirty": ["sexy"], "festive": ["xmas", "holiday"],
+    "happy": ["feel good"], "heartbreak": ["breakup", "heartbreak"], "morning": ["morning"],
+    "brunch_mix": ["sunday morning"], "focus": ["focus", "concentration"],
+    "deep_work": ["focus", "concentration"], "summer_roadtrip": ["road trip"],
+    "beach_vibes": ["beach"], "cookout": ["bbq", "summer"], "main_character": ["confidence"],
+    "confidence_boost": ["confidence", "empowering"], "throwback_anthems": ["throwback", "nostalgia"],
+    "nostalgia_mix": ["nostalgia"], "pre_party": ["pregame", "party"], "meditation": ["meditation"],
+}
+
+
+def _lastfm_tag_boost(entry, profile_key):
+    """Pull tracks whose Last.fm tags match the profile's theme words (_PROFILE_MOODTHEME plus the
+    Last.fm-specific _PROFILE_LASTFM folksonomy). Track-level tags (precise, per-song) count double
+    the artist-level tags (broad); weights are Last.fm's 0–100 counts. No-op until tags are synced."""
+    wanted = list(_PROFILE_MOODTHEME.get(profile_key, ())) + list(_PROFILE_LASTFM.get(profile_key, ()))
+    if not wanted:
+        return 0.0
+    tt = entry.get("lastfm_track_tags") or {}
+    at = entry.get("lastfm_artist_tags") or {}
+    if not tt and not at:
+        return 0.0
+
+    def _match(tags):
+        return sum(w for t, w in tags.items() if any(word in t for word in wanted))
+
+    score = 2.0 * _match(tt) + _match(at)
+    return -_LASTFM_WEIGHT * min(1.0, score / 150.0)
+
+
 # ---------------------------------------------------------------------------
 # Mood Mix Context Helpers — time-of-day and weather
 # ---------------------------------------------------------------------------
@@ -7217,6 +7258,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _style_tag_boost(entry, profile_key)
             + _moodtheme_boost(entry, profile_key)
             + _moodclass_boost(entry, profile_key)
+            + _lastfm_tag_boost(entry, profile_key)
         )
 
     history_rks = sorted(

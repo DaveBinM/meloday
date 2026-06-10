@@ -92,7 +92,8 @@ def load_essentia_cache_exclusive():
             "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
-            "mood_electronic, danceability_hl, moodtheme, genre_discogs "
+            "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
+            "lastfm_artist_tags, lastfm_track_tags "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -103,7 +104,8 @@ def load_essentia_cache_exclusive():
                 beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
                 arousal, valence, vocal_presence, \
                 mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
-                mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j in rows:
+                mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
+                lastfm_artist_j, lastfm_track_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -126,6 +128,8 @@ def load_essentia_cache_exclusive():
                 "mood_electronic": mood_electronic, "danceability_hl": danceability_hl,
                 "moodtheme": json.loads(moodtheme_j) if moodtheme_j else None,
                 "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
+                "lastfm_artist_tags": json.loads(lastfm_artist_j) if lastfm_artist_j else None,
+                "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
             }
         return result
     except Exception:
@@ -146,9 +150,10 @@ def upsert_essentia_cache_entries(entries):
              beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
              arousal, valence, vocal_presence,
              mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
-             mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn)
+             mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
+             lastfm_artist_tags, lastfm_track_tags)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -164,7 +169,9 @@ def upsert_essentia_cache_entries(entries):
              d.get("mood_electronic"), d.get("danceability_hl"),
              json.dumps(d["moodtheme"]) if d.get("moodtheme") is not None else None,
              json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
-             d.get("emb_effnet"), d.get("emb_musicnn"))
+             d.get("emb_effnet"), d.get("emb_musicnn"),
+             json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
+             json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None)
             for rk, d in entries.items()
         ])
         conn.commit()

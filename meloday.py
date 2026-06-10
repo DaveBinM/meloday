@@ -409,9 +409,10 @@ _UPSERT_SQL = """
      beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
      arousal, valence, vocal_presence,
      mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
-     mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn)
+     mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
+     lastfm_artist_tags, lastfm_track_tags)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
@@ -423,7 +424,8 @@ _CANONICAL_COLUMNS = (
     "arousal REAL, valence REAL, vocal_presence REAL, "
     "mood_happy REAL, mood_sad REAL, mood_aggressive REAL, mood_relaxed REAL, "
     "mood_party REAL, mood_acoustic REAL, mood_electronic REAL, danceability_hl REAL, "
-    "moodtheme TEXT, genre_discogs TEXT, emb_effnet BLOB, emb_musicnn BLOB"
+    "moodtheme TEXT, genre_discogs TEXT, emb_effnet BLOB, emb_musicnn BLOB, "
+    "lastfm_artist_tags TEXT, lastfm_track_tags TEXT"
 )
 
 def _ensure_db_schema(conn):
@@ -458,6 +460,8 @@ def _ensure_db_schema(conn):
         ("genre_discogs",        "genre_discogs TEXT"),
         ("emb_effnet",           "emb_effnet BLOB"),
         ("emb_musicnn",          "emb_musicnn BLOB"),
+        ("lastfm_artist_tags",   "lastfm_artist_tags TEXT"),
+        ("lastfm_track_tags",    "lastfm_track_tags TEXT"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -548,7 +552,9 @@ def _entry_to_row(rk, d):
             d.get("mood_electronic"), d.get("danceability_hl"),
             json.dumps(d["moodtheme"]) if d.get("moodtheme") is not None else None,
             json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
-            d.get("emb_effnet"), d.get("emb_musicnn"))
+            d.get("emb_effnet"), d.get("emb_musicnn"),
+            json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
+            json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None)
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
@@ -557,7 +563,8 @@ def _row_to_entry(row):
         beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
         arousal, valence, vocal_presence, \
         mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
-        mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn = row
+        mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn, \
+        lastfm_artist_j, lastfm_track_j = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -581,6 +588,8 @@ def _row_to_entry(row):
         "moodtheme": json.loads(moodtheme_j) if moodtheme_j else None,
         "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
         "emb_effnet": emb_effnet, "emb_musicnn": emb_musicnn,
+        "lastfm_artist_tags": json.loads(lastfm_artist_j) if lastfm_artist_j else None,
+        "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
     }
 
 def _migrate_json_to_sqlite():
@@ -617,7 +626,8 @@ def load_essentia_cache():
             "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
-            "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn "
+            "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn, "
+            "lastfm_artist_tags, lastfm_track_tags "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
