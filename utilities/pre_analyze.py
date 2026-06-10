@@ -93,7 +93,8 @@ def load_essentia_cache_exclusive():
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
-            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners "
+            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
+            "lyric_valence, lyric_themes, lyric_lang "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -105,7 +106,8 @@ def load_essentia_cache_exclusive():
                 arousal, valence, vocal_presence, \
                 mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
                 mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
-                lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners in rows:
+                lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
+                lyric_valence, lyric_themes_j, lyric_lang in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -132,6 +134,9 @@ def load_essentia_cache_exclusive():
                 "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
                 "artist_origin": json.loads(artist_origin_j) if artist_origin_j else None,
                 "lastfm_listeners": lastfm_listeners,
+                "lyric_valence": lyric_valence,
+                "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
+                "lyric_lang": lyric_lang,
             }
         return result
     except Exception:
@@ -153,9 +158,10 @@ def upsert_essentia_cache_entries(entries):
              arousal, valence, vocal_presence,
              mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
              mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
-             lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners)
+             lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
+             lyric_valence, lyric_themes, lyric_lang)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -175,7 +181,9 @@ def upsert_essentia_cache_entries(entries):
              json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
              json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None,
              json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None,
-             d.get("lastfm_listeners"))
+             d.get("lastfm_listeners"), d.get("lyric_valence"),
+             json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
+             d.get("lyric_lang"))
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -955,10 +963,123 @@ def sync_artist_origin(limit=None):
     log_msg("\n[INFO] MusicBrainz origin sync complete.")
 
 
+# --- METADATA SYNC: lyrics (LRCLIB; sentiment + theme keywords + language) ---
+_LRCLIB_UA = "meloday/1.0 (https://github.com/meloday)"
+try:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    _vader = SentimentIntensityAnalyzer()
+except Exception:
+    _vader = None
+try:
+    from langdetect import detect as _detect_lang, DetectorFactory
+    DetectorFactory.seed = 0
+except Exception:
+    _detect_lang = None
+
+# Distinctive lyric themes (>=2 keyword hits to fire). Generic words like "love" are excluded —
+# the audio mood models cover emotion; lyrics add lyrically-specific themes the audio can't know.
+_LYRIC_THEMES = {
+    "christmas": ["christmas", "santa", "sleigh", "jingle", "mistletoe", "reindeer", "silent night", "merry"],
+    "summer": ["summertime", "summer", "sunshine", "beach", "heatwave", "by the pool"],
+    "heartbreak": ["broken heart", "heartbreak", "in tears", "crying", "miss you", "without you",
+                   "left me", "say goodbye", "so lonely"],
+    "road": ["highway", "on the road", "road trip", "driving down", "behind the wheel", "miles away", "open road"],
+    "party": ["dance floor", "party all", "hands up", "let's dance", "all night long", "turn it up"],
+    "rain": ["raining", "the rain", "thunder", "storm"],
+}
+
+def _lrclib_get(artist, title, album, duration):
+    url = "https://lrclib.net/api/get?" + urllib.parse.urlencode(
+        {"artist_name": artist, "track_name": title, "album_name": album or "", "duration": int(duration or 0)})
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": _LRCLIB_UA}), timeout=15) as r:
+            return json.loads(r.read().decode("utf-8", "ignore"))
+    except Exception:
+        return None   # 404 (no match) or network error
+
+def _analyze_lyrics(text):
+    """(valence 0-1 or None, [themes], lang or None) from plain lyrics. VADER averaged per line
+    (the whole-song compound saturates); themes from distinctive keyword counts."""
+    tl = text.lower()
+    themes = [th for th, kws in _LYRIC_THEMES.items() if sum(tl.count(k) for k in kws) >= 2]
+    valence = None
+    if _vader:
+        comps = [_vader.polarity_scores(l)["compound"] for l in text.splitlines() if l.strip()]
+        if comps:
+            valence = round((sum(comps) / len(comps) + 1) / 2, 4)
+    lang = None
+    if _detect_lang:
+        try:
+            lang = _detect_lang(text[:2000])
+        except Exception:
+            lang = None
+    return valence, themes, lang
+
+def sync_lyrics(limit=None):
+    """Fetch lyrics from LRCLIB and derive sentiment + themes + language per cached track.
+    Targeted UPDATE; resumable (done = lyric_lang set, incl. 'instrumental'/'none' sentinels)."""
+    if _vader is None:
+        log_msg("[WARN] vaderSentiment not installed — lyric_valence will be null (themes/lang only). "
+                "pip install vaderSentiment langdetect for the full version.")
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
+    music = plex.library.section(MUSIC_LIBRARY)
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    cached = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache")}
+    done = {rk for (rk,) in conn.execute("SELECT rating_key FROM essentia_cache WHERE lyric_lang IS NOT NULL")}
+    log_msg("Fetching tracks from Plex...")
+    tracks = music.search(libtype='track', container_size=5000)
+    todo = [t for t in tracks if str(t.ratingKey) in cached and str(t.ratingKey) not in done]
+    if limit:
+        todo = todo[:int(limit)]
+    verbose = bool(limit) and int(limit) <= 25
+    log_msg(f"[INFO] Lyrics sync: {len(todo)} tracks to do ({len(done)} already done). "
+            f"sentiment={'on' if _vader else 'off'}, lang={'on' if _detect_lang else 'off'}")
+    pending, start = [], time.time()
+    for i, t in enumerate(todo):
+        artist = getattr(t, "grandparentTitle", "") or ""
+        title = getattr(t, "title", "") or ""
+        album = getattr(t, "parentTitle", "") or ""
+        dur = int((getattr(t, "duration", 0) or 0) / 1000)
+        valence, themes, lang = None, [], "none"   # 'none' = no lyrics found (still marks done)
+        d = _lrclib_get(artist, title, album, dur) if (artist and title) else None
+        if d:
+            if d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
+                lang = "instrumental"
+            else:
+                valence, themes, _lang = _analyze_lyrics(d["plainLyrics"])
+                lang = _lang or "unknown"
+        pending.append((valence, json.dumps(themes), lang, str(t.ratingKey)))
+        time.sleep(0.15)   # be polite to LRCLIB
+        if len(pending) >= 50 or i == len(todo) - 1:
+            conn.executemany(
+                "UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_lang=? WHERE rating_key=?",
+                pending)
+            conn.commit()
+            pending = []
+        if verbose:
+            log_msg(f"   {artist[:16]:16} - {title[:20]:20} | valence={valence} themes={themes} lang={lang}")
+        else:
+            avg = (time.time() - start) / max(1, i + 1)
+            eta = timedelta(seconds=int((len(todo) - i - 1) * avg))
+            log_msg(f"Lyrics: [{i + 1}/{len(todo)}] {avg:.2f}s/trk | ETA {eta} ", end='\r')
+    conn.close()
+    log_msg("\n[INFO] Lyrics sync complete.")
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
-    if "--sync-geo" in sys.argv:
+    if "--sync-lyrics" in sys.argv:
+        _lim = None
+        if "--limit" in sys.argv:
+            try:
+                _lim = int(sys.argv[sys.argv.index("--limit") + 1])
+            except Exception:
+                _lim = None
+        sync_lyrics(limit=_lim)
+    elif "--sync-geo" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:
             try:

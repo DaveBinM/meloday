@@ -410,9 +410,10 @@ _UPSERT_SQL = """
      arousal, valence, vocal_presence,
      mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
      mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
-     lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners)
+     lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
+     lyric_valence, lyric_themes, lyric_lang)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
@@ -426,7 +427,7 @@ _CANONICAL_COLUMNS = (
     "mood_party REAL, mood_acoustic REAL, mood_electronic REAL, danceability_hl REAL, "
     "moodtheme TEXT, genre_discogs TEXT, emb_effnet BLOB, emb_musicnn BLOB, "
     "lastfm_artist_tags TEXT, lastfm_track_tags TEXT, artist_origin TEXT, "
-    "lastfm_listeners INTEGER"
+    "lastfm_listeners INTEGER, lyric_valence REAL, lyric_themes TEXT, lyric_lang TEXT"
 )
 
 def _ensure_db_schema(conn):
@@ -465,6 +466,9 @@ def _ensure_db_schema(conn):
         ("lastfm_track_tags",    "lastfm_track_tags TEXT"),
         ("artist_origin",        "artist_origin TEXT"),
         ("lastfm_listeners",     "lastfm_listeners INTEGER"),
+        ("lyric_valence",        "lyric_valence REAL"),
+        ("lyric_themes",         "lyric_themes TEXT"),
+        ("lyric_lang",           "lyric_lang TEXT"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -559,7 +563,9 @@ def _entry_to_row(rk, d):
             json.dumps(d["lastfm_artist_tags"]) if d.get("lastfm_artist_tags") is not None else None,
             json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None,
             json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None,
-            d.get("lastfm_listeners"))
+            d.get("lastfm_listeners"), d.get("lyric_valence"),
+            json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
+            d.get("lyric_lang"))
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
@@ -569,7 +575,8 @@ def _row_to_entry(row):
         arousal, valence, vocal_presence, \
         mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
         mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn, \
-        lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners = row
+        lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
+        lyric_valence, lyric_themes_j, lyric_lang = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -597,6 +604,9 @@ def _row_to_entry(row):
         "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
         "artist_origin": json.loads(artist_origin_j) if artist_origin_j else None,
         "lastfm_listeners": lastfm_listeners,
+        "lyric_valence": lyric_valence,
+        "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
+        "lyric_lang": lyric_lang,
     }
 
 def _migrate_json_to_sqlite():
@@ -634,7 +644,8 @@ def load_essentia_cache():
             "arousal, valence, vocal_presence, "
             "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn, "
-            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners "
+            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
+            "lyric_valence, lyric_themes, lyric_lang "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()

@@ -3837,6 +3837,46 @@ def _listening_hour_boost(rk):
 
 
 # ---------------------------------------------------------------------------
+# Lyrics (LRCLIB): theme match (strong, unique) + light sentiment nudge
+# ---------------------------------------------------------------------------
+_LYRIC_THEME_WEIGHT   = 0.35   # strong pull for lyrically-defined mixes (festive/summer/road)
+_LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and overlaps mood_sad/happy
+
+# Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
+_PROFILE_LYRIC_THEMES = {
+    "festive": ["christmas"],
+    "summer_heat": ["summer"], "summer_breeze": ["summer"], "summer_tropical": ["summer"],
+    "summer_evening": ["summer"], "beach_vibes": ["summer"], "cookout": ["summer"], "sunny": ["summer"],
+    "summer_roadtrip": ["summer", "road"], "road_trip": ["road"], "driving_mix": ["road"],
+    "driving_singalong": ["road"], "night_drive": ["road"],
+    "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "celebration": ["party"],
+    "heartbreak": ["heartbreak"], "grief_release": ["heartbreak"], "melancholy": ["heartbreak"],
+    "rainy_day": ["rain"], "stormy": ["rain"],
+}
+# Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
+_PROFILE_LYRIC_VALENCE = {
+    "heartbreak": -1, "grief_release": -1, "melancholy": -1, "angst_mix": -1, "moody_mix": -1,
+    "happy": 1, "euphoric": 1, "sunny": 1, "celebration": 1, "confidence_boost": 1,
+}
+
+
+def _lyric_boost(entry, profile_key):
+    """Pull tracks whose lyrics match the mix theme (christmas/summer/road/party — the strong,
+    unique signal) plus a light nudge on lyric sentiment for clearly happy/sad mixes. No-op until
+    lyrics are synced / for un-mapped profiles."""
+    boost = 0.0
+    wanted = _PROFILE_LYRIC_THEMES.get(profile_key)
+    themes = entry.get("lyric_themes")
+    if wanted and themes and any(t in themes for t in wanted):
+        boost -= _LYRIC_THEME_WEIGHT
+    lean = _PROFILE_LYRIC_VALENCE.get(profile_key)
+    lv = entry.get("lyric_valence")
+    if lean and lv is not None:
+        boost -= _LYRIC_VALENCE_WEIGHT * (lv if lean > 0 else (1.0 - lv))
+    return boost
+
+
+# ---------------------------------------------------------------------------
 # Mood Mix Context Helpers — time-of-day and weather
 # ---------------------------------------------------------------------------
 
@@ -7443,6 +7483,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _origin_boost(entry, profile_key)
             + _popularity_boost(entry, profile_key)
             + _listening_hour_boost(rk)
+            + _lyric_boost(entry, profile_key)
         )
 
     history_rks = sorted(
