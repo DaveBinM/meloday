@@ -146,6 +146,24 @@ PATH_MAPPING         = ess_cfg.get("path_mapping", {})
 _TF_AVAILABLE     = False
 _TF_MODELS_LOADED = False
 _effnet_model = _musicnn_model = _av_model = _vocal_model = None
+# Optional high-level classification heads (run on the same EffNet/MusiCNN embeddings).
+# Absent model files are skipped, so these fields simply stay null until the models exist.
+_mood_models       = {}    # cache_field -> (head, "musicnn"|"effnet", positive_class_index)
+_moodtheme_model   = None  # 56-class mood/theme sigmoid (EffNet)
+_genre_model       = None  # 400-class Discogs genre (EffNet)
+_MOODTHEME_CLASSES = []
+_GENRE400_CLASSES  = []
+# (cache_field, model basename in models_dir, embedding, index of the positive class)
+_MOOD_HEAD_SPECS = (
+    ("mood_happy",      "mood_happy-msd-musicnn-1",      "musicnn", 0),
+    ("mood_sad",        "mood_sad-msd-musicnn-1",        "musicnn", 1),
+    ("mood_aggressive", "mood_aggressive-msd-musicnn-1", "musicnn", 0),
+    ("mood_relaxed",    "mood_relaxed-msd-musicnn-1",    "musicnn", 1),
+    ("mood_party",      "mood_party-msd-musicnn-1",      "musicnn", 1),
+    ("mood_acoustic",   "mood_acoustic-msd-musicnn-1",   "musicnn", 0),
+    ("mood_electronic", "mood_electronic-msd-musicnn-1", "musicnn", 0),
+    ("danceability_hl", "danceability-msd-musicnn-1",    "musicnn", 0),
+)
 
 # MELODAY_SKIP_TF_MODELS is set by pre_analyze.py in the main process before spawning
 # workers. With 'spawn' context, workers re-import meloday.py; loading the TF C++
@@ -177,6 +195,28 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
                 _vocal_model   = es.TensorflowPredict2D(
                     graphFilename=_vocal_path,   output="model/Softmax")
                 _TF_MODELS_LOADED = True
+
+                # Optional high-level heads (downloaded into models_dir separately). Each runs
+                # on the embeddings already extracted above; missing files are skipped.
+                def _ld_head(_base, _out):
+                    _p = os.path.join(_models_dir, _base + ".pb")
+                    return es.TensorflowPredict2D(graphFilename=_p, output=_out) if os.path.isfile(_p) else None
+
+                def _ld_classes(_base):
+                    try:
+                        with open(os.path.join(_models_dir, _base + ".json")) as _jf:
+                            return json.load(_jf).get("classes", [])
+                    except Exception:
+                        return []
+
+                for _field, _base, _emb, _idx in _MOOD_HEAD_SPECS:
+                    _h = _ld_head(_base, "model/Softmax")
+                    if _h is not None:
+                        _mood_models[_field] = (_h, _emb, _idx)
+                _moodtheme_model   = _ld_head("mtg_jamendo_moodtheme-discogs-effnet-1", "model/Sigmoid")
+                _MOODTHEME_CLASSES = _ld_classes("mtg_jamendo_moodtheme-discogs-effnet-1")
+                _genre_model       = _ld_head("genre_discogs400-discogs-effnet-1", "PartitionedCall:0")
+                _GENRE400_CLASSES  = _ld_classes("genre_discogs400-discogs-effnet-1")
     except Exception:
         pass
 
@@ -359,8 +399,11 @@ _UPSERT_SQL = """
     (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
      track_updated_at, album_updated_at, artist_updated_at, danceability, brightness,
      beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
-     arousal, valence, vocal_presence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     arousal, valence, vocal_presence,
+     mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
+     mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
@@ -369,7 +412,10 @@ _CANONICAL_COLUMNS = (
     "year INTEGER, artist TEXT, genres TEXT, styles TEXT, moods TEXT, "
     "file_path TEXT, track_updated_at REAL, album_updated_at REAL, artist_updated_at REAL, "
     "beat_confidence REAL, integrated_loudness REAL, onset_rate REAL, dynamic_complexity REAL, "
-    "arousal REAL, valence REAL, vocal_presence REAL"
+    "arousal REAL, valence REAL, vocal_presence REAL, "
+    "mood_happy REAL, mood_sad REAL, mood_aggressive REAL, mood_relaxed REAL, "
+    "mood_party REAL, mood_acoustic REAL, mood_electronic REAL, danceability_hl REAL, "
+    "moodtheme TEXT, genre_discogs TEXT, emb_effnet BLOB, emb_musicnn BLOB"
 )
 
 def _ensure_db_schema(conn):
@@ -392,6 +438,18 @@ def _ensure_db_schema(conn):
         ("arousal",              "arousal REAL"),
         ("valence",              "valence REAL"),
         ("vocal_presence",       "vocal_presence REAL"),
+        ("mood_happy",           "mood_happy REAL"),
+        ("mood_sad",             "mood_sad REAL"),
+        ("mood_aggressive",      "mood_aggressive REAL"),
+        ("mood_relaxed",         "mood_relaxed REAL"),
+        ("mood_party",           "mood_party REAL"),
+        ("mood_acoustic",        "mood_acoustic REAL"),
+        ("mood_electronic",      "mood_electronic REAL"),
+        ("danceability_hl",      "danceability_hl REAL"),
+        ("moodtheme",            "moodtheme TEXT"),
+        ("genre_discogs",        "genre_discogs TEXT"),
+        ("emb_effnet",           "emb_effnet BLOB"),
+        ("emb_musicnn",          "emb_musicnn BLOB"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -476,14 +534,22 @@ def _entry_to_row(rk, d):
             d.get("danceability"), d.get("brightness"),
             d.get("beat_confidence"), d.get("integrated_loudness"),
             d.get("onset_rate"), d.get("dynamic_complexity"),
-            d.get("arousal"), d.get("valence"), d.get("vocal_presence"))
+            d.get("arousal"), d.get("valence"), d.get("vocal_presence"),
+            d.get("mood_happy"), d.get("mood_sad"), d.get("mood_aggressive"),
+            d.get("mood_relaxed"), d.get("mood_party"), d.get("mood_acoustic"),
+            d.get("mood_electronic"), d.get("danceability_hl"),
+            json.dumps(d["moodtheme"]) if d.get("moodtheme") is not None else None,
+            json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
+            d.get("emb_effnet"), d.get("emb_musicnn"))
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
         genres_j, styles_j, moods_j, file_path, \
         track_updated_at, album_updated_at, artist_updated_at, \
         beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
-        arousal, valence, vocal_presence = row
+        arousal, valence, vocal_presence, \
+        mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
+        mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -501,6 +567,12 @@ def _row_to_entry(row):
         "arousal": arousal,
         "valence": valence,
         "vocal_presence": vocal_presence,
+        "mood_happy": mood_happy, "mood_sad": mood_sad, "mood_aggressive": mood_aggressive,
+        "mood_relaxed": mood_relaxed, "mood_party": mood_party, "mood_acoustic": mood_acoustic,
+        "mood_electronic": mood_electronic, "danceability_hl": danceability_hl,
+        "moodtheme": json.loads(moodtheme_j) if moodtheme_j else None,
+        "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
+        "emb_effnet": emb_effnet, "emb_musicnn": emb_musicnn,
     }
 
 def _migrate_json_to_sqlite():
@@ -535,7 +607,9 @@ def load_essentia_cache():
             "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
             "track_updated_at, album_updated_at, artist_updated_at, "
             "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
-            "arousal, valence, vocal_presence "
+            "arousal, valence, vocal_presence, "
+            "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
+            "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -598,7 +672,12 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
     needs_onset      = data.get("onset_rate") is None
     needs_dyn_comp   = data.get("dynamic_complexity") is None
     needs_tf         = (data.get("arousal") is None or data.get("valence") is None
-                        or data.get("vocal_presence") is None)
+                        or data.get("vocal_presence") is None
+                        # backfill the high-level heads on existing tracks (only if the models
+                        # are loaded — otherwise these stay null and don't force re-analysis)
+                        or (bool(_mood_models) and data.get("mood_happy") is None)
+                        or (_moodtheme_model is not None and data.get("moodtheme") is None)
+                        or (_genre_model is not None and data.get("genre_discogs") is None))
 
     needs_base = any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
                       needs_dance, needs_brightness, needs_onset, needs_dyn_comp])
@@ -711,6 +790,30 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
             # voice_instrumental classes are [instrumental, voice] → vocal_presence = P(voice).
             if data.get("vocal_presence") is None:
                 data["vocal_presence"] = round(float(voc[:, 1].mean()), 4)
+
+            # High-level heads on the SAME embeddings; each filled only if currently missing.
+            for _field, (_head, _emb_key, _idx) in _mood_models.items():
+                if data.get(_field) is None:
+                    _e = emb_musicnn if _emb_key == "musicnn" else emb_effnet
+                    data[_field] = round(float(_np.asarray(_head(_e))[:, _idx].mean()), 4)
+            if _moodtheme_model is not None and _MOODTHEME_CLASSES and data.get("moodtheme") is None:
+                _mt = _np.asarray(_moodtheme_model(emb_effnet)).mean(axis=0)
+                data["moodtheme"] = {
+                    _MOODTHEME_CLASSES[_i]: round(float(_p), 3)
+                    for _i, _p in sorted(enumerate(_mt), key=lambda kv: kv[1], reverse=True)[:8]
+                    if float(_p) >= 0.05
+                }
+            if _genre_model is not None and _GENRE400_CLASSES and data.get("genre_discogs") is None:
+                _gp = _np.asarray(_genre_model(emb_effnet)).mean(axis=0)
+                data["genre_discogs"] = {
+                    _GENRE400_CLASSES[_i]: round(float(_p), 3)
+                    for _i, _p in sorted(enumerate(_gp), key=lambda kv: kv[1], reverse=True)[:6]
+                    if float(_p) >= 0.03
+                }
+            # Cache the mean embeddings so any future head needs no audio re-read.
+            if _mood_models and data.get("emb_effnet") is None:
+                data["emb_effnet"]  = emb_effnet.mean(axis=0).astype(_np.float32).tobytes()
+                data["emb_musicnn"] = emb_musicnn.mean(axis=0).astype(_np.float32).tobytes()
         except Exception as tf_err:
             log_text(f"[WARN] TF inference failed: {tf_err}")
 

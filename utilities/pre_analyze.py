@@ -89,7 +89,9 @@ def load_essentia_cache_exclusive():
             "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
             "track_updated_at, album_updated_at, artist_updated_at, "
             "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
-            "arousal, valence, vocal_presence "
+            "arousal, valence, vocal_presence, "
+            "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
+            "mood_electronic, danceability_hl, moodtheme, genre_discogs "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -98,7 +100,9 @@ def load_essentia_cache_exclusive():
                 genres_j, styles_j, moods_j, file_path, \
                 track_updated_at, album_updated_at, artist_updated_at, \
                 beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
-                arousal, valence, vocal_presence in rows:
+                arousal, valence, vocal_presence, \
+                mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
+                mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -116,6 +120,11 @@ def load_essentia_cache_exclusive():
                 "arousal": arousal,
                 "valence": valence,
                 "vocal_presence": vocal_presence,
+                "mood_happy": mood_happy, "mood_sad": mood_sad, "mood_aggressive": mood_aggressive,
+                "mood_relaxed": mood_relaxed, "mood_party": mood_party, "mood_acoustic": mood_acoustic,
+                "mood_electronic": mood_electronic, "danceability_hl": danceability_hl,
+                "moodtheme": json.loads(moodtheme_j) if moodtheme_j else None,
+                "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
             }
         return result
     except Exception:
@@ -134,8 +143,11 @@ def upsert_essentia_cache_entries(entries):
             (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
              track_updated_at, album_updated_at, artist_updated_at, danceability, brightness,
              beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
-             arousal, valence, vocal_presence)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             arousal, valence, vocal_presence,
+             mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
+             mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -145,7 +157,13 @@ def upsert_essentia_cache_entries(entries):
              d.get("danceability"), d.get("brightness"),
              d.get("beat_confidence"), d.get("integrated_loudness"),
              d.get("onset_rate"), d.get("dynamic_complexity"),
-             d.get("arousal"), d.get("valence"), d.get("vocal_presence"))
+             d.get("arousal"), d.get("valence"), d.get("vocal_presence"),
+             d.get("mood_happy"), d.get("mood_sad"), d.get("mood_aggressive"),
+             d.get("mood_relaxed"), d.get("mood_party"), d.get("mood_acoustic"),
+             d.get("mood_electronic"), d.get("danceability_hl"),
+             json.dumps(d["moodtheme"]) if d.get("moodtheme") is not None else None,
+             json.dumps(d["genre_discogs"]) if d.get("genre_discogs") is not None else None,
+             d.get("emb_effnet"), d.get("emb_musicnn"))
             for rk, d in entries.items()
         ])
         conn.commit()
