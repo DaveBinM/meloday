@@ -7660,23 +7660,27 @@ def _song_min_year_map(essentia_cache):
 
 
 _NONCANON_SUBSTR = ("instrumental", "unplugged", "karaoke", "remix", "acoustic", "rehearsal",
-                    "acapella", "a cappella", "re-recorded", "rerecorded", "bbc session",
-                    "spotify session", "radio session")
-_LIVE_DEMO_RE = re.compile(
-    r"[\(\[\-/]\s*live\b|\blive (?:at|in|from|around|session|recording|concert|version)\b"
+                    "acapella", "a cappella", "re-recorded", "rerecorded", "sessions")
+# In the TITLE, only treat "live"/"demo" as a version marker when it's delimited ("(Live)", "- Live",
+# "Live at…") — so song titles like "Live and Let Die" aren't mistaken for live recordings.
+_TITLE_LIVE_DEMO = re.compile(
+    r"[\(\[\-]\s*live\b|\blive (?:at|in|from|around|session|recording|concert|version)\b"
     r"|\blive\s*[\)\]]|[\(\[]\s*demo\b|\bdemo\s*[\)\]]", re.I)
+_ALBUM_LIVE = re.compile(r"\blive\b", re.I)   # a bare "Live" in the ALBUM folder = a live album
 def _canonical_penalty(entry):
     """Lower = more canonical. Penalises different-recording copies (live / remix / demo /
-    instrumental / acoustic / …, detected from the title + album-folder path) and, mildly,
-    compilations — so decade-mix dedup keeps the studio/original of each song, not a festival
-    or instrumental copy. Ties then break to the earliest (original) release year."""
-    text = ((entry.get("title") or "") + " " + (entry.get("file_path") or "")).lower()
-    pen = sum(4 for kw in _NONCANON_SUBSTR if kw in text)
-    if _LIVE_DEMO_RE.search(text):
+    instrumental / acoustic / orchestral-"sessions" re-recordings — detected from the title + the
+    ALBUM folder of the file path) and, mildly, compilations — so decade-mix dedup keeps the
+    studio/original of each song. Ties then break to the earliest (original) release year."""
+    title = (entry.get("title") or "").lower()
+    parts = (entry.get("file_path") or "").split("/")
+    album = (parts[-2] if len(parts) >= 2 else (entry.get("file_path") or "")).lower()
+    pen = sum(4 for kw in _NONCANON_SUBSTR if kw in title or kw in album)
+    if _TITLE_LIVE_DEMO.search(title) or _ALBUM_LIVE.search(album):
         pen += 4
-    if "various artists" in text:
+    if "various artists" in album:
         pen += 2
-    if "greatest hits" in text or " best of" in text or "compilation" in text:
+    if "greatest hits" in album or "best of" in album or "compilation" in album:
         pen += 1
     return pen
 
