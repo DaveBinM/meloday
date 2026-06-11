@@ -177,6 +177,10 @@ _EXTRAS_COVER_COLORS = {
     "decade_00s": ((80, 140, 240), (180, 100, 220)),
     "decade_10s": ((40, 200, 190), (255, 110, 120)),
     "decade_20s": ((150, 120, 255), (90, 200, 220)),
+    # ---- 3 geo showcase mixes ----
+    "scotland_scene":  ((80, 110, 145), (32, 48, 78)),     # slate-blue (Scottish mist)
+    "australia_scene": ((225, 125, 60), (140, 55, 50)),    # sunset orange/red
+    "london_scene":    ((125, 85, 130), (48, 38, 68)),     # urban purple
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -716,6 +720,10 @@ _PROFILE_ICON = {
     "decade_00s": "graphic_eq",
     "decade_10s": "music_note",
     "decade_20s": "star_shine",
+    # ---- 3 geo showcase mixes ----
+    "scotland_scene":  "travel_explore",
+    "australia_scene": "travel_explore",
+    "london_scene":    "travel_explore",
     "stormy": "thunderstorm",
     "foggy": "foggy",
     "snow_day": "snowflake",
@@ -1805,6 +1813,11 @@ _MOOD_PROFILES = {
     "decade_00s": {"bpm": 116, "energy": -8, "danceability": 0.6, "brightness": 0.43, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.62, "vocal_presence": 0.76},
     "decade_10s": {"bpm": 114, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.6, "vocal_presence": 0.74},
     "decade_20s": {"bpm": 112, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.6, "valence": 0.58, "vocal_presence": 0.74},
+    # ---- 3 geo showcase mixes (origin-gated, popularity-ranked like the decades; targets only feed
+    #      the rotation sim-guard, not selection) ----
+    "scotland_scene":  {"bpm": 116, "energy": -9, "danceability": 0.54, "brightness": 0.40, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.60, "valence": 0.55, "vocal_presence": 0.76},
+    "australia_scene": {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
+    "london_scene":    {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
     # ---- 25 weather/seasonal mixes ----
     "stormy": {"bpm": 80, "energy": -12, "danceability": 0.3, "brightness": 0.12, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.45, "valence": 0.35, "vocal_presence": 0.45},
     "foggy": {"bpm": 78, "energy": -16, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.45, "vocal_presence": 0.45},
@@ -2230,6 +2243,10 @@ _MOOD_MIX_NAMES = {
     "decade_00s": "00s Mix • Meloday+",
     "decade_10s": "10s Mix • Meloday+",
     "decade_20s": "20s Mix • Meloday+",
+    # ---- 3 geo showcase mixes ----
+    "scotland_scene":  "Sounds of Scotland • Meloday+",
+    "australia_scene": "Sounds of Australia • Meloday+",
+    "london_scene":    "Sounds of London • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -2655,6 +2672,10 @@ _PROFILE_CATEGORY = {
     "decade_00s": "era",
     "decade_10s": "era",
     "decade_20s": "era",
+    # ---- 3 geo showcase mixes ----
+    "scotland_scene": "geo",
+    "australia_scene": "geo",
+    "london_scene": "geo",
     "stormy": "atmospheric",
     "foggy": "atmospheric",
     "snow_day": "calm",
@@ -3858,6 +3879,14 @@ _PROFILE_ORIGIN.update({
     "bossa_samba":  {"country": "brazil"},
     "britpop_rock": {"country_code": "GB"},
 })
+
+# Geo SHOWCASE mixes (category "geo"): a HARD origin gate — only tracks whose artist is from the
+# place — then ranked by Last.fm popularity, exactly like the decade mixes. Matched via `places`.
+_PROFILE_GEO_GATE = {
+    "scotland_scene":  {"region": "scotland"},
+    "australia_scene": {"country": "australia"},
+    "london_scene":    {"city": "london"},
+}
 
 
 def _origin_match(entry, spec):
@@ -7406,7 +7435,7 @@ def _external_used_rks(existing_playlists, building_names):
     nk = {v: k for k, v in _MOOD_MIX_NAMES.items()}
     for name, pl in (existing_playlists or {}).items():
         key = nk.get(name)
-        if key is None or _PROFILE_CATEGORY.get(key) == "era" or name in building_names:
+        if key is None or _PROFILE_CATEGORY.get(key) in ("era", "geo") or name in building_names:
             continue
         try:
             used.update(str(t.ratingKey) for t in pl.items())
@@ -7566,10 +7595,10 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         seen, pool = Counter(), []
         for _, k in scored:
             cat = _PROFILE_CATEGORY.get(k, "other")
-            # decade/era mixes: admit ALL of them (not just the best acoustic-fitting per_cat), so the
-            # per-slot shuffle surfaces a different decade over time instead of always the one or two
-            # that match recent listening. Other categories keep the fit-based stratification.
-            cap = 999 if cat == "era" else per_cat
+            # decade + geo showcase mixes: admit ALL of them (not just the best acoustic-fitting
+            # per_cat), so the per-slot shuffle surfaces a different decade/scene over time instead of
+            # always the one or two that fit recent listening. Other categories keep the fit-based cap.
+            cap = 999 if cat in ("era", "geo") else per_cat
             if seen[cat] < cap:
                 seen[cat] += 1
                 pool.append(k)
@@ -7632,12 +7661,12 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     seen_rks = set(recent_rks) | _external_used_rks(existing, building)
     mixes = []
     for profile_key in active_profiles:
-        is_era = _PROFILE_CATEGORY.get(profile_key) == "era"   # decade mixes are EXEMPT from cross-mix dedup
+        is_showcase = _PROFILE_CATEGORY.get(profile_key) in ("era", "geo")  # decade + geo: EXEMPT from cross-mix dedup
         tracks = _build_mix_tracks(
             profile_key, essentia_cache, history_entries,
             excluded_album_keys, mix_size, plex,
-            hard_exclude_rks=(recent_rks if is_era else seen_rks))
-        if not is_era:
+            hard_exclude_rks=(recent_rks if is_showcase else seen_rks))
+        if not is_showcase:
             seen_rks.update(str(t.ratingKey) for t in tracks)   # no repeats across dedup-eligible mixes
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
 
@@ -7733,13 +7762,15 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     target       = _MOOD_PROFILES[profile_key]
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
     _is_era      = _PROFILE_CATEGORY.get(profile_key) == "era"
+    _is_geo      = _PROFILE_CATEGORY.get(profile_key) == "geo"
+    _is_showcase = _is_era or _is_geo          # decade + geo mixes: popularity-ranked, gated, deduped
 
     def _combined_score(rk):
-        """Acoustic distance adjusted by mood/style tag compatibility and play count — EXCEPT decade
-        (era) mixes, which rank purely by Last.fm popularity (the canon of the decade), not a target
-        acoustic fingerprint, so the mix is defined by the decade + its hits rather than a sound."""
+        """Acoustic distance adjusted by mood/style tag compatibility and play count — EXCEPT the
+        SHOWCASE mixes (decade + geo), which rank purely by Last.fm popularity (the canon of the decade
+        / scene) within their year/origin gate, rather than matching a target acoustic fingerprint."""
         entry = essentia_cache.get(rk, {})
-        if _is_era:
+        if _is_showcase:
             return -(entry.get("lastfm_listeners") or 0)
         return (
             _acoustic_distance_to_centroid(entry, target)
@@ -7787,16 +7818,24 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks = _h or history_rks
         library_rks = _l or library_rks
 
+    # Geo showcase mixes: HARD origin gate — keep only tracks whose artist is from the place.
+    _geo = _PROFILE_GEO_GATE.get(profile_key)
+    if _geo:
+        _h = [rk for rk in history_rks if _origin_match(essentia_cache.get(rk, {}), _geo)]
+        _l = [rk for rk in library_rks if _origin_match(essentia_cache.get(rk, {}), _geo)]
+        history_rks = _h or history_rks
+        library_rks = _l or library_rks
+
     # HARD exclusion — recently-played + tracks used by other dedup-eligible mixes. UNconditional:
     # never re-admitted to reach length (we widen the pool / relax the artist cap instead).
     if hard_exclude_rks:
         history_rks = [rk for rk in history_rks if rk not in hard_exclude_rks]
         library_rks = [rk for rk in library_rks if rk not in hard_exclude_rks]
 
-    # Decade mixes: keep the top ~3x most popular tracks of the decade, then pick the slate RANDOMLY
-    # (seeded per day so it's stable within a day, fresh across days) — variety without losing the
-    # "recognisable hits" feel. The fill ladder below still enforces <=1 artist + the hard excludes.
-    if _is_era:
+    # Showcase mixes (decade + geo): keep the top ~3x most popular tracks of the decade/scene, then
+    # pick the slate RANDOMLY (seeded per day — stable within a day, fresh across days) — variety
+    # without losing the "recognisable hits" feel. The fill ladder still enforces <=1 artist + excludes.
+    if _is_showcase:
         # Collapse the same song appearing on multiple albums/compilations/reissues into ONE entry,
         # keeping its most CANONICAL copy (studio/original — least live/remix/demo/instrumental
         # markers, then earliest release) so e.g. "In the End" -> the Hybrid Theory studio track, not
@@ -7812,10 +7851,15 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
         floored = [rk for rk in uniq
                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _ERA_MIN_LISTENERS]
-        # the decade's recognisable canon, capped at ~3x mix_size to keep the anthems FREQUENT: a
-        # bigger pool dilutes them (measured: 00s anthems fall from ~33% of days at 150 to ~13% at the
-        # full ~1900). Floor keeps older decades recognisable; fall back below it only if too thin.
-        pool = (floored if len(floored) >= mix_size else uniq)[:mix_size * 3]
+        # the recognisable canon, capped at ~3x mix_size to keep the anthems FREQUENT: a bigger pool
+        # dilutes them (measured: 00s anthems fall from ~33% of days at 150 to ~13% at the full ~1900).
+        # Use the floor only if it still yields enough DISTINCT ARTISTS to fill one-per-artist —
+        # otherwise (a small scene like Scotland, where the floor leaves a few prolific artists) fall
+        # back to the full popularity-ranked canon so the mix stays artist-diverse, not Snow Patrol x15.
+        def _n_artists(rks):
+            return len({(essentia_cache.get(rk, {}).get("artist") or "").lower() for rk in rks if rk})
+        use_floor = len(floored) >= mix_size and _n_artists(floored[:mix_size * 3]) >= mix_size
+        pool = (floored if use_floor else uniq)[:mix_size * 3]
         random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         history_rks, library_rks = [], pool
 
@@ -7864,7 +7908,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     _fill(library_tracks, library_rks, mix_size - len(history_tracks))   # library covers any history shortfall
 
     combined = history_tracks + library_tracks
-    if not _is_era:                        # decade mixes keep their shuffled (per-day varied) order
+    if not _is_showcase:                   # decade + geo mixes keep their shuffled (per-day varied) order
         combined.sort(key=lambda t: (
             _combined_score(str(t.ratingKey))
             - _rating_dist_bonus(getattr(t, "userRating", None))
