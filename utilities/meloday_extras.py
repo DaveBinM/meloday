@@ -7634,9 +7634,9 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
 
 _SONG_MIN_YEAR_CACHE = {}
-_ERA_POOL_MAX = 250            # decade mix: randomly pick the slate from up to this many tracks...
-_ERA_MIN_LISTENERS = 300_000   # ...but only those above this Last.fm listener floor, so older/smaller
-                               # decades (where rank 250 is already a deep cut) stay recognisable
+_ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm listener floor to count as
+                               # part of the decade's recognisable canon — so older/smaller decades
+                               # self-size below it while the modern ones have far more above it
 def _entry_song_key(entry):
     return (norm_text(primary_artist(entry.get("artist") or "")),
             norm_text(clean_title(entry.get("title") or "")))
@@ -7657,6 +7657,28 @@ def _song_min_year_map(essentia_cache):
                 m[k] = y
         _SONG_MIN_YEAR_CACHE[cid] = m
     return m
+
+
+_NONCANON_SUBSTR = ("instrumental", "unplugged", "karaoke", "remix", "acoustic", "rehearsal",
+                    "acapella", "a cappella", "re-recorded", "rerecorded", "bbc session",
+                    "spotify session", "radio session")
+_LIVE_DEMO_RE = re.compile(
+    r"[\(\[\-/]\s*live\b|\blive (?:at|in|from|around|session|recording|concert|version)\b"
+    r"|\blive\s*[\)\]]|[\(\[]\s*demo\b|\bdemo\s*[\)\]]", re.I)
+def _canonical_penalty(entry):
+    """Lower = more canonical. Penalises different-recording copies (live / remix / demo /
+    instrumental / acoustic / …, detected from the title + album-folder path) and, mildly,
+    compilations — so decade-mix dedup keeps the studio/original of each song, not a festival
+    or instrumental copy. Ties then break to the earliest (original) release year."""
+    text = ((entry.get("title") or "") + " " + (entry.get("file_path") or "")).lower()
+    pen = sum(4 for kw in _NONCANON_SUBSTR if kw in text)
+    if _LIVE_DEMO_RE.search(text):
+        pen += 4
+    if "various artists" in text:
+        pen += 2
+    if "greatest hits" in text or " best of" in text or "compilation" in text:
+        pen += 1
+    return pen
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
@@ -7736,12 +7758,25 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     # (seeded per day so it's stable within a day, fresh across days) — variety without losing the
     # "recognisable hits" feel. The fill ladder below still enforces <=1 artist + the hard excludes.
     if _is_era:
-        pool = list(dict.fromkeys(history_rks + library_rks))
-        pool.sort(key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        floored = [rk for rk in pool
+        # Collapse the same song appearing on multiple albums/compilations/reissues into ONE entry,
+        # keeping its most CANONICAL copy (studio/original — least live/remix/demo/instrumental
+        # markers, then earliest release) so e.g. "In the End" -> the Hybrid Theory studio track, not
+        # the festival/instrumental/live copies. (The 00s top-150 was only ~86 unique before this.)
+        best = {}   # song_key -> (sort_score, rk)
+        for rk in dict.fromkeys(history_rks + library_rks):
+            e  = essentia_cache.get(rk, {})
+            sk = _entry_song_key(e)
+            sc = (_canonical_penalty(e), e.get("year") or 9999, rk)
+            if sk not in best or sc < best[sk][0]:
+                best[sk] = (sc, rk)
+        uniq = sorted((v[1] for v in best.values()),
+                      key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        floored = [rk for rk in uniq
                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _ERA_MIN_LISTENERS]
-        # up to _ERA_POOL_MAX recognisable tracks; fall back to a fixed top-N if the floor is too thin
-        pool = floored[:_ERA_POOL_MAX] if len(floored) >= mix_size else pool[:mix_size * 3]
+        # the decade's recognisable canon, capped at ~3x mix_size to keep the anthems FREQUENT: a
+        # bigger pool dilutes them (measured: 00s anthems fall from ~33% of days at 150 to ~13% at the
+        # full ~1900). Floor keeps older decades recognisable; fall back below it only if too thin.
+        pool = (floored if len(floored) >= mix_size else uniq)[:mix_size * 3]
         random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         history_rks, library_rks = [], pool
 
