@@ -7629,6 +7629,29 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     return mixes, to_remove
 
 
+_SONG_MIN_YEAR_CACHE = {}
+def _entry_song_key(entry):
+    return (norm_text(primary_artist(entry.get("artist") or "")),
+            norm_text(clean_title(entry.get("title") or "")))
+def _song_min_year_map(essentia_cache):
+    """Earliest cached year per song (artist+title) — so decade/era gating uses a track's ORIGINAL
+    release rather than a reissue/compilation album year (Plex `year` is the album's, which is wrong
+    for compilations). Computed once per cache object."""
+    cid = id(essentia_cache)
+    m = _SONG_MIN_YEAR_CACHE.get(cid)
+    if m is None:
+        m = {}
+        for e in essentia_cache.values():
+            y = e.get("year")
+            if not y:
+                continue
+            k = _entry_song_key(e)
+            if k[1] and y < m.get(k, 9999):
+                m[k] = y
+        _SONG_MIN_YEAR_CACHE[cid] = m
+    return m
+
+
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
     """Build the mix_size-track list for a single mix profile.
@@ -7641,10 +7664,15 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     """
     target       = _MOOD_PROFILES[profile_key]
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
+    _is_era      = _PROFILE_CATEGORY.get(profile_key) == "era"
 
     def _combined_score(rk):
-        """Acoustic distance adjusted by mood/style tag compatibility and play count."""
+        """Acoustic distance adjusted by mood/style tag compatibility and play count — EXCEPT decade
+        (era) mixes, which rank purely by Last.fm popularity (the canon of the decade), not a target
+        acoustic fingerprint, so the mix is defined by the decade + its hits rather than a sound."""
         entry = essentia_cache.get(rk, {})
+        if _is_era:
+            return -(entry.get("lastfm_listeners") or 0)
         return (
             _acoustic_distance_to_centroid(entry, target)
             + _mood_tag_boost(entry, profile_key)
@@ -7675,12 +7703,19 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         library_rks = [rk for rk in library_rks
                        if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
 
-    # Nostalgia mixes (Throwback Anthems, School Days, Memory Lane, Old Friends): keep only
-    # era-appropriate tracks so "throwbacks" are actually throwbacks. Fall back if too thin.
+    # Decade/era + nostalgia mixes: keep only era-appropriate tracks, gating on the song's EARLIEST
+    # year across the library (its original release) rather than the album year — so reissues and
+    # compilations don't leak a track into the wrong decade. Fall back if too thin.
     _yw = _PROFILE_YEAR_WINDOW.get(profile_key)
     if _yw:
-        _h = [rk for rk in history_rks if _year_in_window(essentia_cache.get(rk, {}), _yw)]
-        _l = [rk for rk in library_rks if _year_in_window(essentia_cache.get(rk, {}), _yw)]
+        lo, hi = _yw
+        _smy = _song_min_year_map(essentia_cache)
+        def _orig_in(rk):
+            e  = essentia_cache.get(rk, {})
+            oy = _smy.get(_entry_song_key(e)) or e.get("year")
+            return oy is not None and lo <= oy <= hi
+        _h = [rk for rk in history_rks if _orig_in(rk)]
+        _l = [rk for rk in library_rks if _orig_in(rk)]
         history_rks = _h or history_rks
         library_rks = _l or library_rks
 
