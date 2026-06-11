@@ -1549,11 +1549,12 @@ def _batch_state_path():
 
 def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     """PRIMARY lyric tagger — open-ended LLM moods/themes/excluded via the OpenAI BATCH API (50% cheaper,
-    async) for whatever's due: a handful, thousands, or the whole library under --force. Fetches lyrics
-    from LRCLIB, batches the tracks that have lyrics, writes none/instrumental for the rest. --resume
-    re-polls a previously-submitted run. (The live per-track --sync-lyrics is a pricier fallback.)
-    lyric_valence is left NULL — the LLM moods carry sentiment now (the valence profiles re-map to moods
-    in the boost)."""
+    async) for whatever's due: a handful, thousands, or the whole library under --force. Submits
+    INCREMENTALLY — a batch fires every ~5k tracks as LRCLIB lyrics come in, so OpenAI starts within the
+    first chunk and tags WHILE the (slow) fetch continues; each submitted batch is persisted so a crash
+    only costs the un-submitted remainder (--resume re-polls). Tracks without lyrics get none/instrumental
+    written directly. lyric_valence is left NULL — the LLM moods carry sentiment now (the valence profiles
+    re-map to moods in the boost). The live per-track --sync-lyrics is a pricier fallback."""
     client = _get_openai_client()
     if client is None:
         log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return
@@ -1592,18 +1593,20 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     if not todo:
         return
 
-    # ---- Phase 1: concurrent LRCLIB fetch -> requests (with-lyrics) + nolyr + lang map ----
+    # ---- Fetch + submit INCREMENTALLY: as lyrics come back, fire a batch every `chunk_size` tracks so
+    #      OpenAI starts within ~the first chunk, the tagging OVERLAPS the (slow) LRCLIB fetch, memory
+    #      stays low (only one chunk buffered), and each submitted batch is persisted for --resume — a
+    #      crash/OOM only costs the un-submitted remainder, never the whole run. ----
     import concurrent.futures, io
-    reqs, nolyr, langmap = [], [], {}
-    lock = _threading.Lock()
+    chunk_size = 5000
+    langmap, batch_ids, chunk, nolyr = {}, [], [], []
+
     def _build(item):
         rk, artist, title, audio = item
         artist, title = artist or "", title or ""
         d = _lrclib_search(artist, title) if (artist and title) else None
         if not d or d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
-            with lock:
-                nolyr.append((rk, "instrumental" if d else "none"))
-            return
+            return (str(rk), None, "instrumental" if d else "none")
         lyrics = d["plainLyrics"]
         lang = "unknown"
         if _detect_lang:
@@ -1619,45 +1622,59 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
                         "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
                                      {"role": "user", "content": user}],
                         "response_format": {"type": "json_object"}}}
-        with lock:
-            reqs.append(req); langmap[str(rk)] = lang
-    workers = 16
-    log_msg(f"[INFO] Fetching lyrics ({workers} workers)...")
-    done = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-        for _ in ex.map(_build, todo):
-            done += 1
-            if done % 500 == 0:
-                log_msg(f"  fetched {done}/{len(todo)} (with lyrics={len(reqs)}) ", end='\r')
-    log_msg(f"\n[INFO] {len(reqs)} with lyrics -> batch; {len(nolyr)} instrumental/none -> direct write.")
+        return (str(rk), req, lang)
 
-    if nolyr:
-        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
-        wc.executemany("UPDATE essentia_cache SET lyric_lang=?, lyrics_synced_at=?, lyric_themes=NULL, "
-                       "lyric_themes_raw=NULL, lyric_valence=NULL WHERE rating_key=?",
-                       [(lang, time.time(), rk) for rk, lang in nolyr])
-        wc.commit(); wc.close()
-    if not reqs:
-        log_msg("[INFO] Nothing with lyrics to tag."); return
+    def _save_state():
+        try:
+            os.makedirs(os.path.dirname(_batch_state_path()), exist_ok=True)
+            json.dump({"batch_ids": batch_ids, "lang": langmap}, open(_batch_state_path(), "w"))
+        except Exception:
+            pass
 
-    # ---- Phase 2: chunk (<=20k reqs/batch) + submit ----
-    CHUNK = 20000
-    batch_ids = []
-    for ci in range(0, len(reqs), CHUNK):
-        chunk = reqs[ci:ci + CHUNK]
-        data = ("\n".join(json.dumps(r) for r in chunk)).encode("utf-8")
+    def _submit(reqs):
+        data = ("\n".join(json.dumps(r) for r in reqs)).encode("utf-8")
         up = client.files.create(file=io.BytesIO(data), purpose="batch")
         b = client.batches.create(input_file_id=up.id, endpoint="/v1/chat/completions",
                                   completion_window="24h")
-        batch_ids.append(b.id)
-        log_msg(f"[INFO] submitted batch {b.id} ({len(chunk)} reqs)")
-    try:
-        os.makedirs(os.path.dirname(_batch_state_path()), exist_ok=True)
-        json.dump({"batch_ids": batch_ids, "lang": langmap}, open(_batch_state_path(), "w"))
-    except Exception:
-        pass
+        batch_ids.append(b.id); _save_state()
+        log_msg(f"\n[INFO] batch {len(batch_ids)} submitted ({b.id[:22]}, {len(reqs)} tracks) — OpenAI is "
+                f"now tagging while the fetch continues.")
 
-    # ---- Phase 3: poll + write ----
+    def _flush_nolyr():
+        if nolyr:
+            c = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+            c.executemany("UPDATE essentia_cache SET lyric_lang=?, lyrics_synced_at=?, lyric_themes=NULL, "
+                          "lyric_themes_raw=NULL, lyric_valence=NULL WHERE rating_key=?",
+                          [(lang, time.time(), rk) for rk, lang in nolyr])
+            c.commit(); c.close(); nolyr.clear()
+
+    workers = 16
+    log_msg(f"[INFO] Fetching lyrics ({workers} workers); a batch fires every {chunk_size} tagged tracks...")
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = [ex.submit(_build, item) for item in todo]
+        for fut in concurrent.futures.as_completed(futs):
+            rk, req, lang = fut.result()
+            done += 1
+            if req is None:
+                nolyr.append((rk, lang))
+                if len(nolyr) >= 1000:
+                    _flush_nolyr()
+            else:
+                chunk.append(req); langmap[rk] = lang
+                if len(chunk) >= chunk_size:
+                    _submit(chunk); chunk.clear()
+            if done % 1000 == 0:
+                log_msg(f"  fetched {done}/{len(todo)} | with lyrics {len(langmap)} | batches "
+                        f"{len(batch_ids)} ", end='\r')
+    if chunk:
+        _submit(chunk); chunk.clear()
+    _flush_nolyr()
+    log_msg(f"\n[INFO] Fetch complete: {len(langmap)} tracks across {len(batch_ids)} batches.")
+    if not batch_ids:
+        log_msg("[INFO] Nothing with lyrics to tag."); return
+
+    # ---- poll + write (the early batches are likely already done) ----
     _write_batch_results(client, batch_ids, langmap, poll_interval)
 
 
