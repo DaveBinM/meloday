@@ -6729,8 +6729,11 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
             continue
         aff  = acoustic_affinity(rk, centroid, essentia_cache)   # taste: acoustic + Last.fm/AllMusic tags
         lis  = entry.get("lastfm_listeners") or 0
-        obsc = 1.0 - min(1.0, math.log10(lis + 1) / 6.5)         # lean to lesser-known for genuine discovery
-        score = 0.82 * aff + 0.18 * obsc
+        pop  = min(1.0, math.log10(lis + 1) / 6.5)
+        # discovery sweet spot: reward lesser-known-but-REAL (peak ~a few-k to tens-of-k listeners),
+        # penalising BOTH the obvious mega-hits AND near-zero-listener noise.
+        disc = max(0.0, 1.0 - abs(pop - 0.6) * 1.4)
+        score = 0.8 * aff + 0.2 * disc
         artist = norm_text(primary_artist(entry.get("artist", "") or ""))
         if artist and artist not in played_artists:
             new_artist_scored.append((score, rk))
@@ -7831,7 +7834,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         def _orig_in(rk):
             e  = essentia_cache.get(rk, {})
             oy = _smy.get(_entry_song_key(e)) or e.get("year")
-            return oy is not None and lo <= oy <= hi
+            return oy is not None and (lo is None or oy >= lo) and (hi is None or oy <= hi)
         _h = [rk for rk in history_rks if _orig_in(rk)]
         _l = [rk for rk in library_rks if _orig_in(rk)]
         history_rks = _h or history_rks
