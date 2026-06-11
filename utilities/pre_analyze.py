@@ -1544,17 +1544,188 @@ def sync_lyrics(limit=None, force=False):
     log_msg(f"\n[INFO] Lyrics sync complete: {cnt['n']} processed, {cnt['lyr']} with lyrics.")
 
 
+def _batch_state_path():
+    return os.path.join(BASE_DIR, "logs", "lyric_batch_state.json")
+
+def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
+    """PRIMARY lyric tagger — open-ended LLM moods/themes/excluded via the OpenAI BATCH API (50% cheaper,
+    async) for whatever's due: a handful, thousands, or the whole library under --force. Fetches lyrics
+    from LRCLIB, batches the tracks that have lyrics, writes none/instrumental for the rest. --resume
+    re-polls a previously-submitted run. (The live per-track --sync-lyrics is a pricier fallback.)
+    lyric_valence is left NULL — the LLM moods carry sentiment now (the valence profiles re-map to moods
+    in the boost)."""
+    client = _get_openai_client()
+    if client is None:
+        log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return
+    if resume:
+        try:
+            st = json.load(open(_batch_state_path()))
+        except Exception:
+            log_msg("[ERROR] No saved batch state to resume."); return
+        log_msg(f"[INFO] Resuming {len(st['batch_ids'])} batch(es).")
+        _write_batch_results(client, st["batch_ids"], st["lang"], poll_interval); return
+
+    model, effort = _lyric_llm_cfg()
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn); _ensure_meta_fields(conn)
+    now = time.time()
+    if force:
+        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=NULL, lyric_lang=NULL, "
+                     "lyric_themes=NULL, lyric_themes_raw=NULL, lyric_valence=NULL")
+        log_msg("[INFO] --force: cleared lyric data; re-tagging the whole library.")
+    else:
+        conn.execute("UPDATE essentia_cache SET lyrics_synced_at=? WHERE lyric_lang IS NOT NULL "
+                     "AND lyrics_synced_at IS NULL", (now,))
+    conn.commit()
+    rows = conn.execute(
+        "SELECT rating_key, artist, title, release_date, year, lyrics_synced_at, lyric_lang, "
+        "energy, danceability, valence, bpm, mood_happy, mood_sad, mood_party, mood_relaxed, "
+        "mood_aggressive, arousal FROM essentia_cache WHERE title IS NOT NULL").fetchall()
+    _acols = ("energy", "danceability", "valence", "bpm", "mood_happy", "mood_sad", "mood_party",
+              "mood_relaxed", "mood_aggressive", "arousal")
+    todo = [(rk, art, tit, dict(zip(_acols, ac))) for rk, art, tit, rd, yr, syn, data, *ac in rows
+            if _refresh_due(syn, rd, yr, data is not None, "lyrics", now)]
+    if limit:
+        todo = todo[:int(limit)]
+    log_msg(f"[INFO] Batch lyric tagging: {len(todo)} due of {len(rows)} cached.")
+    conn.close()
+    if not todo:
+        return
+
+    # ---- Phase 1: concurrent LRCLIB fetch -> requests (with-lyrics) + nolyr + lang map ----
+    import concurrent.futures, io
+    reqs, nolyr, langmap = [], [], {}
+    lock = _threading.Lock()
+    def _build(item):
+        rk, artist, title, audio = item
+        artist, title = artist or "", title or ""
+        d = _lrclib_search(artist, title) if (artist and title) else None
+        if not d or d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
+            with lock:
+                nolyr.append((rk, "instrumental" if d else "none"))
+            return
+        lyrics = d["plainLyrics"]
+        lang = "unknown"
+        if _detect_lang:
+            with _NLP_LOCK:
+                try:
+                    lang = _detect_lang(lyrics[:2000])
+                except Exception:
+                    lang = "unknown"
+        user = (f"Artist: {artist}\nTitle: {title}\nAudio profile (production): "
+                f"{lyric_audio_profile(audio) or 'n/a'}\n\nLyrics:\n{lyrics[:4000]}")
+        req = {"custom_id": str(rk), "method": "POST", "url": "/v1/chat/completions",
+               "body": {"model": model, "reasoning_effort": effort,
+                        "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
+                                     {"role": "user", "content": user}],
+                        "response_format": {"type": "json_object"}}}
+        with lock:
+            reqs.append(req); langmap[str(rk)] = lang
+    workers = 16
+    log_msg(f"[INFO] Fetching lyrics ({workers} workers)...")
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        for _ in ex.map(_build, todo):
+            done += 1
+            if done % 500 == 0:
+                log_msg(f"  fetched {done}/{len(todo)} (with lyrics={len(reqs)}) ", end='\r')
+    log_msg(f"\n[INFO] {len(reqs)} with lyrics -> batch; {len(nolyr)} instrumental/none -> direct write.")
+
+    if nolyr:
+        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        wc.executemany("UPDATE essentia_cache SET lyric_lang=?, lyrics_synced_at=?, lyric_themes=NULL, "
+                       "lyric_themes_raw=NULL, lyric_valence=NULL WHERE rating_key=?",
+                       [(lang, time.time(), rk) for rk, lang in nolyr])
+        wc.commit(); wc.close()
+    if not reqs:
+        log_msg("[INFO] Nothing with lyrics to tag."); return
+
+    # ---- Phase 2: chunk (<=20k reqs/batch) + submit ----
+    CHUNK = 20000
+    batch_ids = []
+    for ci in range(0, len(reqs), CHUNK):
+        chunk = reqs[ci:ci + CHUNK]
+        data = ("\n".join(json.dumps(r) for r in chunk)).encode("utf-8")
+        up = client.files.create(file=io.BytesIO(data), purpose="batch")
+        b = client.batches.create(input_file_id=up.id, endpoint="/v1/chat/completions",
+                                  completion_window="24h")
+        batch_ids.append(b.id)
+        log_msg(f"[INFO] submitted batch {b.id} ({len(chunk)} reqs)")
+    try:
+        os.makedirs(os.path.dirname(_batch_state_path()), exist_ok=True)
+        json.dump({"batch_ids": batch_ids, "lang": langmap}, open(_batch_state_path(), "w"))
+    except Exception:
+        pass
+
+    # ---- Phase 3: poll + write ----
+    _write_batch_results(client, batch_ids, langmap, poll_interval)
+
+
+def _write_batch_results(client, batch_ids, langmap, poll_interval=60):
+    """Poll the batches; as each completes, parse + write lyric_themes (3-group) + lyric_themes_raw +
+    lang (lyric_valence stays NULL). Idempotent enough to be re-run via --resume."""
+    pending = set(batch_ids)
+    total = 0
+    while pending:
+        ready = []
+        for bid in list(pending):
+            try:
+                b = client.batches.retrieve(bid)
+            except Exception as e:
+                log_msg(f"[WARN] retrieve {bid[:20]}: {e}"); continue
+            if b.status in ("completed", "failed", "cancelled", "expired"):
+                ready.append((bid, b)); pending.discard(bid)
+            else:
+                rc = b.request_counts
+                log_msg(f"  {bid[:22]} {b.status} {rc.completed}/{rc.total}      ", end='\r')
+        for bid, b in ready:
+            if b.status != "completed":
+                log_msg(f"\n[WARN] batch {bid} ended {b.status}: {getattr(b, 'errors', None)}"); continue
+            out = client.files.content(b.output_file_id).text
+            batch = []
+            for line in out.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    res = json.loads(line); rk = str(res["custom_id"])
+                    content = res["response"]["body"]["choices"][0]["message"]["content"]
+                    groups = _normalise_groups(json.loads(content))
+                    batch.append((None, json.dumps(groups), content,
+                                  langmap.get(rk, "unknown"), time.time(), rk))
+                except Exception:
+                    continue
+            if batch:
+                wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+                wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
+                               "lyric_themes_raw=?, lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?",
+                               batch)
+                wc.commit(); wc.close()
+                total += len(batch)
+            log_msg(f"\n[INFO] batch {bid[:22]} written: {len(batch)} tagged (running total {total}).")
+        if pending:
+            time.sleep(poll_interval)
+    log_msg(f"[INFO] Batch tagging complete: {total} tracks tagged.")
+    try:
+        os.remove(_batch_state_path())
+    except Exception:
+        pass
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
-    if "--sync-lyrics" in sys.argv:
-        _lim = None
+    def _arg_limit():
         if "--limit" in sys.argv:
             try:
-                _lim = int(sys.argv[sys.argv.index("--limit") + 1])
+                return int(sys.argv[sys.argv.index("--limit") + 1])
             except Exception:
-                _lim = None
-        sync_lyrics(limit=_lim, force="--force" in sys.argv)
+                return None
+        return None
+    if "--sync-lyrics-batch" in sys.argv:
+        sync_lyrics_batch(limit=_arg_limit(), force="--force" in sys.argv,
+                          resume="--resume" in sys.argv)
+    elif "--sync-lyrics" in sys.argv:
+        sync_lyrics(limit=_arg_limit(), force="--force" in sys.argv)
     elif "--sync-geo" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:
