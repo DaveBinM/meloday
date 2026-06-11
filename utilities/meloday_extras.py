@@ -7848,7 +7848,7 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
         for profile_key in to_remove:
             name = _MOOD_MIX_NAMES[profile_key]
             pl   = (ep or {}).get(name)
-            if pl:
+            if pl is not None:          # identity check — `if pl:` calls len()->items() (network; can 404)
                 try:
                     pl.delete()
                     xlog(f"[OK] Removed: '{name}'")
