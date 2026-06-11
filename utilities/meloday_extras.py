@@ -4047,14 +4047,28 @@ _PROFILE_LYRIC_VALENCE = {
 
 
 def _lyric_boost(entry, profile_key):
-    """Pull tracks whose lyrics match the mix theme (christmas/summer/road/party — the strong,
-    unique signal) plus a light nudge on lyric sentiment for clearly happy/sad mixes. No-op until
-    lyrics are synced / for un-mapped profiles."""
-    boost = 0.0
+    """Pull tracks whose lyrics match the mix's wanted moods/themes; PUSH OUT tracks whose lyrics
+    actively EXCLUDE them (the veto — e.g. a danceable breakup song kept out of a party mix). The new
+    `lyric_themes` is a 3-group dict {moods, themes, excluded_themes} of {tag: weight}; a legacy keyword
+    list (pre-backfill) is treated as themes at weight 1.0. No-op for un-mapped profiles / untagged."""
     wanted = _PROFILE_LYRIC_THEMES.get(profile_key)
-    themes = entry.get("lyric_themes")
-    if wanted and themes and any(t in themes for t in wanted):
-        boost -= _LYRIC_THEME_WEIGHT
+    if not wanted:
+        return 0.0
+    boost = 0.0
+    lt = entry.get("lyric_themes")
+    if isinstance(lt, dict):
+        if any(t in (lt.get("excluded_themes") or {}) for t in wanted):
+            boost += _LYRIC_THEME_WEIGHT * 1.5                     # exclusion veto: strong push-OUT
+        else:
+            pos = {**(lt.get("moods") or {}), **(lt.get("themes") or {})}
+            matched = [pos[t] for t in wanted if t in pos]
+            if matched:
+                boost -= _LYRIC_THEME_WEIGHT * max(matched)        # pull: core fires fully, faint a quarter
+    elif isinstance(lt, list):                                     # legacy keyword list (pre-backfill)
+        if any(t in lt for t in wanted):
+            boost -= _LYRIC_THEME_WEIGHT
+    # lyric sentiment lean — legacy VADER; lv is None for batch-tagged tracks, so this is a no-op there
+    # (the happy/sad valence profiles re-map to mood tags in the Phase D mapping rebuild).
     lean = _PROFILE_LYRIC_VALENCE.get(profile_key)
     lv = entry.get("lyric_valence")
     if lean and lv is not None:
