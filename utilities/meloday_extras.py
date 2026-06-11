@@ -7725,6 +7725,16 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks = [rk for rk in history_rks if rk not in hard_exclude_rks]
         library_rks = [rk for rk in library_rks if rk not in hard_exclude_rks]
 
+    # Decade mixes: keep the top ~3x most popular tracks of the decade, then pick the slate RANDOMLY
+    # (seeded per day so it's stable within a day, fresh across days) — variety without losing the
+    # "recognisable hits" feel. The fill ladder below still enforces <=1 artist + the hard excludes.
+    if _is_era:
+        pool = list(dict.fromkeys(history_rks + library_rks))
+        pool.sort(key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        pool = pool[:mix_size * 3]
+        random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
+        history_rks, library_rks = [], pool
+
     n_history = min(int(mix_size * 0.40), len(history_rks))
     n_library = mix_size - n_history
     # Wide-but-bounded candidate pool (8x target) so the artist ladder can prefer distinct artists
@@ -7770,10 +7780,11 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     _fill(library_tracks, library_rks, mix_size - len(history_tracks))   # library covers any history shortfall
 
     combined = history_tracks + library_tracks
-    combined.sort(key=lambda t: (
-        _combined_score(str(t.ratingKey))
-        - _rating_dist_bonus(getattr(t, "userRating", None))
-    ))
+    if not _is_era:                        # decade mixes keep their shuffled (per-day varied) order
+        combined.sort(key=lambda t: (
+            _combined_score(str(t.ratingKey))
+            - _rating_dist_bonus(getattr(t, "userRating", None))
+        ))
     return combined[:mix_size]
 
 
