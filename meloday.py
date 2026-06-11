@@ -430,7 +430,8 @@ _CANONICAL_COLUMNS = (
     "moodtheme TEXT, genre_discogs TEXT, emb_effnet BLOB, emb_musicnn BLOB, "
     "lastfm_artist_tags TEXT, lastfm_track_tags TEXT, artist_origin TEXT, "
     "lastfm_listeners INTEGER, lyric_valence REAL, lyric_themes TEXT, lyric_lang TEXT, "
-    "title TEXT, release_date REAL, lastfm_synced_at REAL, geo_synced_at REAL, lyrics_synced_at REAL"
+    "title TEXT, release_date REAL, lastfm_synced_at REAL, geo_synced_at REAL, lyrics_synced_at REAL, "
+    "lyric_themes_raw TEXT"
 )
 
 def _ensure_db_schema(conn):
@@ -477,6 +478,7 @@ def _ensure_db_schema(conn):
         ("lastfm_synced_at",     "lastfm_synced_at REAL"),
         ("geo_synced_at",        "geo_synced_at REAL"),
         ("lyrics_synced_at",     "lyrics_synced_at REAL"),
+        ("lyric_themes_raw",     "lyric_themes_raw TEXT"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -574,7 +576,8 @@ def _entry_to_row(rk, d):
             d.get("lastfm_listeners"), d.get("lyric_valence"),
             json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
             d.get("lyric_lang"), d.get("title"), d.get("release_date"),
-            d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"))
+            d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"),
+            json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None)
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
@@ -586,7 +589,8 @@ def _row_to_entry(row):
         mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn, \
         lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
         lyric_valence, lyric_themes_j, lyric_lang, \
-        title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at = row
+        title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
+        lyric_themes_raw_j = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -616,6 +620,7 @@ def _row_to_entry(row):
         "lastfm_listeners": lastfm_listeners,
         "lyric_valence": lyric_valence,
         "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
+        "lyric_themes_raw": json.loads(lyric_themes_raw_j) if lyric_themes_raw_j else None,
         "lyric_lang": lyric_lang,
         "title": title, "release_date": release_date,
         "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
@@ -659,7 +664,8 @@ def load_essentia_cache():
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn, "
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
             "lyric_valence, lyric_themes, lyric_lang, "
-            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at "
+            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
+            "lyric_themes_raw "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()

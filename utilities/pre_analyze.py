@@ -9,6 +9,7 @@ import signal
 import multiprocessing
 import time
 import json
+import re
 import sqlite3
 import concurrent.futures
 import logging
@@ -95,7 +96,8 @@ def load_essentia_cache_exclusive():
             "mood_electronic, danceability_hl, moodtheme, genre_discogs, "
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
             "lyric_valence, lyric_themes, lyric_lang, "
-            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at "
+            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
+            "lyric_themes_raw "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -109,7 +111,8 @@ def load_essentia_cache_exclusive():
                 mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, \
                 lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
                 lyric_valence, lyric_themes_j, lyric_lang, \
-                title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at in rows:
+                title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
+                lyric_themes_raw_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -138,6 +141,7 @@ def load_essentia_cache_exclusive():
                 "lastfm_listeners": lastfm_listeners,
                 "lyric_valence": lyric_valence,
                 "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
+                "lyric_themes_raw": json.loads(lyric_themes_raw_j) if lyric_themes_raw_j else None,
                 "lyric_lang": lyric_lang,
                 "title": title, "release_date": release_date,
                 "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
@@ -165,10 +169,11 @@ def upsert_essentia_cache_entries(entries):
              mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
              lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
              lyric_valence, lyric_themes, lyric_lang,
-             title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at)
+             title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at,
+             lyric_themes_raw)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -191,7 +196,8 @@ def upsert_essentia_cache_entries(entries):
              d.get("lastfm_listeners"), d.get("lyric_valence"),
              json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
              d.get("lyric_lang"), d.get("title"), d.get("release_date"),
-             d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"))
+             d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"),
+             json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None)
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -1231,30 +1237,196 @@ def _lrclib_search(artist, title):
     except Exception:
         return None
 
-def _analyze_lyrics(text):
-    """(valence 0-1 or None, [themes], lang or None) from plain lyrics. VADER averaged per line
-    (the whole-song compound saturates); themes from distinctive keyword counts."""
-    tl = text.lower()
-    # Fire a theme on >=2 DISTINCT phrases, OR one phrase repeated >=4x (a chorus hook like the
-    # "christmas" in Last Christmas). Distinct-matching stops a repeated colloquialism (e.g.
-    # "hallelujah" x3 in a funk song) from tripping a theme; the >=4 rule keeps single-hook songs.
-    themes = []
-    for _th, _sp in _LYRIC_THEMES.items():
-        # a theme-unique STRONG phrase fires alone; otherwise need >=2 distinct phrases
-        if any(s in tl for s in _sp["strong"]) or sum(1 for k in _sp["strong"] + _sp["weak"] if k in tl) >= 2:
-            themes.append(_th)
-    valence = None
-    if _vader:
-        comps = [_vader.polarity_scores(l)["compound"] for l in text.splitlines() if l.strip()]
-        if comps:
-            valence = round((sum(comps) / len(comps) + 1) / 2, 4)
-    lang = None
-    if _detect_lang:
+# --- LLM lyric tagging: open-ended weighted moods/themes/excluded (keyword detector = fallback) ---
+
+try:
+    from openai import OpenAI as _OpenAI
+except Exception:
+    _OpenAI = None
+
+def _load_openai_key():
+    """env OPENAI_API_KEY -> live/config.yml -> config.yml (extras.openai_api_key)."""
+    k = os.environ.get("OPENAI_API_KEY")
+    if k:
+        return k
+    try:
+        import yaml
+        for p in ("live/config.yml", "config.yml"):
+            fp = os.path.join(BASE_DIR, p)
+            if not os.path.exists(fp):
+                continue
+            k = ((yaml.safe_load(open(fp)) or {}).get("extras") or {}).get("openai_api_key")
+            if k and k != "YOUR_OPENAI_API_KEY":
+                return k
+    except Exception:
+        pass
+    return None
+
+def _lyric_llm_cfg():
+    try:
+        import yaml
+        cfg = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
+    except Exception:
+        cfg = {}
+    return cfg.get("lyric_llm_model", "gpt-5.4-mini"), cfg.get("lyric_llm_reasoning_effort", "low")
+
+# The canonical tagging prompt (the user's engineered prompt + the routing self-assessment).
+_LYRIC_LLM_SYSTEM = """Analyse the song's lyrical content for use in Spotify-style theme and mood mixes.
+
+Return only valid JSON. Do not include commentary, explanations, markdown, or any text outside the JSON.
+
+Use exactly these four top-level keys:
+{ "moods": {}, "themes": {}, "excluded_themes": {}, "routing": {} }
+
+Interpret the lyrics with as much emotional and thematic depth as possible. Go beyond obvious sentiment. Capture subtext, relationship stage, emotional contradictions, setting, implied narrative, and the kinds of mood-based or theme-based mixes the song would naturally suit.
+
+Compress relationship-stage information into the "themes" section rather than returning it separately.
+
+Make the analysis exhaustive:
+* Include all moods and themes that are meaningfully present.
+* Include weaker but still defensible signals at lower weights.
+* Avoid near-duplicate tags unless they capture genuinely different aspects of the song.
+* Use concise snake_case tags.
+* Do not include generic tags that add little value.
+* Do not invent themes unsupported by the lyrics.
+
+Use only these positive ordinal weights for moods and themes:
+* 1.0 = defining or central to the song
+* 0.75 = strongly present
+* 0.5 = clearly present but secondary
+* 0.25 = weak but still meaningful
+
+Use only these negative ordinal weights for excluded themes:
+* -1.0 = strongly contradicted by the song
+* -0.75 = clearly inconsistent with the song
+* -0.5 = somewhat inconsistent or notably absent
+* -0.25 = weakly inconsistent, but worth excluding to prevent misclassification
+
+The "moods" section should contain emotional states and tonal qualities, such as: yearning, bittersweet, lonely, cathartic, nostalgic, melancholic, vulnerable, hopeful, dreamy, restless, tender, reflective.
+
+The "themes" section should contain narrative, relationship-stage, situational, playlist-context, and emotional-concept tags, such as: post_breakup_longing, unresolved_attachment, relationship_limbo, secure_love, new_romance, drifting_apart, missing_someone, crying_in_the_club, sad_banger, night_drive, late_night, loneliness_in_company, searching_for_intimacy, euphoric_sadness, dancefloor_catharsis, carefree_partying, healing, romantic_triumph.
+
+The "excluded_themes" section should contain themes that the song should actively be pushed away from during playlist generation or similarity matching, such as: secure_love, carefree_partying, new_romance, angry_breakup, revenge, fully_moved_on, uncomplicated_happiness, confident_independence, healing_complete, romantic_triumph.
+
+Use excluded themes selectively but comprehensively enough to reduce false-positive playlist placement.
+
+Consider lyrical and musical contrast where relevant. The user message includes an AUDIO PROFILE describing the production. A song with sad lyrics and euphoric production may deserve themes such as: sad_banger, euphoric_sadness, crying_in_the_club, dancefloor_catharsis.
+
+Do not treat a nightlife setting as evidence of carefree partying unless the emotional content supports that interpretation.
+
+Do not return prose explanations for individual tags.
+
+The "routing" key holds your honest self-assessment of this analysis (stored as metadata):
+{ "ambiguity": 0.0, "narrative_complexity": 0.0, "metaphor_dependency": 0.0, "emotional_contradiction": 0.0, "insufficient_lyrics": false, "needs_medium_reasoning": false }
+Where ambiguity = how unclear the meaning is; narrative_complexity = how layered the story is; metaphor_dependency = how much meaning rides on figurative language; emotional_contradiction = how much the feeling conflicts with the surface (e.g. sad lyrics over euphoric music); insufficient_lyrics = too little text to analyse; needs_medium_reasoning = true if a deeper pass would materially improve the tags."""
+
+_openai_client = None
+def _get_openai_client():
+    global _openai_client
+    if _openai_client is None and _OpenAI is not None:
+        key = _load_openai_key()
+        if key:
+            _openai_client = _OpenAI(api_key=key)
+    return _openai_client
+
+_TAG_SUB_RE = re.compile(r"[^a-z0-9_]+")
+def _normalise_tag(t):
+    """lowercase snake_case only (openness lives in the prompt; we never gate the vocab here)."""
+    t = (t or "").strip().lower().replace("&", " and ").replace("'", "")
+    t = _TAG_SUB_RE.sub("_", t).strip("_")
+    return re.sub(r"_+", "_", t)
+
+def lyric_audio_profile(e):
+    """Human-readable production summary from a cache entry's acoustic fields (for the LLM)."""
+    if not e:
+        return ""
+    p = []
+    if e.get("danceability") is not None:
+        v = e["danceability"]; p.append(f"danceability {v:.2f} ({'high' if v>=0.6 else 'low' if v<=0.4 else 'moderate'})")
+    if e.get("valence") is not None:
+        v = e["valence"]; p.append(f"valence {v:.2f} ({'brighter/happier' if v>=0.6 else 'darker/sadder' if v<=0.4 else 'neutral'})")
+    if e.get("energy") is not None: p.append(f"loudness {e['energy']:.1f}dB")
+    if e.get("bpm") is not None: p.append(f"tempo {e['bpm']:.0f}BPM")
+    for m in ("mood_happy", "mood_sad", "mood_party", "mood_relaxed", "mood_aggressive", "arousal"):
+        if e.get(m) is not None: p.append(f"{m} {e[m]:.2f}")
+    return ", ".join(p)
+
+def _classify_lyrics(text, artist="", title="", audio=""):
+    """Open-ended weighted tagging via the LLM. Returns {"moods":{},"themes":{},"excluded_themes":{},
+    "routing":{}} or None on no-key / error (caller falls back to the keyword detector)."""
+    client = _get_openai_client()
+    if client is None or not (text or "").strip():
+        return None
+    model, effort = _lyric_llm_cfg()
+    user = (f"Artist: {artist}\nTitle: {title}\nAudio profile (production): {audio or 'n/a'}\n\n"
+            f"Lyrics:\n{text[:4000]}")
+    for attempt in range(3):
         try:
-            lang = _detect_lang(text[:2000])
-        except Exception:
-            lang = None
-    return valence, themes, lang
+            resp = client.chat.completions.create(
+                model=model, reasoning_effort=effort,
+                messages=[{"role": "system", "content": _LYRIC_LLM_SYSTEM},
+                          {"role": "user", "content": user}],
+                response_format={"type": "json_object"})
+            data = json.loads(resp.choices[0].message.content)
+            return data if isinstance(data, dict) and "moods" in data else None
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2 ** attempt); continue
+            log_msg(f"[WARN] _classify_lyrics failed ({artist} - {title}): {type(e).__name__}: {str(e)[:120]}")
+            return None
+    return None
+
+def _normalise_groups(raw):
+    """Normalise tag NAMES in a 3-group dict (lowercase/snake_case), keeping the
+    moods/themes/excluded_themes structure + weights. Synonym-mapping to the canonical vocab happens
+    later (consolidation); this is just the per-track tidy-up that produces `lyric_themes`."""
+    out = {"moods": {}, "themes": {}, "excluded_themes": {}}
+    if not isinstance(raw, dict):
+        return out
+    for grp in ("moods", "themes", "excluded_themes"):
+        for tag, w in (raw.get(grp) or {}).items():
+            nt = _normalise_tag(tag)
+            if not nt:
+                continue
+            try:
+                wf = round(float(w), 2)
+            except Exception:
+                continue
+            g = out[grp]
+            if nt not in g or abs(wf) > abs(g[nt]):   # keep strongest if names collide
+                g[nt] = wf
+    return out
+
+def _classify_lyrics_keyword(text):
+    """Fallback when the LLM is unavailable: keyword detector -> the 3-group shape (themes at 1.0)."""
+    tl = (text or "").lower()
+    themes = {}
+    for _th, _sp in _LYRIC_THEMES.items():
+        if any(s in tl for s in _sp["strong"]) or sum(1 for k in _sp["strong"] + _sp["weak"] if k in tl) >= 2:
+            themes[_th] = 1.0
+    return {"moods": {}, "themes": themes, "excluded_themes": {}, "routing": {}}
+
+_NLP_LOCK = _threading.Lock()   # VADER/langdetect aren't guaranteed thread-safe; the LLM call is
+
+def _analyze_lyrics(text, artist="", title="", audio=""):
+    """(valence 0-1 or None, raw_3group dict, lang or None). Tags via the LLM (open-ended, weighted)
+    when an OpenAI key is set, else the keyword fallback. Valence (VADER per line) + lang as before.
+    The slow LLM call runs UNLOCKED (concurrent); only VADER/langdetect are serialised."""
+    raw = _classify_lyrics(text, artist, title, audio)
+    if raw is None:
+        raw = _classify_lyrics_keyword(text)
+    valence, lang = None, None
+    with _NLP_LOCK:
+        if _vader:
+            comps = [_vader.polarity_scores(l)["compound"] for l in text.splitlines() if l.strip()]
+            if comps:
+                valence = round((sum(comps) / len(comps) + 1) / 2, 4)
+        if _detect_lang:
+            try:
+                lang = _detect_lang(text[:2000])
+            except Exception:
+                lang = None
+    return valence, raw, lang
 
 def sync_lyrics(limit=None, force=False):
     """Refresh lyrics-derived sentiment/themes/language for cached tracks whose data is missing or
@@ -1281,9 +1453,13 @@ def sync_lyrics(limit=None, force=False):
                      "WHERE lyric_lang IS NOT NULL AND lyrics_synced_at IS NULL", (now,))
     conn.commit()
     rows = conn.execute(
-        "SELECT rating_key, artist, title, release_date, year, lyrics_synced_at, lyric_lang "
+        "SELECT rating_key, artist, title, release_date, year, lyrics_synced_at, lyric_lang, "
+        "energy, danceability, valence, bpm, mood_happy, mood_sad, mood_party, mood_relaxed, "
+        "mood_aggressive, arousal "
         "FROM essentia_cache WHERE title IS NOT NULL").fetchall()
-    todo = [(rk, art, tit) for rk, art, tit, rd, yr, syn, data in rows
+    _acols = ("energy", "danceability", "valence", "bpm", "mood_happy", "mood_sad", "mood_party",
+              "mood_relaxed", "mood_aggressive", "arousal")
+    todo = [(rk, art, tit, dict(zip(_acols, ac))) for rk, art, tit, rd, yr, syn, data, *ac in rows
             if _refresh_due(syn, rd, yr, data is not None, "lyrics", now)]
     if limit:
         todo = todo[:int(limit)]
@@ -1322,7 +1498,7 @@ def sync_lyrics(limit=None, force=False):
             cnt["lyr"] += 1 if had else 0
             if len(batch) >= 100:
                 wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
-                               "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
+                               "lyric_themes_raw=?, lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
                 wc.commit(); batch = []
             if verbose:
                 log_msg(f"   {disp}")
@@ -1333,7 +1509,7 @@ def sync_lyrics(limit=None, force=False):
                 log_msg(f"Lyrics: [{cnt['n']}/{len(todo)}] {rate:.1f}/s | ETA {eta} ", end='\r')
         if batch:
             wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
-                           "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
+                           "lyric_themes_raw=?, lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
             wc.commit()
         wc.close()
 
@@ -1341,19 +1517,23 @@ def sync_lyrics(limit=None, force=False):
     wt.start()
 
     def _fetch(item):
-        rk, artist, title = item
+        rk, artist, title, audio = item
         artist, title = artist or "", title or ""
-        valence, themes, lang, had = None, [], "none", False
+        valence, lang, had, raw = None, "none", False, None
+        groups = {"moods": {}, "themes": {}, "excluded_themes": {}}
         d = _lrclib_search(artist, title) if (artist and title) else None
         if d:
             if d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
                 lang = "instrumental"
             else:
-                with _nlp_lock:
-                    valence, themes, _lang = _analyze_lyrics(d["plainLyrics"])
+                # _analyze_lyrics runs the LLM unlocked + locks VADER/langdetect itself
+                valence, raw, _lang = _analyze_lyrics(d["plainLyrics"], artist, title,
+                                                      lyric_audio_profile(audio))
+                groups = _normalise_groups(raw)
                 lang = _lang or "unknown"; had = True
-        disp = f"{artist[:16]:16} - {title[:20]:20} | valence={valence} themes={themes} lang={lang}"
-        q.put(((valence, json.dumps(themes), lang, time.time(), rk), had, disp))
+        nt = sum(len(groups[g]) for g in ("moods", "themes", "excluded_themes"))
+        disp = f"{artist[:16]:16} - {title[:20]:20} | {nt} tags lang={lang}"
+        q.put(((valence, json.dumps(groups), json.dumps(raw), lang, time.time(), rk), had, disp))
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
