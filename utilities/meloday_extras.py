@@ -7288,7 +7288,9 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
         xlog(f"[ERROR] all_time_favourites: track fetch failed: {e}")
         return []
 
-    candidates = _dedup_canonical(candidates)   # one canonical copy per song (studio over live/remix)
+    # NB: NO canonical dedup here — this list is view-count-sorted (your plays) and the loop stops at
+    # the first 0-play track. Swapping in a studio copy you've never played would have 0 plays and cut
+    # the playlist short. The inline dedup below keeps your most-played copy of each song (correct).
     artist_count = Counter()
     seen_songs   = set()
     result = []
