@@ -3877,7 +3877,8 @@ _PROFILE_ORIGIN.update({
     "reggae_dub":   {"country": "jamaica"},
     "afrobeat":     {"country": {"nigeria", "south africa", "ghana", "senegal", "mali"}},
     "bossa_samba":  {"country": "brazil"},
-    "britpop_rock": {"country_code": "GB"},
+    # match the UK PLACE NAME, not country_code: 15% of UK artists lack a GB code but have a UK place
+    "britpop_rock": {"country": {"united kingdom", "england", "scotland", "wales", "northern ireland"}},
 })
 
 # Geo SHOWCASE mixes (category "geo"): a HARD origin gate — only tracks whose artist is from the
