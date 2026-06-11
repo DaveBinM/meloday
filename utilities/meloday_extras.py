@@ -3890,17 +3890,27 @@ _PROFILE_GEO_GATE = {
 
 
 def _origin_match(entry, spec):
-    """True if the track's artist matches the origin spec, by MusicBrainz place hierarchy first
-    (union of begin-area + area chains) then a Last.fm scene-tag fallback (catches artists whose
-    MB origin is a birthplace, not their scene). spec keys: city / region / country / country_code."""
+    """True if the track's artist matches the origin spec. MusicBrainz files the same place under
+    inconsistent headings (area / region / country / begin_area / city), so we consolidate EVERY place
+    field into ONE lowercased `places` set and match only against that — then a Last.fm scene-tag
+    fallback catches artists whose MB origin is a birthplace, not their scene. spec keys:
+    city / region / country (place names matched vs `places`, str or set, case-insensitive) /
+    country_code (matched vs the ISO code)."""
     o = entry.get("artist_origin") or {}
-    places = set(o.get("places") or [])
-    if spec.get("city") and spec["city"] in places:
-        return True
-    if spec.get("region") and spec["region"] in places:
+    places = {p.lower() for p in (o.get("places") or []) if isinstance(p, str)}
+    for field in ("begin_area", "area", "city", "region", "country", "subdivisions"):
+        v = o.get(field)
+        if isinstance(v, str) and v:
+            places.add(v.lower())
+        elif isinstance(v, (list, tuple)):
+            places.update(x.lower() for x in v if isinstance(x, str))
+    def _in(val):
+        return bool(val) and val.lower() in places
+    if _in(spec.get("city")) or _in(spec.get("region")):
         return True
     if spec.get("country"):
-        want = {spec["country"]} if isinstance(spec["country"], str) else set(spec["country"])
+        want = ({spec["country"].lower()} if isinstance(spec["country"], str)
+                else {c.lower() for c in spec["country"]})
         if want & places:
             return True
     if spec.get("country_code") and (o.get("country_code") or "").upper() == spec["country_code"].upper():
