@@ -4848,22 +4848,14 @@ def _song_key(track):
     return (artist, title)
 
 
-def _dedup_filter(tracks):
+def _dedup_filter(tracks, essentia_cache=None):
     """
-    Remove duplicate songs from a track list, keeping the first occurrence
-    (which is always the highest-scored version since lists are pre-sorted).
-    Two tracks are considered the same song if they share a normalised
-    (artist, clean_title) key — so "Stars" from a studio album and
-    "Stars" from a compilation are treated as one entry.
+    Remove duplicate songs from a track list, keeping the most CANONICAL copy of each (studio/original
+    — not a live / remix / demo / instrumental / compilation version) at the song's best (highest-
+    scored) position. Two tracks are the same song by normalised (artist, clean_title) key — so
+    "Stars" from a studio album and "Stars" from a compilation are treated as one entry.
     """
-    seen = set()
-    result = []
-    for t in tracks:
-        key = _song_key(t)
-        if key not in seen:
-            seen.add(key)
-            result.append(t)
-    return result
+    return _dedup_canonical(tracks, essentia_cache)
 
 
 # ===========================================================================
@@ -6641,7 +6633,7 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
         result.append((rel, t))
 
     result.sort(key=lambda x: x[0], reverse=True)
-    return _dedup_filter([t for _, t in result[:TARGET]])
+    return _dedup_filter([t for _, t in result[:TARGET]], essentia_cache)
 
 
 # --- 4. Discover Weekly ---
@@ -6903,7 +6895,8 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
 
         # Sort combined tracks by distance to cluster centroid — creates acoustic
         # flow within each mix rather than alternating history/library blocks.
-        combined = history_tracks + library_tracks
+        # dedup to one canonical copy per song (the same track can be in BOTH pools — no dedup before)
+        combined = _dedup_canonical(history_tracks + library_tracks, essentia_cache)
         combined.sort(key=lambda t: (
             float(np.linalg.norm(X[rk_to_idx[str(t.ratingKey)]] - centroid_vec))
             if str(t.ratingKey) in rk_to_idx else 1.0
@@ -7070,6 +7063,7 @@ def build_time_capsule(plex, history_entries, essentia_cache, excluded_album_key
             filtered.append(t)
         filtered_pools.append(filtered)
 
+    filtered_pools = [_dedup_canonical(p, essentia_cache) for p in filtered_pools]  # canonical copy per song
     # Round-robin across eras with artist cap and inline dedup
     result      = []
     seen_songs  = set()
@@ -7186,7 +7180,7 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
                 break
 
         if selected:
-            artist_deep_cuts[artist_key] = selected
+            artist_deep_cuts[artist_key] = _dedup_canonical(selected, essentia_cache)
 
     return _round_robin_interleave(
         [artist_deep_cuts[a] for a in top_artists if a in artist_deep_cuts],
@@ -7294,6 +7288,7 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
         xlog(f"[ERROR] all_time_favourites: track fetch failed: {e}")
         return []
 
+    candidates = _dedup_canonical(candidates)   # one canonical copy per song (studio over live/remix)
     artist_count = Counter()
     seen_songs   = set()
     result = []
@@ -7667,14 +7662,11 @@ _TITLE_LIVE_DEMO = re.compile(
     r"[\(\[\-]\s*live\b|\blive (?:at|in|from|around|session|recording|concert|version)\b"
     r"|\blive\s*[\)\]]|[\(\[]\s*demo\b|\bdemo\s*[\)\]]", re.I)
 _ALBUM_LIVE = re.compile(r"\blive\b", re.I)   # a bare "Live" in the ALBUM folder = a live album
-def _canonical_penalty(entry):
+def _version_penalty(title, album):
     """Lower = more canonical. Penalises different-recording copies (live / remix / demo /
-    instrumental / acoustic / orchestral-"sessions" re-recordings — detected from the title + the
-    ALBUM folder of the file path) and, mildly, compilations — so decade-mix dedup keeps the
-    studio/original of each song. Ties then break to the earliest (original) release year."""
-    title = (entry.get("title") or "").lower()
-    parts = (entry.get("file_path") or "").split("/")
-    album = (parts[-2] if len(parts) >= 2 else (entry.get("file_path") or "")).lower()
+    instrumental / acoustic / orchestral-"sessions" re-recordings — from the track title + its album
+    name) and, mildly, compilations. Ties then break to the earliest (original) release year."""
+    title = (title or "").lower(); album = (album or "").lower()
     pen = sum(4 for kw in _NONCANON_SUBSTR if kw in title or kw in album)
     if _TITLE_LIVE_DEMO.search(title) or _ALBUM_LIVE.search(album):
         pen += 4
@@ -7683,6 +7675,33 @@ def _canonical_penalty(entry):
     if "greatest hits" in album or "best of" in album or "compilation" in album:
         pen += 1
     return pen
+def _canonical_penalty(entry):
+    """Version penalty for a CACHE entry (album = the file-path's album folder)."""
+    parts = (entry.get("file_path") or "").split("/")
+    return _version_penalty(entry.get("title"), parts[-2] if len(parts) >= 2 else (entry.get("file_path") or ""))
+def _canonical_penalty_track(t):
+    """Version penalty for a Plex Track (album = parentTitle)."""
+    return _version_penalty(getattr(t, "title", ""), getattr(t, "parentTitle", ""))
+
+
+def _dedup_canonical(tracks, essentia_cache=None):
+    """Collapse same-song duplicate Track objects to the most CANONICAL copy (studio/original — not
+    live / remix / demo / instrumental / compilation), keeping the song at its best (first / highest-
+    scored) position in the list. Uses the cache entry (by rating key) for the version penalty. For
+    LIBRARY-pulled playlists — leave history-reflecting ones (On Repeat etc.) showing what was played."""
+    best, order = {}, []
+    for t in tracks:
+        sk = _song_key(t)
+        e  = (essentia_cache or {}).get(str(t.ratingKey))
+        if e:
+            cs = (_canonical_penalty(e), e.get("year") or 9999, str(t.ratingKey))
+        else:                                   # not in cache -> score from the Track itself
+            cs = (_canonical_penalty_track(t), getattr(t, "year", None) or 9999, str(t.ratingKey))
+        if sk not in best:
+            best[sk] = (cs, t); order.append(sk)
+        elif cs < best[sk][0]:
+            best[sk] = (cs, t)
+    return [best[sk][1] for sk in order]
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
