@@ -4439,6 +4439,7 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
     wcount = defaultdict(float)
     styles_counter = Counter()
     genres_counter = Counter()
+    lastfm_counter = Counter()
 
     for rk in top_keys:
         entry = essentia_cache.get(rk)
@@ -4456,6 +4457,10 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
             styles_counter[s] += count
         for g in (entry.get("genres") or []):
             genres_counter[g] += count
+        for tag in (entry.get("lastfm_track_tags") or {}):        # community taste tags (Last.fm)
+            lastfm_counter[tag] += count
+        for tag in (entry.get("lastfm_artist_tags") or {}):
+            lastfm_counter[tag] += count * 0.4                    # artist-level tags weighted lighter
 
     return {
         "bpm":                wsum["bpm"]               / wcount["bpm"]               if wcount["bpm"]               else None,
@@ -4472,6 +4477,7 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
         "vocal_presence":     wsum["vocal_presence"]     / wcount["vocal_presence"]     if wcount["vocal_presence"]     else None,
         "styles_counter": styles_counter,
         "genres_counter": genres_counter,
+        "lastfm_counter": lastfm_counter,
     }
 
 
@@ -4776,20 +4782,26 @@ def _acoustic_distance_to_centroid(entry, centroid):
 
 
 def _tag_overlap_score(entry, centroid):
-    """Jaccard-like overlap between track styles/genres and centroid's top tags."""
+    """Taste overlap with the listening profile: Last.fm community tags (richest signal) blended with
+    AllMusic styles/genres."""
+    # Last.fm community-tag overlap — overlap coefficient (robust to the large artist-tag sets)
+    top_lf = {t for t, _ in centroid.get("lastfm_counter", Counter()).most_common(30)}
+    track_lf = set(entry.get("lastfm_track_tags") or {}) | set(entry.get("lastfm_artist_tags") or {})
+    lf = (len(top_lf & track_lf) / min(len(top_lf), len(track_lf))) if (top_lf and track_lf) else None
+    # AllMusic styles / genres Jaccard (existing)
     top_styles = {s for s, _ in centroid.get("styles_counter", Counter()).most_common(10)}
     top_genres = {g for g, _ in centroid.get("genres_counter", Counter()).most_common(5)}
     track_styles = set(entry.get("styles") or [])
     track_genres = set(entry.get("genres") or [])
+    sg = None
     if top_styles and track_styles:
-        union = top_styles | track_styles
-        if union:
-            return len(top_styles & track_styles) / len(union)
-    if top_genres and track_genres:
-        union = top_genres | track_genres
-        if union:
-            return len(top_genres & track_genres) / len(union)
-    return 0.0
+        sg = len(top_styles & track_styles) / len(top_styles | track_styles)
+    elif top_genres and track_genres:
+        sg = len(top_genres & track_genres) / len(top_genres | track_genres)
+    # blend — Last.fm primary; fall back to whichever signal is present
+    if lf is not None and sg is not None:
+        return 0.6 * lf + 0.4 * sg
+    return lf if lf is not None else (sg if sg is not None else 0.0)
 
 
 def acoustic_affinity(rk, centroid, essentia_cache):
@@ -6625,7 +6637,11 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
                 continue
             rks          = [str(t.ratingKey) for t in tracks]
             alb_centroid = _album_acoustic_centroid(rks, essentia_cache)
-            affinity     = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
+            ac_aff       = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
+            # taste: how well the album's tags (incl. the artist's established Last.fm tags, present
+            # even on a brand-new track) match the listening profile — the best-aligned track stands in.
+            tag_aff      = max((_tag_overlap_score(essentia_cache.get(rk, {}), centroid) for rk in rks), default=0.0)
+            affinity     = 0.65 * ac_aff + 0.35 * tag_aff
             reps         = _select_album_reps(album, tracks, essentia_cache)
             artist_key   = _artist_key(reps[0]) if reps else ""
             album_data.append((rel, affinity, album.ratingKey, artist_key, reps))
@@ -6711,7 +6727,10 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
     for rk, entry in essentia_cache.items():
         if rk in played_keys:
             continue
-        score = acoustic_affinity(rk, centroid, essentia_cache)
+        aff  = acoustic_affinity(rk, centroid, essentia_cache)   # taste: acoustic + Last.fm/AllMusic tags
+        lis  = entry.get("lastfm_listeners") or 0
+        obsc = 1.0 - min(1.0, math.log10(lis + 1) / 6.5)         # lean to lesser-known for genuine discovery
+        score = 0.82 * aff + 0.18 * obsc
         artist = norm_text(primary_artist(entry.get("artist", "") or ""))
         if artist and artist not in played_artists:
             new_artist_scored.append((score, rk))
