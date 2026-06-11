@@ -3858,45 +3858,48 @@ def _lastfm_tag_boost(entry, profile_key):
 _ORIGIN_WEIGHT  = 0.50   # strong pull toward local artists in a city/region mix
 _ORIGIN_PENALTY = 0.15   # gentle push-out of confirmed non-local artists (keeps the genre though)
 
-# City mixes -> origin spec. Auto-built from the glasgow_/london_/melbourne_ prefixes; add
-# explicit entries here for country/region/continent mixes (e.g. {"country_code": "GB"}).
+# Origin specs are a single `places` set (place names matched against the artist's consolidated place
+# hierarchy — the MB heading area/region/country doesn't matter) + an optional `scene` set (Last.fm
+# scene-tag fallback). City mixes are auto-built from the glasgow_/london_/melbourne_ prefixes.
 _PROFILE_ORIGIN = {}
 for _pk in _MOOD_PROFILES:
     for _pre, _city in (("glasgow_", "glasgow"), ("london_", "london"), ("melbourne_", "melbourne")):
         if _pk.startswith(_pre):
-            _PROFILE_ORIGIN[_pk] = {"city": _city}
+            _PROFILE_ORIGIN[_pk] = {"places": {_city}, "scene": {_city}}
 
 # Geographically-rooted genre mixes: prefer artists from the genre's home turf. The style gate keeps
 # the genre coherent; origin just refines toward authentic local artists (and gently pushes out
-# confirmed non-locals). Values are LOWERCASE to match the `places` hierarchy; country_code is
-# case-insensitive. Extra (currently low-content) countries are future-proofing as the geo sync fills.
+# confirmed non-locals). Place names are LOWERCASE and matched against the consolidated `places`, so
+# the MB heading doesn't matter. Extra (currently low-content) countries future-proof the geo sync.
 _PROFILE_ORIGIN.update({
-    "celtic_folk":  {"country": {"ireland", "scotland", "wales"}},   # place names matched vs `places`
-    "latin_heat":   {"country": {"mexico", "spain", "colombia", "argentina", "chile", "puerto rico",
-                                 "cuba", "venezuela", "peru", "dominican republic"}},
-    "reggae_dub":   {"country": "jamaica"},
-    "afrobeat":     {"country": {"nigeria", "south africa", "ghana", "senegal", "mali"}},
-    "bossa_samba":  {"country": "brazil"},
+    "celtic_folk":  {"places": {"ireland", "scotland", "wales"}},
+    "latin_heat":   {"places": {"mexico", "spain", "colombia", "argentina", "chile", "puerto rico",
+                                "cuba", "venezuela", "peru", "dominican republic"}},
+    "reggae_dub":   {"places": {"jamaica"}},
+    "afrobeat":     {"places": {"nigeria", "south africa", "ghana", "senegal", "mali"}},
+    "bossa_samba":  {"places": {"brazil"}},
     # match the UK PLACE NAME, not country_code: 15% of UK artists lack a GB code but have a UK place
-    "britpop_rock": {"country": {"united kingdom", "england", "scotland", "wales", "northern ireland"}},
+    "britpop_rock": {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland"}},
 })
 
-# Geo SHOWCASE mixes (category "geo"): a HARD origin gate — only tracks whose artist is from the
-# place — then ranked by Last.fm popularity, exactly like the decade mixes. Matched via `places`.
+# Geo SHOWCASE mixes (category "geo"): a HARD origin gate — only tracks whose artist is from the place
+# — then ranked by Last.fm popularity, exactly like the decade mixes. `places` matched vs the artist's
+# consolidated place hierarchy; `scene` adds a Last.fm scene-tag fallback.
 _PROFILE_GEO_GATE = {
-    "scotland_scene":  {"region": "scotland"},
-    "australia_scene": {"country": "australia"},
-    "london_scene":    {"city": "london"},
+    "scotland_scene":  {"places": {"scotland"},  "scene": {"scotland"}},
+    "australia_scene": {"places": {"australia"}, "scene": {"australia"}},
+    "london_scene":    {"places": {"london"},    "scene": {"london"}},
 }
 
 
 def _origin_match(entry, spec):
-    """True if the track's artist matches the origin spec. MusicBrainz files the same place under
-    inconsistent headings (area / region / country / begin_area / city), so we consolidate EVERY place
-    field into ONE lowercased `places` set and match only against that — then a Last.fm scene-tag
-    fallback catches artists whose MB origin is a birthplace, not their scene. spec keys:
-    city / region / country (place names matched vs `places`, str or set, case-insensitive) /
-    country_code (matched vs the ISO code)."""
+    """True if the track's artist is from one of the spec's places. MusicBrainz files the same place
+    under inconsistent headings (area / region / country / begin_area / city), so we consolidate EVERY
+    place field into ONE lowercased `places` set and match the spec's place names against that — the
+    spec doesn't care which heading MB used. spec keys:
+      `places` — set of lowercase place names (matched against the artist's consolidated places);
+      `scene`  — optional set of scene tags (Last.fm fallback: catches artists tagged with a scene
+                 whose MB origin is only a birthplace, e.g. someone tagged "glasgow")."""
     o = entry.get("artist_origin") or {}
     places = {p.lower() for p in (o.get("places") or []) if isinstance(p, str)}
     for field in ("begin_area", "area", "city", "region", "country", "subdivisions"):
@@ -3905,22 +3908,12 @@ def _origin_match(entry, spec):
             places.add(v.lower())
         elif isinstance(v, (list, tuple)):
             places.update(x.lower() for x in v if isinstance(x, str))
-    def _in(val):
-        return bool(val) and val.lower() in places
-    if _in(spec.get("city")) or _in(spec.get("region")):
+    if {p.lower() for p in spec.get("places", ())} & places:
         return True
-    if spec.get("country"):
-        want = ({spec["country"].lower()} if isinstance(spec["country"], str)
-                else {c.lower() for c in spec["country"]})
-        if want & places:
-            return True
-    if spec.get("country_code") and (o.get("country_code") or "").upper() == spec["country_code"].upper():
-        return True
-    # Last.fm scene-tag fallback (e.g. an artist tagged "melbourne"/"glasgow")
-    target = spec.get("city") or spec.get("region")
-    if target:
-        lf = list((entry.get("lastfm_artist_tags") or {})) + list((entry.get("lastfm_track_tags") or {}))
-        if any(target in t for t in lf):
+    scene = spec.get("scene")
+    if scene:
+        lf = list(entry.get("lastfm_artist_tags") or {}) + list(entry.get("lastfm_track_tags") or {})
+        if any(s in t for s in (x.lower() for x in scene) for t in lf):
             return True
     return False
 
