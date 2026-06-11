@@ -1711,6 +1711,123 @@ def _write_batch_results(client, batch_ids, langmap, poll_interval=60):
         pass
 
 
+def _lyric_vocab_path():
+    return os.path.join(BASE_DIR, "assets", "lyric_vocab.json")
+
+def _llm_cluster_synonyms(tags, kind):
+    """Ask the LLM to merge near-synonym / trivial-variant tags under one canonical form. Returns
+    {non_canonical_tag: canonical_tag}. Chunked (most synonyms live among the frequent set)."""
+    client = _get_openai_client()
+    if client is None or not tags:
+        return {}
+    model, _ = _lyric_llm_cfg()
+    syn = {}
+    for i in range(0, len(tags), 250):
+        chunk = tags[i:i + 250]
+        prompt = (f"These are {kind} tags from a music library (snake_case), most-frequent first. Merge "
+                  f"only NEAR-SYNONYMS and trivial variants (e.g. melancholy/melancholic, lonely/"
+                  f"loneliness, yearning/longing, heartbroken/heartbreak) under ONE canonical tag — "
+                  f"prefer the most common, natural form already in the list. Do NOT merge tags that "
+                  f"capture genuinely different feelings/situations. Return ONLY a JSON object mapping "
+                  f"each NON-canonical tag to its canonical tag (omit tags that stay as-is).\n\n"
+                  f"Tags: {', '.join(chunk)}")
+        try:
+            resp = client.chat.completions.create(model=model, reasoning_effort="low",
+                messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
+            for k, v in (json.loads(resp.choices[0].message.content) or {}).items():
+                ck, cv = _normalise_tag(k), _normalise_tag(v)
+                if ck and cv and ck != cv:
+                    syn[ck] = cv
+        except Exception as e:
+            log_msg(f"[WARN] synonym cluster chunk failed: {e}")
+    return syn
+
+def build_lyric_vocab(min_count=None, cluster=True):
+    """Phase C consolidation: aggregate the emergent tags from `lyric_themes_raw` across the library
+    into canonical mood + theme registers, LLM-cluster near-synonyms, write assets/lyric_vocab.json +
+    print a review report. Run after the backfill; review/edit the vocab, then apply_lyric_vocab()."""
+    from collections import Counter
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    rows = conn.execute("SELECT lyric_themes_raw FROM essentia_cache "
+                        "WHERE lyric_themes_raw IS NOT NULL").fetchall()
+    conn.close()
+    mood_c, theme_c, excl_c = Counter(), Counter(), Counter()
+    n = 0
+    for (raw_j,) in rows:
+        try:
+            raw = json.loads(raw_j)
+        except Exception:
+            continue
+        if not isinstance(raw, dict):
+            continue
+        n += 1
+        for t in (raw.get("moods") or {}):
+            mood_c[_normalise_tag(t)] += 1
+        for t in (raw.get("themes") or {}):
+            theme_c[_normalise_tag(t)] += 1
+        for t in (raw.get("excluded_themes") or {}):
+            excl_c[_normalise_tag(t)] += 1
+    if not n:
+        log_msg("[INFO] No tagged tracks yet — run --sync-lyrics-batch --force first."); return
+    if min_count is None:
+        min_count = max(3, n // 2000)   # keep tags in >= ~0.05% of tracks
+    moods = [t for t, c in mood_c.most_common() if c >= min_count]
+    themes = [t for t, c in theme_c.most_common() if c >= min_count]
+    log_msg(f"[INFO] {n} tagged tracks | unique moods {len(mood_c)} themes {len(theme_c)} excluded "
+            f"{len(excl_c)} | canonical candidates (>= {min_count}): {len(moods)} moods, {len(themes)} themes.")
+    log_msg("\nTOP MOODS:    " + ", ".join(f"{t}({c})" for t, c in mood_c.most_common(50)))
+    log_msg("\nTOP THEMES:   " + ", ".join(f"{t}({c})" for t, c in theme_c.most_common(50)))
+    log_msg("\nTOP EXCLUDED: " + ", ".join(f"{t}({c})" for t, c in excl_c.most_common(40)))
+    synonyms = {}
+    if cluster:
+        log_msg("\n[INFO] LLM-clustering near-synonyms...")
+        synonyms = _llm_cluster_synonyms(moods, "mood")
+        synonyms.update(_llm_cluster_synonyms(themes, "theme"))
+        # collapse the canonical lists through the synonym map (drop merged-away tags)
+        moods = sorted({synonyms.get(t, t) for t in moods})
+        themes = sorted({synonyms.get(t, t) for t in themes})
+        log_msg(f"[INFO] {len(synonyms)} synonyms merged -> {len(moods)} moods, {len(themes)} themes canonical.")
+    vocab = {"n_tracks": n, "min_count": min_count, "moods": moods, "themes": themes, "synonyms": synonyms}
+    os.makedirs(os.path.dirname(_lyric_vocab_path()), exist_ok=True)
+    json.dump(vocab, open(_lyric_vocab_path(), "w"), indent=1, sort_keys=True)
+    log_msg(f"[INFO] wrote {_lyric_vocab_path()} — REVIEW it, then run --apply-lyric-vocab.")
+
+def apply_lyric_vocab():
+    """Normalise lyric_themes_raw -> lyric_themes using the (reviewed) lyric_vocab.json synonym map.
+    No API — re-runnable whenever the vocab changes (the living-vocab loop)."""
+    try:
+        vocab = json.load(open(_lyric_vocab_path()))
+    except Exception:
+        log_msg("[ERROR] No lyric_vocab.json — run --build-lyric-vocab first."); return
+    syn = vocab.get("synonyms", {})
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+    conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn)
+    rows = conn.execute("SELECT rating_key, lyric_themes_raw FROM essentia_cache "
+                        "WHERE lyric_themes_raw IS NOT NULL").fetchall()
+    batch = []
+    for rk, raw_j in rows:
+        try:
+            raw = json.loads(raw_j)
+        except Exception:
+            continue
+        groups = {"moods": {}, "themes": {}, "excluded_themes": {}}
+        for grp in groups:
+            for tag, w in (raw.get(grp) or {}).items():
+                nt = _normalise_tag(tag)
+                ct = syn.get(nt, nt)               # synonym -> canonical
+                try:
+                    wf = round(float(w), 2)
+                except Exception:
+                    continue
+                if ct not in groups[grp] or abs(wf) > abs(groups[grp][ct]):
+                    groups[grp][ct] = wf
+        batch.append((json.dumps(groups), rk))
+    conn.executemany("UPDATE essentia_cache SET lyric_themes=? WHERE rating_key=?", batch)
+    conn.commit(); conn.close()
+    log_msg(f"[INFO] normalised {len(batch)} tracks (raw -> canonical lyric_themes) using "
+            f"{len(syn)} synonyms.")
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
@@ -1724,6 +1841,10 @@ if __name__ == "__main__":
     if "--sync-lyrics-batch" in sys.argv:
         sync_lyrics_batch(limit=_arg_limit(), force="--force" in sys.argv,
                           resume="--resume" in sys.argv)
+    elif "--build-lyric-vocab" in sys.argv:
+        build_lyric_vocab(min_count=_arg_limit(), cluster="--no-cluster" not in sys.argv)
+    elif "--apply-lyric-vocab" in sys.argv:
+        apply_lyric_vocab()
     elif "--sync-lyrics" in sys.argv:
         sync_lyrics(limit=_arg_limit(), force="--force" in sys.argv)
     elif "--sync-geo" in sys.argv:
