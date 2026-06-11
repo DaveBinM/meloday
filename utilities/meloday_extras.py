@@ -3845,6 +3845,20 @@ for _pk in _MOOD_PROFILES:
         if _pk.startswith(_pre):
             _PROFILE_ORIGIN[_pk] = {"city": _city}
 
+# Geographically-rooted genre mixes: prefer artists from the genre's home turf. The style gate keeps
+# the genre coherent; origin just refines toward authentic local artists (and gently pushes out
+# confirmed non-locals). Values are LOWERCASE to match the `places` hierarchy; country_code is
+# case-insensitive. Extra (currently low-content) countries are future-proofing as the geo sync fills.
+_PROFILE_ORIGIN.update({
+    "celtic_folk":  {"country": "ireland"},
+    "latin_heat":   {"country": {"mexico", "spain", "colombia", "argentina", "chile", "puerto rico",
+                                 "cuba", "venezuela", "peru", "dominican republic"}},
+    "reggae_dub":   {"country": "jamaica"},
+    "afrobeat":     {"country": {"nigeria", "south africa", "ghana", "senegal", "mali"}},
+    "bossa_samba":  {"country": "brazil"},
+    "britpop_rock": {"country_code": "GB"},
+})
+
 
 def _origin_match(entry, spec):
     """True if the track's artist matches the origin spec, by MusicBrainz place hierarchy first
