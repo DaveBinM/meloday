@@ -7555,7 +7555,11 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         seen, pool = Counter(), []
         for _, k in scored:
             cat = _PROFILE_CATEGORY.get(k, "other")
-            if seen[cat] < per_cat:
+            # decade/era mixes: admit ALL of them (not just the best acoustic-fitting per_cat), so the
+            # per-slot shuffle surfaces a different decade over time instead of always the one or two
+            # that match recent listening. Other categories keep the fit-based stratification.
+            cap = 999 if cat == "era" else per_cat
+            if seen[cat] < cap:
                 seen[cat] += 1
                 pool.append(k)
     else:
@@ -7630,6 +7634,9 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
 
 _SONG_MIN_YEAR_CACHE = {}
+_ERA_POOL_MAX = 250            # decade mix: randomly pick the slate from up to this many tracks...
+_ERA_MIN_LISTENERS = 300_000   # ...but only those above this Last.fm listener floor, so older/smaller
+                               # decades (where rank 250 is already a deep cut) stay recognisable
 def _entry_song_key(entry):
     return (norm_text(primary_artist(entry.get("artist") or "")),
             norm_text(clean_title(entry.get("title") or "")))
@@ -7731,7 +7738,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if _is_era:
         pool = list(dict.fromkeys(history_rks + library_rks))
         pool.sort(key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        pool = pool[:mix_size * 3]
+        floored = [rk for rk in pool
+                   if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _ERA_MIN_LISTENERS]
+        # up to _ERA_POOL_MAX recognisable tracks; fall back to a fixed top-N if the floor is too thin
+        pool = floored[:_ERA_POOL_MAX] if len(floored) >= mix_size else pool[:mix_size * 3]
         random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         history_rks, library_rks = [], pool
 
