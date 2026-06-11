@@ -3850,7 +3850,7 @@ for _pk in _MOOD_PROFILES:
 # confirmed non-locals). Values are LOWERCASE to match the `places` hierarchy; country_code is
 # case-insensitive. Extra (currently low-content) countries are future-proofing as the geo sync fills.
 _PROFILE_ORIGIN.update({
-    "celtic_folk":  {"country": "ireland"},
+    "celtic_folk":  {"country": {"ireland", "scotland", "wales"}},   # place names matched vs `places`
     "latin_heat":   {"country": {"mexico", "spain", "colombia", "argentina", "chile", "puerto rico",
                                  "cuba", "venezuela", "peru", "dominican republic"}},
     "reggae_dub":   {"country": "jamaica"},
