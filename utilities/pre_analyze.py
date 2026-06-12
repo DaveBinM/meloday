@@ -10,6 +10,8 @@ import multiprocessing
 import time
 import json
 import re
+import hashlib
+import unicodedata
 import sqlite3
 import concurrent.futures
 import logging
@@ -19,7 +21,7 @@ from meloday import (
     save_essentia_cache, ESSENTIA_ENABLED,
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
-    _fill_missing_acoustic, _TF_MODELS_LOADED,
+    _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text,
     _mood_models, _moodtheme_model, _genre_model,
 )
 
@@ -1547,17 +1549,41 @@ def sync_lyrics(limit=None, force=False):
     log_msg(f"\n[INFO] Lyrics sync complete: {cnt['n']} processed, {cnt['lyr']} with lyrics.")
 
 
+_LYR_BRACKET_RE = re.compile(r"[\[\{][^\]\}]*[\]\}]")   # [Chorus], [Verse 1], {x2} annotations
+_LYR_APOS_RE = re.compile(r"['’´`ʼ]")                   # apostrophe variants (don't / don’t / dont)
+_LYR_KEEP_RE = re.compile(r"[^a-z0-9\s]")               # remaining punctuation, dashes, quotes
+_LYR_WS_RE = re.compile(r"\s+")
+
+def _lyrics_fingerprint(lyrics):
+    """A formatting-insensitive fingerprint of a song's lyrics, so the SAME words identify the SAME song
+    even when LRCLIB's two copies differ in case, punctuation, apostrophes (' vs ' vs none), accents,
+    [section] tags or line breaks — they'd never be byte-identical, but they ARE the same lyrics.
+    Normalises to bare word content then hashes. A live/remix with genuinely different or extra WORDS
+    normalises differently -> its own fingerprint, so it's tagged on its own (never wrongly merged)."""
+    s = unicodedata.normalize("NFKD", (lyrics or "").lower())
+    s = "".join(c for c in s if not unicodedata.combining(c))   # drop accents (café -> cafe)
+    s = _LYR_BRACKET_RE.sub(" ", s)                             # drop [chorus]/{x2} annotations
+    s = _LYR_APOS_RE.sub("", s)                                 # delete apostrophes (don't == dont)
+    s = _LYR_KEEP_RE.sub(" ", s)                                # other punctuation -> space (word breaks)
+    s = _LYR_WS_RE.sub(" ", s).strip()                          # collapse whitespace
+    return hashlib.md5(s.encode("utf-8", "ignore")).hexdigest()
+
+
 def _batch_state_path():
     return os.path.join(BASE_DIR, "logs", "lyric_batch_state.json")
 
 def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     """PRIMARY lyric tagger — open-ended LLM moods/themes/excluded via the OpenAI BATCH API (50% cheaper,
     async) for whatever's due: a handful, thousands, or the whole library under --force. Submits
-    INCREMENTALLY — a batch fires every ~5k tracks as LRCLIB lyrics come in, so OpenAI starts within the
-    first chunk and tags WHILE the (slow) fetch continues; each submitted batch is persisted so a crash
-    only costs the un-submitted remainder (--resume re-polls). Tracks without lyrics get none/instrumental
-    written directly. lyric_valence is left NULL — the LLM moods carry sentiment now (the valence profiles
-    re-map to moods in the boost). The live per-track --sync-lyrics is a pricier fallback."""
+    INCREMENTALLY in SMALL batches (default 500) as LRCLIB lyrics come in, so OpenAI starts within the
+    first chunk and tags WHILE the (slow) fetch continues. THROTTLED: at most `max_inflight` batches run
+    at once and a batch-queue-limit error makes it drain (poll+write a finished batch) and retry, so it
+    self-paces under OpenAI's enqueued-token limit. DEDUP: tracks sharing byte-identical lyrics (true
+    duplicates across albums/comps) are tagged ONCE and the result copied to the rest — a live/remix with
+    even slightly different lyrics hashes differently and is tagged on its own. Each batch + the dedup map
+    is persisted so a crash only costs the un-submitted remainder (--resume re-polls + re-copies). Tracks
+    without lyrics get none/instrumental written directly. lyric_valence stays NULL — the LLM moods carry
+    sentiment (valence profiles re-map to moods in the boost). Live per-track --sync-lyrics is the fallback."""
     client = _get_openai_client()
     if client is None:
         log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return
@@ -1567,9 +1593,22 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
         except Exception:
             log_msg("[ERROR] No saved batch state to resume."); return
         log_msg(f"[INFO] Resuming {len(st['batch_ids'])} batch(es).")
-        _write_batch_results(client, st["batch_ids"], st["lang"], poll_interval); return
+        _write_batch_results(client, st["batch_ids"], st["lang"], poll_interval)
+        _copy_lyric_dupes(st.get("dupes") or {})
+        try:
+            os.remove(_batch_state_path())
+        except Exception:
+            pass
+        return
 
     model, effort = _lyric_llm_cfg()
+    try:
+        import yaml
+        _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
+    except Exception:
+        _ex = {}
+    batch_size = max(1, int(_ex.get("lyric_batch_size", 500)))      # small batches (was 5000)
+    max_inflight = max(1, int(_ex.get("lyric_max_inflight", 6)))    # cap concurrent batches (queue limit)
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn); _ensure_meta_fields(conn)
     now = time.time()
@@ -1596,20 +1635,21 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     if not todo:
         return
 
-    # ---- Fetch + submit INCREMENTALLY: as lyrics come back, fire a batch every `chunk_size` tracks so
-    #      OpenAI starts within ~the first chunk, the tagging OVERLAPS the (slow) LRCLIB fetch, memory
-    #      stays low (only one chunk buffered), and each submitted batch is persisted for --resume — a
-    #      crash/OOM only costs the un-submitted remainder, never the whole run. ----
-    import concurrent.futures, io
-    chunk_size = 5000
+    # ---- Fetch → DEDUP (artist + lyrics-hash) → submit SMALL batches, THROTTLED under the OpenAI
+    #      batch-queue limit. As lyrics return, identical-lyrics tracks collapse to one "rep" (the rest
+    #      are copied for free afterwards); reps fill a `batch_size` chunk and fire a batch; at most
+    #      `max_inflight` batches run at once (drain = poll+write a finished one to free a slot) and a
+    #      queue-limit error forces drain+retry. Each batch + the dedup map is persisted for --resume. ----
+    import io
     langmap, batch_ids, chunk, nolyr = {}, [], [], []
+    seen, dupes, inflight = {}, {}, set()
 
     def _build(item):
         rk, artist, title, audio = item
         artist, title = artist or "", title or ""
         d = _lrclib_search(artist, title) if (artist and title) else None
         if not d or d.get("instrumental") or not (d.get("plainLyrics") or "").strip():
-            return (str(rk), None, "instrumental" if d else "none")
+            return (str(rk), None, "instrumental" if d else "none", None, None, None, "", "")
         lyrics = d["plainLyrics"]
         lang = "unknown"
         if _detect_lang:
@@ -1618,30 +1658,72 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
                     lang = _detect_lang(lyrics[:2000])
                 except Exception:
                     lang = "unknown"
+        try:
+            akey = norm_text(primary_artist(artist))
+        except Exception:
+            akey = artist.strip().lower()
+        h = _lyrics_fingerprint(lyrics)
+        return (str(rk), lyrics, lang, akey, h, audio, artist, title)
+
+    def _mkreq(rk, artist, title, audio, lyrics):
         user = (f"Artist: {artist}\nTitle: {title}\nAudio profile (production): "
                 f"{lyric_audio_profile(audio) or 'n/a'}\n\nLyrics:\n{lyrics[:4000]}")
-        req = {"custom_id": str(rk), "method": "POST", "url": "/v1/chat/completions",
-               "body": {"model": model, "reasoning_effort": effort,
-                        "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
-                                     {"role": "user", "content": user}],
-                        "response_format": {"type": "json_object"}}}
-        return (str(rk), req, lang)
+        return {"custom_id": str(rk), "method": "POST", "url": "/v1/chat/completions",
+                "body": {"model": model, "reasoning_effort": effort,
+                         "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
+                                      {"role": "user", "content": user}],
+                         "response_format": {"type": "json_object"}}}
 
     def _save_state():
         try:
             os.makedirs(os.path.dirname(_batch_state_path()), exist_ok=True)
-            json.dump({"batch_ids": batch_ids, "lang": langmap}, open(_batch_state_path(), "w"))
+            json.dump({"batch_ids": batch_ids, "lang": langmap, "dupes": dupes},
+                      open(_batch_state_path(), "w"))
         except Exception:
             pass
 
+    def _drain(block):
+        # poll in-flight batches; write any that finished (frees a queue slot). True if one did.
+        progressed = False
+        for bid in list(inflight):
+            try:
+                b = client.batches.retrieve(bid)
+            except Exception:
+                continue
+            if b.status in ("completed", "failed", "cancelled", "expired"):
+                _write_one_batch(client, b, langmap); inflight.discard(bid); progressed = True
+            else:
+                rc = b.request_counts
+                log_msg(f"  in-flight {len(inflight)}/{max_inflight} | {bid[:18]} {b.status} "
+                        f"{rc.completed}/{rc.total}    ", end='\r')
+        if block and not progressed:
+            time.sleep(poll_interval)
+        return progressed
+
     def _submit(reqs):
+        while len(inflight) >= max_inflight:           # throttle: stay under the queue limit
+            _drain(block=True)
         data = ("\n".join(json.dumps(r) for r in reqs)).encode("utf-8")
-        up = client.files.create(file=io.BytesIO(data), purpose="batch")
-        b = client.batches.create(input_file_id=up.id, endpoint="/v1/chat/completions",
-                                  completion_window="24h")
-        batch_ids.append(b.id); _save_state()
-        log_msg(f"\n[INFO] batch {len(batch_ids)} submitted ({b.id[:22]}, {len(reqs)} tracks) — OpenAI is "
-                f"now tagging while the fetch continues.")
+        up = b = None
+        for attempt in range(8):
+            try:
+                if up is None:
+                    up = client.files.create(file=io.BytesIO(data), purpose="batch")
+                b = client.batches.create(input_file_id=up.id, endpoint="/v1/chat/completions",
+                                          completion_window="24h")
+                break
+            except Exception as e:
+                msg = str(e).lower()
+                if any(k in msg for k in ("queue", "enqueued", "token_limit")) and inflight:
+                    log_msg(f"\n[INFO] batch-queue limit reached ({len(inflight)} in-flight); "
+                            f"draining a batch before retrying...")
+                    _drain(block=True); continue
+                if attempt == 7:
+                    log_msg(f"\n[ERROR] batch submit failed after retries: {e}"); raise
+                time.sleep(5)
+        batch_ids.append(b.id); inflight.add(b.id); _save_state()
+        log_msg(f"\n[INFO] batch {len(batch_ids)} submitted ({b.id[:22]}, {len(reqs)} unique tracks, "
+                f"{len(inflight)}/{max_inflight} in-flight) — tagging while the fetch continues.")
 
     def _flush_nolyr():
         if nolyr:
@@ -1652,83 +1734,124 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
             c.commit(); c.close(); nolyr.clear()
 
     workers = 16
-    log_msg(f"[INFO] Fetching lyrics ({workers} workers); a batch fires every {chunk_size} tagged tracks...")
+    log_msg(f"[INFO] Fetching lyrics ({workers} workers); batches of {batch_size}, "
+            f"≤{max_inflight} in-flight, deduping identical lyrics...")
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
         futs = [ex.submit(_build, item) for item in todo]
         for fut in concurrent.futures.as_completed(futs):
-            rk, req, lang = fut.result()
+            rk, lyrics, lang, akey, h, audio, artist, title = fut.result()
             done += 1
-            if req is None:
+            if lyrics is None:
                 nolyr.append((rk, lang))
                 if len(nolyr) >= 1000:
                     _flush_nolyr()
             else:
-                chunk.append(req); langmap[rk] = lang
-                if len(chunk) >= chunk_size:
-                    _submit(chunk); chunk.clear()
+                key = (akey, h)
+                rep = seen.get(key)
+                if rep is not None:
+                    dupes.setdefault(rep, []).append(rk)      # identical lyrics — copy rep's tags later
+                else:
+                    seen[key] = rk
+                    chunk.append(_mkreq(rk, artist, title, audio, lyrics)); langmap[rk] = lang
+                    if len(chunk) >= batch_size:
+                        _submit(chunk); chunk.clear()
             if done % 1000 == 0:
-                log_msg(f"  fetched {done}/{len(todo)} | with lyrics {len(langmap)} | batches "
-                        f"{len(batch_ids)} ", end='\r')
+                log_msg(f"  fetched {done}/{len(todo)} | unique {len(langmap)} | dupes "
+                        f"{sum(len(v) for v in dupes.values())} | batches {len(batch_ids)}   ", end='\r')
     if chunk:
         _submit(chunk); chunk.clear()
     _flush_nolyr()
-    log_msg(f"\n[INFO] Fetch complete: {len(langmap)} tracks across {len(batch_ids)} batches.")
+    ndup = sum(len(v) for v in dupes.values())
+    log_msg(f"\n[INFO] Fetch complete: {len(langmap)} unique-lyrics songs in {len(batch_ids)} batches; "
+            f"{ndup} duplicates to copy (saved {ndup} LLM calls).")
     if not batch_ids:
         log_msg("[INFO] Nothing with lyrics to tag."); return
 
-    # ---- poll + write (the early batches are likely already done) ----
-    _write_batch_results(client, batch_ids, langmap, poll_interval)
+    # ---- drain remaining in-flight batches, then copy dedup'd duplicates (no API) ----
+    while inflight:
+        _drain(block=True)
+    if dupes:
+        _copy_lyric_dupes(dupes)
+    try:
+        os.remove(_batch_state_path())
+    except Exception:
+        pass
+    log_msg("[INFO] Batch tagging complete.")
+
+
+def _write_one_batch(client, b, langmap):
+    """Parse + write ONE finished batch's results (the unique 'rep' tracks): lyric_themes (3-group) +
+    lyric_themes_raw + lang (lyric_valence stays NULL). Returns the count written."""
+    if b.status != "completed":
+        log_msg(f"\n[WARN] batch {b.id[:22]} ended {b.status}: {getattr(b, 'errors', None)}"); return 0
+    try:
+        out = client.files.content(b.output_file_id).text
+    except Exception as e:
+        log_msg(f"\n[WARN] fetch output {b.id[:22]}: {e}"); return 0
+    batch = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        try:
+            res = json.loads(line); rk = str(res["custom_id"])
+            content = res["response"]["body"]["choices"][0]["message"]["content"]
+            groups = _normalise_groups(json.loads(content))
+            batch.append((None, json.dumps(groups), content,
+                          langmap.get(rk, "unknown"), time.time(), rk))
+        except Exception:
+            continue
+    if batch:
+        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_themes_raw=?, "
+                       "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
+        wc.commit(); wc.close()
+    log_msg(f"\n[INFO] batch {b.id[:22]} written: {len(batch)} unique tagged.")
+    return len(batch)
+
+
+def _copy_lyric_dupes(dupes):
+    """Copy each tagged 'rep' track's lyric_themes/raw/lang to its identical-lyrics duplicates — pure DB,
+    no API. dupes = {rep_rating_key: [duplicate_rating_keys]}. Skips a rep that wasn't tagged (e.g. a
+    failed batch) so its duplicates stay due for the next run."""
+    if not dupes:
+        return
+    rc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+    n = 0
+    for rep, dl in dupes.items():
+        row = rc.execute("SELECT lyric_themes, lyric_themes_raw, lyric_lang FROM essentia_cache "
+                         "WHERE rating_key=?", (rep,)).fetchone()
+        if not row or row[0] is None:
+            continue
+        lt, lr, lang = row
+        rc.executemany("UPDATE essentia_cache SET lyric_themes=?, lyric_themes_raw=?, lyric_lang=?, "
+                       "lyric_valence=NULL, lyrics_synced_at=? WHERE rating_key=?",
+                       [(lt, lr, lang, time.time(), rk) for rk in dl])
+        n += len(dl)
+    rc.commit(); rc.close()
+    log_msg(f"[INFO] Copied tags to {n} duplicate-lyrics tracks (no extra API cost).")
 
 
 def _write_batch_results(client, batch_ids, langmap, poll_interval=60):
-    """Poll the batches; as each completes, parse + write lyric_themes (3-group) + lyric_themes_raw +
-    lang (lyric_valence stays NULL). Idempotent enough to be re-run via --resume."""
+    """Poll a set of batches to completion, writing each as it finishes (used by --resume; the live path
+    drains in-flight batches itself). Does NOT remove the state file — the caller does, after dupes."""
     pending = set(batch_ids)
     total = 0
     while pending:
-        ready = []
+        progressed = False
         for bid in list(pending):
             try:
                 b = client.batches.retrieve(bid)
             except Exception as e:
                 log_msg(f"[WARN] retrieve {bid[:20]}: {e}"); continue
             if b.status in ("completed", "failed", "cancelled", "expired"):
-                ready.append((bid, b)); pending.discard(bid)
+                total += _write_one_batch(client, b, langmap); pending.discard(bid); progressed = True
             else:
                 rc = b.request_counts
                 log_msg(f"  {bid[:22]} {b.status} {rc.completed}/{rc.total}      ", end='\r')
-        for bid, b in ready:
-            if b.status != "completed":
-                log_msg(f"\n[WARN] batch {bid} ended {b.status}: {getattr(b, 'errors', None)}"); continue
-            out = client.files.content(b.output_file_id).text
-            batch = []
-            for line in out.splitlines():
-                if not line.strip():
-                    continue
-                try:
-                    res = json.loads(line); rk = str(res["custom_id"])
-                    content = res["response"]["body"]["choices"][0]["message"]["content"]
-                    groups = _normalise_groups(json.loads(content))
-                    batch.append((None, json.dumps(groups), content,
-                                  langmap.get(rk, "unknown"), time.time(), rk))
-                except Exception:
-                    continue
-            if batch:
-                wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
-                wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, "
-                               "lyric_themes_raw=?, lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?",
-                               batch)
-                wc.commit(); wc.close()
-                total += len(batch)
-            log_msg(f"\n[INFO] batch {bid[:22]} written: {len(batch)} tagged (running total {total}).")
-        if pending:
+        if pending and not progressed:
             time.sleep(poll_interval)
-    log_msg(f"[INFO] Batch tagging complete: {total} tracks tagged.")
-    try:
-        os.remove(_batch_state_path())
-    except Exception:
-        pass
+    log_msg(f"[INFO] Batch tagging complete: {total} unique tracks tagged.")
 
 
 def _lyric_vocab_path():
