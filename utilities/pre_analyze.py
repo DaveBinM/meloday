@@ -1597,13 +1597,21 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     client = _get_openai_client()
     if client is None:
         log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return
+    try:
+        import yaml
+        _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
+    except Exception:
+        _ex = {}
+    # Cancel a batch that OpenAI has stranded at 0/N past this many minutes — its tracks just stay due for
+    # a follow-up run, and a 0-progress batch is free to cancel (OpenAI bills only completed requests).
+    stuck_timeout = max(600, int(_ex.get("lyric_stuck_timeout_min", 60)) * 60)
     if resume:
         try:
             st = json.load(open(_batch_state_path()))
         except Exception:
             log_msg("[ERROR] No saved batch state to resume."); return
         log_msg(f"[INFO] Resuming {len(st['batch_ids'])} batch(es).")
-        _write_batch_results(client, st["batch_ids"], st["lang"], poll_interval)
+        _write_batch_results(client, st["batch_ids"], st["lang"], poll_interval, stuck_timeout)
         _copy_lyric_dupes(st.get("dupes") or {})
         try:
             os.remove(_batch_state_path())
@@ -1612,11 +1620,6 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
         return
 
     model, effort = _lyric_llm_cfg()
-    try:
-        import yaml
-        _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
-    except Exception:
-        _ex = {}
     # Small `batch_size`-song batches, THROTTLED by ENQUEUED INPUT TOKENS (what OpenAI's batch-queue limit
     # actually meters): keep ~`queue_tokens` in flight and top up as batches finish. `max_chars` caps the
     # lyrics fed per track (0 = uncapped — only ~1% of songs exceed 4k chars and they're the ones that most
@@ -1720,7 +1723,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
             pass
 
     def _drain(block):
-        # poll in-flight batches; write any that finished (frees a queue slot). True if one did.
+        # poll in-flight batches; write finished ones, cancel stranded ones (both free their tokens).
         progressed = False
         for bid in list(inflight):
             try:
@@ -1729,6 +1732,14 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
                 continue
             if b.status in ("completed", "failed", "cancelled", "expired"):
                 _write_one_batch(client, b, langmap); inflight.pop(bid, None); progressed = True
+            elif b.request_counts.completed == 0 and (time.time() - b.created_at) > stuck_timeout:
+                try:
+                    client.batches.cancel(bid)
+                except Exception:
+                    pass
+                inflight.pop(bid, None); progressed = True
+                log_msg(f"\n[WARN] batch {bid[:22]} stranded at 0/{b.request_counts.total} for "
+                        f">{stuck_timeout//60}min — cancelled (free); its tracks stay due for a re-run.")
             else:
                 rc = b.request_counts
                 log_msg(f"  queue ~{sum(inflight.values())//1000}k/{queue_tokens//1000}k tok, "
@@ -1879,9 +1890,10 @@ def _copy_lyric_dupes(dupes):
     log_msg(f"[INFO] Copied tags to {n} duplicate-lyrics tracks (no extra API cost).")
 
 
-def _write_batch_results(client, batch_ids, langmap, poll_interval=60):
+def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_timeout=3600):
     """Poll a set of batches to completion, writing each as it finishes (used by --resume; the live path
-    drains in-flight batches itself). Does NOT remove the state file — the caller does, after dupes."""
+    drains in-flight batches itself). Cancels any batch OpenAI has stranded at 0 progress past
+    stuck_timeout (its tracks stay due for a re-run). Does NOT remove the state file — caller does."""
     pending = set(batch_ids)
     total = 0
     while pending:
@@ -1893,6 +1905,14 @@ def _write_batch_results(client, batch_ids, langmap, poll_interval=60):
                 log_msg(f"[WARN] retrieve {bid[:20]}: {e}"); continue
             if b.status in ("completed", "failed", "cancelled", "expired"):
                 total += _write_one_batch(client, b, langmap); pending.discard(bid); progressed = True
+            elif b.request_counts.completed == 0 and (time.time() - b.created_at) > stuck_timeout:
+                try:
+                    client.batches.cancel(bid)
+                except Exception:
+                    pass
+                pending.discard(bid); progressed = True
+                log_msg(f"\n[WARN] batch {bid[:22]} stranded at 0/{b.request_counts.total} for "
+                        f">{stuck_timeout//60}min — cancelled; its tracks stay due for a re-run.")
             else:
                 rc = b.request_counts
                 log_msg(f"  {bid[:22]} {b.status} {rc.completed}/{rc.total}      ", end='\r')
