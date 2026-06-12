@@ -1364,7 +1364,7 @@ def _classify_lyrics(text, artist="", title="", audio=""):
         return None
     model, effort = _lyric_llm_cfg()
     user = (f"Artist: {artist}\nTitle: {title}\nAudio profile (production): {audio or 'n/a'}\n\n"
-            f"Lyrics:\n{text[:4000]}")
+            f"Lyrics:\n{text}")
     for attempt in range(3):
         try:
             resp = client.chat.completions.create(
@@ -1549,6 +1549,12 @@ def sync_lyrics(limit=None, force=False):
     log_msg(f"\n[INFO] Lyrics sync complete: {cnt['n']} processed, {cnt['lyr']} with lyrics.")
 
 
+try:
+    import tiktoken as _tiktoken
+    _LYR_ENC = _tiktoken.get_encoding("o200k_base")    # gpt-4o/5.x tokenizer — exact queue-token accounting
+except Exception:
+    _LYR_ENC = None
+
 _LYR_BRACKET_RE = re.compile(r"[\[\{][^\]\}]*[\]\}]")   # [Chorus], [Verse 1], {x2} annotations
 _LYR_APOS_RE = re.compile(r"['’´`ʼ]")                   # apostrophe variants (don't / don’t / dont)
 _LYR_KEEP_RE = re.compile(r"[^a-z0-9\s]")               # remaining punctuation, dashes, quotes
@@ -1572,16 +1578,18 @@ def _lyrics_fingerprint(lyrics):
 def _batch_state_path():
     return os.path.join(BASE_DIR, "logs", "lyric_batch_state.json")
 
-def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
+def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
+                      queue_tokens=None, batch_size=None):
     """PRIMARY lyric tagger — open-ended LLM moods/themes/excluded via the OpenAI BATCH API (50% cheaper,
     async) for whatever's due: a handful, thousands, or the whole library under --force. Submits
-    INCREMENTALLY in SMALL batches (default 500) as LRCLIB lyrics come in, so OpenAI starts within the
-    first chunk and tags WHILE the (slow) fetch continues. THROTTLED: at most `max_inflight` batches run
-    at once and a batch-queue-limit error makes it drain (poll+write a finished batch) and retry, so it
-    self-paces under OpenAI's enqueued-token limit. DEDUP (two levels): tracks with the SAME exact
-    artist+title fetch LRCLIB once (twins skip the fetch); then a formatting-insensitive lyrics
-    fingerprint tags each unique-lyrics song ONCE and copies to the rest — so remaster/edit copies merge
-    for the LLM too, while a live/remix with different words fingerprints apart and is tagged alone. Each
+    INCREMENTALLY in small `batch_size`-song batches as LRCLIB lyrics come in, so OpenAI starts within the
+    first batch and tags WHILE the (slow) fetch continues. THROTTLED to a TOKEN BUDGET: ~`queue_tokens` of
+    enqueued INPUT tokens are kept in flight (what OpenAI's batch-queue limit meters, counted exactly with
+    tiktoken), draining a finished batch to free tokens before topping up; a queue-limit error still forces
+    drain+retry. DEDUP (two levels): tracks with the SAME exact artist+title fetch LRCLIB once (twins skip
+    the fetch); then a formatting-insensitive lyrics fingerprint tags each unique-lyrics song ONCE and
+    copies to the rest — so remaster/edit copies merge for the LLM too, while a live/remix with different
+    words fingerprints apart and is tagged alone. Each
     batch + the dedup map
     is persisted so a crash only costs the un-submitted remainder (--resume re-polls + re-copies). Tracks
     without lyrics get none/instrumental written directly. lyric_valence stays NULL — the LLM moods carry
@@ -1609,8 +1617,16 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
         _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
     except Exception:
         _ex = {}
-    batch_size = max(1, int(_ex.get("lyric_batch_size", 500)))      # small batches (was 5000)
-    max_inflight = max(1, int(_ex.get("lyric_max_inflight", 6)))    # cap concurrent batches (queue limit)
+    # Small `batch_size`-song batches, THROTTLED by ENQUEUED INPUT TOKENS (what OpenAI's batch-queue limit
+    # actually meters): keep ~`queue_tokens` in flight and top up as batches finish. `max_chars` caps the
+    # lyrics fed per track (0 = uncapped — only ~1% of songs exceed 4k chars and they're the ones that most
+    # need a full read). Per-track tokens are counted exactly with tiktoken when available.
+    queue_tokens = max(1000, int(queue_tokens if queue_tokens is not None
+                                 else _ex.get("lyric_queue_tokens", 1_500_000)))   # target enqueued tokens
+    batch_size = max(1, int(batch_size if batch_size is not None
+                            else _ex.get("lyric_batch_size", 100)))                # SMALL song-count batches
+    max_chars = int(_ex.get("lyric_max_chars", 0))                                 # lyrics cap (0 = uncapped)
+    _SYS_TOK = len(_LYR_ENC.encode(_LYRIC_LLM_SYSTEM)) if _LYR_ENC else 810        # exact, or measured fallback
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn); _ensure_meta_fields(conn)
     now = time.time()
@@ -1652,14 +1668,15 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
         log_msg(f"[INFO] LRCLIB fetch-dedup: {len(fetch_items)} unique artist+title to fetch "
                 f"({_n_exact} exact-title duplicates skip the fetch).")
 
-    # ---- Fetch → DEDUP (artist + lyrics-hash) → submit SMALL batches, THROTTLED under the OpenAI
-    #      batch-queue limit. As lyrics return, identical-lyrics tracks collapse to one "rep" (the rest
-    #      are copied for free afterwards); reps fill a `batch_size` chunk and fire a batch; at most
-    #      `max_inflight` batches run at once (drain = poll+write a finished one to free a slot) and a
-    #      queue-limit error forces drain+retry. Each batch + the dedup map is persisted for --resume. ----
+    # ---- Fetch → DEDUP (artist + lyrics-hash) → submit batches, THROTTLED to a TOKEN BUDGET (OpenAI's
+    #      batch-queue limit meters enqueued INPUT tokens). As lyrics return, identical-lyrics tracks
+    #      collapse to one "rep"; reps fill a `batch_size`-song batch and fire it; we keep ~`queue_tokens`
+    #      enqueued, draining (poll+write a finished batch) to free tokens before topping up, and a
+    #      queue-limit error still forces drain+retry. Each batch + the dedup map is persisted for --resume. ----
     import io
     langmap, batch_ids, chunk, nolyr = {}, [], [], []
-    seen, dupes, inflight = {}, {}, set()
+    seen, dupes, inflight = {}, {}, {}     # inflight: batch_id -> estimated input tokens (the queue)
+    chunk_tokens = 0
 
     def _build(item):
         rk, artist, title, audio = item
@@ -1683,13 +1700,16 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
         return (str(rk), lyrics, lang, akey, h, audio, artist, title)
 
     def _mkreq(rk, artist, title, audio, lyrics):
+        clip = lyrics if max_chars <= 0 else lyrics[:max_chars]
         user = (f"Artist: {artist}\nTitle: {title}\nAudio profile (production): "
-                f"{lyric_audio_profile(audio) or 'n/a'}\n\nLyrics:\n{lyrics[:4000]}")
-        return {"custom_id": str(rk), "method": "POST", "url": "/v1/chat/completions",
-                "body": {"model": model, "reasoning_effort": effort,
-                         "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
-                                      {"role": "user", "content": user}],
-                         "response_format": {"type": "json_object"}}}
+                f"{lyric_audio_profile(audio) or 'n/a'}\n\nLyrics:\n{clip}")
+        req = {"custom_id": str(rk), "method": "POST", "url": "/v1/chat/completions",
+               "body": {"model": model, "reasoning_effort": effort,
+                        "messages": [{"role": "system", "content": _LYRIC_LLM_SYSTEM},
+                                     {"role": "user", "content": user}],
+                        "response_format": {"type": "json_object"}}}
+        utok = len(_LYR_ENC.encode(user)) if _LYR_ENC else len(user) // 3   # exact, or conservative est
+        return req, _SYS_TOK + utok
 
     def _save_state():
         try:
@@ -1708,17 +1728,18 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
             except Exception:
                 continue
             if b.status in ("completed", "failed", "cancelled", "expired"):
-                _write_one_batch(client, b, langmap); inflight.discard(bid); progressed = True
+                _write_one_batch(client, b, langmap); inflight.pop(bid, None); progressed = True
             else:
                 rc = b.request_counts
-                log_msg(f"  in-flight {len(inflight)}/{max_inflight} | {bid[:18]} {b.status} "
-                        f"{rc.completed}/{rc.total}    ", end='\r')
+                log_msg(f"  queue ~{sum(inflight.values())//1000}k/{queue_tokens//1000}k tok, "
+                        f"{len(inflight)} batches | {bid[:18]} {b.status} {rc.completed}/{rc.total}  ", end='\r')
         if block and not progressed:
             time.sleep(poll_interval)
         return progressed
 
-    def _submit(reqs):
-        while len(inflight) >= max_inflight:           # throttle: stay under the queue limit
+    def _submit(reqs, tok):
+        # keep the enqueued token total under `queue_tokens`: drain finished batches to free room first
+        while inflight and sum(inflight.values()) + tok > queue_tokens:
             _drain(block=True)
         data = ("\n".join(json.dumps(r) for r in reqs)).encode("utf-8")
         up = b = None
@@ -1732,15 +1753,14 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
             except Exception as e:
                 msg = str(e).lower()
                 if any(k in msg for k in ("queue", "enqueued", "token_limit")) and inflight:
-                    log_msg(f"\n[INFO] batch-queue limit reached ({len(inflight)} in-flight); "
-                            f"draining a batch before retrying...")
+                    log_msg(f"\n[INFO] batch-queue limit hit; draining a batch before retrying...")
                     _drain(block=True); continue
                 if attempt == 7:
                     log_msg(f"\n[ERROR] batch submit failed after retries: {e}"); raise
                 time.sleep(5)
-        batch_ids.append(b.id); inflight.add(b.id); _save_state()
-        log_msg(f"\n[INFO] batch {len(batch_ids)} submitted ({b.id[:22]}, {len(reqs)} unique tracks, "
-                f"{len(inflight)}/{max_inflight} in-flight) — tagging while the fetch continues.")
+        batch_ids.append(b.id); inflight[b.id] = tok; _save_state()
+        log_msg(f"\n[INFO] batch {len(batch_ids)} submitted ({b.id[:22]}, {len(reqs)} tracks, ~{tok//1000}k "
+                f"tok; queue now ~{sum(inflight.values())//1000}k/{queue_tokens//1000}k) — tagging continues.")
 
     def _flush_nolyr():
         if nolyr:
@@ -1751,8 +1771,8 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
             c.commit(); c.close(); nolyr.clear()
 
     workers = 16
-    log_msg(f"[INFO] Fetching lyrics ({workers} workers); batches of {batch_size}, "
-            f"≤{max_inflight} in-flight, deduping identical lyrics...")
+    log_msg(f"[INFO] Fetching lyrics ({workers} workers); batches of {batch_size} songs, keeping "
+            f"~{queue_tokens//1000}k tokens enqueued, deduping identical lyrics...")
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
         futs = [ex.submit(_build, item) for item in fetch_items]
@@ -1775,16 +1795,18 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
                         dupes[rep].extend(twins)             # the rep's twins inherit from it too
                 else:
                     seen[key] = rk
-                    chunk.append(_mkreq(rk, artist, title, audio, lyrics)); langmap[rk] = lang
+                    req, _t = _mkreq(rk, artist, title, audio, lyrics)
+                    chunk.append(req); chunk_tokens += _t; langmap[rk] = lang
                     if twins:
                         dupes.setdefault(rk, []).extend(twins)
                     if len(chunk) >= batch_size:
-                        _submit(chunk); chunk.clear()
+                        _submit(chunk, chunk_tokens); chunk.clear(); chunk_tokens = 0
             if done % 1000 == 0:
                 log_msg(f"  fetched {done}/{len(fetch_items)} | unique {len(langmap)} | dupes "
-                        f"{sum(len(v) for v in dupes.values())} | batches {len(batch_ids)}   ", end='\r')
+                        f"{sum(len(v) for v in dupes.values())} | batches {len(batch_ids)} | queue "
+                        f"~{sum(inflight.values())//1000}k tok   ", end='\r')
     if chunk:
-        _submit(chunk); chunk.clear()
+        _submit(chunk, chunk_tokens); chunk.clear(); chunk_tokens = 0
     _flush_nolyr()
     ndup = sum(len(v) for v in dupes.values())
     log_msg(f"\n[INFO] Fetch complete: {len(fetch_items)} fetched, {len(langmap)} unique-lyrics songs "
