@@ -1578,9 +1578,11 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     INCREMENTALLY in SMALL batches (default 500) as LRCLIB lyrics come in, so OpenAI starts within the
     first chunk and tags WHILE the (slow) fetch continues. THROTTLED: at most `max_inflight` batches run
     at once and a batch-queue-limit error makes it drain (poll+write a finished batch) and retry, so it
-    self-paces under OpenAI's enqueued-token limit. DEDUP: tracks sharing byte-identical lyrics (true
-    duplicates across albums/comps) are tagged ONCE and the result copied to the rest — a live/remix with
-    even slightly different lyrics hashes differently and is tagged on its own. Each batch + the dedup map
+    self-paces under OpenAI's enqueued-token limit. DEDUP (two levels): tracks with the SAME exact
+    artist+title fetch LRCLIB once (twins skip the fetch); then a formatting-insensitive lyrics
+    fingerprint tags each unique-lyrics song ONCE and copies to the rest — so remaster/edit copies merge
+    for the LLM too, while a live/remix with different words fingerprints apart and is tagged alone. Each
+    batch + the dedup map
     is persisted so a crash only costs the un-submitted remainder (--resume re-polls + re-copies). Tracks
     without lyrics get none/instrumental written directly. lyric_valence stays NULL — the LLM moods carry
     sentiment (valence profiles re-map to moods in the boost). Live per-track --sync-lyrics is the fallback."""
@@ -1634,6 +1636,21 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
     conn.close()
     if not todo:
         return
+
+    # ---- LRCLIB fetch-dedup: group by EXACT artist+title first. Identical title => identical LRCLIB
+    #      fetch, so this is safe even for live/remix (which carry a different title). Fetch ONE per
+    #      group; the exact-title twins skip the fetch and inherit the rep's tags. (The lyrics fingerprint
+    #      below still dedups same-lyrics songs across DIFFERENT titles for the LLM, e.g. remaster/edit.)
+    from collections import defaultdict
+    _fg = defaultdict(list)
+    for _it in todo:
+        _fg[((_it[1] or "").strip().lower(), (_it[2] or "").strip().lower())].append(_it)
+    fetch_items = [g[0] for g in _fg.values()]
+    exact_dups = {str(g[0][0]): [str(x[0]) for x in g[1:]] for g in _fg.values() if len(g) > 1}
+    _n_exact = len(todo) - len(fetch_items)
+    if _n_exact:
+        log_msg(f"[INFO] LRCLIB fetch-dedup: {len(fetch_items)} unique artist+title to fetch "
+                f"({_n_exact} exact-title duplicates skip the fetch).")
 
     # ---- Fetch → DEDUP (artist + lyrics-hash) → submit SMALL batches, THROTTLED under the OpenAI
     #      batch-queue limit. As lyrics return, identical-lyrics tracks collapse to one "rep" (the rest
@@ -1738,33 +1755,41 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False):
             f"≤{max_inflight} in-flight, deduping identical lyrics...")
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = [ex.submit(_build, item) for item in todo]
+        futs = [ex.submit(_build, item) for item in fetch_items]
         for fut in concurrent.futures.as_completed(futs):
             rk, lyrics, lang, akey, h, audio, artist, title = fut.result()
             done += 1
+            twins = exact_dups.get(rk, ())               # exact-title duplicates that skipped the fetch
             if lyrics is None:
                 nolyr.append((rk, lang))
+                for _d in twins:
+                    nolyr.append((_d, lang))
                 if len(nolyr) >= 1000:
                     _flush_nolyr()
             else:
                 key = (akey, h)
                 rep = seen.get(key)
-                if rep is not None:
-                    dupes.setdefault(rep, []).append(rk)      # identical lyrics — copy rep's tags later
+                if rep is not None:                          # same lyrics as an earlier rep (cross-title)
+                    dupes.setdefault(rep, []).append(rk)
+                    if twins:
+                        dupes[rep].extend(twins)             # the rep's twins inherit from it too
                 else:
                     seen[key] = rk
                     chunk.append(_mkreq(rk, artist, title, audio, lyrics)); langmap[rk] = lang
+                    if twins:
+                        dupes.setdefault(rk, []).extend(twins)
                     if len(chunk) >= batch_size:
                         _submit(chunk); chunk.clear()
             if done % 1000 == 0:
-                log_msg(f"  fetched {done}/{len(todo)} | unique {len(langmap)} | dupes "
+                log_msg(f"  fetched {done}/{len(fetch_items)} | unique {len(langmap)} | dupes "
                         f"{sum(len(v) for v in dupes.values())} | batches {len(batch_ids)}   ", end='\r')
     if chunk:
         _submit(chunk); chunk.clear()
     _flush_nolyr()
     ndup = sum(len(v) for v in dupes.values())
-    log_msg(f"\n[INFO] Fetch complete: {len(langmap)} unique-lyrics songs in {len(batch_ids)} batches; "
-            f"{ndup} duplicates to copy (saved {ndup} LLM calls).")
+    log_msg(f"\n[INFO] Fetch complete: {len(fetch_items)} fetched, {len(langmap)} unique-lyrics songs "
+            f"in {len(batch_ids)} batches; {ndup} duplicates to copy ({_n_exact} exact-title that skipped "
+            f"the fetch + {ndup - _n_exact} cross-title same-lyrics) — saved {ndup} LLM calls.")
     if not batch_ids:
         log_msg("[INFO] Nothing with lyrics to tag."); return
 
