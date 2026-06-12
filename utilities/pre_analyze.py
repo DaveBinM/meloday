@@ -1263,12 +1263,15 @@ def _load_openai_key():
     return None
 
 def _lyric_llm_cfg():
+    # gpt-5.4-nano (low) chosen by a 4-model bake-off: its reasoning catches the nuance gpt-4o-mini
+    # misses (anger/anxiety/resentment on complex songs) at ~1/4 the cost of gpt-5.4-mini (~$34 vs
+    # ~$135 for the full backfill). Override via config.yml extras.lyric_llm_model / _reasoning_effort.
     try:
         import yaml
         cfg = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
     except Exception:
         cfg = {}
-    return cfg.get("lyric_llm_model", "gpt-5.4-mini"), cfg.get("lyric_llm_reasoning_effort", "low")
+    return cfg.get("lyric_llm_model", "gpt-5.4-nano"), cfg.get("lyric_llm_reasoning_effort", "low")
 
 # The canonical tagging prompt (the user's engineered prompt + the routing self-assessment).
 _LYRIC_LLM_SYSTEM = """Analyse the song's lyrical content for use in Spotify-style theme and mood mixes.
