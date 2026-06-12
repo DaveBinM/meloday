@@ -1602,9 +1602,10 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
         _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
     except Exception:
         _ex = {}
-    # Cancel a batch that OpenAI has stranded at 0/N past this many minutes — its tracks just stay due for
-    # a follow-up run, and a 0-progress batch is free to cancel (OpenAI bills only completed requests).
-    stuck_timeout = max(600, int(_ex.get("lyric_stuck_timeout_min", 60)) * 60)
+    # Cancel a batch OpenAI has stranded at 0 completed past this many minutes — its tracks stay due for a
+    # follow-up run, and a 0-progress batch is free to cancel (OpenAI bills only completed requests). Real
+    # batches finish in ~6 min and any that started show a non-zero count, so 15 min is safe margin.
+    stuck_timeout = max(300, int(_ex.get("lyric_stuck_timeout_min", 15)) * 60)
     if resume:
         try:
             st = json.load(open(_batch_state_path()))
@@ -1890,7 +1891,7 @@ def _copy_lyric_dupes(dupes):
     log_msg(f"[INFO] Copied tags to {n} duplicate-lyrics tracks (no extra API cost).")
 
 
-def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_timeout=3600):
+def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_timeout=900):
     """Poll a set of batches to completion, writing each as it finishes (used by --resume; the live path
     drains in-flight batches itself). Cancels any batch OpenAI has stranded at 0 progress past
     stuck_timeout (its tracks stay due for a re-run). Does NOT remove the state file — caller does."""
