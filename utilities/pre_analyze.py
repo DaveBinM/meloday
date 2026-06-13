@@ -1618,6 +1618,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
             os.remove(_batch_state_path())
         except Exception:
             pass
+        _log_lyric_coverage()
         return
 
     model, effort = _lyric_llm_cfg()
@@ -1652,9 +1653,15 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
             if _refresh_due(syn, rd, yr, data is not None, "lyrics", now)]
     if limit:
         todo = todo[:int(limit)]
-    log_msg(f"[INFO] Batch lyric tagging: {len(todo)} due of {len(rows)} cached.")
+    _total = len(rows)
+    _nolyr0 = sum(1 for r in rows if (r[6] or "") in ("instrumental", "none"))
+    _modern0 = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE title IS NOT NULL AND "
+                            "lyric_themes_raw LIKE '%\"routing\"%'").fetchone()[0]
+    log_msg(f"[INFO] Lyric analysis — {_total:,} tracks: {_modern0:,} already analysed, "
+            f"{_nolyr0:,} instrumental/no-lyrics, {len(todo):,} to process this run.")
     conn.close()
     if not todo:
+        log_msg("[INFO] Nothing due — lyric analysis is already up to date.")
         return
 
     # ---- LRCLIB fetch-dedup: group by EXACT artist+title first. Identical title => identical LRCLIB
@@ -1681,6 +1688,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     langmap, batch_ids, chunk, nolyr = {}, [], [], []
     seen, dupes, inflight = {}, {}, {}     # inflight: batch_id -> estimated input tokens (the queue)
     chunk_tokens = 0
+    no_lyrics_total = 0
 
     def _build(item):
         rk, artist, title, audio = item
@@ -1793,7 +1801,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
             done += 1
             twins = exact_dups.get(rk, ())               # exact-title duplicates that skipped the fetch
             if lyrics is None:
-                nolyr.append((rk, lang))
+                nolyr.append((rk, lang)); no_lyrics_total += 1 + len(twins)
                 for _d in twins:
                     nolyr.append((_d, lang))
                 if len(nolyr) >= 1000:
@@ -1813,10 +1821,10 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
                         dupes.setdefault(rk, []).extend(twins)
                     if len(chunk) >= batch_size:
                         _submit(chunk, chunk_tokens); chunk.clear(); chunk_tokens = 0
-            if done % 1000 == 0:
-                log_msg(f"  fetched {done}/{len(fetch_items)} | unique {len(langmap)} | dupes "
-                        f"{sum(len(v) for v in dupes.values())} | batches {len(batch_ids)} | queue "
-                        f"~{sum(inflight.values())//1000}k tok   ", end='\r')
+            if done % 500 == 0:
+                log_msg(f"  fetched {done:,}/{len(fetch_items):,} | with-lyrics {len(langmap):,} "
+                        f"(+{sum(len(v) for v in dupes.values()):,} dup) | no-lyrics {no_lyrics_total:,} | "
+                        f"{len(batch_ids)} batches, queue ~{sum(inflight.values())//1000}k tok   ", end='\r')
     if chunk:
         _submit(chunk, chunk_tokens); chunk.clear(); chunk_tokens = 0
     _flush_nolyr()
@@ -1837,6 +1845,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     except Exception:
         pass
     log_msg("[INFO] Batch tagging complete.")
+    _log_lyric_coverage()
 
 
 def _write_one_batch(client, b, langmap):
@@ -1889,6 +1898,19 @@ def _copy_lyric_dupes(dupes):
         n += len(dl)
     rc.commit(); rc.close()
     log_msg(f"[INFO] Copied tags to {n} duplicate-lyrics tracks (no extra API cost).")
+
+
+def _log_lyric_coverage():
+    """Log how many tracks now carry modern lyric analysis (routing block in raw) vs still due."""
+    c = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+    analysed = c.execute("SELECT COUNT(*) FROM essentia_cache WHERE title IS NOT NULL AND "
+                         "lyric_themes_raw LIKE '%\"routing\"%'").fetchone()[0]
+    nolyr = c.execute("SELECT COUNT(*) FROM essentia_cache WHERE title IS NOT NULL AND "
+                      "lyric_lang IN ('instrumental','none')").fetchone()[0]
+    due = c.execute("SELECT COUNT(*) FROM essentia_cache WHERE title IS NOT NULL AND lyrics_synced_at IS NULL").fetchone()[0]
+    c.close()
+    log_msg(f"[INFO] Lyric coverage now — {analysed:,} analysed, {nolyr:,} instrumental/no-lyrics, "
+            f"{due:,} still due" + (" (re-run --sync-lyrics-batch to finish them)." if due else " — complete."))
 
 
 def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_timeout=900):
