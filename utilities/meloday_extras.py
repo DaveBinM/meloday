@@ -14,6 +14,7 @@ Usage:
 
 import io
 import os
+import json
 import sys
 import re
 import math
@@ -2615,6 +2616,7 @@ _WEEKDAY_RESTRICTED = {
     "monday_motivation": {0},            # Monday only
     "friday_feeling":    {4},            # Friday only
     "sunday_scaries":    {6},            # Sunday only
+    "midweek_reset":     {1, 2, 3},      # Tue–Thu — midweek only
 }
 
 # Hard time-of-day gates — profiles excluded from the pool entirely outside their
@@ -2645,6 +2647,20 @@ _HOUR_RESTRICTED = {
     "monday_motivation": ( 5, 12),  # Monday morning (+ _WEEKDAY_RESTRICTED {0})
     "friday_feeling":    (11, 19),  # Friday afternoon/evening (+ {4})
     "sunday_scaries":    (15, 23),  # Sunday afternoon/evening (+ {6})
+    # --- daypart-named mixes that previously had only a soft time nudge (now hard-gated) ---
+    "after_hours_rnb":   (21,  4),  # late-night R&B
+    "glasgow_late":      (21,  4),  # late-night Glasgow
+    "date_night":        (18,  1),  # evening/night
+    "game_night":        (18,  1),  # evening/night
+    "romantic_dinner":   (17, 23),  # dinner
+    "jazz_dinner":       (17, 23),  # dinner
+    "golden_afternoon":  (12, 18),  # afternoon
+    "golden_hour":       (16, 21),  # dusk
+    "winter_nights":     (18,  3),  # nights
+    "friday_night":      (18,  3),  # night (+ _WEEKDAY_RESTRICTED {4})
+    "sunday_morning":    ( 5, 12),  # morning (+ {6})
+    "clear_night":       (20,  5),  # weather-managed, but night by definition
+    "summer_evening":    (17, 22),  # season-managed, but an evening mix
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
@@ -3571,6 +3587,51 @@ def _year_in_window(entry, window):
         return False
     lo, hi = window
     return (lo is None or y >= lo) and (hi is None or y <= hi)
+
+
+# ---------------------------------------------------------------------------
+# Unfillable-profile guard — cheap per-run yield estimate
+# ---------------------------------------------------------------------------
+_MIN_PROFILE_YIELD = 25          # a profile must clear this many HARD-gate-passing cache entries to be
+                                 # worth surfacing — below it the mix is visibly thin/repetitive
+_YIELD_FILLABLE    = 10 ** 9     # sentinel for acoustic-only profiles (no hard gate → always fillable)
+_YIELD_CACHE       = {}          # (id(cache), profile_key, cap) -> capped yield, per cache object
+
+
+def _profile_yield(profile_key, essentia_cache, cap=_MIN_PROFILE_YIELD):
+    """Count cache entries passing the profile's HARD gates only — style (_STYLE_DEFINED_PROFILES /
+    _has_required_style), year-window (_PROFILE_YEAR_WINDOW), geo (_PROFILE_GEO_GATE / _origin_match) —
+    reusing the exact predicates _build_mix_tracks applies. Acoustic-only profiles (no hard gate) are
+    always fillable (returns _YIELD_FILLABLE, no scan). Counting stops at `cap` (we only need to know if a
+    profile clears the bar), so fillable profiles early-exit cheaply and only genuinely-thin ones scan the
+    whole cache. Pure dict scan, no Plex calls. Memoised per cache object."""
+    ck = (id(essentia_cache), profile_key, cap)
+    v = _YIELD_CACHE.get(ck)
+    if v is not None:
+        return v
+    style_gated = profile_key in _STYLE_DEFINED_PROFILES
+    yw  = _PROFILE_YEAR_WINDOW.get(profile_key)
+    geo = _PROFILE_GEO_GATE.get(profile_key)
+    if not (style_gated or yw or geo):
+        _YIELD_CACHE[ck] = _YIELD_FILLABLE
+        return _YIELD_FILLABLE
+    smy    = _song_min_year_map(essentia_cache) if yw else None
+    lo, hi = yw if yw else (None, None)
+    n = 0
+    for e in essentia_cache.values():
+        if style_gated and not _has_required_style(e, profile_key):
+            continue
+        if yw:
+            oy = smy.get(_entry_song_key(e)) or e.get("year")
+            if oy is None or (lo is not None and oy < lo) or (hi is not None and oy > hi):
+                continue
+        if geo and not _origin_match(e, geo):
+            continue
+        n += 1
+        if n >= cap:                 # cleared the bar — no need to count further
+            break
+    _YIELD_CACHE[ck] = n
+    return n
 
 
 def _style_tag_boost(entry, profile_key):
@@ -7549,6 +7610,51 @@ def _rotation_slot(hour):
     return (hour % 24) * MOOD_MIX_ROTATIONS_PER_DAY // 24
 
 
+# ---------------------------------------------------------------------------
+# Slate freshness — vary the rotating mood-mix selection day-to-day / slot-to-slot
+# ---------------------------------------------------------------------------
+_FRESHNESS_PENALTY = 0.30        # rotation-score penalty for a recently-surfaced profile; same order as
+                                 # the hard time-of-day boost, so a strong contextual fit can still win
+
+
+def _mood_history_path():
+    return os.path.join(_BASE_DIR, "logs", "mood_mix_history.json")
+
+
+def _load_mood_history():
+    """Recently-surfaced general slates: [{ord, slot, ts, profiles}, ...] oldest-first. [] if missing."""
+    try:
+        with open(_mood_history_path()) as f:
+            return json.load(f).get("slots", [])
+    except (OSError, ValueError):
+        return []
+
+
+def _save_mood_history(slots):
+    """Persist the last 8 slates atomically (best-effort — never fatal to a build)."""
+    try:
+        os.makedirs(os.path.dirname(_mood_history_path()), exist_ok=True)
+        tmp = _mood_history_path() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"version": 1, "slots": slots[-8:]}, f)
+        os.replace(tmp, _mood_history_path())
+    except OSError as e:
+        xlog(f"[WARN] mood_mixes: could not persist rotation history: {e}")
+
+
+def _recency_penalty(profile_key, prior_slots, cur_ord, cur_slot):
+    """Decaying rotation-score penalty for a profile surfaced recently: full _FRESHNESS_PENALTY if it led
+    the immediately-previous slot (anti-consecutive), halving each slot further back, 0 outside the
+    retained window. `max` (not sum) keeps it bounded at _FRESHNESS_PENALTY."""
+    pen = 0.0
+    for s in prior_slots:
+        if profile_key in (s.get("profiles") or ()):
+            ago = (cur_ord - s.get("ord", 0)) * MOOD_MIX_ROTATIONS_PER_DAY + (cur_slot - s.get("slot", 0))
+            if ago > 0:
+                pen = max(pen, _FRESHNESS_PENALTY / (2 ** (ago - 1)))
+    return pen
+
+
 def _external_used_rks(existing_playlists, building_names):
     """Rating keys already used by EXISTING dedup-eligible Meloday+ mixes built by OTHER cron runs,
     so the no-repeat invariant holds across runs (a track in the Morning mix won't be reused by a
@@ -7688,6 +7794,9 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     # Determine which general profiles are active
     today_wd     = datetime.now().weekday()
     current_hour = _get_active_hour()
+    slot         = _rotation_slot(current_hour)
+    cur_ord      = datetime.now().date().toordinal()
+    prior_slots  = _load_mood_history()   # recent slates, for the freshness / anti-repeat penalty
 
     def _hour_allowed(k):
         window = _HOUR_RESTRICTED.get(k)
@@ -7701,15 +7810,22 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     recent_entries  = [e for e in history_entries
                        if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
     recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
-    eligible = [k for k in _GENERAL_PROFILES
-                if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)
-                and _profile_season_ok(k, lat)]
+    _eligible_pre = [k for k in _GENERAL_PROFILES
+                     if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)
+                     and _profile_season_ok(k, lat)]
+    # Drop profiles whose hard gate (style / year / geo) can't fill a mix — they'd surface thin.
+    eligible = [k for k in _eligible_pre
+                if _profile_yield(k, essentia_cache) >= _MIN_PROFILE_YIELD]
+    if len(eligible) < len(_eligible_pre):
+        xlog(f"[INFO] mood_mixes: skipped {len(_eligible_pre) - len(eligible)} unfillable "
+             f"profile(s): {sorted(set(_eligible_pre) - set(eligible))}")
     n_cats = len(set(_PROFILE_CATEGORY.values()))
     if recent_centroid.get("bpm") and eligible:
         scored = sorted(
             (_mood_rotation_score(
                  k, _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
-                 current_hour, weather), k)
+                 current_hour, weather)
+             + _recency_penalty(k, prior_slots, cur_ord, slot), k)
             for k in eligible
         )
         # Stratify by category: keep the best-fitting few from EACH category, not just the
@@ -7728,9 +7844,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                 pool.append(k)
     else:
         pool = list(eligible)
-    slot = _rotation_slot(current_hour)
     # int seed (Random() rejects tuples on Py3.11+); hash of an int-tuple is stable across runs
-    random.Random(hash((datetime.now().date().toordinal(), slot))).shuffle(pool)
+    random.Random(hash((cur_ord, slot))).shuffle(pool)
     max_per_cat = max(1, math.ceil(n_active / n_cats))
     active_general = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
                                               n_active, max_per_category=max_per_cat)
@@ -7756,6 +7871,12 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                             break
                 if pick not in active_general:
                     active_general.append(pick)
+
+    # Record this slot's surfaced general slate so the freshness penalty varies the next slots. Drop any
+    # existing row for the SAME (ord, slot) first, so re-running a slot reproduces an identical slate.
+    _hist = [s for s in prior_slots if not (s.get("ord") == cur_ord and s.get("slot") == slot)]
+    _save_mood_history(_hist + [{"ord": cur_ord, "slot": slot,
+                                 "ts": int(time.time()), "profiles": list(active_general)}])
 
     # Weather-conditional profiles
     active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
