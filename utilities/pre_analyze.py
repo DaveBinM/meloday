@@ -1947,32 +1947,47 @@ def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_tim
 def _lyric_vocab_path():
     return os.path.join(BASE_DIR, "assets", "lyric_vocab.json")
 
-def _llm_cluster_synonyms(tags, kind):
-    """Ask the LLM to merge near-synonym / trivial-variant tags under one canonical form. Returns
-    {non_canonical_tag: canonical_tag}. Chunked (most synonyms live among the frequent set)."""
+def _llm_cluster_synonyms(tags, kind, counts=None):
+    """Aggressively consolidate the frequent {kind} tags into a tighter canonical set, holistically:
+    merge morphological variants AND same-core-feeling tags under the most-common canonical form, while
+    keeping genuinely distinct ones. Returns {non_canonical_tag: canonical_tag}. One pass (<=900 tags)
+    so the model sees the whole register; alphabetical so a root's variants sit together. Uses a stronger
+    model than the backfill — this is a one-time, quality-critical step."""
     client = _get_openai_client()
     if client is None or not tags:
         return {}
-    model, _ = _lyric_llm_cfg()
+    counts = counts or {}
+    feeling = "feeling/tone" if kind == "mood" else "situation/theme"
     syn = {}
-    for i in range(0, len(tags), 250):
-        chunk = tags[i:i + 250]
-        prompt = (f"These are {kind} tags from a music library (snake_case), most-frequent first. Merge "
-                  f"only NEAR-SYNONYMS and trivial variants (e.g. melancholy/melancholic, lonely/"
-                  f"loneliness, yearning/longing, heartbroken/heartbreak) under ONE canonical tag — "
-                  f"prefer the most common, natural form already in the list. Do NOT merge tags that "
-                  f"capture genuinely different feelings/situations. Return ONLY a JSON object mapping "
-                  f"each NON-canonical tag to its canonical tag (omit tags that stay as-is).\n\n"
-                  f"Tags: {', '.join(chunk)}")
+    tags = sorted(tags)                                   # alphabetical -> aching, aching_longing adjacent
+    for i in range(0, len(tags), 900):
+        chunk = tags[i:i + 900]
+        listing = ", ".join(f"{t}({counts.get(t, 0)})" for t in chunk)
+        prompt = (f"These are {kind} tags (snake_case; the number in parens is how many tracks use each) "
+                  f"from a music library. Consolidate AGGRESSIVELY into a tighter canonical set, roughly "
+                  f"halving the list. Merge: (a) morphological variants & re-orderings (aching / "
+                  f"aching_longing / aching_yearning -> aching; adrenaline_driven / adrenaline_fueled -> "
+                  f"adrenaline; emotional_dependency / emotional_dependence -> emotional_dependence; "
+                  f"dark_humor / darkly_humorous -> dark_humor), and (b) tags expressing essentially the "
+                  f"SAME {feeling} at the same intensity (longing / pining -> yearning). Map each merged "
+                  f"tag to ONE canonical form — the most common (highest count) and most natural phrasing. "
+                  f"KEEP genuinely distinct {feeling}s separate (melancholic != angry; late_night != "
+                  f"heartbreak; tender != aggressive). Return ONLY a JSON object mapping each NON-canonical "
+                  f"tag to its canonical tag (omit tags kept as-is).\n\nTags: {listing}")
         try:
-            resp = client.chat.completions.create(model=model, reasoning_effort="low",
+            resp = client.chat.completions.create(model="gpt-5.4-mini", reasoning_effort="low",
                 messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
             for k, v in (json.loads(resp.choices[0].message.content) or {}).items():
                 ck, cv = _normalise_tag(k), _normalise_tag(v)
                 if ck and cv and ck != cv:
                     syn[ck] = cv
         except Exception as e:
-            log_msg(f"[WARN] synonym cluster chunk failed: {e}")
+            log_msg(f"[WARN] {kind} cluster chunk failed: {e}")
+    for k in list(syn):                                   # resolve chains a->b->c => a->c
+        v, seen = syn[k], set()
+        while v in syn and v not in seen:
+            seen.add(v); v = syn[v]
+        syn[k] = v
     return syn
 
 def build_lyric_vocab(min_count=None, cluster=True):
@@ -2014,8 +2029,8 @@ def build_lyric_vocab(min_count=None, cluster=True):
     synonyms = {}
     if cluster:
         log_msg("\n[INFO] LLM-clustering near-synonyms...")
-        synonyms = _llm_cluster_synonyms(moods, "mood")
-        synonyms.update(_llm_cluster_synonyms(themes, "theme"))
+        synonyms = _llm_cluster_synonyms(moods, "mood", dict(mood_c))
+        synonyms.update(_llm_cluster_synonyms(themes, "theme", dict(theme_c)))
         # collapse the canonical lists through the synonym map (drop merged-away tags)
         moods = sorted({synonyms.get(t, t) for t in moods})
         themes = sorted({synonyms.get(t, t) for t in themes})
