@@ -2656,11 +2656,15 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 # Work-hours focus guarantee — at least one of these is always active Mon-Fri 7am-3pm.
 _WORK_FOCUS_PROFILES = {"focus", "deep_work"}
 
+# Always-present geo showcase mixes — pinned into every general run (never rotated, never removed); like
+# the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
+_PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
-                     - _SEASONAL_PROFILES)
+                     - _SEASONAL_PROFILES
+                     - _PINNED_PROFILES)
 
 # Category labels for diversity-aware rotation (max 2 per category in active slots).
 _PROFILE_CATEGORY = {
@@ -7770,9 +7774,12 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     to_remove += [k for name, k in name_to_key.items()
                   if k in _GENERAL_PROFILES and k not in active_general and name in existing]
 
-    active_profiles = active_general + active_weather + active_seasonal
-    xlog(f"[INFO] mood_mixes: active = general{active_general} "
-         f"+ weather{active_weather} + seasonal{active_seasonal}")
+    # Pinned geo showcase mixes are ALWAYS built (alongside the rotating slate) and never in to_remove,
+    # so they're always present; their per-day shuffle seed (in _build_mix_tracks) refreshes them daily.
+    active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene") if k in _MOOD_MIX_NAMES]
+    active_profiles = active_general + active_weather + active_seasonal + active_pinned
+    xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather} "
+         f"+ seasonal{active_seasonal} + pinned{active_pinned}")
 
     # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g.
     # the time-of-day mixes), but NOT the mixes we rebuild/remove now, decades, or the stats lists.
