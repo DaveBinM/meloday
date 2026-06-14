@@ -3987,57 +3987,135 @@ _LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and ove
 
 # Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
 _PROFILE_LYRIC_THEMES = {
-    # Only mixes whose IDENTITY is about what the songs are *about* get a lyric theme; instrumental
-    # and pure-sound/texture mixes (meditation, ambient, techno, jazz, the decades, etc.) get none.
-    # --- seasonal / weather ---
-    "festive": ["christmas"],
-    "summer_heat": ["summer"], "summer_breeze": ["summer"], "summer_tropical": ["summer"], "summer_evening": ["summer"],
-    "beach_vibes": ["summer"], "sunny": ["summer"], "cookout": ["summer", "party"], "summer_roadtrip": ["summer", "road"],
-    "rainy_day": ["rain"], "stormy": ["rain"], "autumn_rain": ["rain"],
-    "winter_nights": ["winter"], "winter_cosy": ["winter"],
-    "autumn_leaves": ["nostalgia"], "autumn_embers": ["nostalgia"], "spring_bloom": ["hope"],
-    # --- travel ---
-    "road_trip": ["road"], "driving_mix": ["road"], "night_drive": ["road"], "driving_singalong": ["road", "nostalgia"],
-    "commute_mix": ["road"], "country_roads": ["homesick", "road"],
-    # --- love / romance (each its own sub-feeling) ---
-    "romantic_mix": ["love"], "love_songs": ["love"], "modern_romance": ["love"], "romantic_dinner": ["love"],
-    "slow_dance": ["love"], "tender": ["love"], "romantic_jazz": ["love"], "acoustic_romance": ["love"],
-    "synthpop_romance": ["love"], "candlelight": ["love"],
-    "date_night": ["desire"], "late_night_romance": ["desire"], "flirty": ["desire"], "slow_burn": ["desire"],
-    "after_dark": ["desire"], "after_hours_rnb": ["love", "desire"],
-    "crush": ["new_love"], "first_date": ["new_love"],
-    "wedding_day": ["devotion"], "loved_up": ["devotion"], "devotion": ["devotion"],
-    "indie_romance": ["longing"], "long_distance": ["longing"], "yearning": ["longing"],
-    # soul / bossa lean to love lyrics
-    "neo_soul": ["love"], "motown_soul": ["love"], "london_soul": ["love"], "glasgow_soul": ["love"],
-    "melbourne_soul": ["love"], "bossa_samba": ["love"],
-    # --- heartbreak / sadness ---
-    "heartbreak": ["heartbreak"], "grief_release": ["grief"], "melancholy": ["sad"], "moody_mix": ["sad"],
-    "grey_skies": ["sad"], "vulnerable": ["sad", "loneliness"], "bittersweet": ["nostalgia", "longing"],
-    "moving_on": ["moving_on"], "blues_bar": ["heartbreak", "drinking"], "emo_poppunk": ["angst", "heartbreak"],
-    # --- empowerment / motivation / hope ---
-    "triumphant": ["empowerment"], "empowering": ["empowerment"], "monday_motivation": ["empowerment"],
-    "workout": ["empowerment"], "running": ["empowerment"], "cathartic": ["resilience", "empowerment"],
-    "confidence_boost": ["confidence"], "main_character": ["confidence"], "treat_yourself": ["confidence"],
-    "defiant": ["resilience", "rebellion"], "hopeful": ["hope"], "midweek_reset": ["hope"], "morning": ["hope"],
-    "fresh_start": ["hope"], "conscious_flow": ["hope", "resilience"],
-    # --- party / nightlife / celebration ---
-    "party": ["party"], "friday_night": ["party"], "pre_party": ["party"], "euphoric": ["party"],
-    "house_party": ["party"], "uk_garage": ["party"], "glasgow_house": ["party"], "london_garage": ["party"],
-    "afrobeat": ["party"], "celebration": ["celebration"], "friday_feeling": ["party", "celebration"],
-    "weekend_mix": ["party", "celebration"], "funk_disco": ["party", "celebration"], "party_throwback": ["party", "nostalgia"],
-    "latin_heat": ["party", "desire"],
-    # --- nostalgia / youth / friendship ---
-    "throwback_anthems": ["nostalgia"], "memory_lane": ["nostalgia"], "nostalgia_mix": ["nostalgia"],
-    "school_days": ["youth", "nostalgia"], "old_friends": ["friendship", "nostalgia"], "campfire": ["friendship"],
-    # --- anger / rebellion / freedom ---
-    "angst_mix": ["angst"], "punk_energy": ["rebellion", "angst"], "garage_grunge": ["angst"],
-    "outlaw_country": ["rebellion", "drinking"], "reggae_dub": ["freedom"],
-    # --- hip-hop: money / hustle ---
-    "trap_mode": ["money", "hustle"], "g_funk": ["money", "hustle"], "boom_bap": ["hustle", "nostalgia"],
-    "london_grime": ["hustle", "money"], "melbourne_hiphop": ["hustle", "money"],
-    # --- faith / home ---
-    "gospel": ["faith"], "celtic_folk": ["homesick"], "bluegrass": ["homesick"],
+    # Rebuilt onto the emergent canonical lyric vocab (assets/lyric_vocab.json, 471 moods + 586
+    # themes). Each profile's wanted moods + themes are flattened into one list; the boost pulls a
+    # song carrying ANY of them and the exclusion VETO pushes out songs that exclude them. Seasonal/
+    # weather mixes map to their emotional CHARACTER. Texture/instrumental mixes (decades, ambient,
+    # jazz, meditation, geo) get no entry. Regenerate via build_lyric_vocab + the profile mapper.
+    # --- activity ---
+    "bluegrass": ["upbeat", "earnest", "resilient", "hopeful", "nostalgic", "playful", "working_class_struggle", "perseverance", "family_responsibility", "overcoming_adversity", "community_support"],
+    "blues_bar": ["melancholic", "somber", "sad", "heartbreak", "reflective", "tired", "grief_and_loss", "loneliness", "missing_someone", "trying_to_forget", "crying_in_private", "night_drive"],
+    "commute_mix": ["reflective", "thoughtful", "calm", "melancholic", "focused", "restless", "late_night_introspection", "searching_for_direction", "rumination", "feeling_stuck", "keep_moving_forward"],
+    "driving_mix": ["focused", "driven", "energized", "confident", "restless", "adventurous", "night_drive", "searching_for_direction", "escapism", "keep_moving_forward"],
+    "driving_singalong": ["energetic", "upbeat", "cheerful", "confident", "anthemic", "adventurous", "living_in_the_moment", "weekend_escape", "collective_momentum", "music_as_escape", "party_energy"],
+    "night_drive": ["late_night_introspection", "hypnotic", "reflective", "brooding", "dreamlike", "night_drive", "late_night", "searching_for_meaning", "memory_loop"],
+    "outlaw_country": ["defiant", "gritty", "resigned", "reflective", "rebellious", "wry", "haunted", "anti_authoritarian", "burning_bridges", "running_from_consequences", "regret", "standing_your_ground", "working_class_struggle"],
+    "road_trip": ["adventurous", "restless", "hopeful", "reflective", "energetic", "searching_for_direction", "escapism", "leaving_the_past_behind", "weekend_escape"],
+    # --- atmospheric ---
+    "after_dark": ["mysterious", "intimate", "brooding", "dreamlike", "late_night_introspection", "seductive", "late_night", "dreamlike_imagery", "romantic_limbo", "seeking_connection", "unspoken_desire"],
+    "main_character": ["confident", "bold", "mysterious", "playful", "anthemic", "identity_as_performance", "self_mythologizing", "status_flex", "living_in_the_moment", "performative_identity"],
+    "stormy": ["tense", "brooding", "uneasy", "dramatic", "dark", "volatile", "relationship_conflict", "warning_signs_ignored", "inner_turmoil", "dread", "emotional_overwhelm"],
+    # --- calm ---
+    "candlelight": ["tender", "intimate", "calm", "warm", "serene", "reflective", "emotional_safety", "late_night_intimacy", "mutual_support", "unconditional_support", "healing"],
+    "romantic_jazz": ["romantic", "tender", "intimate", "warm", "reverent", "late_night_intimacy", "mutual_affection", "invitation_to_intimacy", "romantic_devotion", "enduring_love"],
+    # --- emotional ---
+    "bittersweet": ["bittersweet", "nostalgic", "wistful", "tender", "reflective", "sad", "hopeful", "moving_on", "nostalgia_for_the_past", "post_breakup_longing", "letting_go", "healing", "enduring_love"],
+    "defiant": ["defiant", "rebellious", "unyielding", "angry", "assertive", "bold", "defiance_against_authority", "rebellion_against_authority", "stand_your_ground", "anti_conformity", "anti_authoritarian", "reclaiming_agency"],
+    "grey_skies": ["reflective", "wistful", "melancholic", "somber", "calm", "introspective", "nature_as_emotional_mirror", "nostalgia_for_the_past", "loneliness", "searching_for_closure"],
+    "grief_release": ["grief_heavy", "mourning", "reflective", "somber", "tender", "cathartic", "accepting", "grief_and_loss", "grief_and_mourning", "letting_go", "healing", "anticipatory_grief"],
+    "heartbreak": ["heartbroken", "grief_stricken", "sad", "aching", "lonely", "devastated", "heartbreak", "lost_love", "breaking_point", "cant_move_on", "post_breakup_longing", "emotional_abandonment"],
+    "hopeful": ["hopeful", "optimistic", "encouraging", "warm", "earnest", "bright", "second_chance", "healing", "new_romance", "personal_growth", "overcoming_obstacles"],
+    "melancholy": ["melancholic", "wistful", "sad", "reflective", "somber", "lonely", "brooding", "nostalgia_for_the_past", "missing_someone", "loneliness", "rumination", "loss_of_direction"],
+    "moody_mix": ["brooding", "reflective", "melancholic", "tender", "guarded", "uncertain", "late_night_introspection", "inner_conflict", "rumination", "emotional_distance", "identity_questioning"],
+    "nostalgia_mix": ["nostalgic", "wistful", "reflective", "sentimental", "melancholic", "haunted_by_memory", "nostalgia_for_the_past", "haunting_memories", "memory_loop", "missing_someone", "trying_to_forget"],
+    "rainy_day": ["melancholic", "wistful", "reflective", "somber", "gentle", "introspective", "late_night_introspection", "missing_someone", "nostalgia_for_the_past", "heartbreak", "grief_and_loss"],
+    "tender": ["tender", "gentle", "warm", "comforting", "affectionate", "intimate", "emotional_safety", "mutual_support", "unconditional_support", "healing", "reassurance_seeking"],
+    "triumphant": ["triumphant", "confident", "empowered", "uplifted", "resilient", "bold", "overcoming_obstacles", "self_empowerment", "personal_growth", "prove_them_wrong", "reclaiming_agency"],
+    "vulnerable": ["vulnerable", "earnest", "confessional", "anxious", "tender", "vulnerability", "seeking_reassurance", "asking_for_help", "emotional_accountability", "unspoken_truths", "relationship_boundaries"],
+    "yearning": ["yearning", "wistful", "aching", "vulnerable", "reflective", "melancholic", "unresolved_longing", "missing_someone", "post_separation_longing", "unrequited_love", "waiting_for_return"],
+    # --- energy ---
+    "angst_mix": ["angst", "anxious", "restless", "conflicted", "brooding", "overthinking", "hurt", "inner_conflict", "relationship_conflict", "self_doubt"],
+    "cathartic": ["cathartic", "intense", "exhilarated", "agitated", "healing", "inner_turmoil", "breaking_point"],
+    "celebration": ["celebratory", "joyful", "festive", "exuberant", "grateful", "bright", "uplifted", "party_energy", "collective_momentum", "community_solidarity", "personal_growth"],
+    "confidence_boost": ["confident", "swagger", "bold", "assertive", "playful_confident", "empowered", "self_belief", "self_empowerment", "bragging_rights", "status_flex", "reclaiming_agency", "standing_your_ground"],
+    "emo_poppunk": ["angst", "defiant", "angry", "hurt", "restless", "intense", "coming_of_age", "relationship_breakdown", "self_doubt", "burning_bridges", "identity_conflict"],
+    "empowering": ["empowered", "inspiring", "confident", "resilient", "motivational", "uplifted", "self_empowerment", "self_belief", "reclaiming_agency", "overcoming_doubt", "perseverance", "personal_transformation"],
+    "euphoric": ["euphoric", "exuberant", "joyful", "ecstatic", "uplifted", "bright", "triumphant", "living_in_the_moment", "club_energy", "dancefloor_catharsis", "collective_momentum", "mutual_affection"],
+    "friday_night": ["hyped", "carefree_energy", "playful", "flirty", "energetic", "celebratory", "party_energy", "club_energy", "weekend_escape", "hookup_energy", "flirtation", "living_in_the_moment"],
+    "garage_grunge": ["angst", "brooding", "gritty", "angry", "alienated", "defiant", "inner_turmoil", "emotional_dysregulation", "social_isolation", "identity_conflict", "self_destruction", "falling_apart", "rebellion_against_authority"],
+    "london_grime": ["intense", "aggressive", "defiant", "urgent", "bold", "edgy", "competitive", "stand_your_ground", "conflict_escalation", "survival_mindset", "power_struggle", "reclaiming_agency", "anti_authoritarian"],
+    "party": ["party_energy", "celebratory", "hyped", "playful", "carefree", "energetic", "club_energy", "living_in_the_moment", "collective_momentum", "hookup_energy", "weekend_escape"],
+    "party_throwback": ["nostalgic", "cheerful", "festive", "energetic", "playful", "excited", "nostalgia_for_the_past", "party_energy", "collective_momentum", "memory_loop", "living_in_the_moment"],
+    "pre_party": ["anticipatory", "excited", "energized", "playful", "flirty", "hyped", "party_energy", "club_energy", "night_drive", "flirtation", "living_in_the_moment"],
+    "punk_energy": ["rebellious", "defiant", "aggressive", "angry", "high_energy", "bold", "anti_conformity", "defiance_against_authority", "rebellion_against_authority", "stand_your_ground", "burning_bridges", "conflict_escalation", "collective_momentum"],
+    "running": ["adrenaline_rush", "driven", "energized", "focused", "restless", "breathless", "action_call", "keep_moving_forward", "perseverance", "escape_attempt", "time_pressure", "survival_mindset"],
+    "trap_mode": ["ambitious", "cocky", "swaggering_confidence", "driven", "assertive", "aggressive", "tense", "status_flex", "wealth_flex", "hustle_mindset", "power_dynamics", "survival_mindset", "reclaiming_agency", "luxury_flex"],
+    "workout": ["high_energy", "driven", "aggressive", "adrenaline_driven", "focused", "action_call", "perseverance", "survival_mindset", "collective_momentum"],
+    # --- global ---
+    "afrobeat": ["joyful", "energetic", "festive", "playful", "upbeat", "warm", "celebratory", "party_energy", "collective_momentum", "community_solidarity", "living_in_the_moment", "dancefloor_catharsis"],
+    "bossa_samba": ["playful", "carefree", "romantic", "flirtatious", "bright", "cheerful", "sensual", "flirtation", "mutual_attraction", "summer_romance", "living_in_the_moment", "desire"],
+    "celtic_folk": ["nostalgic", "wistful", "reflective", "gentle", "earnest", "warm", "mournful", "homesickness", "nostalgia_for_the_past", "searching_for_home", "nature_as_emotional_mirror", "grief_and_loss", "family_responsibility", "coming_of_age"],
+    "latin_heat": ["passionate", "flirtatious", "playful", "sensual", "energetic", "warm", "carefree_energy", "flirtation", "sexual_tension", "mutual_attraction", "party_energy", "living_in_the_moment"],
+    "reggae_dub": ["peaceful", "relaxed", "hopeful", "warm", "grounded", "reassuring", "liberated", "community_solidarity", "community_support", "mutual_support", "healing", "spiritual_reassurance"],
+    # --- groove ---
+    "after_hours_rnb": ["intimate", "seductive", "relaxed", "confident", "late_night", "invitation_to_intimacy", "mutual_desire", "romantic_pursuit"],
+    "boom_bap": ["thoughtful", "observant", "confident", "grounded", "critical", "self_reflective", "serious", "social_commentary", "social_critique", "self_reflection", "identity_questioning", "hustle_mindset", "prove_them_wrong", "moral_accountability"],
+    "conscious_flow": ["thoughtful", "reflective", "calm", "meditative", "self_reflective", "serene", "self_reflection", "existential_reflection", "searching_for_meaning", "inner_conflict", "healing"],
+    "funk_disco": ["playful", "cheerful", "energetic", "confident", "bright", "festive", "party_energy", "club_energy", "dancefloor_catharsis", "living_in_the_moment", "collective_momentum"],
+    "g_funk": ["playful", "confident", "swaggering", "carefree", "seductive", "upbeat", "party_energy", "club_energy", "sexual_playfulness", "flirtation", "luxury_flex", "night_drive", "mutual_attraction"],
+    "glasgow_house": ["energetic", "rowdy", "cheerful", "uplifted", "gritty", "bold", "party_energy", "club_energy", "collective_momentum", "community_solidarity", "dancefloor_catharsis"],
+    "glasgow_soul": ["heartfelt", "brooding", "vulnerable", "gritty", "reflective", "melancholic", "resilient", "working_class_struggle", "heartbreak", "emotional_resilience", "personal_growth", "self_reckoning"],
+    "gospel": ["reverent", "hopeful", "uplifting", "devotional", "comforting", "transcendent", "spiritual_guidance", "spiritual_reassurance", "spiritual_renewal", "divine_guidance", "healing", "community_support"],
+    "house_party": ["festive", "cheerful", "playful", "energetic", "rowdy", "confident", "party_energy", "club_energy", "collective_momentum", "community_solidarity", "living_in_the_moment"],
+    "london_garage": ["energetic", "confident", "playful", "hypnotic", "restless", "hyped", "party_energy", "club_energy", "late_night", "dancefloor_catharsis", "living_in_the_moment"],
+    "london_soul": ["reflective", "intimate", "earnest", "wistful", "confident", "romantic_uncertainty", "identity_search", "love_with_conditions", "self_reflection"],
+    "melbourne_hiphop": ["thoughtful", "confident", "motivated", "reflective", "gritty", "self_aware", "ambitious", "self_determination", "identity_search", "personal_growth", "hustle_mindset", "social_commentary", "overcoming_adversity", "reclaiming_agency"],
+    "melbourne_soul": ["warm", "hopeful", "reflective", "gentle", "content", "intimate", "mutual_support", "healing", "romantic_possibility", "self_discovery", "weekend_escape"],
+    "motown_soul": ["joyful", "upbeat", "energetic", "romantic", "celebratory", "bright", "warm", "mutual_affection", "falling_in_love", "romantic_promise", "love_at_first_sight", "community_solidarity"],
+    "neo_soul": ["intimate", "warm", "confident", "reflective", "sensual", "calm", "late_night_intimacy", "romantic_invitation", "mutual_affection", "music_as_escape"],
+    "uk_garage": ["energetic", "driven", "playful", "hypnotic", "restless", "party_energy", "club_energy", "dancefloor_catharsis", "living_in_the_moment", "late_night"],
+    # --- occasion ---
+    "friday_feeling": ["relaxed", "upbeat", "anticipatory", "carefree", "cheerful", "liberated", "playful", "weekend_escape", "party_energy", "living_in_the_moment", "collective_momentum"],
+    "midweek_reset": ["calm", "reflective", "grounded", "reassuring", "hopeful", "relaxed", "starting_over", "self_reflection", "healing", "seeking_clarity"],
+    "monday_motivation": ["motivated", "driven", "focused", "energetic", "optimistic", "determined", "hustle_mindset", "action_call", "perseverance", "starting_over", "personal_growth", "keep_moving_forward"],
+    "treat_yourself": ["carefree", "joyful", "celebratory", "playful", "relaxed", "bright", "living_in_the_moment", "weekend_escape", "luxury_flex", "club_energy"],
+    # --- romantic ---
+    "acoustic_romance": ["romantic", "intimate", "tender", "earnest", "heartfelt", "gentle", "falling_in_love", "unspoken_feelings", "mutual_affection", "romantic_reassurance", "enduring_love"],
+    "crush": ["infatuated", "flirty", "dreamy", "eager", "nervous", "hopeful", "infatuation", "instant_attraction", "unspoken_feelings", "mutual_attraction", "romantic_possibility"],
+    "date_night": ["romantic", "flirty", "playful", "confident", "affectionate", "sensual", "flirtation", "mutual_attraction", "invitation_to_intimacy", "early_stage_romance", "romantic_persuasion"],
+    "devotion": ["devoted", "devotional", "tender", "reverent", "earnest", "warm", "steadfast", "devotion", "enduring_love", "mutual_devotion", "romantic_devotion", "unconditional_love"],
+    "first_date": ["flirtatious", "excited", "playful", "hopeful", "curious", "anticipatory"],
+    "flirty": ["flirty", "playful", "cheeky", "confident", "mischievous", "seductive", "flirtation", "mutual_attraction", "sexual_playfulness", "invitation_to_intimacy"],
+    "indie_romance": ["intimate", "wistful", "dreamy", "tender", "reflective", "romantic", "vulnerable", "falling_in_love", "romantic_pining", "mutual_affection", "unspoken_feelings", "romantic_uncertainty"],
+    "late_night_romance": ["romantic", "intimate", "tender", "dreamy", "reflective", "late_night_intimacy", "unspoken_feelings", "yearning", "post_separation_longing", "romantic_pining"],
+    "long_distance": ["yearning", "hopeful_longing", "wistful", "vulnerable", "lonely", "reflective", "uncertain", "long_term_commitment", "missing_someone", "post_separation_longing", "waiting_for_return", "seeking_reassurance"],
+    "love_songs": ["romantic", "affectionate", "tender", "devoted", "heartfelt", "passionate", "falling_in_love", "mutual_affection", "all_consuming_love", "enduring_love", "romantic_devotion"],
+    "loved_up": ["euphoric", "joyful", "affectionate", "romantic", "bright", "playful", "content", "mutual_affection", "mutual_desire", "falling_in_love", "all_consuming_love", "new_romance"],
+    "modern_romance": ["romantic", "playful", "confident", "flirty", "hopeful", "curious", "instant_connection", "mixed_signals", "seeking_connection", "romantic_possibility"],
+    "moving_on": ["resigned", "reflective", "wistful", "hopeful", "relieved", "moving_on", "letting_go", "healing", "self_reclamation", "post_breakup_longing", "trying_to_hold_on", "leaving_the_past_behind"],
+    "romantic_dinner": ["romantic", "tender", "warm", "affectionate", "intimate", "reverent", "mutual_affection", "invitation_to_intimacy", "romantic_reassurance", "enduring_love", "intimacy_as_escape"],
+    "romantic_mix": ["romantic", "affectionate", "tender", "passionate", "warm", "devoted", "falling_in_love", "mutual_affection", "mutual_desire", "all_consuming_love", "romantic_possibility"],
+    "slow_burn": ["romantic", "anticipatory", "tender", "yearning", "intimate", "romantic_pining", "unspoken_desire", "mutual_attraction", "pursuit_of_intimacy"],
+    "slow_dance": ["romantic", "tender", "intimate", "gentle", "devoted", "falling_in_love", "mutual_affection", "invitation_to_intimacy", "romantic_devotion", "all_consuming_love"],
+    "synthpop_romance": ["romantic", "dreamy", "euphoric", "playful", "electric", "flirty", "falling_in_love", "instant_connection", "romantic_escape", "mutual_attraction", "love_at_first_sight"],
+    "wedding_day": ["devoted", "joyful", "romantic", "celebratory", "grateful", "warm", "content", "long_term_commitment", "promise_of_forever", "mutual_devotion", "unconditional_love"],
+    # --- seasonal ---
+    "autumn_embers": ["brooding", "reflective", "warm", "tender", "nostalgic", "dark_tenderness", "haunting_memories", "unresolved_longing", "letting_go", "emotional_resilience"],
+    "autumn_leaves": ["reflective", "nostalgic", "wistful", "gentle", "melancholic", "thoughtful", "letting_go_of_the_past", "nostalgia_for_the_past", "moving_on", "haunting_memory"],
+    "autumn_rain": ["wistful", "melancholic", "reflective", "nostalgic", "somber", "gentle", "nostalgia_for_the_past", "haunting_memory", "missing_someone", "grief_and_loss", "late_night_introspection"],
+    "festive": ["festive", "joyful", "celebratory", "upbeat", "cheerful", "playful", "christmas_spirit", "community_solidarity", "party_energy", "family_responsibility", "mutual_support"],
+    "spring_bloom": ["hopeful", "uplifted", "bright", "optimistic", "gentle", "starting_over", "personal_growth", "healing", "new_romance"],
+    "summer_breeze": ["carefree", "relaxed", "warm", "bright", "lighthearted", "peaceful", "living_in_the_moment", "weekend_escape", "romantic_possibility", "mutual_affection", "escapism"],
+    "summer_heat": ["carefree_energy", "euphoric", "playful", "flirtatious", "sensual", "bright", "summer_romance", "hookup_energy", "flirtation", "living_in_the_moment", "party_energy"],
+    "summer_roadtrip": ["adventurous", "carefree", "energized", "reflective", "hopeful", "bright", "escapism", "leaving_the_past_behind", "searching_for_direction"],
+    "summer_tropical": ["euphoric", "carefree", "playful", "sensual", "exuberant", "bright", "summer_romance", "escapism", "party_energy", "living_in_the_moment"],
+    "winter_cosy": ["cozy", "warm", "comforted", "gentle", "content", "secure", "mutual_support", "emotional_safety", "unconditional_love", "healing"],
+    "winter_nights": ["reflective", "intimate", "tender", "nostalgic", "melancholic", "cozy", "late_night_intimacy", "missing_someone", "nostalgia_for_the_past", "homesickness"],
+    # --- social ---
+    "campfire": ["cozy", "intimate", "warm", "reflective", "gentle", "nostalgic", "community_solidarity", "searching_for_meaning"],
+    "cookout": ["festive", "cheerful", "playful", "warm", "upbeat", "community_solidarity", "party_energy", "family_responsibility", "mutual_support", "call_and_response"],
+    "memory_lane": ["nostalgic", "wistful", "reflective", "sentimental", "melancholic", "tender", "nostalgia_for_the_past", "haunting_memories", "memory_loop", "missing_someone", "searching_for_home"],
+    "old_friends": ["nostalgic", "warm", "affectionate", "sentimental", "grateful", "mutual_support", "nostalgia_for_the_past", "community_solidarity", "enduring_love"],
+    "school_days": ["nostalgic", "reflective", "sentimental", "wistful", "playful", "earnest", "coming_of_age", "nostalgia_for_the_past", "memory_loop", "identity_search"],
+    "throwback_anthems": ["anthemic", "nostalgic", "confident", "uplifted", "celebratory", "energetic", "nostalgia_for_the_past", "collective_momentum", "party_energy", "bragging_rights", "living_in_the_moment"],
+    # --- upbeat ---
+    "beach_vibes": ["carefree", "relaxed", "bright", "playful", "warm", "upbeat", "escapism", "weekend_escape", "living_in_the_moment", "romantic_possibility", "party_energy"],
+    "country_roads": ["adventurous", "nostalgic", "warm", "peaceful", "reflective", "nature_as_emotional_mirror", "weekend_escape", "homesickness", "searching_for_home", "living_in_the_moment"],
+    "fresh_start": ["optimistic", "uplifted", "motivated", "hopeful", "energized", "resilient", "starting_over", "self_reclamation", "personal_growth", "leaving_the_past_behind", "second_chance"],
+    "morning": ["bright", "upbeat", "cheerful", "calm", "optimistic", "warm", "starting_over", "living_in_the_moment", "self_reassurance"],
+    "summer_evening": ["warm", "romantic", "reflective", "relaxed", "gentle", "wistful", "summer_romance", "late_night_intimacy", "mutual_affection", "nostalgia_for_the_past", "romantic_possibility"],
+    "sunny": ["bright", "cheerful", "uplifted", "hopeful", "warm", "optimistic", "light_in_the_dark", "personal_growth", "overcoming_adversity", "mutual_support", "living_in_the_moment"],
+    "weekend_mix": ["carefree", "upbeat", "relaxed", "cheerful", "playful", "liberated", "bright", "weekend_escape", "living_in_the_moment", "party_energy", "music_as_escape", "collective_momentum"],
 }
 # Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
 _PROFILE_LYRIC_VALENCE = {
@@ -4057,13 +4135,15 @@ def _lyric_boost(entry, profile_key):
     boost = 0.0
     lt = entry.get("lyric_themes")
     if isinstance(lt, dict):
-        if any(t in (lt.get("excluded_themes") or {}) for t in wanted):
-            boost += _LYRIC_THEME_WEIGHT * 1.5                     # exclusion veto: strong push-OUT
-        else:
-            pos = {**(lt.get("moods") or {}), **(lt.get("themes") or {})}
-            matched = [pos[t] for t in wanted if t in pos]
-            if matched:
-                boost -= _LYRIC_THEME_WEIGHT * max(matched)        # pull: core fires fully, faint a quarter
+        # A POSITIVE match wins: a song carrying a wanted mood/theme belongs even if it also excludes one
+        # (genuine party songs exclude breakup themes yet are obviously party). Only veto when there's NO
+        # positive match AND the lyrics actively exclude a wanted tag (a sad-banger kept out of party).
+        pos = {**(lt.get("moods") or {}), **(lt.get("themes") or {})}
+        matched = [pos[t] for t in wanted if t in pos]
+        if matched:
+            boost -= _LYRIC_THEME_WEIGHT * max(matched)            # pull: core fires fully, faint a quarter
+        elif any(t in (lt.get("excluded_themes") or {}) for t in wanted):
+            boost += _LYRIC_THEME_WEIGHT * 1.5                     # excludes a wanted tag, no positive -> push OUT
     elif isinstance(lt, list):                                     # legacy keyword list (pre-backfill)
         if any(t in lt for t in wanted):
             boost -= _LYRIC_THEME_WEIGHT

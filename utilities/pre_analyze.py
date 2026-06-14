@@ -2069,6 +2069,9 @@ def apply_lyric_vocab():
                     continue
                 if ct not in groups[grp] or abs(wf) > abs(groups[grp][ct]):
                     groups[grp][ct] = wf
+        for t in list(groups["excluded_themes"]):     # positive wins: a tag can't be both wanted + excluded
+            if t in groups["moods"] or t in groups["themes"]:
+                del groups["excluded_themes"][t]
         batch.append((json.dumps(groups), rk))
     conn.executemany("UPDATE essentia_cache SET lyric_themes=? WHERE rating_key=?", batch)
     conn.commit(); conn.close()
