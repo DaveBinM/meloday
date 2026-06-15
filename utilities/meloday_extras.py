@@ -8040,9 +8040,16 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     to_remove += [k for name, k in name_to_key.items()
                   if k in _GENERAL_PROFILES and k not in active_general and name in existing]
 
-    # Pinned geo showcase mixes are ALWAYS built (alongside the rotating slate) and never in to_remove,
-    # so they're always present; their per-day shuffle seed (in _build_mix_tracks) refreshes them daily.
-    active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene") if k in _MOOD_MIX_NAMES]
+    # Pinned geo showcase mixes are present every run but their content refreshes ONCE A DAY. Their
+    # _build_mix_tracks geo branch advances the artist-coverage rotation (stamping each chosen artist's
+    # `last` = today) every time it runs, so rebuilding on the sub-daily cron churns their content. Skip
+    # any scene whose rotation already advanced today; a skipped scene is neither rebuilt nor in
+    # to_remove, so the caller leaves its existing playlist untouched until tomorrow's first run.
+    _geo_rot = _load_geo_rotation()
+    def _scene_done_today(scene):
+        return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
+    active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene")
+                     if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
     xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather} "
          f"+ seasonal{active_seasonal} + pinned{active_pinned}")
