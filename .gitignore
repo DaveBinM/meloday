@@ -1,6 +1,7 @@
 logs/lyric_batch_state.json
 logs/lyric_backfill.log
-logs/mood_mix_history.json
+assets/mood_mix_history.json
+assets/geo_scene_rotation.json
 
 # Dev-only: holds the real Plex token + OpenAI key — never commit
 live/

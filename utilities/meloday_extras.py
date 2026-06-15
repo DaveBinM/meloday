@@ -7618,7 +7618,7 @@ _FRESHNESS_PENALTY = 0.30        # rotation-score penalty for a recently-surface
 
 
 def _mood_history_path():
-    return os.path.join(_BASE_DIR, "logs", "mood_mix_history.json")
+    return os.path.join(_BASE_DIR, "assets", "mood_mix_history.json")
 
 
 def _load_mood_history():
@@ -7977,6 +7977,81 @@ def _canonical_penalty_track(t):
     return _version_penalty(getattr(t, "title", ""), getattr(t, "parentTitle", ""))
 
 
+# ---------------------------------------------------------------------------
+# Geo "scene" mixes — artist-coverage rotation
+# Instead of ranking by global Last.fm fame (which buries locally-loved bands), rotate through ALL the
+# user's artists from the place over a few days — leaning to the heavily-owned/recognisable names — and
+# surface a RANDOM song from each chosen artist's recognisable top-N. See the _is_geo branch below.
+# ---------------------------------------------------------------------------
+_GEO_SONGS_PER_ARTIST = 10        # rotate a random song from each artist's top-N (after recently-played)
+_GEO_OVERDUE_RATE     = 0.10      # per-day rotation bonus for an unshown artist; tuned so the longest-
+                                  # unseen always cycle in within ~ceil(artists/mix) days (coverage) while
+                                  # the [0.5,1.0] recognisability weight still leans to the hits people know
+
+# Score/classical-dominated catalogues (film/soundtrack/game composers) aren't a band/song "scene".
+# Deliberately TIGHTER than _INSTRUMENTAL_CUES (no post-rock/ambient/math-rock) so legit post-rock bands
+# like Mogwai stay in.
+_SCORE_CLASSICAL_TAGS = ("soundtrack", "film score", "original score", "score", "stage & screen",
+    "classical", "contemporary classical", "modern classical", "neo-classical", "orchestral", "opera",
+    "video game", "library music")
+
+
+def _is_score_classical_artist(entries):
+    """True if a MAJORITY of an artist's tracks carry a score/classical tag — so film/soundtrack/classical
+    catalogues (Lorne Balfe, Craig Armstrong) stay out of a band/song scene mix, while a band with the odd
+    orchestral track stays in."""
+    if not entries:
+        return False
+    hits = sum(1 for e in entries
+               if any(s in t for t in _track_style_tags(e) for s in _SCORE_CLASSICAL_TAGS))
+    return hits * 2 > len(entries)
+
+
+def _scene_artist_weight(owned_depth, best_listeners):
+    """Recognisability lean in [0.5, 1.0]: heavily-owned + globally-familiar artists score higher (so the
+    mix sounds like the hits people locally know), but both inputs are log-compressed and saturated so a
+    giant catalogue (a 1000-track composer) or a global megastar can't dominate the rotation."""
+    ow = min(1.0, math.log1p(owned_depth)                   / math.log1p(200))     # saturates ~200 owned
+    fa = min(1.0, math.log1p((best_listeners or 0) / 1000.0) / math.log1p(3000))   # saturates ~3M listeners
+    return 0.5 + 0.3 * ow + 0.2 * fa
+
+
+def _geo_rotation_path():
+    return os.path.join(_BASE_DIR, "assets", "geo_scene_rotation.json")
+
+
+def _load_geo_rotation():
+    """Per-scene rotation state {profile_key: {artist: {"last": ordinal, "songs": [song-keys]}}}. {} if missing."""
+    try:
+        with open(_geo_rotation_path()) as f:
+            return json.load(f).get("scenes", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_geo_rotation(scenes):
+    """Atomic best-effort write (never fatal to a build), mirroring _save_mood_history."""
+    try:
+        os.makedirs(os.path.dirname(_geo_rotation_path()), exist_ok=True)
+        tmp = _geo_rotation_path() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"version": 1, "scenes": scenes}, f)
+        os.replace(tmp, _geo_rotation_path())
+    except OSError as e:
+        xlog(f"[WARN] geo_scene: could not persist rotation state: {e}")
+
+
+def _geo_overdue_bonus(last_ord, cur_ord):
+    """Rotation bonus that rises (uncapped) with days since an artist was last shown, so the longest-unseen
+    always cycle in within ~a cycle (coverage) while the [0.5,1.0] recognisability weight still leads
+    day-to-day (a representative blend). Never-shown artists get top priority, so newly-added local artists
+    surface promptly. Uncapped is deliberate: a cap starves the lowest-weight artists in a big scene (they
+    can never out-accumulate the weight gap), whereas unbounded overdue guarantees everyone returns."""
+    if last_ord is None:
+        return _GEO_OVERDUE_RATE * 10_000
+    return _GEO_OVERDUE_RATE * max(0, cur_ord - last_ord)
+
+
 def _dedup_canonical(tracks, essentia_cache=None):
     """Collapse same-song duplicate Track objects to the most CANONICAL copy (studio/original — not
     live / remix / demo / instrumental / compilation), keeping the song at its best (first / highest-
@@ -8083,7 +8158,68 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     # Showcase mixes (decade + geo): keep the top ~3x most popular tracks of the decade/scene, then
     # pick the slate RANDOMLY (seeded per day — stable within a day, fresh across days) — variety
     # without losing the "recognisable hits" feel. The fill ladder still enforces <=1 artist + excludes.
-    if _is_showcase:
+    if _is_geo:
+        # Artist-coverage rotation (scotland/australia/london scenes): every gate-matched, non-score/
+        # classical artist cycles in over ~ceil(artists/mix_size) days — leaning to the recognisable /
+        # heavily-owned names — surfacing a RANDOM song from each chosen artist's recognisable top-N (after
+        # recently-played removal by SONG identity, so all releases/comps of a song go together). Replaces
+        # global-fame ranking, which buried locally-loved bands (Biffy Clyro, The Snuts, Twin Atlantic, …).
+        _sk = lambda e: "\t".join(_entry_song_key(e))
+        _excl_songs = {_sk(essentia_cache[rk]) for rk in (hard_exclude_rks or ()) if rk in essentia_cache}
+        own_depth   = Counter((e.get("artist") or "").strip().lower() for e in essentia_cache.values())
+        by_artist   = defaultdict(list)
+        for rk in dict.fromkeys(history_rks + library_rks):
+            a = (essentia_cache.get(rk, {}).get("artist") or "").strip().lower()
+            if a:
+                by_artist[a].append(rk)
+
+        artist_pool, artist_weight = {}, {}     # artist -> [(song_key, rk), …] top-N ;  artist -> weight
+        for a, rks in by_artist.items():
+            if _is_score_classical_artist([essentia_cache[rk] for rk in rks]):
+                continue
+            best = {}                            # song_key -> (canon_penalty, -listeners, rk) — canonical copy
+            for rk in rks:
+                e  = essentia_cache.get(rk, {})
+                sk = _sk(e)
+                if sk in _excl_songs:            # version-safe: any recently-played copy excludes the song
+                    continue
+                sc = (_canonical_penalty(e), -(e.get("lastfm_listeners") or 0), rk)
+                if sk not in best or sc < best[sk]:
+                    best[sk] = sc
+            if not best:                         # every distinct song recently played -> artist sits out today
+                continue
+            top = sorted(best.items(), key=lambda kv: kv[1][1])[:_GEO_SONGS_PER_ARTIST]   # most-listened first
+            artist_pool[a]   = [(sk, sc[2]) for sk, sc in top]
+            artist_weight[a] = _scene_artist_weight(own_depth.get(a, 0), -top[0][1][1])   # best song listeners
+
+        cur_ord = date.today().toordinal()
+        _scenes = _load_geo_rotation()
+        _state  = _scenes.get(profile_key, {})
+        _jit    = random.Random(f"geo-{cur_ord}-{profile_key}")        # deterministic tiebreak within a day
+
+        def _rank(a):
+            return -(artist_weight[a]
+                     + _geo_overdue_bonus((_state.get(a) or {}).get("last"), cur_ord)
+                     + _jit.random() * 1e-3)
+        chosen = sorted(artist_weight, key=_rank)[:mix_size]
+
+        pool = []
+        for a in chosen:
+            shown = set((_state.get(a) or {}).get("songs") or [])
+            fresh = [(sk, rk) for sk, rk in artist_pool[a] if sk not in shown]
+            if not fresh:                        # whole top-N already cycled -> reshuffle this artist
+                fresh, shown = artist_pool[a], set()
+            sk, rk = random.Random(f"geo-song-{cur_ord}-{profile_key}-{a}").choice(fresh)
+            pool.append(rk)
+            shown.add(sk)
+            _state[a] = {"last": cur_ord, "songs": sorted(shown & {k for k, _ in artist_pool[a]})}
+        _scenes[profile_key] = _state
+        _save_geo_rotation(_scenes)
+
+        random.Random(f"geo-order-{cur_ord}-{profile_key}").shuffle(pool)   # vary playlist order day to day
+        history_rks, library_rks = [], pool
+
+    elif _is_era:
         # Collapse the same song appearing on multiple albums/compilations/reissues into ONE entry,
         # keeping its most CANONICAL copy (studio/original — least live/remix/demo/instrumental
         # markers, then earliest release) so e.g. "In the End" -> the Hybrid Theory studio track, not
