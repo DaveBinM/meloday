@@ -8211,20 +8211,22 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         for a, rks in by_artist.items():
             if _is_score_classical_artist([essentia_cache[rk] for rk in rks]):
                 continue
-            best = {}                            # song_key -> (canon_penalty, -listeners, rk) — canonical copy
+            best = {}                            # song_key -> (canon_penalty, year, rk, listeners)
             for rk in rks:
                 e  = essentia_cache.get(rk, {})
                 sk = _sk(e)
                 if sk in _excl_songs:            # version-safe: any recently-played copy excludes the song
                     continue
-                sc = (_canonical_penalty(e), -(e.get("lastfm_listeners") or 0), rk)
-                if sk not in best or sc < best[sk]:
-                    best[sk] = sc
+                # canonical copy = least version penalty, then EARLIEST year (the original studio cut, not a
+                # later re-recording/rework/reissue), then rk; carry the song's listeners for the ranking.
+                cand = (_canonical_penalty(e), e.get("year") or 9999, rk, e.get("lastfm_listeners") or 0)
+                if sk not in best or cand[:3] < best[sk][:3]:
+                    best[sk] = cand
             if not best:                         # every distinct song recently played -> artist sits out today
                 continue
-            top = sorted(best.items(), key=lambda kv: kv[1][1])[:_GEO_SONGS_PER_ARTIST]   # most-listened first
-            artist_pool[a]   = [(sk, sc[2]) for sk, sc in top]
-            artist_weight[a] = _scene_artist_weight(own_depth.get(a, 0), -top[0][1][1])   # best song listeners
+            top = sorted(best.items(), key=lambda kv: -kv[1][3])[:_GEO_SONGS_PER_ARTIST]   # most-listened first
+            artist_pool[a]   = [(sk, cand[2]) for sk, cand in top]
+            artist_weight[a] = _scene_artist_weight(own_depth.get(a, 0), top[0][1][3])     # top song listeners
 
         cur_ord = date.today().toordinal()
         _scenes = _load_geo_rotation()
