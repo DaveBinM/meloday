@@ -815,7 +815,6 @@ _PROFILE_ICON = {
     "melancholy":        "water_drop",
     "dreamy_mix":        "cloud",
     # Sun / day
-    "morning":           "wb_sunny",
     "sunny":             "wb_sunny",
     "golden_hour":       "wb_sunny",
     "sunday_morning":    "wb_sunny",
@@ -831,7 +830,6 @@ _PROFILE_ICON = {
     "workout":           "fitness_center",
     "running":           "directions_run",
     "confidence_boost":  "trending_up",
-    "cathartic":         "whatshot",
     # Calm / dreamy / focus
     "daydreaming":       "cloud",
     "lazy_sunday":       "cloud",
@@ -897,7 +895,6 @@ _ICON_PROFILE_OVERRIDE = {
     "night_drive":    {"anchor": (0.62, 0.40)},
     "late_night":     {"anchor": (0.62, 0.41)},
     "sleep":          {"anchor": (0.50, 0.38)},
-    "morning":        {"anchor": (0.40, 0.37)},
     "sunny":          {"anchor": (0.58, 0.37)},
     "golden_hour":    {"anchor": (0.40, 0.37)},
     "sunset_mix":     {"anchor": (0.50, 0.36)},
@@ -912,6 +909,11 @@ _ICON_PROFILE_OVERRIDE = {
     "friday_night":   {"anchor": (0.70, 0.62)},
     # Winter — cloud sits in the top-right quadrant; flakes fall below it (cloud drawn on top).
     "winter_mix":     {"anchor": (0.66, 0.33)},
+    # Time Capsule — larger, up in the top-right quadrant; Rediscovery — larger, centred.
+    "time_capsule":   {"anchor": (0.73, 0.27), "base_scale": 1.30},
+    "rediscovery":    {"base_scale": 1.30},
+    # Discover Weekly — small, tucked into the bottom-right quadrant.
+    "discover_weekly": {"anchor": (0.74, 0.62), "base_scale": 0.45},
 }
 
 # Heart arrangement per romance profile — deliberately spread so no two covers match.
@@ -6035,9 +6037,9 @@ _MS_CODEPOINTS = {
     "brunch_dining": 0xEA73, "bakery_dining": 0xEA53, "egg_alt": 0xEAC8, "flare": 0xE3E4,
 }
 
-# Glyphs rendered FILL=0 (outlined) instead of solid — their interior detail (a screen,
-# pages, a cup, a glass…) reads as a second tone via the background, matching the canonical
-# two-tone Material look. Solid symbols (heart, note, star, sun, drop) stay FILL=1.
+# Two-tone glyphs: drawn as a filled duotone (see _draw_glyph) — a solid FILL=1 body in the glyph
+# colour + a darker-tone FILL=0 interior/outline detail (a screen, pages, a cup, a glass…) on top.
+# Solid symbols (heart, note, star, sun, drop) stay single-tone FILL=1.
 _TWO_TONE_GLYPHS = {
     "movie", "menu_book", "local_cafe", "restaurant", "stadia_controller", "headphones",
     "wine_bar", "local_bar", "brunch_dining", "bakery_dining", "egg_alt", "piano", "weekend",
@@ -6063,21 +6065,27 @@ def _load_ms_font(size, fill=1):
 
 
 def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
-                stroke_width=0, stroke_fill=None):
+                stroke_width=0, stroke_fill=None, fill2=None):
     """Render a Material Symbol glyph centred at (cx, cy) at `size` px em, optionally tilted,
     mirrored (flip = horizontal) and outlined (stroke), compositing onto RGBA `layer` via its
-    own tile (so it can rotate/mirror freely)."""
+    own tile (so it can rotate/mirror freely). A two-tone glyph with `fill2` is drawn as a filled
+    duotone: a solid FILL=1 body in `fill` + a FILL=0 interior/outline detail in `fill2` on top."""
     cp = _MS_CODEPOINTS.get(icon_name)
     if cp is None or not _PIL_AVAILABLE:
         return
-    ch   = chr(cp)
-    font = _load_ms_font(max(8, int(round(size))), 0 if icon_name in _TWO_TONE_GLYPHS else 1)
+    ch       = chr(cp)
+    sz       = max(8, int(round(size)))
+    two_tone = icon_name in _TWO_TONE_GLYPHS and fill2 is not None
+    font = _load_ms_font(sz, 1 if two_tone else (0 if icon_name in _TWO_TONE_GLYPHS else 1))
     l, t, r, b = font.getbbox(ch, stroke_width=stroke_width)     # ink bounds, to centre
     gw, gh = max(1, r - l), max(1, b - t)
     pad = max(8, int(size * 0.10) + stroke_width)
     tile = Image.new("RGBA", (gw + 2 * pad, gh + 2 * pad), (0, 0, 0, 0))
-    ImageDraw.Draw(tile).text((pad - l, pad - t), ch, font=font, fill=fill,
-                              stroke_width=stroke_width, stroke_fill=stroke_fill)
+    draw = ImageDraw.Draw(tile)
+    draw.text((pad - l, pad - t), ch, font=font, fill=fill,
+              stroke_width=stroke_width, stroke_fill=stroke_fill)
+    if two_tone:                                                 # darker interior/outline detail over the body
+        draw.text((pad - l, pad - t), ch, font=_load_ms_font(sz, 0), fill=fill2)
     if flip:
         tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
     if tilt:
@@ -6294,6 +6302,12 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     rgb   = _ensure_icon_contrast(base_rgb, bg_lum)
     alpha = meta.get("alpha", 240)
     fill  = (*rgb, alpha)
+    fill2 = None
+    if icon_name in _TWO_TONE_GLYPHS:                # darker (or lighter) in-hue detail over the filled body
+        fl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+        detail = tuple(int(c * 0.50) for c in rgb) if fl >= 110 \
+            else tuple(min(255, int(c + (255 - c) * 0.55)) for c in rgb)
+        fill2 = (*detail, alpha)
     size  = max(40, int(round(2 * R)))               # font em size → prominent hero proportion
 
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -6314,7 +6328,7 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
                                 rng=rng, fill=fill, n=cluster_n, stroke=stroke)
     else:
         angle = rng.uniform(-meta["tilt"], meta["tilt"])
-        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False))
+        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False), fill2=fill2)
         if key == "rainy_day":                       # little ripples landing below the cloud
             _draw_ripples_below(overlay, cx, cy, size, rgb, alpha)
         elif key == "friday_night":                  # scatter non-overlapping music notes around it
