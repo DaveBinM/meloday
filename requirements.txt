@@ -9,3 +9,4 @@ requests
 openai
 langdetect
 tiktoken
+mutagen

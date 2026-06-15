@@ -111,6 +111,8 @@ extras:
   mood_mix_rotations_per_day: 6 # How many times a day the general mood mixes rotate to a fresh set (run the generator at least this often; default 6 = every ~4h)
   mood_mix_exclude_played_days: 3 # Keep songs played in the last N days out of the mixes for variety (0 = disabled). Also dedupes tracks across the mixes shown at once.
   weather_location:             # Optional: city name, coordinates, or airport code (e.g. "Sydney") — enables weather-triggered mood mixes
+  exclude_compilations_from_era: true          # Drop compilations (Various Artists, Greatest Hits, Best Of) from the decade/era mixes, using the MusicBrainz release type read from your files' tags
+  era_excluded_release_types: ["compilation"]  # Which MusicBrainz release types the decade mixes exclude (add "soundtrack" / "live" to also drop those)
 
 files:
   mood_map: "assets/moodmap.json"             

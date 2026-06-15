@@ -22,7 +22,7 @@ from meloday import (
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text,
-    _mood_models, _moodtheme_model, _genre_model,
+    _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags,
 )
 
 # --- LOGGING SETUP ---
@@ -99,7 +99,7 @@ def load_essentia_cache_exclusive():
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
             "lyric_valence, lyric_themes, lyric_lang, "
             "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
-            "lyric_themes_raw "
+            "lyric_themes_raw, artist_mbid, release_types "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -114,7 +114,7 @@ def load_essentia_cache_exclusive():
                 lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
                 lyric_valence, lyric_themes_j, lyric_lang, \
                 title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
-                lyric_themes_raw_j in rows:
+                lyric_themes_raw_j, artist_mbid, release_types_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -148,6 +148,8 @@ def load_essentia_cache_exclusive():
                 "title": title, "release_date": release_date,
                 "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
                 "lyrics_synced_at": lyrics_synced_at,
+                "artist_mbid": artist_mbid,
+                "release_types": json.loads(release_types_j) if release_types_j else None,
             }
         return result
     except Exception:
@@ -172,10 +174,10 @@ def upsert_essentia_cache_entries(entries):
              lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
              lyric_valence, lyric_themes, lyric_lang,
              title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at,
-             lyric_themes_raw)
+             lyric_themes_raw, artist_mbid, release_types)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -199,7 +201,9 @@ def upsert_essentia_cache_entries(entries):
              json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
              d.get("lyric_lang"), d.get("title"), d.get("release_date"),
              d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"),
-             json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None)
+             json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None,
+             d.get("artist_mbid"),
+             json.dumps(d["release_types"]) if d.get("release_types") is not None else None)
             for rk, d in entries.items()
         ])
         conn.commit()
@@ -315,6 +319,10 @@ def bulk_analyze():
     # Pre-load cache to filter processing list
     current_cache = load_essentia_cache_exclusive()
     _essentia_cache.update(current_cache)
+
+    # One-time (NULL-driven) backfill of the embedded MusicBrainz file tags — artist MBID (for exact geo
+    # resolution) + release type (so the decade mixes can drop compilations). New tracks get them inline.
+    _ensure_mb_file_tags()
 
     # Fetch all tracks as a flat list.
     # Use a longer timeout here — fetching 50k+ tracks in a single response can take
@@ -840,6 +848,38 @@ def _ensure_meta_fields(conn):
         conn.commit()
 
 
+def _ensure_mb_file_tags(limit=None):
+    """Populate artist_mbid + release_types from each file's embedded MusicBrainz tags (Picard) for cached
+    tracks that lack them. A tag-only header read — no audio decode, no Plex, no API — so it parallelises
+    well over the NAS (measured ~2-4 min for the full ~131k library at 16 workers). NULL-driven: runs only
+    while such tracks exist (first run; new tracks get tagged inline during analysis), then a no-op."""
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
+                        "WHERE release_types IS NULL AND file_path IS NOT NULL").fetchall()
+    conn.close()
+    if limit:
+        todo = todo[:int(limit)]
+    if not todo:
+        return
+    log_msg(f"[INFO] Reading MusicBrainz file tags (artist MBID + release type) for {len(todo)} tracks "
+            f"— local & parallel, no API...")
+
+    def _fetch(item):
+        rk, fp = item
+        t = _read_mb_file_tags(fp)
+        rts = t.get("release_types") or []
+        return ((t.get("artist_mbid"), json.dumps(rts), rk),
+                f"{(','.join(rts) or '-'):24.24} {os.path.basename(fp or '')[:42]}")
+
+    n = _run_concurrent(
+        todo, _fetch,
+        "UPDATE essentia_cache SET artist_mbid=?, release_types=? WHERE rating_key=?",
+        _workers_arg(16), "MB tags")
+    log_msg(f"\n[INFO] MusicBrainz file tags complete: {n} tracks.")
+
+
 # --- METADATA SYNC: Last.fm community tags (cache-driven; targeted UPDATEs; refresh cadence) ---
 
 def _load_lastfm_key():
@@ -1038,11 +1078,15 @@ def _resolve_area_chain(mbid):
     _mb_area_chain[mbid] = chain
     return chain
 
-def _artist_origin(name):
+def _artist_origin(name, mbid=None):
     """Resolve an artist's full place hierarchy from MusicBrainz — the union of the begin-area and
-    area parent chains (whichever exist), plus the country code. {} if not found."""
-    q = urllib.parse.quote('artist:"%s"' % name.replace('"', ""))
-    a = (_mb_get(f"artist/?query={q}&fmt=json&limit=1").get("artists") or [{}])[0]
+    area parent chains (whichever exist), plus the country code. {} if not found. Uses the artist MBID
+    (from the file tags) for an EXACT lookup when available — no name-collision risk — else a name search."""
+    if mbid:
+        a = _mb_get(f"artist/{mbid}?fmt=json") or {}
+    else:
+        q = urllib.parse.quote('artist:"%s"' % name.replace('"', ""))
+        a = (_mb_get(f"artist/?query={q}&fmt=json&limit=1").get("artists") or [{}])[0]
     if not a:
         return {}
     begin, area = a.get("begin-area") or {}, a.get("area") or {}
@@ -1082,9 +1126,9 @@ def sync_artist_origin(limit=None):
                  "WHERE artist_origin IS NOT NULL AND geo_synced_at IS NULL", (now,))
     conn.commit()
     rows = conn.execute(
-        "SELECT rating_key, artist, release_date, year, geo_synced_at, artist_origin "
+        "SELECT rating_key, artist, release_date, year, geo_synced_at, artist_origin, artist_mbid "
         "FROM essentia_cache WHERE artist IS NOT NULL").fetchall()
-    todo = [(rk, art) for rk, art, rd, yr, syn, data in rows
+    todo = [(rk, art, mbid) for rk, art, rd, yr, syn, data, mbid in rows
             if _refresh_due(syn, rd, yr, data is not None, "geo", now)]
     if limit:
         todo = todo[:int(limit)]
@@ -1096,11 +1140,20 @@ def sync_artist_origin(limit=None):
     workers = _workers_arg(3)
     import concurrent.futures, queue as _queue
     from collections import defaultdict
-    artist_tracks = defaultdict(list)
-    for rk, art in todo:
-        artist_tracks[art or ""].append(rk)
-    artists = [a for a in artist_tracks if a]
-    log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s).")
+    # Group tracks by artist IDENTITY — prefer the file's MusicBrainz artist MBID (exact, no name
+    # collisions), falling back to the name for the ~1% with no tag.
+    artist_tracks = defaultdict(list)   # key (mbid or name) -> [rk, ...]
+    artist_info   = {}                  # key -> (name, mbid)
+    for rk, art, mbid in todo:
+        key = mbid or (art or "")
+        if not key:
+            continue
+        artist_tracks[key].append(rk)
+        artist_info.setdefault(key, (art, mbid))
+    artists = list(artist_tracks)
+    n_mbid = sum(1 for k in artists if artist_info[k][1])
+    log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s) "
+            f"— {n_mbid} via exact MBID, {len(artists) - n_mbid} by name.")
     q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time(); _last = [0.0]
     now2 = time.time()
 
@@ -1111,15 +1164,15 @@ def sync_artist_origin(limit=None):
             it = q.get()
             if it is STOP:
                 break
-            artist, origin = it
+            key, origin = it
             oj = json.dumps(origin) if origin else None
-            for rk in artist_tracks[artist]:
+            for rk in artist_tracks[key]:
                 batch.append((oj, now2, rk)); cnt["t"] += 1
             cnt["a"] += 1
             if len(batch) >= 300:
                 wc.executemany("UPDATE essentia_cache SET artist_origin=?, geo_synced_at=? WHERE rating_key=?", batch); wc.commit(); batch = []
             if verbose:
-                log_msg(f"   {artist[:22]:22} -> city={(origin or {}).get('city')} "
+                log_msg(f"   {(artist_info[key][0] or key)[:22]:22} -> city={(origin or {}).get('city')} "
                         f"region={(origin or {}).get('region')} country={(origin or {}).get('country')}")
             elif time.time() - _last[0] >= 1.0:
                 _last[0] = time.time()
@@ -1133,7 +1186,7 @@ def sync_artist_origin(limit=None):
     wt = _threading.Thread(target=_writer, daemon=True); wt.start()
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            list(ex.map(lambda a: q.put((a, _artist_origin(a))), artists))
+            list(ex.map(lambda k: q.put((k, _artist_origin(*artist_info[k]))), artists))
     finally:
         q.put(STOP); wt.join()
     log_msg(f"\n[INFO] MusicBrainz origin sync complete: {cnt['a']} artists, {cnt['t']} tracks.")
@@ -2106,6 +2159,8 @@ if __name__ == "__main__":
             except Exception:
                 _lim = None
         sync_artist_origin(limit=_lim)
+    elif "--backfill-mb-tags" in sys.argv:
+        _ensure_mb_file_tags(limit=_arg_limit())
     elif "--sync-metadata" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:

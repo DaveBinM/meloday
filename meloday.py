@@ -412,10 +412,11 @@ _UPSERT_SQL = """
      mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
      lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
      lyric_valence, lyric_themes, lyric_lang,
-     title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at)
+     title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at,
+     lyric_themes_raw, artist_mbid, release_types)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?)
+            ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 _CANONICAL_COLUMNS = (
@@ -431,7 +432,7 @@ _CANONICAL_COLUMNS = (
     "lastfm_artist_tags TEXT, lastfm_track_tags TEXT, artist_origin TEXT, "
     "lastfm_listeners INTEGER, lyric_valence REAL, lyric_themes TEXT, lyric_lang TEXT, "
     "title TEXT, release_date REAL, lastfm_synced_at REAL, geo_synced_at REAL, lyrics_synced_at REAL, "
-    "lyric_themes_raw TEXT"
+    "lyric_themes_raw TEXT, artist_mbid TEXT, release_types TEXT"
 )
 
 def _ensure_db_schema(conn):
@@ -479,6 +480,8 @@ def _ensure_db_schema(conn):
         ("geo_synced_at",        "geo_synced_at REAL"),
         ("lyrics_synced_at",     "lyrics_synced_at REAL"),
         ("lyric_themes_raw",     "lyric_themes_raw TEXT"),
+        ("artist_mbid",          "artist_mbid TEXT"),
+        ("release_types",        "release_types TEXT"),
     ):
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
@@ -577,7 +580,9 @@ def _entry_to_row(rk, d):
             json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
             d.get("lyric_lang"), d.get("title"), d.get("release_date"),
             d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"),
-            json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None)
+            json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None,
+            d.get("artist_mbid"),
+            json.dumps(d["release_types"]) if d.get("release_types") is not None else None)
 
 def _row_to_entry(row):
     rk, bpm, key, energy, danceability, brightness, year, artist, \
@@ -590,7 +595,7 @@ def _row_to_entry(row):
         lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
         lyric_valence, lyric_themes_j, lyric_lang, \
         title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
-        lyric_themes_raw_j = row
+        lyric_themes_raw_j, artist_mbid, release_types_j = row
     return rk, {
         "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
         "year": year, "artist": artist,
@@ -625,6 +630,8 @@ def _row_to_entry(row):
         "title": title, "release_date": release_date,
         "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
         "lyrics_synced_at": lyrics_synced_at,
+        "artist_mbid": artist_mbid,
+        "release_types": json.loads(release_types_j) if release_types_j else None,
     }
 
 def _migrate_json_to_sqlite():
@@ -665,7 +672,7 @@ def load_essentia_cache():
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
             "lyric_valence, lyric_themes, lyric_lang, "
             "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
-            "lyric_themes_raw "
+            "lyric_themes_raw, artist_mbid, release_types "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -873,6 +880,54 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
         except Exception as tf_err:
             log_text(f"[WARN] TF inference failed: {tf_err}")
 
+
+def _read_mb_file_tags(file_path):
+    """Read the MusicBrainz tags Picard embeds in the audio file: the release-group type list (for
+    compilation detection) and the artist MBID (for an exact geo lookup). Authoritative + local — no API.
+    Handles FLAC/Vorbis (`releasetype`/`musicbrainz_artistid`), MP4/M4A (freeform `MusicBrainz Album Type`/
+    `MusicBrainz Artist Id`) and MP3/ID3 (`TXXX:…`). Returns {"artist_mbid", "release_types": [lowercased]};
+    empties on a tagless/unreadable file (never raises)."""
+    try:
+        import mutagen
+        from mutagen.mp4 import MP4FreeForm
+    except Exception:
+        return {"artist_mbid": None, "release_types": []}
+    try:
+        m = mutagen.File(file_path)
+    except Exception:
+        m = None
+    if m is None or getattr(m, "tags", None) is None:
+        return {"artist_mbid": None, "release_types": []}
+    tags   = m.tags
+    keymap = {k.lower(): k for k in tags.keys()}
+
+    def _norm(v):
+        out = []
+        for x in (v if isinstance(v, (list, tuple)) else [v]):
+            if isinstance(x, MP4FreeForm):
+                x = bytes(x).decode("utf-8", "ignore")
+            elif isinstance(x, bytes):
+                x = x.decode("utf-8", "ignore")
+            out.append(str(x).strip().lower())
+        return [s for s in out if s]
+
+    def _get(*names):
+        for n in names:
+            k = keymap.get(n.lower())
+            if k is not None:
+                v = tags[k]
+                if hasattr(v, "text"):            # ID3 frame -> .text list
+                    v = list(v.text)
+                return _norm(v)
+        return []
+
+    rtypes = _get("releasetype", "----:com.apple.iTunes:MusicBrainz Album Type",
+                  "TXXX:MusicBrainz Album Type", "TXXX:RELEASETYPE", "musicbrainz_albumtype")
+    ambid  = _get("musicbrainz_artistid", "----:com.apple.iTunes:MusicBrainz Artist Id",
+                  "TXXX:MusicBrainz Artist Id")
+    return {"artist_mbid": (ambid[0] if ambid else None), "release_types": rtypes}
+
+
 def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
     rk = str(track.ratingKey)
 
@@ -962,6 +1017,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "onset_rate": None, "dynamic_complexity": None,
             "arousal": None, "valence": None, "vocal_presence": None,
         }
+        data.update(_read_mb_file_tags(data.get("file_path")))
         _essentia_cache[rk] = data
         return data
 
@@ -993,6 +1049,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "arousal": None, "valence": None, "vocal_presence": None,
         }
         log_text(f"[DIAGNOSTIC] Skipping Essentia for '{track.title}' ({duration_ms // 60000}m — too long for RhythmExtractor).")
+        data.update(_read_mb_file_tags(file_path))
         _essentia_cache[rk] = data
         return data
 
@@ -1024,6 +1081,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "arousal": None, "valence": None, "vocal_presence": None,
         }
         _fill_missing_acoustic(data, file_path, audio=audio, track_title=track.title)
+        data.update(_read_mb_file_tags(file_path))
         _essentia_cache[rk] = data
         return data
     except Exception as e:

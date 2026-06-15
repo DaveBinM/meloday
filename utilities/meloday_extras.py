@@ -7925,6 +7925,40 @@ _SONG_MIN_YEAR_CACHE = {}
 _ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm listener floor to count as
                                # part of the decade's recognisable canon — so older/smaller decades
                                # self-size below it while the modern ones have far more above it
+
+# Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
+# Authoritative source = the MusicBrainz `release_types` read from each file's tags (cached); for the ~1%
+# of tracks not yet tagged, fall back to the file-path folder convention.
+_EXCLUDE_COMPS_FROM_ERA     = bool(_extras.get("exclude_compilations_from_era", True))
+_ERA_EXCLUDED_RELEASE_TYPES = {str(t).lower() for t in
+                               (_extras.get("era_excluded_release_types") or ["compilation"])}
+_COMP_FOLDER_CUES = ("greatest hits", "best of", "the best of", "very best of", "anthology",
+                     "the collection", "the essential", "compilation")
+
+
+def _comp_folder_fallback(file_path):
+    """Heuristic compilation check from the file path, for tracks whose MB `release_types` isn't cached
+    yet: the user's `/Various Artists [add compilations to this artist]/` parent folder (parts[-3]) or a
+    greatest-hits/best-of style album folder (parts[-2])."""
+    if not file_path:
+        return False
+    parts = file_path.split("/")
+    artist_folder = parts[-3].lower() if len(parts) >= 3 else ""
+    album_folder  = parts[-2].lower() if len(parts) >= 2 else ""
+    if "various artist" in artist_folder:
+        return True
+    return any(cue in album_folder for cue in _COMP_FOLDER_CUES)
+
+
+def _era_is_comp(entry):
+    """True if a track's release is a compilation (excluded from decade mixes). Uses the cached MB
+    `release_types` when present; falls back to the file-path folder heuristic when it isn't (NULL/empty)."""
+    rt = entry.get("release_types")
+    if rt:
+        return bool({str(t).lower() for t in rt} & _ERA_EXCLUDED_RELEASE_TYPES)
+    return _comp_folder_fallback(entry.get("file_path"))
+
+
 def _entry_song_key(entry):
     return (norm_text(primary_artist(entry.get("artist") or "")),
             norm_text(clean_title(entry.get("title") or "")))
@@ -8220,6 +8254,14 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks, library_rks = [], pool
 
     elif _is_era:
+        # Drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of) BEFORE the
+        # collapse, so a song that also has a studio copy keeps the studio copy and a comp-only song
+        # vanishes. (Comps are ~2.5% of a decade; the empty-guard keeps a decade from ever emptying.)
+        if _EXCLUDE_COMPS_FROM_ERA:
+            _kh = [rk for rk in history_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
+            _kl = [rk for rk in library_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
+            if _kh or _kl:
+                history_rks, library_rks = _kh, _kl
         # Collapse the same song appearing on multiple albums/compilations/reissues into ONE entry,
         # keeping its most CANONICAL copy (studio/original — least live/remix/demo/instrumental
         # markers, then earliest release) so e.g. "In the End" -> the Hybrid Theory studio track, not
