@@ -1192,6 +1192,35 @@ def sync_artist_origin(limit=None):
     log_msg(f"\n[INFO] MusicBrainz origin sync complete: {cnt['a']} artists, {cnt['t']} tracks.")
 
 
+def resync_geo(names):
+    """Force a geo re-resolve: clear artist_origin + geo_synced_at for the given artist name(s) — or
+    'all' to redo every artist that now carries a file MBID — then re-run sync_artist_origin so they
+    resolve via the EXACT MusicBrainz MBID instead of the old (sometimes wrong) name match. Clearing
+    artist_origin too is required: sync_artist_origin re-stamps any row that still has an origin."""
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    names = [n for n in (names or []) if n and n.strip()]
+    if not names:
+        log_msg('[INFO] Usage: --resync-geo "Artist A" "Artist B" ...   (or  --resync-geo all)')
+        conn.close(); return
+    if len(names) == 1 and names[0].strip().lower() == "all":
+        n = conn.execute("UPDATE essentia_cache SET artist_origin=NULL, geo_synced_at=NULL "
+                         "WHERE artist_mbid IS NOT NULL").rowcount
+        log_msg(f"[INFO] Cleared geo for {n} tracks (all MBID-tagged artists).")
+    else:
+        ph = ",".join("?" * len(names))
+        n = conn.execute(f"UPDATE essentia_cache SET artist_origin=NULL, geo_synced_at=NULL "
+                         f"WHERE lower(artist) IN ({ph})", [x.strip().lower() for x in names]).rowcount
+        log_msg(f"[INFO] Cleared geo for {n} tracks across {len(names)} artist(s): {', '.join(names)}.")
+    conn.commit(); conn.close()
+    if n == 0:
+        log_msg("[WARN] No matching tracks — check the name(s) exactly match the `artist` column, e.g. "
+                "sqlite3 assets/essentia_cache.db \"SELECT DISTINCT artist FROM essentia_cache WHERE lower(artist) LIKE '%snuts%';\"")
+        return
+    sync_artist_origin()   # only the cleared artists are now 'due', so this re-resolves just those
+
+
 # --- METADATA SYNC: lyrics (LRCLIB; sentiment + theme keywords + language) ---
 _LRCLIB_UA = "meloday/1.0 (https://github.com/meloday)"
 try:
@@ -2159,6 +2188,14 @@ if __name__ == "__main__":
             except Exception:
                 _lim = None
         sync_artist_origin(limit=_lim)
+    elif "--resync-geo" in sys.argv:
+        _i = sys.argv.index("--resync-geo")
+        _names = []
+        for _a in sys.argv[_i + 1:]:
+            if _a.startswith("--"):
+                break
+            _names.append(_a)
+        resync_geo(_names)
     elif "--backfill-mb-tags" in sys.argv:
         _ensure_mb_file_tags(limit=_arg_limit())
     elif "--sync-metadata" in sys.argv:
