@@ -170,6 +170,18 @@ _CENTROID_PLAYLISTS = {"release_radar", "discover_weekly"}
 # Cover Art — gradient colour palette (top RGB, bottom RGB) per playlist
 # ---------------------------------------------------------------------------
 _EXTRAS_COVER_COLORS = {
+    # --- Meloday+ gap-fill mixes: 7 vibe gaps + 4-mix pop family ---
+    "situationship": ((110, 95, 140), (55, 45, 75)),
+    "sad_bangers": ((230, 70, 150), (45, 30, 90)),
+    "power_ballads": ((200, 60, 80), (60, 20, 35)),
+    "restless": ((40, 140, 150), (25, 30, 45)),
+    "neoclassical": ((180, 200, 210), (95, 120, 145)),
+    "yacht_rock": ((255, 200, 120), (70, 150, 180)),
+    "swagger": ((205, 165, 60), (70, 40, 70)),
+    "chart_pop": ((255, 90, 140), (120, 40, 150)),
+    "dance_pop": ((255, 60, 170), (60, 30, 120)),
+    "indie_pop": ((255, 170, 120), (60, 140, 150)),
+    "synth_pop": ((230, 90, 210), (40, 40, 120)),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ((240, 150, 60), (200, 70, 120)),
     "decade_70s": ((230, 160, 50), (150, 70, 40)),
@@ -448,6 +460,18 @@ _EXTRAS_COVER_COLORS = {
 # 13 style families: geometric, circles, radial, waves, floating_circles, rays,
 #   arc_sweep, aurora, triangles, diamond, starburst, chevrons, spiral
 _COVER_BG_STYLES = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": ("waves", 13),
+    "sad_bangers": ("starburst", 3),
+    "power_ballads": ("rays", 14),
+    "restless": ("chevrons", 2),
+    "neoclassical": ("aurora", 2),
+    "yacht_rock": ("waves", 8),
+    "swagger": ("geometric", 2),
+    "chart_pop": ("circles", 5),
+    "dance_pop": ("starburst", 7),
+    "indie_pop": ("floating_circles", 3),
+    "synth_pop": ("waves", 11),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ("spiral", 3),
     "decade_70s": ("rays", 5),
@@ -713,6 +737,14 @@ _COVER_BG_STYLES = {
 # Per-profile icon overlay — drawn on top of the background before text.
 # Keys not listed here get no icon (plain background only).
 _PROFILE_ICON = {
+    # --- Meloday+ gap-fill mixes: glyph only where a direct symbol fits (6 of 11);
+    # situationship/restless/dance_pop/indie_pop/synth_pop intentionally have none (gradient + bg only) ---
+    "sad_bangers": "nightlife",
+    "power_ballads": "whatshot",
+    "neoclassical": "piano",
+    "yacht_rock": "beach_access",
+    "swagger": "mic",
+    "chart_pop": "trending_up",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "history",
     "decade_70s": "replay",
@@ -1035,6 +1067,18 @@ _TOP_SONGS_STYLE_POOL = [
 # Playlist descriptions — picked randomly each run for variety
 # ---------------------------------------------------------------------------
 _DESCRIPTIONS = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": ["Almost something.", "Mixed signals on repeat.", "Undefined, unresolved, undeniable.", "Neither here nor there."],
+    "sad_bangers": ["Cry on the dancefloor.", "Heartbreak you can dance to.", "Sad songs with a beat.", "Big feelings, bigger hooks."],
+    "power_ballads": ["Lighters up.", "Big, dramatic, all heart.", "The ones with the key change.", "Sing it to the rafters."],
+    "restless": ["Can't switch off.", "Wired and racing.", "Too much energy, nowhere to put it.", "Restless, on the edge."],
+    "neoclassical": ["Quiet, modern, contemplative.", "Piano, strings, stillness.", "Arnalds, Richter, Einaudi and kin.", "Space to think."],
+    "yacht_rock": ["Smooth sailing.", "Soft rock, top down.", "Polished, warm, breezy.", "Mellow gold."],
+    "swagger": ["Walk in like you own it.", "Pure attitude.", "Cocky, stylish, untouchable.", "Strut to this."],
+    "chart_pop": ["The songs everyone knows.", "Chart-toppers and earworms.", "Pure pop, all hits.", "Radio-ready."],
+    "dance_pop": ["Pop you can dance to.", "Hands up.", "Uptempo pop bangers.", "Move."],
+    "indie_pop": ["Jangly, bright, indie pop.", "Cooler than the charts.", "Hooks with heart.", "Sunny indie."],
+    "synth_pop": ["Synths and hooks.", "Neon-lit electropop.", "80s sheen, modern pulse.", "Glittering synth-pop."],
     # ---- 7 decade mixes (era) ----
     "decade_60s": ["The sound of the sixties.", "Where it all kicked off.", "Sixties gold."],
     "decade_70s": ["Seventies grooves and gold.", "Flares, funk and rock.", "The sound of the seventies."],
@@ -1806,6 +1850,18 @@ def _pick_description(playlist_id, era=None, styles=None):
 # Mood / Activity Mix profiles — acoustic target fingerprints
 # ---------------------------------------------------------------------------
 _MOOD_PROFILES = {
+    # --- Meloday+ gap-fill mixes: 7 vibe gaps + 4-mix pop family ---
+    "situationship": {"bpm": 90, "energy": -15, "danceability": 0.30, "brightness": 0.16, "beat_confidence": 0.50, "onset_rate": 3.2, "dynamic_complexity": 0.60, "arousal": 0.46, "valence": 0.42, "vocal_presence": 0.74},
+    "sad_bangers": {"bpm": 124, "energy": -8, "danceability": 0.70, "brightness": 0.34, "beat_confidence": 0.78, "onset_rate": 6.0, "dynamic_complexity": 0.40, "arousal": 0.80, "valence": 0.32, "vocal_presence": 0.72},
+    "power_ballads": {"bpm": 78, "energy": -11, "danceability": 0.24, "brightness": 0.26, "beat_confidence": 0.48, "onset_rate": 3.2, "dynamic_complexity": 0.72, "arousal": 0.55, "valence": 0.52, "vocal_presence": 0.86},
+    "restless": {"bpm": 116, "energy": -11, "danceability": 0.40, "brightness": 0.24, "beat_confidence": 0.62, "onset_rate": 5.5, "dynamic_complexity": 0.55, "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.62},
+    "neoclassical": {"bpm": 78, "energy": -19, "danceability": 0.16, "brightness": 0.22, "beat_confidence": 0.22, "onset_rate": 1.8, "dynamic_complexity": 0.76, "arousal": 0.24, "valence": 0.52, "vocal_presence": 0.18},
+    "yacht_rock": {"bpm": 102, "energy": -13, "danceability": 0.48, "brightness": 0.36, "beat_confidence": 0.60, "onset_rate": 4.0, "dynamic_complexity": 0.50, "arousal": 0.46, "valence": 0.70, "vocal_presence": 0.68},
+    "swagger": {"bpm": 96, "energy": -11, "danceability": 0.62, "brightness": 0.22, "beat_confidence": 0.66, "onset_rate": 4.0, "dynamic_complexity": 0.42, "arousal": 0.58, "valence": 0.60, "vocal_presence": 0.80},
+    "chart_pop": {"bpm": 116, "energy": -9, "danceability": 0.66, "brightness": 0.50, "beat_confidence": 0.70, "onset_rate": 4.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.78, "vocal_presence": 0.80},
+    "dance_pop": {"bpm": 122, "energy": -8, "danceability": 0.74, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.0, "dynamic_complexity": 0.40, "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.76},
+    "indie_pop": {"bpm": 112, "energy": -12, "danceability": 0.50, "brightness": 0.40, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.50, "arousal": 0.55, "valence": 0.68, "vocal_presence": 0.74},
+    "synth_pop": {"bpm": 116, "energy": -10, "danceability": 0.58, "brightness": 0.42, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.66, "vocal_presence": 0.72},
     # ---- 7 decade mixes (era) ----
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
@@ -2236,6 +2292,18 @@ _MOOD_PROFILES = {
 }
 
 _MOOD_MIX_NAMES = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": "Situationship Mix • Meloday+",
+    "sad_bangers": "Sad Bangers Mix • Meloday+",
+    "power_ballads": "Power Ballads • Meloday+",
+    "restless": "Restless Mix • Meloday+",
+    "neoclassical": "Modern Classical Mix • Meloday+",
+    "yacht_rock": "Yacht Rock Mix • Meloday+",
+    "swagger": "Swagger Mix • Meloday+",
+    "chart_pop": "Pop Hits Mix • Meloday+",
+    "dance_pop": "Dance Pop Mix • Meloday+",
+    "indie_pop": "Indie Pop Mix • Meloday+",
+    "synth_pop": "Synth Pop Mix • Meloday+",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "60s Mix • Meloday+",
     "decade_70s": "70s Mix • Meloday+",
@@ -2684,6 +2752,10 @@ _GENERAL_PROFILES = (set(_MOOD_PROFILES)
 
 # Category labels for diversity-aware rotation (max 2 per category in active slots).
 _PROFILE_CATEGORY = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": "romantic", "sad_bangers": "energy", "power_ballads": "emotional",
+    "restless": "emotional", "neoclassical": "calm", "yacht_rock": "upbeat", "swagger": "groove",
+    "chart_pop": "upbeat", "dance_pop": "energy", "indie_pop": "upbeat", "synth_pop": "upbeat",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "era",
     "decade_70s": "era",
@@ -2912,6 +2984,18 @@ _PROFILE_CATEGORY = {
 # Tracks with matching positive tags get a distance boost; conflicting tags get a penalty.
 # Profiles where emotional character is the key distinguishing feature benefit most.
 _PROFILE_MOOD_SIGNALS = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": (["yearning", "searching", "bittersweet", "wistful", "tense", "anxious"], ["euphoric", "carefree", "celebratory", "joyous"]),
+    "sad_bangers": (["cathartic", "bittersweet", "melancholy", "energetic", "lively", "danceable"], []),
+    "power_ballads": (["dramatic", "passionate", "theatrical", "rousing", "anthemic", "yearning"], ["aggressive", "boisterous", "frivolous"]),
+    "restless": (["tense", "anxious", "urgent", "nervous", "searching", "brooding"], ["calm", "peaceful", "serene", "mellow"]),
+    "neoclassical": (["peaceful", "elegant", "graceful", "reflective", "poignant", "serene"], ["aggressive", "energetic", "boisterous", "intense"]),
+    "yacht_rock": (["smooth", "warm", "mellow", "sophisticated", "sunny", "easygoing"], ["aggressive", "intense", "angry", "abrasive"]),
+    "swagger": (["swaggering", "brash", "confident", "stylish", "street-smart", "bravado", "gutsy"], ["sad", "melancholy", "tender", "vulnerable"]),
+    "chart_pop": (["happy", "lively", "bright", "fun", "upbeat", "sunny", "exuberant"], ["aggressive", "brooding", "bleak"]),
+    "dance_pop": (["energetic", "celebratory", "fun", "exuberant", "lively", "euphoric"], ["brooding", "bleak", "melancholy"]),
+    "indie_pop": (["bright", "playful", "sweet", "quirky", "sparkling", "earnest"], ["aggressive", "menacing", "bleak"]),
+    "synth_pop": (["stylish", "sparkling", "bright", "lively", "sophisticated", "nocturnal"], ["aggressive", "rustic", "raw"]),
     # ---- 7 decade mixes (era) ----
     "decade_60s": (["rousing", "energetic", "stylish", "playful"], []),
     "decade_70s": (["rousing", "energetic", "stylish", "playful"], []),
@@ -3269,6 +3353,16 @@ def _mood_tag_boost(entry, profile_key):
 # classical / indie mixes) the positives are REQUIRED: _build_mix_tracks keeps only tracks
 # carrying one of them, so the mix is genre-pure. The rest (focus/deep_work) are a soft nudge.
 _PROFILE_STYLE_SIGNALS = {
+    # --- Meloday+ gap-fill mixes (power_ballads is a SOFT nudge — not in _STYLE_DEFINED_PROFILES;
+    # the others are hard-gated. Pop lists carry BOTH Plex + genre_discogs spellings) ---
+    "power_ballads": (["arena rock", "album rock", "soft rock", "adult contemporary", "hard rock", "contemporary pop/rock"], ["rap", "techno", "drill"]),
+    "neoclassical": (["neo-classical", "modern composition", "chamber music", "classical crossover", "contemporary instrumental", "classical"], ["film score", "original score", "soundtracks", "rap", "metal", "punk"]),
+    "yacht_rock": (["soft rock", "am pop", "adult contemporary", "sophisti-pop", "blue-eyed soul", "pop-soul", "quiet storm"], ["metal", "rap", "punk", "techno", "drill", "hardcore"]),
+    "swagger": (["contemporary rap", "hardcore rap", "contemporary r&b", "g-funk", "funk", "west coast rap"], ["folk", "ambient", "classical", "metal", "country"]),
+    "chart_pop": (["contemporary pop/rock", "dance-pop", "teen pop", "vocal pop", "traditional pop", "pop idol", "social media pop", "europop", "euro-pop", "power pop", "bubblegum", "sunshine pop", "brill building pop", "pop-soul"], ["punk", "metal", "experimental", "country"]),
+    "dance_pop": (["dance-pop", "dance-rock", "alternative dance", "euro-dance", "eurodance", "hi-nrg", "nu-disco", "italo-disco", "euro-disco", "post-disco", "electroclash", "eurobeat"], ["metal", "folk", "ambient", "country"]),
+    "indie_pop": (["indie pop", "left-field pop", "jangle pop", "twee pop", "chamber pop", "baroque pop", "noise pop", "psychedelic pop", "sunshine pop", "bedroom pop", "sophisti-pop", "c-86", "indie electronic"], ["metal", "rap", "techno", "hardcore"]),
+    "synth_pop": (["synth pop", "synth-pop", "synthwave", "new wave", "new romantic", "neo-electro", "electroclash", "sophisti-pop", "indie electronic"], ["metal", "country", "folk", "gospel"]),
     "festive": (["christmas", "holidays"], []),
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
@@ -3427,6 +3521,9 @@ _PROFILE_STYLE_SIGNALS = {
 # Profiles whose identity IS a genre — positives above are required (the candidate pool is
 # hard-filtered to them in _build_mix_tracks). focus/deep_work stay a soft nudge.
 _STYLE_DEFINED_PROFILES = {
+    # --- Meloday+ gap-fill mixes (hard style gate) ---
+    "neoclassical", "yacht_rock", "swagger",
+    "chart_pop", "dance_pop", "indie_pop", "synth_pop",
     "festive",
     "spring_acoustic",
     "spring_strings",
@@ -3669,6 +3766,17 @@ _MOODCLASS_WEIGHT = 0.25   # pull on the calibrated production-quality mood clas
 # Profile -> mtg_jamendo mood/theme tags it wants (from the 56-tag model vocabulary). A track
 # scoring high in these tags is pulled into the mix. Only profiles with a clear theme are listed.
 _PROFILE_MOODTHEME = {
+    # --- Meloday+ gap-fill mixes (neoclassical omitted — instrumental) ---
+    "situationship": ["love", "melancholic", "emotional"],
+    "sad_bangers": ["energetic", "party", "melancholic", "sad"],
+    "power_ballads": ["ballad", "epic", "dramatic", "emotional"],
+    "restless": ["energetic", "dark", "emotional"],
+    "yacht_rock": ["relaxing", "soft", "summer"],
+    "swagger": ["cool", "groovy", "energetic"],
+    "chart_pop": ["happy", "positive", "upbeat", "energetic"],
+    "dance_pop": ["party", "energetic", "upbeat", "happy"],
+    "indie_pop": ["happy", "positive", "melodic"],
+    "synth_pop": ["energetic", "cool", "retro", "upbeat"],
     # Seasonal / weather
     "festive": ["christmas", "holiday"], "summer_heat": ["summer", "party"],
     "summer_breeze": ["summer", "relaxing"], "summer_roadtrip": ["summer", "travel"],
@@ -3742,6 +3850,9 @@ _PROFILE_MOODTHEME = {
 # Profile -> {calibrated mood-class field: 1 to want high / 0 to want low}. Captures production
 # qualities (acoustic, aggressive, electronic, danceable) the 56 theme tags don't.
 _PROFILE_MOODCLASS = {
+    # --- Meloday+ gap-fill mixes ---
+    "sad_bangers": {"danceability_hl": 1, "mood_party": 1}, "neoclassical": {"mood_acoustic": 1},
+    "dance_pop": {"danceability_hl": 1, "mood_party": 1},
     "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
     "folk_acoustic": {"mood_acoustic": 1}, "spring_acoustic": {"mood_acoustic": 1},
     "celtic_folk": {"mood_acoustic": 1}, "country_roads": {"mood_acoustic": 1},
@@ -4002,6 +4113,9 @@ _POP_WEIGHT = 0.20
 # Profile -> lean: +1 wants well-known/hits, -1 wants deep cuts/obscure. Most mixes are neutral
 # (no entry). The decade mixes lean to the hits people remember; focus/underground mixes dig deep.
 _PROFILE_POPULARITY = {
+    # --- Meloday+ gap-fill mixes (pop mixes lean to hits; neoclassical digs deep) ---
+    "sad_bangers": 1, "power_ballads": 1, "neoclassical": -1, "swagger": 1,
+    "chart_pop": 1, "dance_pop": 1, "indie_pop": 1, "synth_pop": 1,
     # hits — the recognisable, well-known songs (decades, throwbacks, parties, sing-alongs, motivation)
     "decade_60s": 1, "decade_70s": 1, "decade_80s": 1, "decade_90s": 1, "decade_00s": 1,
     "decade_10s": 1, "decade_20s": 1,
@@ -4015,6 +4129,14 @@ _PROFILE_POPULARITY = {
     "ambient_drift": -1, "meditation": -1, "spa_bath": -1, "yoga_stretch": -1, "power_nap": -1,
     "sleep": -1, "lofi_beats": -1, "vaporwave": -1, "downtempo": -1, "post_rock": -1, "starlit": -1,
     "three_am": -1, "witching_hour": -1, "glasgow_underground": -1, "melbourne_techno": -1,
+}
+
+
+# Hard floor on Last.fm listeners — "only songs people actually know" (generalises the decade mixes'
+# _ERA_MIN_LISTENERS to any profile). Applied in _build_mix_tracks with a depth fallback so a floor
+# never starves a mix; the pop mixes use it to stay recognisable rather than dredging up deep cuts.
+_PROFILE_MIN_LISTENERS = {
+    "chart_pop": 500_000, "dance_pop": 400_000, "indie_pop": 150_000, "synth_pop": 150_000,
 }
 
 
@@ -4052,6 +4174,13 @@ _LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and ove
 
 # Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
 _PROFILE_LYRIC_THEMES = {
+    # --- Meloday+ gap-fill mixes (neoclassical + the pop mixes omitted — not lyric-anchored) ---
+    "situationship": ["yearning", "restless", "anxious", "conflicted", "uncertain", "bittersweet", "vulnerable", "unresolved_attachment", "relationship_limbo", "mixed_signals", "push_pull_dynamics", "drifting_apart", "emotional_distance", "communication_breakdown", "fear_of_abandonment", "searching_for_intimacy", "missing_someone"],
+    "sad_bangers": ["euphoric_sadness", "cathartic", "bittersweet", "melancholic", "dancefloor_catharsis", "sad_banger", "post_breakup_longing", "living_in_the_moment"],
+    "power_ballads": ["dramatic", "passionate", "yearning", "triumphant", "overcoming_obstacles", "self_empowerment"],
+    "restless": ["restless", "anxious", "tense", "urgent", "frustrated", "brooding", "intrusive_thoughts", "late_night", "survival_mode", "feeling_trapped", "feeling_stuck", "time_running_out", "emotional_overwhelm", "inner_turmoil", "late_night_introspection", "keep_moving_forward"],
+    "yacht_rock": ["warm", "relaxed", "carefree", "romantic", "bright", "gentle", "living_in_the_moment", "summer_romance", "mutual_affection"],
+    "swagger": ["swaggering", "confident", "bold", "assertive", "cocky", "bragging_rights", "luxury_flex", "status_flex", "wealth_flex", "hustle_mindset"],
     # Rebuilt onto the emergent canonical lyric vocab (assets/lyric_vocab.json, 471 moods + 586
     # themes). Each profile's wanted moods + themes are flattened into one list; the boost pulls a
     # song carrying ANY of them and the exclusion VETO pushes out songs that exclude them. Seasonal/
@@ -4184,6 +4313,8 @@ _PROFILE_LYRIC_THEMES = {
 }
 # Profile -> desired lyric sentiment (+1 positive lyrics, -1 sad lyrics). Light nudge only.
 _PROFILE_LYRIC_VALENCE = {
+    # --- Meloday+ gap-fill mixes ---
+    "situationship": -1, "sad_bangers": -1, "restless": -1, "yacht_rock": 1, "swagger": 1,
     "heartbreak": -1, "grief_release": -1, "melancholy": -1, "angst_mix": -1, "moody_mix": -1,
     "happy": 1, "euphoric": 1, "sunny": 1, "celebration": 1, "confidence_boost": 1,
 }
@@ -8188,6 +8319,18 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if hard_exclude_rks:
         history_rks = [rk for rk in history_rks if rk not in hard_exclude_rks]
         library_rks = [rk for rk in library_rks if rk not in hard_exclude_rks]
+
+    # Popularity floor — keep only well-known songs for hits-only profiles (the pop mixes), but never
+    # return short: fall back to the full score-ranked pool if the floor over-thins it. Generalises the
+    # decade mixes' _ERA_MIN_LISTENERS; skipped for the showcase mixes, which do their own popularity gate.
+    _floor = _PROFILE_MIN_LISTENERS.get(profile_key)
+    if _floor and not _is_showcase:
+        def _loud(rk):
+            return (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _floor
+        _fh = [rk for rk in history_rks if _loud(rk)]
+        _fl = [rk for rk in library_rks if _loud(rk)]
+        if len(_fh) + len(_fl) >= mix_size * 2:
+            history_rks, library_rks = _fh, _fl
 
     # Showcase mixes (decade + geo): keep the top ~3x most popular tracks of the decade/scene, then
     # pick the slate RANDOMLY (seeded per day — stable within a day, fresh across days) — variety
