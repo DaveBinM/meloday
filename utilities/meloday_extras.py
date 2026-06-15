@@ -110,7 +110,6 @@ config = load_config()
 _extras = config.get("extras", {})
 
 DAILY_MIX_COUNT          = int(_extras.get("daily_mix_count", 6))
-MOOD_MIX_ROTATIONS_PER_DAY = max(1, int(_extras.get("mood_mix_rotations_per_day", 6)))
 DISCOVER_WEEKLY_SIZE      = int(_extras.get("discover_weekly_size", 30))
 RELEASE_RADAR_START_DAYS  = int(_extras.get("release_radar_start_days", 14))
 RELEASE_RADAR_STEP_DAYS   = int(_extras.get("release_radar_step_days", 7))
@@ -7750,11 +7749,6 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2):
     return selected[:n_active]
 
 
-def _rotation_slot(hour):
-    """Index (0 .. MOOD_MIX_ROTATIONS_PER_DAY-1) of the current intra-day rotation slot."""
-    return (hour % 24) * MOOD_MIX_ROTATIONS_PER_DAY // 24
-
-
 # ---------------------------------------------------------------------------
 # Slate freshness — vary the rotating mood-mix selection day-to-day / slot-to-slot
 # ---------------------------------------------------------------------------
@@ -7787,14 +7781,14 @@ def _save_mood_history(slots):
         xlog(f"[WARN] mood_mixes: could not persist rotation history: {e}")
 
 
-def _recency_penalty(profile_key, prior_slots, cur_ord, cur_slot):
-    """Decaying rotation-score penalty for a profile surfaced recently: full _FRESHNESS_PENALTY if it led
-    the immediately-previous slot (anti-consecutive), halving each slot further back, 0 outside the
-    retained window. `max` (not sum) keeps it bounded at _FRESHNESS_PENALTY."""
+def _recency_penalty(profile_key, prior_days, cur_ord):
+    """Decaying rotation-score penalty for a profile surfaced on a recent DAY: full _FRESHNESS_PENALTY if it
+    was in yesterday's slate (anti-consecutive), halving each day further back, 0 outside the retained
+    window. `max` (not sum) keeps it bounded at _FRESHNESS_PENALTY."""
     pen = 0.0
-    for s in prior_slots:
+    for s in prior_days:
         if profile_key in (s.get("profiles") or ()):
-            ago = (cur_ord - s.get("ord", 0)) * MOOD_MIX_ROTATIONS_PER_DAY + (cur_slot - s.get("slot", 0))
+            ago = cur_ord - s.get("ord", 0)
             if ago > 0:
                 pen = max(pen, _FRESHNESS_PENALTY / (2 ** (ago - 1)))
     return pen
@@ -7939,7 +7933,6 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     # Determine which general profiles are active
     today_wd     = datetime.now().weekday()
     current_hour = _get_active_hour()
-    slot         = _rotation_slot(current_hour)
     cur_ord      = datetime.now().date().toordinal()
     prior_slots  = _load_mood_history()   # recent slates, for the freshness / anti-repeat penalty
 
@@ -7947,81 +7940,81 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         window = _HOUR_RESTRICTED.get(k)
         return _in_time_window(current_hour, window) if window else True
 
-    # ---- General mixes: intra-day time-slot rotation ----
-    # A fresh, well-fitting, diverse subset surfaces each rotation slot, so the mixes change
-    # several times a day when this runs on a sub-daily cron. Deterministic within a slot
-    # (re-running the same slot reproduces the same set), reshuffling at each slot boundary.
+    # ---- General mixes: a daily "anytime" core + time/day-gated mixes layered on top ----
+    # The genre/vibe/mood/decade mixes (no hard hour/day gate) are chosen ONCE A DAY and held stable all
+    # day, fresh each morning; the _HOUR_RESTRICTED / _WEEKDAY_RESTRICTED profiles rotate in/out by their
+    # window ON TOP (like the weather/season tiers). Splitting them keeps the anytime half steady while
+    # time-relevant mixes still come and go — and avoids freezing the slate to one build-hour's vibe.
+    _gated = lambda k: k in _HOUR_RESTRICTED or k in _WEEKDAY_RESTRICTED
     now             = datetime.now(tz=timezone.utc)
     recent_entries  = [e for e in history_entries
                        if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
     recent_centroid = compute_listening_centroid(recent_entries, essentia_cache, top_n=100)
-    _eligible_pre = [k for k in _GENERAL_PROFILES
-                     if today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd}) and _hour_allowed(k)
-                     and _profile_season_ok(k, lat)]
-    # Drop profiles whose hard gate (style / year / geo) can't fill a mix — they'd surface thin.
-    eligible = [k for k in _eligible_pre
-                if _profile_yield(k, essentia_cache) >= _MIN_PROFILE_YIELD]
-    if len(eligible) < len(_eligible_pre):
-        xlog(f"[INFO] mood_mixes: skipped {len(_eligible_pre) - len(eligible)} unfillable "
-             f"profile(s): {sorted(set(_eligible_pre) - set(eligible))}")
-    n_cats = len(set(_PROFILE_CATEGORY.values()))
-    if recent_centroid.get("bpm") and eligible:
-        scored = sorted(
-            (_mood_rotation_score(
-                 k, _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid),
-                 current_hour, weather)
-             + _recency_penalty(k, prior_slots, cur_ord, slot), k)
-            for k in eligible
-        )
-        # Stratify by category: keep the best-fitting few from EACH category, not just the
-        # global best-fitting. This makes the slate a balanced "one per vibe" set instead of
-        # 12 near-clones of the current mood when recent listening is narrow.
+    _has_centroid   = bool(recent_centroid.get("bpm"))
+    n_cats          = len(set(_PROFILE_CATEGORY.values()))
+
+    def _fillable(ks):
+        keep = [k for k in ks if _profile_yield(k, essentia_cache) >= _MIN_PROFILE_YIELD]
+        if len(keep) < len(ks):
+            xlog(f"[INFO] mood_mixes: skipped {len(ks) - len(keep)} unfillable: {sorted(set(ks) - set(keep))}")
+        return keep
+
+    def _adist(k):
+        return _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid) if _has_centroid else 0.0
+
+    def _stratified(scored):
+        # best-fitting few per category (era/geo uncapped) so the pool is vibe-balanced, not near-clones
         per_cat = max(2, math.ceil(n_active * 4 / max(1, n_cats)))
         seen, pool = Counter(), []
         for _, k in scored:
             cat = _PROFILE_CATEGORY.get(k, "other")
-            # decade + geo showcase mixes: admit ALL of them (not just the best acoustic-fitting
-            # per_cat), so the per-slot shuffle surfaces a different decade/scene over time instead of
-            # always the one or two that fit recent listening. Other categories keep the fit-based cap.
             cap = 999 if cat in ("era", "geo") else per_cat
             if seen[cat] < cap:
                 seen[cat] += 1
                 pool.append(k)
+        return pool
+
+    # Anytime core — ungated, hour/weather-neutral, chosen ONCE A DAY (day-seeded) and held stable.
+    _today = next((s for s in prior_slots if s.get("ord") == cur_ord), None)
+    if _today is not None:
+        active_core = [k for k in (_today.get("profiles") or [])
+                       if k in _GENERAL_PROFILES and not _gated(k)]
     else:
-        pool = list(eligible)
-    # int seed (Random() rejects tuples on Py3.11+); hash of an int-tuple is stable across runs
-    random.Random(hash((cur_ord, slot))).shuffle(pool)
-    max_per_cat = max(1, math.ceil(n_active / n_cats))
-    active_general = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
-                                              n_active, max_per_category=max_per_cat)
-    xlog(f"[INFO] mood_mixes: slot {slot + 1}/{MOOD_MIX_ROTATIONS_PER_DAY} rotation → {active_general}")
+        anytime = _fillable([k for k in _GENERAL_PROFILES
+                             if not _gated(k) and _profile_season_ok(k, lat)])
+        scored  = sorted((_adist(k) + _recency_penalty(k, prior_slots, cur_ord), k) for k in anytime)
+        pool    = _stratified(scored) if _has_centroid else list(anytime)
+        random.Random(hash(cur_ord)).shuffle(pool)           # day-seeded: identical all day, fresh next day
+        active_core = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
+                                               n_active, max_per_category=max(1, math.ceil(n_active / n_cats)))
+        xlog(f"[INFO] mood_mixes: daily anytime core → {active_core}")
+        # One row per day; the day-based _recency_penalty varies the core day to day.
+        _save_mood_history([s for s in prior_slots if s.get("ord") != cur_ord]
+                           + [{"ord": cur_ord, "ts": int(time.time()), "profiles": list(active_core)}])
 
-    # Work-hours guarantee — Mon-Fri 7am-3pm: ensure at least one focus/work profile is active.
-    if 0 <= today_wd <= 4 and 7 <= current_hour < 15:
-        if not any(k in _WORK_FOCUS_PROFILES for k in active_general):
-            focus_pool = sorted(
-                _WORK_FOCUS_PROFILES & set(_GENERAL_PROFILES),
-                key=lambda k: (
-                    _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid)
-                    if recent_centroid.get("bpm") else 0
-                ),
-            )
-            if focus_pool:
-                pick = focus_pool[0]
-                if len(active_general) >= n_active:
-                    for evict in reversed(list(active_general)):
-                        if evict not in _WORK_FOCUS_PROFILES:
-                            active_general.remove(evict)
-                            xlog(f"[INFO] mood_mixes: work-hours guarantee: {evict} → {pick}")
-                            break
-                if pick not in active_general:
-                    active_general.append(pick)
+    # Time/day-gated — in-window profiles selected per run, layered ON TOP (rotate in/out by their window).
+    win_pool = _fillable([k for k in _GENERAL_PROFILES if _gated(k)
+                          and today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
+                          and _hour_allowed(k) and _profile_season_ok(k, lat)])
+    if win_pool:
+        win_ranked = [k for _, k in sorted(
+            (_mood_rotation_score(k, _adist(k), current_hour, weather)
+             + _recency_penalty(k, prior_slots, cur_ord), k) for k in win_pool)]
+        active_windowed = _select_diverse_profiles([(i, k) for i, k in enumerate(win_ranked)],
+                                                   max(2, n_active // 3), max_per_category=2)
+    else:
+        active_windowed = []
 
-    # Record this slot's surfaced general slate so the freshness penalty varies the next slots. Drop any
-    # existing row for the SAME (ord, slot) first, so re-running a slot reproduces an identical slate.
-    _hist = [s for s in prior_slots if not (s.get("ord") == cur_ord and s.get("slot") == slot)]
-    _save_mood_history(_hist + [{"ord": cur_ord, "slot": slot,
-                                 "ts": int(time.time()), "profiles": list(active_general)}])
+    # Work-hours focus guarantee — Mon-Fri 7am-3pm ensure a focus/work mix is on the shelf (focus/deep_work
+    # are _HOUR_RESTRICTED 5-17, so they belong to the windowed tier).
+    if (0 <= today_wd <= 4 and 7 <= current_hour < 15
+            and not any(k in _WORK_FOCUS_PROFILES for k in active_windowed)):
+        focus_pool = sorted(_WORK_FOCUS_PROFILES & set(win_pool), key=_adist)
+        if focus_pool:
+            active_windowed.append(focus_pool[0])
+
+    active_general = list(active_core) + [k for k in active_windowed if k not in active_core]
+    xlog(f"[INFO] mood_mixes: general = core{active_core} + windowed{active_windowed}")
 
     # Weather-conditional profiles
     active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
@@ -8054,13 +8047,16 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather} "
          f"+ seasonal{active_seasonal} + pinned{active_pinned}")
 
-    # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g.
-    # the time-of-day mixes), but NOT the mixes we rebuild/remove now, decades, or the stats lists.
-    building = ({_MOOD_MIX_NAMES[k] for k in active_profiles}
+    # The anytime core is built once a day; on later sub-daily runs skip rebuilding it (leave the
+    # playlists untouched) — only the windowed / weather / season / scene tiers refresh through the day.
+    to_build = [k for k in active_profiles if not (_today is not None and k in active_core)]
+    # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g. the
+    # time-of-day mixes) AND the held-over anytime core, but NOT the mixes we rebuild/remove now.
+    building = ({_MOOD_MIX_NAMES[k] for k in to_build}
                 | {_MOOD_MIX_NAMES[k] for k in to_remove})
     seen_rks = set(recent_rks) | _external_used_rks(existing, building)
     mixes = []
-    for profile_key in active_profiles:
+    for profile_key in to_build:
         is_showcase = _PROFILE_CATEGORY.get(profile_key) in ("era", "geo")  # decade + geo: EXEMPT from cross-mix dedup
         tracks = _build_mix_tracks(
             profile_key, essentia_cache, history_entries,
