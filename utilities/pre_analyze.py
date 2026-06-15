@@ -858,10 +858,12 @@ def _ensure_mb_file_tags(limit=None):
     _ensure_db_schema(conn)
     todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
                         "WHERE release_types IS NULL AND file_path IS NOT NULL").fetchall()
+    done = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE release_types IS NOT NULL").fetchone()[0]
     conn.close()
     if limit:
         todo = todo[:int(limit)]
     if not todo:
+        log_msg(f"[INFO] MusicBrainz file tags: nothing to do — {done:,} tracks already tagged.")
         return
     log_msg(f"[INFO] Reading MusicBrainz file tags (artist MBID + release type) for {len(todo)} tracks "
             f"— local & parallel, no API...")
