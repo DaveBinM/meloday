@@ -1907,7 +1907,7 @@ _MOOD_PROFILES = {
     "rap_rock": {"bpm": 128, "energy": -7, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.84, "onset_rate": 6.0, "dynamic_complexity": 0.44, "arousal": 0.86, "valence": 0.45, "vocal_presence": 0.66},
     "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
     "soundtracks": {"bpm": 92, "energy": -15, "danceability": 0.24, "brightness": 0.22, "beat_confidence": 0.42, "onset_rate": 2.8, "dynamic_complexity": 0.70, "arousal": 0.40, "valence": 0.50, "vocal_presence": 0.18},
-    "rave_cave": {"bpm": 132, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.66, "vocal_presence": 0.62},
+    "rave_cave": {"bpm": 132, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.66, "vocal_presence": 0.45},
     # ---- 7 decade mixes (era) ----
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
@@ -5125,6 +5125,17 @@ _INSTRUMENTAL_VOCAL = {"meditation", "spa_bath", "yoga_stretch", "power_nap", "s
 for _k in _INSTRUMENTAL_VOCAL:
     if _k in _MOOD_PROFILES:
         _MOOD_PROFILES[_k]["vocal_weight"] = 3.0
+
+# Rave Cave leans instrumental for a different reason than the focus/ambient mixes above: its
+# hard-dance gate can't tell genuine instrumental rave (Hannah Laing's donk measures vocal ~0.45)
+# from vocal-pop that the Discogs classifier mis-tags with hard-dance subgenres (vocal ~0.85-0.99
+# — Katy Perry, Girls Aloud, etc.). Lowering the target (0.62 -> 0.45) + up-weighting the vocal
+# axis separates them on the one dimension that actually differs, and as a bonus keeps genuine
+# instrumental REMIXES of pop tracks (e.g. Girls Aloud "Life Got Cold (29 Palms remix)", voc 0.43)
+# while dropping the vocal originals. Weight 2.0 (< the 3.0 above) so moderate-vocal dance
+# (vocal trance/house, voc ~0.5-0.6) still fits. Trade-off: vocal-pop crossovers go too.
+if "rave_cave" in _MOOD_PROFILES:
+    _MOOD_PROFILES["rave_cave"]["vocal_weight"] = 2.0
 
 
 def _entry_affect_proxy(entry):
