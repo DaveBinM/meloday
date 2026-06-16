@@ -189,6 +189,7 @@ _EXTRAS_COVER_COLORS = {
     "rap_rock": ((180, 50, 40), (40, 30, 35)),
     "festival_edm": ((90, 70, 230), (200, 40, 170)),
     "soundtracks": ((200, 170, 90), (30, 40, 80)),
+    "rave_cave": ((40, 230, 120), (15, 12, 30)),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ((240, 150, 60), (200, 70, 120)),
     "decade_70s": ((230, 160, 50), (150, 70, 40)),
@@ -487,6 +488,7 @@ _COVER_BG_STYLES = {
     "rap_rock": ("triangles", 13),
     "festival_edm": ("starburst", 5),
     "soundtracks": ("rays", 15),
+    "rave_cave": ("starburst", 6),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ("spiral", 3),
     "decade_70s": ("rays", 5),
@@ -1105,6 +1107,7 @@ _DESCRIPTIONS = {
     "rap_rock": ["Rap-rock and nu-metal energy.", "Riffs, rhymes and attitude.", "Drop the bass and break stuff.", "Turn-of-the-millennium aggression."],
     "festival_edm": ["Big-room, main-stage EDM.", "Hands up — festival drops.", "Build, drop, repeat.", "The anthems that close the set."],
     "soundtracks": ["Scores and soundtracks, big screen to game.", "Sweeping themes and end credits.", "Cinematic and orchestral, score-forward.", "Music from the movies, shows and games."],
+    "rave_cave": ["Donk, hardstyle and hard trance.", "Hands up — full send.", "Fast, loud, relentless.", "Rave till the lights come up."],
     # ---- 7 decade mixes (era) ----
     "decade_60s": ["The sound of the sixties.", "Where it all kicked off.", "Sixties gold."],
     "decade_70s": ["Seventies grooves and gold.", "Flares, funk and rock.", "The sound of the seventies."],
@@ -1902,6 +1905,7 @@ _MOOD_PROFILES = {
     "rap_rock": {"bpm": 128, "energy": -7, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.84, "onset_rate": 6.0, "dynamic_complexity": 0.44, "arousal": 0.86, "valence": 0.45, "vocal_presence": 0.66},
     "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
     "soundtracks": {"bpm": 92, "energy": -15, "danceability": 0.24, "brightness": 0.22, "beat_confidence": 0.42, "onset_rate": 2.8, "dynamic_complexity": 0.70, "arousal": 0.40, "valence": 0.50, "vocal_presence": 0.18},
+    "rave_cave": {"bpm": 132, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.66, "vocal_presence": 0.62},
     # ---- 7 decade mixes (era) ----
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
@@ -2351,6 +2355,7 @@ _MOOD_MIX_NAMES = {
     "rap_rock": "Rap-Rock & Nu-Metal • Meloday+",
     "festival_edm": "EDM Anthems • Meloday+",
     "soundtracks": "Soundtracks & Scores • Meloday+",
+    "rave_cave": "Rave Cave • Meloday+",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "60s Mix • Meloday+",
     "decade_70s": "70s Mix • Meloday+",
@@ -2804,7 +2809,7 @@ _PROFILE_CATEGORY = {
     "restless": "emotional", "neoclassical": "calm", "yacht_rock": "upbeat", "swagger": "groove",
     "chart_pop": "upbeat", "dance_pop": "energy", "indie_pop": "upbeat", "synth_pop": "upbeat",
     "indie_rock": "upbeat", "adult_alt": "emotional", "post_grunge": "energy",
-    "rap_rock": "energy", "festival_edm": "energy", "soundtracks": "cinematic",
+    "rap_rock": "energy", "festival_edm": "energy", "soundtracks": "cinematic", "rave_cave": "energy",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "era",
     "decade_70s": "era",
@@ -3052,6 +3057,7 @@ _PROFILE_MOOD_SIGNALS = {
     "rap_rock": (["aggressive", "brash", "intense", "swaggering", "rebellious", "visceral"], ["calm", "peaceful", "gentle"]),
     "festival_edm": (["euphoric", "exuberant", "uplifting", "sparkling", "ecstatic", "exciting"], ["sad", "melancholy", "gritty"]),
     "soundtracks": (["epic", "dramatic", "majestic", "atmospheric", "reflective", "cinematic"], ["aggressive", "silly", "trashy"]),
+    "rave_cave": (["euphoric", "aggressive", "pounding", "relentless", "ecstatic", "frenzied"], ["calm", "gentle", "mellow", "sombre"]),
     # ---- 7 decade mixes (era) ----
     "decade_60s": (["rousing", "energetic", "stylish", "playful"], []),
     "decade_70s": (["rousing", "energetic", "stylish", "playful"], []),
@@ -3426,6 +3432,7 @@ _PROFILE_STYLE_SIGNALS = {
     "rap_rock": (["rap-rock", "rap rock", "rap-metal", "rap metal", "nu metal", "nü metal", "funk metal", "rapcore"], ["ambient", "folk", "gospel", "classical"]),
     "festival_edm": (["edm", "big room", "electro house", "future bass", "complextro"], ["metal", "country", "folk", "ambient", "gospel"]),
     "soundtracks": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
+    "rave_cave": (["donk", "hard house", "hard trance", "hardstyle", "hard techno", "schranz", "gabber", "happy hardcore", "jumpstyle", "makina"], ["ambient", "folk", "classical", "gospel", "rap", "k-pop"]),
     "festive": (["christmas", "holidays"], []),
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
@@ -3587,7 +3594,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "adult_alt", "post_grunge", "rap_rock", "festival_edm", "soundtracks",
+    "indie_rock", "adult_alt", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave",
     "festive",
     "spring_acoustic",
     "spring_strings",
@@ -3708,9 +3715,15 @@ def _track_style_tags(entry):
     return tags
 
 
+# Profiles that ALSO require a dominant Discogs PARENT genre — so a stray cross-genre subgenre tag
+# (e.g. "Electronic---Happy Hardcore" on a rock track) can't drag an off-genre track into a tight mix.
+_PROFILE_GENRE_PARENT = {"rave_cave": "electronic"}
+
+
 def _has_required_style(entry, profile_key):
     """True if the track carries one of the profile's required (positive) styles. Untagged
-    tracks return False so genre-defined mixes never include unconfirmable tracks."""
+    tracks return False so genre-defined mixes never include unconfirmable tracks. Profiles in
+    _PROFILE_GENRE_PARENT additionally require that Discogs parent to dominate the classification."""
     sig = _PROFILE_STYLE_SIGNALS.get(profile_key)
     if not sig:
         return True
@@ -3718,7 +3731,17 @@ def _has_required_style(entry, profile_key):
     tags = _track_style_tags(entry)
     if not tags:
         return False
-    return any(sub in tag for tag in tags for sub in positive_subs)
+    if not any(sub in tag for tag in tags for sub in positive_subs):
+        return False
+    req_parent = _PROFILE_GENRE_PARENT.get(profile_key)
+    if req_parent:
+        gd = entry.get("genre_discogs") or {}
+        keys = list(gd.keys()) if isinstance(gd, dict) else (gd or [])
+        if keys:
+            parents = Counter(str(k).split("---")[0].strip().lower() for k in keys)
+            if parents.get(req_parent, 0) < max(parents.values()):
+                return False
+    return True
 
 
 # Era windows for the nostalgia mixes, so "throwbacks" are actually old. Computed relative to
@@ -3848,6 +3871,7 @@ _PROFILE_MOODTHEME = {
     "rap_rock": ["energetic", "heavy", "dark", "powerful"],
     "festival_edm": ["party", "energetic", "uplifting", "upbeat"],
     "soundtracks": ["film", "epic", "dramatic", "soundscape"],
+    "rave_cave": ["party", "energetic", "powerful", "uplifting"],
     # Seasonal / weather
     "festive": ["christmas", "holiday"], "summer_heat": ["summer", "party"],
     "summer_breeze": ["summer", "relaxing"], "summer_roadtrip": ["summer", "travel"],
@@ -3926,6 +3950,7 @@ _PROFILE_MOODCLASS = {
     "dance_pop": {"danceability_hl": 1, "mood_party": 1},
     "rap_rock": {"mood_aggressive": 1}, "post_grunge": {"mood_aggressive": 1},
     "festival_edm": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1},
+    "rave_cave": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_aggressive": 1},
     "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
     "folk_acoustic": {"mood_acoustic": 1}, "spring_acoustic": {"mood_acoustic": 1},
     "celtic_folk": {"mood_acoustic": 1}, "country_roads": {"mood_acoustic": 1},
@@ -5038,6 +5063,8 @@ _MOOD_AFFECT = {
 _VALENCE_WEIGHT = 4.0
 _AROUSAL_WEIGHT = 2.0
 _VOCAL_WEIGHT   = 1.0   # instrumental↔vocal axis (TF value, or genre/style proxy as fallback)
+_BC_DIFF_SCALE  = 3.9   # beat_confidence/dynamic_complexity are RAW Essentia (centroids calibrated to raw
+_DC_DIFF_SCALE  = 11.2  # via _REAL_DIST); normalise the DIFF to 0–1 like onset_rate (≈ cache p99−p1)
 
 
 # --- Target calibration --------------------------------------------------------------------
@@ -5051,6 +5078,10 @@ _VOCAL_WEIGHT   = 1.0   # instrumental↔vocal axis (TF value, or genre/style pr
 # instead). Stored targets stay readable as "intent"; this runs once at import.
 _REAL_DIST = {   # feature: (mean, sd, clamp_lo≈p1, clamp_hi≈p99), measured from the live cache
     "arousal": (0.50, 0.10, 0.28, 0.70),
+    # beat_confidence & dynamic_complexity are stored RAW (Essentia scale) but the profiles author them
+    # 0–1; remap the profile targets onto the raw cache distribution so both axes discriminate again.
+    "beat_confidence":    (1.70, 1.07, 0.0,  3.73),
+    "dynamic_complexity": (4.96, 2.17, 1.80, 13.02),
 }
 _CALIB = {}   # feature -> (intended_mean, intended_sd, real_mean, real_sd, lo, hi)
 
@@ -5180,11 +5211,11 @@ def _acoustic_distance_to_centroid(entry, centroid):
     if entry.get("year") and centroid.get("year"):
         _add(min(abs(entry["year"] - centroid["year"]) / 100.0, 1.0) ** 2, 1.0)
     if entry.get("beat_confidence") is not None and centroid.get("beat_confidence") is not None:
-        _add((entry["beat_confidence"] - centroid["beat_confidence"]) ** 2, 1.0)
+        _add(min(abs(entry["beat_confidence"] - centroid["beat_confidence"]) / _BC_DIFF_SCALE, 1.0) ** 2, 1.0)
     if entry.get("onset_rate") is not None and centroid.get("onset_rate") is not None:
         _add(min(abs(entry["onset_rate"] - centroid["onset_rate"]) / 10.0, 1.0) ** 2, 1.0)
     if entry.get("dynamic_complexity") is not None and centroid.get("dynamic_complexity") is not None:
-        _add((entry["dynamic_complexity"] - centroid["dynamic_complexity"]) ** 2, 1.0)
+        _add(min(abs(entry["dynamic_complexity"] - centroid["dynamic_complexity"]) / _DC_DIFF_SCALE, 1.0) ** 2, 1.0)
     # Emotional axis — TF value preferred, tag-derived proxy as fallback. Weighted heavily.
     if centroid.get("valence") is not None or centroid.get("arousal") is not None:
         ev, ea = entry.get("valence"), entry.get("arousal")
@@ -5300,6 +5331,13 @@ def _rating_multiplier(ur):
 
 
 _RATING_WEIGHT = 0.10   # moderate loved-track pull (gentle ≈0.05 / strong ≈0.15); ×tier below
+
+# 50/50 anchor/discovery balance for select genre mixes (piloted on rave_cave; roll out by adding keys).
+# Anchors = tracks you'll KNOW (played, or Last.fm listeners ≥ floor) or already LIKE; the other half is
+# fame-blind best-FIT discovery. Anchor share is capped by availability (niche genres auto-skew discovery).
+_BALANCED_PROFILES = {"rave_cave"}
+_ANCHOR_LISTENERS  = 100_000
+_ANCHOR_RATIO      = 0.50
 
 
 def _rating_dist_bonus(ur):
@@ -8672,10 +8710,26 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks = sorted(history_rks[:n_history * 8], key=_eff_score)
         library_rks = sorted(library_rks[:n_library * 8], key=_eff_score)
 
-    history_tracks = []
-    _fill(history_tracks, history_rks, n_history)
-    library_tracks = []
-    _fill(library_tracks, library_rks, mix_size - len(history_tracks))   # library covers any history shortfall
+    if profile_key in _BALANCED_PROFILES and not _is_showcase:
+        # 50/50 balance: ~half ANCHORS — tracks you'll KNOW (played, or popular on Last.fm) or already
+        # LIKE (rating-boosted via _eff_score) — + ~half fame-blind best-FIT discovery (unplayed, below the
+        # recognisability floor). Anchor share is capped by availability, so a thin-history niche genre
+        # auto-skews to more discovery. (A balanced profile carries no popularity lean, so the discovery
+        # half ranks purely on acoustic fit.)
+        _hist_set = set(history_rks)
+        def _is_known(rk):
+            return rk in _hist_set or (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _ANCHOR_LISTENERS
+        anchor_rks    = sorted({rk for rk in history_rks + library_rks if _is_known(rk)}, key=_eff_score)
+        discovery_rks = [rk for rk in library_rks if not _is_known(rk)]
+        history_tracks = []
+        _fill(history_tracks, anchor_rks, round(mix_size * _ANCHOR_RATIO))
+        library_tracks = []
+        _fill(library_tracks, discovery_rks, mix_size - len(history_tracks))
+    else:
+        history_tracks = []
+        _fill(history_tracks, history_rks, n_history)
+        library_tracks = []
+        _fill(library_tracks, library_rks, mix_size - len(history_tracks))   # library covers any history shortfall
 
     combined = history_tracks + library_tracks
     if not _is_showcase:                   # decade + geo mixes keep their shuffled (per-day varied) order

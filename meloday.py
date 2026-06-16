@@ -2160,7 +2160,7 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
 
             # Beat confidence jump — penalises transitions from strong-groove to loose/ambient
             if ea.get("beat_confidence") is not None and eb.get("beat_confidence") is not None:
-                bc_diff = abs(ea["beat_confidence"] - eb["beat_confidence"])
+                bc_diff = min(abs(ea["beat_confidence"] - eb["beat_confidence"]) / 5.0, 1.0)  # raw Essentia scale → 0–1
                 dist += (bc_diff ** 2) * BEAT_CONF_WEIGHT
 
             # Onset rate jump — penalises transitions between dense and sparse arrangements
