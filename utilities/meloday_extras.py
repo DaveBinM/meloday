@@ -4183,7 +4183,8 @@ def _origin_boost(entry, profile_key):
 # Popularity lean (Last.fm global listeners) — hits vs deep cuts
 # ---------------------------------------------------------------------------
 _POP_WEIGHT = 0.20
-# Profile -> lean: +1 wants well-known/hits, -1 wants deep cuts/obscure. Most mixes are neutral
+# Profile -> lean: >0 wants well-known/hits, <0 wants deep cuts/obscure; the MAGNITUDE scales the nudge
+# (genre mixes use +0.5 = a lighter recognisability touch than the +1 hits mixes). Most mixes are neutral
 # (no entry). The decade mixes lean to the hits people remember; focus/underground mixes dig deep.
 _PROFILE_POPULARITY = {
     # --- Meloday+ gap-fill mixes (pop mixes lean to hits; neoclassical digs deep) ---
@@ -4203,6 +4204,23 @@ _PROFILE_POPULARITY = {
     "ambient_drift": -1, "meditation": -1, "spa_bath": -1, "yoga_stretch": -1, "power_nap": -1,
     "sleep": -1, "lofi_beats": -1, "vaporwave": -1, "downtempo": -1, "post_rock": -1, "starlit": -1,
     "three_am": -1, "witching_hour": -1, "glasgow_underground": -1, "melbourne_techno": -1,
+    # recognisability nudge — a LIGHTER (+0.5) lean than the hits mixes, so these genre mixes surface a
+    # few familiar anchors while staying mood-led + diverse + discovery-friendly (broad data-reliable set;
+    # city/scene, classical/score/instrumental, and deep-cut mixes deliberately left neutral)
+    "classic_rock": 0.5, "britpop_rock": 0.5, "heavy_riffs": 0.5, "punk_energy": 0.5, "garage_grunge": 0.5,
+    "stoner_rock": 0.5, "emo_poppunk": 0.5, "prog_rock": 0.5, "rockabilly_surf": 0.5, "psych_haze": 0.5,
+    "house_party": 0.5, "deep_house": 0.5, "uk_garage": 0.5, "techno": 0.5, "trance": 0.5, "dnb": 0.5,
+    "bass_drop": 0.5, "hyperpop": 0.5, "industrial": 0.5, "synthwave": 0.5,
+    "motown_soul": 0.5, "neo_soul": 0.5, "funk_disco": 0.5, "after_hours_rnb": 0.5, "acid_jazz": 0.5,
+    "boom_bap": 0.5, "g_funk": 0.5, "conscious_flow": 0.5, "trap_mode": 0.5, "gospel": 0.5,
+    "bebop": 0.5, "smooth_jazz": 0.5,
+    "blues_bar": 0.5, "bluegrass": 0.5, "outlaw_country": 0.5, "country_roads": 0.5,
+    "afrobeat": 0.5, "bossa_samba": 0.5, "celtic_folk": 0.5, "latin_heat": 0.5, "reggae_dub": 0.5,
+    "ska": 0.5, "swing_bigband": 0.5, "yacht_rock": 0.5, "folk_acoustic": 0.5,
+    "festive": 0.5, "autumn_embers": 0.5, "autumn_leaves": 0.5, "spring_jangle": 0.5, "spring_acoustic": 0.5,
+    "summer_breeze": 0.5, "summer_tropical": 0.5, "winter_cosy": 0.5, "winter_nights": 0.5,
+    "acoustic_romance": 0.5, "indie_romance": 0.5, "synthpop_romance": 0.5,
+    "dinner_party": 0.5, "campfire": 0.5,
 }
 
 
@@ -4216,8 +4234,9 @@ _PROFILE_MIN_LISTENERS = {
 
 
 def _popularity_boost(entry, profile_key):
-    """Lean a mix toward well-known tracks (+1) or deep cuts (-1). lastfm_listeners is log-scaled
-    (~10k listeners ~ 0.6, a few million ~ 1.0). No-op for neutral profiles / missing data."""
+    """Lean a mix toward well-known tracks (lean > 0) or deep cuts (lean < 0); the lean MAGNITUDE
+    scales the nudge (0.5 = half strength, a lighter recognisability touch for genre mixes).
+    lastfm_listeners is log-scaled (~10k ~ 0.6, a few million ~ 1.0). No-op for neutral / missing data."""
     lean = _PROFILE_POPULARITY.get(profile_key)
     if not lean:
         return 0.0
@@ -4225,7 +4244,7 @@ def _popularity_boost(entry, profile_key):
     if not listeners:
         return 0.0
     pop = min(1.0, math.log10(listeners + 1) / 6.5)
-    return -_POP_WEIGHT * (pop if lean > 0 else (1.0 - pop))
+    return -_POP_WEIGHT * abs(lean) * (pop if lean > 0 else (1.0 - pop))
 
 
 # ---------------------------------------------------------------------------
