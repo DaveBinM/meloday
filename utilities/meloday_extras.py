@@ -141,7 +141,7 @@ def _in_christmas_window(now):
 
 PLAYLIST_IDS = [
     "on_repeat", "repeat_rewind", "release_radar", "discover_weekly",
-    "daily_mixes", "rediscovery", "time_capsule", "deep_cuts",
+    "daily_mixes", "rediscovery", "time_capsule", "time_machine", "deep_cuts",
     "top_songs", "all_time_favourites", "mood_mixes",
 ]
 
@@ -155,7 +155,8 @@ _HISTORY_LOOKBACK_DAYS = {
     "discover_weekly":    365,    # played_keys filter; older plays still valid to exclude
     "daily_mixes":        180,    # 6 months gives stable acoustic clusters
     "rediscovery":        730,    # 24-month outer boundary + buffer
-    "time_capsule":       548,    # 18 months for reliable peak-year inference
+    "time_capsule":       180,    # recent gone-quiet window only; deep history via fetch_history_window
+    "time_machine":       180,    # recent gone-quiet window only; deep history via fetch_history_window
     "deep_cuts":          180,    # 6-month artist ranking window
     # top_songs lookback is computed dynamically from top_songs_start_year config
     # all_time_favourites uses track.viewCount — no history needed
@@ -366,6 +367,7 @@ _EXTRAS_COVER_COLORS = {
     "daily_mix_6":    (( 20, 165, 180), ( 10,  85, 115)),  # teal cyan
     "rediscovery":        ((200,  80, 120), (110,  30,  70)),  # rose → deep rose
     "time_capsule":       ((185, 135,  65), ( 95,  55,  20)),  # warm sepia → dark amber
+    "time_machine":       ((150,  95, 175), ( 60,  35,  95)),  # nostalgic violet → deep indigo
     "deep_cuts":          (( 50,  65, 110), ( 20,  30,  65)),  # slate → near-black blue
     # Top Songs / All-Time
     "top_songs":          ((200, 160,  30), (140,  90,  10)),  # warm gold
@@ -647,6 +649,7 @@ _COVER_BG_STYLES = {
     "deep_cuts":           ("waves",            0),  # deep layered bands
     "all_time_favourites": ("rays",             0),  # radiating gold star
     "time_capsule":        ("circles",          0),  # concentric radar rings
+    "time_machine":        ("spiral",           0),  # time vortex
     "discover_weekly":     ("radial",           0),  # warm centre glow
     # ----- ENERGY -----
     "workout":          ("starburst",       0),  # 14-ray tight centre burst
@@ -1290,6 +1293,13 @@ _DESCRIPTIONS = {
         "Taking you back to {era}.",
         "Your soundtrack from {era}.",
         "The songs that defined {era} for you.",
+    ],
+    "time_machine": [
+        "Back to {era}.",
+        "What you were playing, {era}.",
+        "Rewind to {era}.",
+        "Your {era}, on repeat.",
+        "This time, {era}.",
     ],
     "deep_cuts": [
         "Go deeper with the artists you love.",
@@ -4667,6 +4677,45 @@ def fetch_full_history(music, lookback_days=548):
     return entries
 
 
+def fetch_history_window(music, start_dt, end_dt, cap=20000):
+    """Play history in [start_dt, end_dt] (UTC-aware). plexapi's history() is lower-bound only, so the upper
+    bound is added to the raw endpoint (joinArgs renders the `viewedAt>`/`viewedAt<` keys as `>=`/`<=`); a
+    Python re-filter guarantees the range even if the server ignores a bound. Empty on failure."""
+    from plexapi import utils as _putils
+    args = {"viewedAt>": int(start_dt.timestamp()), "viewedAt<": int(end_dt.timestamp()),
+            "sort": "viewedAt:asc", "librarySectionID": music.key, "accountID": 1}
+    key = "/status/sessions/history/all" + _putils.joinArgs(args)
+    try:
+        entries = music._server.fetchItems(key, maxresults=cap)
+    except Exception as e:
+        xlog(f"[WARN] history window {start_dt:%Y-%m-%d}..{end_dt:%Y-%m-%d} fetch failed: {e}")
+        return []
+    out = []
+    for e in entries:
+        v = e.viewedAt
+        if v is None:
+            continue
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        if start_dt <= v <= end_dt:
+            out.append(e)
+    return out
+
+
+def _year_play_count(music, year):
+    """Cheap total play count for a calendar year via the history endpoint's totalSize (no full fetch)."""
+    from plexapi import utils as _putils
+    start = datetime(year, 1, 1, tzinfo=timezone.utc)
+    end   = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    args = {"viewedAt>": int(start.timestamp()), "viewedAt<": int(end.timestamp()),
+            "librarySectionID": music.key, "accountID": 1, "X-Plex-Container-Size": 0}
+    key = "/status/sessions/history/all" + _putils.joinArgs(args)
+    try:
+        return int(music._server.query(key).get("totalSize") or 0)
+    except Exception:
+        return 0
+
+
 MAX_TRACK_MS = 15 * 60 * 1000   # exclude tracks longer than 15 minutes from all playlists
 
 
@@ -7346,75 +7395,51 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
 
 # --- 7. Time Capsule ---
 
-def build_time_capsule(plex, history_entries, essentia_cache, excluded_album_keys, target=30):
-    """
-    Era-anchored nostalgia mix. Uses birth_year from config (formative years = +13 to +25)
-    if set; otherwise infers peak listening eras from history. Interleaved across eras.
-    Not-played-in-90-days filter applied.
-    """
+def build_time_capsule(plex, music, history_entries, essentia_cache, excluded_album_keys, target=30):
+    """Nostalgia mix from your STANDOUT EARLIER YEARS — the tracks you actually PLAYED during those years
+    (not what was released then), that you've since gone quiet on. The years + per-year play counts come from
+    the Plex API (history windows via `fetch_history_window`); `history_entries` is used only for the recent
+    gone-quiet filter. Interleaved across years, canonical-deduped, artist-capped."""
+    _RECENT_GAP, _ERAS, _SPACING = 3, 3, 2   # skip the recent (non-nostalgic) years; 3 years, ≥2 apart
     now = datetime.now(tz=timezone.utc)
     silence_cutoff = now - timedelta(days=90)
 
-    last_played = {}
-    all_time_plays = Counter()
-    for e in history_entries:
-        if not e.viewedAt:
-            continue
-        rk = str(e.ratingKey)
-        if rk not in last_played or e.viewedAt > last_played[rk]:
-            last_played[rk] = e.viewedAt
-        all_time_plays[rk] += 1
+    # Tracks heard in the last 90 days → excluded (a time capsule is what you've drifted FROM).
+    recently = {str(e.ratingKey) for e in history_entries
+                if e.viewedAt and e.viewedAt >= silence_cutoff}
 
-    # Determine era windows and build cover subtitle
-    era_label = None
-    if BIRTH_YEAR:
-        start_yr = int(BIRTH_YEAR) + 13
-        end_yr   = int(BIRTH_YEAR) + 25
-        era_windows = [(start_yr, end_yr)]
-        era_label = f"{start_yr}–{end_yr}"
-        xlog(f"[INFO] time_capsule: formative era {era_label} (birth_year={BIRTH_YEAR})")
-    else:
-        play_counts = Counter(str(e.ratingKey) for e in history_entries)
-        top_keys = [rk for rk, _ in play_counts.most_common(100)]
-        year_counts = Counter()
-        for rk in top_keys:
-            yr = (essentia_cache.get(rk) or {}).get("year")
-            if yr and 1900 < yr < 2100:
-                year_counts[yr] += play_counts[rk]
+    # Standout EARLIER play-years: count each candidate year cheaply, take the top few spaced apart.
+    counts = []
+    for yr in range(now.year - _RECENT_GAP, 2004, -1):
+        n = _year_play_count(music, yr)
+        if n >= target:
+            counts.append((n, yr))
+    counts.sort(reverse=True)
+    peak_years = []
+    for _, yr in counts:
+        if all(abs(yr - py) >= _SPACING for py in peak_years):
+            peak_years.append(yr)
+        if len(peak_years) >= _ERAS:
+            break
+    if not peak_years:
+        xlog("[WARN] time_capsule: no qualifying earlier years with play history.")
+        return [], None
+    era_label = " · ".join(str(y) for y in sorted(peak_years))
+    xlog(f"[INFO] time_capsule: standout earlier years {sorted(peak_years)}")
 
-        if not year_counts:
-            xlog("[WARN] time_capsule: no year data in essentia cache — skipping.")
-            return [], None
-
-        # Top 3 peak years, spaced ≥ 5 years apart to avoid overlapping windows
-        peak_years = []
-        for yr, _ in year_counts.most_common(50):
-            if all(abs(yr - py) >= 5 for py in peak_years):
-                peak_years.append(yr)
-            if len(peak_years) >= 3:
-                break
-
-        era_windows = sorted([(yr - 2, yr + 2) for yr in peak_years])
-        era_label = " · ".join(str(yr) for yr in sorted(peak_years))
-        xlog(f"[INFO] time_capsule: inferred eras {era_windows}")
-
-    # Build per-era candidate pools from essentia cache
+    # Per-year pool: the tracks you PLAYED most that year, minus anything you've played recently.
     era_pools = []
-    for start_yr, end_yr in era_windows:
-        pool = []
-        for rk, entry in essentia_cache.items():
-            yr = entry.get("year")
-            if not yr or yr < start_yr or yr > end_yr:
-                continue
-            lp = last_played.get(rk)
-            if lp and lp >= silence_cutoff:
-                continue
-            pool.append((all_time_plays.get(rk, 0), rk))
-        pool.sort(reverse=True)
-        era_pools.append([rk for _, rk in pool[:target]])
+    for yr in sorted(peak_years, reverse=True):
+        plays = Counter()
+        for e in fetch_history_window(music, datetime(yr, 1, 1, tzinfo=timezone.utc),
+                                      datetime(yr + 1, 1, 1, tzinfo=timezone.utc)):
+            rk = str(e.ratingKey)
+            if rk not in recently:
+                plays[rk] += 1
+        era_pools.append([rk for rk, _ in plays.most_common(target)])
 
     if not any(era_pools):
-        xlog("[WARN] time_capsule: no qualifying tracks in era windows.")
+        xlog("[WARN] time_capsule: no qualifying tracks in those years.")
         return [], era_label
 
     all_candidate_keys = list(dict.fromkeys(rk for pool in era_pools for rk in pool))
@@ -7459,6 +7484,62 @@ def build_time_capsule(plex, history_entries, essentia_cache, excluded_album_key
         queues = next_queues
 
     return result, era_label
+
+
+# Matches a rotating Time Machine title ("June 2019 • Meloday+") for stale-playlist cleanup.
+_TIME_MACHINE_TITLE_RE = re.compile(r"^[A-Z][a-z]{2,8} \d{4} • Meloday\+$")
+
+
+def build_time_machine(plex, music, history_entries, essentia_cache, excluded_album_keys, target=30):
+    """'This time, years ago' — the tracks you were playing around today's date in a single past year
+    (e.g. 'June 2019'), rotating the featured year ~weekly. Returns (tracks, 'Month YYYY')."""
+    _WINDOW_DAYS, _MIN_TRACKS = 21, 8
+    now = datetime.now(tz=timezone.utc)
+    silence_cutoff = now - timedelta(days=90)
+    recently = {str(e.ratingKey) for e in history_entries
+                if e.viewedAt and e.viewedAt >= silence_cutoff}
+
+    def _window(yr):
+        try:
+            anchor = now.replace(year=yr)
+        except ValueError:                      # today is Feb 29 and yr isn't a leap year
+            anchor = now.replace(year=yr, day=28)
+        return anchor - timedelta(days=_WINDOW_DAYS), anchor + timedelta(days=_WINDOW_DAYS)
+
+    # Eligible past years (enough in-window, gone-quiet plays); rotate weekly through them.
+    candidates = []
+    for yr in range(now.year - 1, 2004, -1):
+        start, end = _window(yr)
+        plays = Counter(str(e.ratingKey) for e in fetch_history_window(music, start, end)
+                        if str(e.ratingKey) not in recently)
+        if len(plays) >= _MIN_TRACKS:
+            candidates.append((yr, plays))
+        if len(candidates) >= 8:
+            break
+    if not candidates:
+        xlog("[WARN] time_machine: no past year has enough plays around this date.")
+        return [], None
+
+    years = [y for y, _ in candidates]
+    yr, plays = candidates[(now.isocalendar()[1] + now.year) % len(years)]
+    label = f"{now.strftime('%B')} {yr}"
+    xlog(f"[INFO] time_machine: {label} ({len(plays)} candidate tracks)")
+
+    pool_rks  = [rk for rk, _ in plays.most_common(target * 3)]
+    track_map = resolve_tracks_by_keys(plex, pool_rks)
+    tracks = [track_map[rk] for rk in pool_rks
+              if rk in track_map and not is_low_rated(track_map[rk])
+              and str(getattr(track_map[rk], "parentRatingKey", "")) not in excluded_album_keys]
+    tracks = _dedup_canonical(tracks, essentia_cache)
+    artist_limit, artist_count, result = max(1, int(target * 0.10)), Counter(), []
+    for t in tracks:
+        if len(result) >= target:
+            break
+        ak = _artist_key(t)
+        if artist_count[ak] < artist_limit:
+            artist_count[ak] += 1
+            result.append(t)
+    return result, label
 
 
 # --- 8. Artist Deep Cuts ---
@@ -8570,11 +8651,26 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
             existing_playlists=ep)
 
     elif playlist_id == "time_capsule":
-        tracks, era_label = build_time_capsule(plex, history, ec, excluded_album_keys)
+        tracks, era_label = build_time_capsule(plex, music, history, ec, excluded_album_keys)
         _upsert_extras_playlist(plex, "Time Capsule • Meloday+", tracks,
             _pick_description("time_capsule", era=era_label or "your past"),
             cover_key="time_capsule", cover_title="Time Capsule",
             cover_subtitle=era_label, existing_playlists=ep)
+
+    elif playlist_id == "time_machine":
+        tracks, label = build_time_machine(plex, music, history, ec, excluded_album_keys)
+        if tracks and label:
+            name = f"{label} • Meloday+"
+            for ptitle, pl in (ep or {}).items():     # rotating title — clear the prior month-year playlist
+                if ptitle != name and _TIME_MACHINE_TITLE_RE.match(ptitle):
+                    try:
+                        pl.delete(); xlog(f"[OK] Removed stale Time Machine: '{ptitle}'")
+                    except Exception as e:
+                        xlog(f"[WARN] Could not remove '{ptitle}': {e}")
+            _upsert_extras_playlist(plex, name, tracks,
+                _pick_description("time_machine", era=label),
+                cover_key="time_machine", cover_title=label,
+                existing_playlists=ep)
 
     elif playlist_id == "deep_cuts":
         tracks = build_deep_cuts(plex, history, ec, excluded_album_keys)
@@ -8683,8 +8779,6 @@ def main():
     weather_context_mode = getattr(args, "weather_context", False)
 
     def _lookback_for(pid):
-        if pid == "time_capsule" and BIRTH_YEAR:
-            return 180
         if pid == "top_songs":
             return _top_songs_lookback()
         if pid == "all_time_favourites":
