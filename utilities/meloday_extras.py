@@ -3739,7 +3739,8 @@ def _has_required_style(entry, profile_key):
         keys = list(gd.keys()) if isinstance(gd, dict) else (gd or [])
         if keys:
             parents = Counter(str(k).split("---")[0].strip().lower() for k in keys)
-            if parents.get(req_parent, 0) < max(parents.values()):
+            other_max = max((v for p, v in parents.items() if p != req_parent), default=0)
+            if parents.get(req_parent, 0) <= other_max:   # STRICT dominance — ties (e.g. europop/parody crossovers) rejected
                 return False
     return True
 
