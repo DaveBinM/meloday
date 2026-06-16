@@ -5299,15 +5299,23 @@ def _rating_multiplier(ur):
     return 1.05                             # 3★ — mildly positive
 
 
+_RATING_WEIGHT = 0.10   # moderate loved-track pull (gentle ≈0.05 / strong ≈0.15); ×tier below
+
+
 def _rating_dist_bonus(ur):
     """
-    Distance reduction for library-scanning sorts. High-rated tracks sort as if
-    acoustically closer to the target profile — Spotify's liked-track boosting.
+    Distance reduction favouring tracks you really like (>=3.5★ = Plex rating 7): they sort as if
+    acoustically closer to the target. Shared by the mood mixes, Daily Mixes and Artist Deep Cuts.
+    3★ (rating 6) is the baseline 'good' so near-neutral; <=2★ is excluded upstream by is_low_rated;
+    unrated = neutral. Scales with _RATING_WEIGHT. (Discover Weekly + decade/geo showcases don't call this.)
     """
-    if ur is None or ur <= 5: return 0.0
-    if ur >= 9:               return 0.05  # 4.5–5★
-    if ur >= 7:               return 0.02  # 3.5–4★
-    return 0.01                             # 3★
+    if ur is None or ur < 6: return 0.0
+    if   ur >= 10: tier = 1.10   # 5★
+    elif ur >= 9:  tier = 1.00   # 4.5★
+    elif ur >= 8:  tier = 0.90   # 4★
+    elif ur >= 7:  tier = 0.80   # 3.5★ — "really like" threshold
+    else:          tier = 0.20   # 3★ — baseline 'good'
+    return _RATING_WEIGHT * tier
 
 
 def _artist_key(track):
@@ -8653,6 +8661,16 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             if len(out) >= want:
                 break
             _take(rks, want, lim, out)
+
+    # Loved-track lean: within the already-resolved candidate pool, let tracks you really like (>=3.5★)
+    # sort as if acoustically closer so they get PICKED (not just re-ordered later) when they fit the mood.
+    # Rare (<2% of library) + still gated by fit / artist-cap / recently-played, so discovery holds.
+    if not _is_showcase:
+        def _eff_score(rk):
+            t = track_map.get(rk)
+            return _combined_score(rk) - _rating_dist_bonus(getattr(t, "userRating", None) if t else None)
+        history_rks = sorted(history_rks[:n_history * 8], key=_eff_score)
+        library_rks = sorted(library_rks[:n_library * 8], key=_eff_score)
 
     history_tracks = []
     _fill(history_tracks, history_rks, n_history)
