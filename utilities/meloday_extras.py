@@ -8225,6 +8225,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
     active_general = list(active_core) + [k for k in active_windowed if k not in active_core]
     xlog(f"[INFO] mood_mixes: general = core{active_core} + windowed{active_windowed}")
+    # Validation hook: force specific mixes onto the slate regardless of rotation, e.g.
+    #   MELODAY_FORCE_MIXES=rave_cave   (comma/space-separated profile keys). No-op when unset.
+    _forced = [k for k in os.environ.get("MELODAY_FORCE_MIXES", "").replace(",", " ").split()
+               if k in _MOOD_MIX_NAMES and k not in active_general]
+    if _forced:
+        active_general += _forced
+        xlog(f"[INFO] mood_mixes: FORCED onto slate via MELODAY_FORCE_MIXES → {_forced}")
 
     # Weather-conditional profiles
     active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
