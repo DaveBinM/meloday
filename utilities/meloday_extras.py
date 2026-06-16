@@ -38,6 +38,8 @@ from meloday import (
     primary_artist,
     clean_title,
     track_artist_name,
+    get_bpm_distance,
+    get_harmonic_distance,
     wrap_text,
     PLEX_URL,
     PLEX_TOKEN,
@@ -8472,6 +8474,87 @@ def _dedup_canonical(tracks, essentia_cache=None):
     return [best[sk][1] for sk in order]
 
 
+# ---------------------------------------------------------------------------
+# DJ-style flow ordering — re-sequence a SELECTED mix so adjacent tracks mix
+# (beatmatch + harmonic key + energy). Beat-driven mixes also get a set ARC.
+# Pure-acoustic (cached bpm/key/energy); no per-track Plex calls.
+# ---------------------------------------------------------------------------
+_DJ_ARC_PROFILES = {
+    "rave_cave", "techno", "trance", "deep_house", "house_party", "dnb", "bass_drop",
+    "uk_garage", "festival_edm", "dance_pop", "funk_disco",
+    "glasgow_house", "glasgow_underground", "glasgow_bass",
+    "london_garage", "london_grime", "london_dubstep", "london_jungle",
+    "melbourne_club", "melbourne_techno",
+}
+_DJ_ARC_WEIGHT = 2.0   # how strongly the energy ARC pulls vs adjacent-transition smoothness
+
+
+def _dj_transition(ea, eb):
+    """DJ transition cost between two cache entries — beatmatch + harmonic key + energy (the DJ
+    essentials), offline. Lower = smoother mix. Same-artist back-to-back is heavily penalised."""
+    d  = 2.0 * get_bpm_distance(ea.get("bpm"), eb.get("bpm"))        # octave-aware tempo (reused)
+    d += 1.5 * get_harmonic_distance(ea.get("key"), eb.get("key"))   # Camelot-wheel key (reused)
+    en_a, en_b = ea.get("energy"), eb.get("energy")
+    if en_a is not None and en_b is not None:
+        d += min(abs(en_a - en_b) / 10.0, 1.0)
+    if ea.get("artist") and ea.get("artist") == eb.get("artist"):
+        d += 2.0
+    return d
+
+
+def _dj_order(tracks, essentia_cache, arc=False):
+    """Sequence already-selected tracks like a DJ: smooth tempo/key/energy transitions (greedy + 2-opt);
+    arc=True also shapes the energy (ease-in -> build -> peak ~75% -> wind-down). Re-orders only — the
+    selection is unchanged. Pure-acoustic, no Plex calls."""
+    if len(tracks) < 4:
+        return tracks
+    ent = {str(t.ratingKey): essentia_cache.get(str(t.ratingKey), {}) for t in tracks}
+    def _c(a, b):
+        return _dj_transition(ent[str(a.ratingKey)], ent[str(b.ratingKey)])
+
+    if not arc:
+        rem = tracks[1:]; order = [tracks[0]]; cur = order[0]
+        while rem:                                                  # greedy nearest-neighbour seed
+            nxt = min(rem, key=lambda t: _c(cur, t)); rem.remove(nxt); order.append(nxt); cur = nxt
+        def _edge(a, b):
+            d = _c(a, b); return (d ** 3) * 20 if d > 0.4 else d     # cubic penalty on hard jumps
+        improved, passes = True, 0
+        while improved and passes < max(20, len(order)):            # 2-opt refinement
+            improved, passes = False, passes + 1
+            for i in range(1, len(order) - 1):
+                for j in range(i + 1, len(order)):
+                    a, b, c = order[i - 1], order[i], order[j]
+                    d2 = order[j + 1] if j + 1 < len(order) else None
+                    before = _edge(a, b) + (_edge(c, d2) if d2 else 0.0)
+                    after  = _edge(a, c) + (_edge(b, d2) if d2 else 0.0)
+                    if after + 1e-9 < before:
+                        order[i:j + 1] = order[i:j + 1][::-1]; improved = True
+        return order
+
+    # ARC mode: energy ease-in -> peak ~75% -> wind-down, with beatmatched/harmonic transitions
+    def _intensity(e):
+        comp = w = 0.0
+        if e.get("arousal")      is not None: comp += 0.30 * e["arousal"];                               w += 0.30
+        if e.get("danceability") is not None: comp += 0.25 * e["danceability"];                          w += 0.25
+        if e.get("bpm")          is not None: comp += 0.35 * min(max((e["bpm"] - 90) / 80.0, 0.0), 1.0); w += 0.35  # tempo = the dance-energy signal
+        if e.get("energy")       is not None: comp += 0.10 * min(max((e["energy"] + 22) / 16.0, 0.0), 1.0); w += 0.10
+        return comp / w if w else 0.5
+    inten = {rk: _intensity(e) for rk, e in ent.items()}
+    lo, hi = min(inten.values()), max(inten.values()); rng = (hi - lo) or 1.0
+    norm = {rk: (v - lo) / rng for rk, v in inten.items()}
+    n = len(tracks)
+    def _target(i):
+        p = i / (n - 1)
+        return 0.45 + 0.55 * (p / 0.75) ** 0.85 if p <= 0.75 else 1.0 - 0.45 * ((p - 0.75) / 0.25)
+    rem = tracks[:]
+    first = min(rem, key=lambda t: norm[str(t.ratingKey)]); rem.remove(first); order = [first]
+    for i in range(1, n):
+        T, prev = _target(i), order[-1]
+        nxt = min(rem, key=lambda t: _DJ_ARC_WEIGHT * abs(norm[str(t.ratingKey)] - T) + _c(prev, t))
+        rem.remove(nxt); order.append(nxt)
+    return order
+
+
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
     """Build the mix_size-track list for a single mix profile.
@@ -8745,7 +8828,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             _combined_score(str(t.ratingKey))
             - _rating_dist_bonus(getattr(t, "userRating", None))
         ))
-    return combined[:mix_size]
+    combined = combined[:mix_size]
+    if not _is_showcase:                   # DJ flow: re-sequence the chosen tracks for smooth mixing
+        combined = _dj_order(combined, essentia_cache, arc=(profile_key in _DJ_ARC_PROFILES))
+    return combined
 
 
 # ===========================================================================
