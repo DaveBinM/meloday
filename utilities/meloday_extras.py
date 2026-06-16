@@ -182,6 +182,13 @@ _EXTRAS_COVER_COLORS = {
     "dance_pop": ((255, 60, 170), (60, 30, 120)),
     "indie_pop": ((255, 170, 120), (60, 140, 150)),
     "synth_pop": ((230, 90, 210), (40, 40, 120)),
+    # rock / electronic / scores gap-fill
+    "indie_rock": ((210, 90, 70), (90, 40, 55)),
+    "adult_alt": ((120, 140, 180), (50, 60, 95)),
+    "post_grunge": ((110, 120, 110), (45, 50, 48)),
+    "rap_rock": ((180, 50, 40), (40, 30, 35)),
+    "festival_edm": ((90, 70, 230), (200, 40, 170)),
+    "soundtracks": ((200, 170, 90), (30, 40, 80)),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ((240, 150, 60), (200, 70, 120)),
     "decade_70s": ((230, 160, 50), (150, 70, 40)),
@@ -473,6 +480,13 @@ _COVER_BG_STYLES = {
     "dance_pop": ("starburst", 7),
     "indie_pop": ("floating_circles", 3),
     "synth_pop": ("waves", 11),
+    # rock / electronic / scores gap-fill
+    "indie_rock": ("triangles", 12),
+    "adult_alt": ("arc_sweep", 3),
+    "post_grunge": ("geometric", 9),
+    "rap_rock": ("triangles", 13),
+    "festival_edm": ("starburst", 5),
+    "soundtracks": ("rays", 15),
     # ---- 7 decade mixes (era) ----
     "decade_60s": ("spiral", 3),
     "decade_70s": ("rays", 5),
@@ -782,6 +796,7 @@ _PROFILE_ICON = {
     "trap_mode": "mic",
     "lofi_beats": "headphones",
     "cinematic_epic": "movie",
+    "soundtracks": "movie",
     "chiptune": "stadia_controller",
     "london_grime": "mic",
     "melbourne_hiphop": "mic",
@@ -1083,6 +1098,13 @@ _DESCRIPTIONS = {
     "dance_pop": ["Pop you can dance to.", "Hands up.", "Uptempo pop bangers.", "Move."],
     "indie_pop": ["Jangly, bright, indie pop.", "Cooler than the charts.", "Hooks with heart.", "Sunny indie."],
     "synth_pop": ["Synths and hooks.", "Neon-lit electropop.", "80s sheen, modern pulse.", "Glittering synth-pop."],
+    # rock / electronic / scores gap-fill
+    "indie_rock": ["Guitar-forward indie and alt-rock.", "Anthems, hooks and jangle.", "Big choruses, skinny ties.", "Indie at full volume."],
+    "adult_alt": ["Polished, grown-up alternative.", "Mature alt-rock for the drive home.", "Widescreen guitars, radio-smooth.", "Alternative, all grown up."],
+    "post_grunge": ["Post-grunge radio rock.", "Loud-quiet-loud, big choruses.", "Flannel hooks, full volume.", "The 2000s rock that ruled the radio."],
+    "rap_rock": ["Rap-rock and nu-metal energy.", "Riffs, rhymes and attitude.", "Drop the bass and break stuff.", "Turn-of-the-millennium aggression."],
+    "festival_edm": ["Big-room, main-stage EDM.", "Hands up — festival drops.", "Build, drop, repeat.", "The anthems that close the set."],
+    "soundtracks": ["Scores and soundtracks, big screen to game.", "Sweeping themes and end credits.", "Cinematic and orchestral, score-forward.", "Music from the movies, shows and games."],
     # ---- 7 decade mixes (era) ----
     "decade_60s": ["The sound of the sixties.", "Where it all kicked off.", "Sixties gold."],
     "decade_70s": ["Seventies grooves and gold.", "Flares, funk and rock.", "The sound of the seventies."],
@@ -1873,6 +1895,13 @@ _MOOD_PROFILES = {
     "dance_pop": {"bpm": 122, "energy": -8, "danceability": 0.74, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.0, "dynamic_complexity": 0.40, "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.76},
     "indie_pop": {"bpm": 112, "energy": -12, "danceability": 0.50, "brightness": 0.40, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.50, "arousal": 0.55, "valence": 0.68, "vocal_presence": 0.74},
     "synth_pop": {"bpm": 116, "energy": -10, "danceability": 0.58, "brightness": 0.42, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.66, "vocal_presence": 0.72},
+    # --- Meloday+ rock / electronic / scores gap-fill (play-history-driven) ---
+    "indie_rock": {"bpm": 124, "energy": -10, "danceability": 0.50, "brightness": 0.33, "beat_confidence": 0.72, "onset_rate": 5.2, "dynamic_complexity": 0.46, "arousal": 0.70, "valence": 0.58, "vocal_presence": 0.72},
+    "adult_alt": {"bpm": 108, "energy": -12, "danceability": 0.46, "brightness": 0.30, "beat_confidence": 0.64, "onset_rate": 4.2, "dynamic_complexity": 0.50, "arousal": 0.55, "valence": 0.56, "vocal_presence": 0.74},
+    "post_grunge": {"bpm": 126, "energy": -8, "danceability": 0.46, "brightness": 0.24, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.46, "arousal": 0.78, "valence": 0.46, "vocal_presence": 0.70},
+    "rap_rock": {"bpm": 128, "energy": -7, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.84, "onset_rate": 6.0, "dynamic_complexity": 0.44, "arousal": 0.86, "valence": 0.45, "vocal_presence": 0.66},
+    "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
+    "soundtracks": {"bpm": 92, "energy": -15, "danceability": 0.24, "brightness": 0.22, "beat_confidence": 0.42, "onset_rate": 2.8, "dynamic_complexity": 0.70, "arousal": 0.40, "valence": 0.50, "vocal_presence": 0.18},
     # ---- 7 decade mixes (era) ----
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
@@ -2315,6 +2344,13 @@ _MOOD_MIX_NAMES = {
     "dance_pop": "Dancefloor Pop • Meloday+",
     "indie_pop": "Indie Darlings • Meloday+",
     "synth_pop": "Synth-Pop Nights • Meloday+",
+    # --- Meloday+ rock / electronic / scores gap-fill ---
+    "indie_rock": "Indie Anthems • Meloday+",
+    "adult_alt": "Adult Alternative • Meloday+",
+    "post_grunge": "Post-Grunge • Meloday+",
+    "rap_rock": "Rap-Rock & Nu-Metal • Meloday+",
+    "festival_edm": "EDM Anthems • Meloday+",
+    "soundtracks": "Soundtracks & Scores • Meloday+",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "60s Mix • Meloday+",
     "decade_70s": "70s Mix • Meloday+",
@@ -2767,6 +2803,8 @@ _PROFILE_CATEGORY = {
     "situationship": "romantic", "sad_bangers": "energy", "power_ballads": "emotional",
     "restless": "emotional", "neoclassical": "calm", "yacht_rock": "upbeat", "swagger": "groove",
     "chart_pop": "upbeat", "dance_pop": "energy", "indie_pop": "upbeat", "synth_pop": "upbeat",
+    "indie_rock": "upbeat", "adult_alt": "emotional", "post_grunge": "energy",
+    "rap_rock": "energy", "festival_edm": "energy", "soundtracks": "cinematic",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "era",
     "decade_70s": "era",
@@ -3007,6 +3045,13 @@ _PROFILE_MOOD_SIGNALS = {
     "dance_pop": (["energetic", "celebratory", "fun", "exuberant", "lively", "euphoric"], ["brooding", "bleak", "melancholy"]),
     "indie_pop": (["bright", "playful", "sweet", "quirky", "sparkling", "earnest"], ["aggressive", "menacing", "bleak"]),
     "synth_pop": (["stylish", "sparkling", "bright", "lively", "sophisticated", "nocturnal"], ["aggressive", "rustic", "raw"]),
+    # rock / electronic / scores gap-fill
+    "indie_rock": (["lively", "stylish", "energetic", "rousing", "wry", "earnest"], ["sad", "somber", "aggressive"]),
+    "adult_alt": (["earnest", "reflective", "warm", "yearning", "stylish", "sophisticated"], ["aggressive", "raucous", "abrasive"]),
+    "post_grunge": (["brooding", "gritty", "intense", "angst-ridden", "cathartic", "fierce"], ["calm", "peaceful", "cheerful"]),
+    "rap_rock": (["aggressive", "brash", "intense", "swaggering", "rebellious", "visceral"], ["calm", "peaceful", "gentle"]),
+    "festival_edm": (["euphoric", "exuberant", "uplifting", "sparkling", "ecstatic", "exciting"], ["sad", "melancholy", "gritty"]),
+    "soundtracks": (["epic", "dramatic", "majestic", "atmospheric", "reflective", "cinematic"], ["aggressive", "silly", "trashy"]),
     # ---- 7 decade mixes (era) ----
     "decade_60s": (["rousing", "energetic", "stylish", "playful"], []),
     "decade_70s": (["rousing", "energetic", "stylish", "playful"], []),
@@ -3374,6 +3419,13 @@ _PROFILE_STYLE_SIGNALS = {
     "dance_pop": (["dance-pop", "dance-rock", "alternative dance", "euro-dance", "eurodance", "hi-nrg", "nu-disco", "italo-disco", "euro-disco", "post-disco", "electroclash", "eurobeat"], ["metal", "folk", "ambient", "country"]),
     "indie_pop": (["indie pop", "left-field pop", "jangle pop", "twee pop", "chamber pop", "baroque pop", "noise pop", "psychedelic pop", "sunshine pop", "bedroom pop", "sophisti-pop", "c-86", "indie electronic"], ["metal", "rap", "techno", "hardcore"]),
     "synth_pop": (["synth pop", "synth-pop", "synthwave", "new wave", "new romantic", "neo-electro", "electroclash", "sophisti-pop", "indie electronic"], ["metal", "country", "folk", "gospel"]),
+    # rock / electronic / scores gap-fill (Plex + genre_discogs spellings)
+    "indie_rock": (["alternative/indie rock", "indie rock", "college rock", "jangle pop", "garage rock revival", "modern rock"], ["rap", "drill", "techno", "edm", "gospel"]),
+    "adult_alt": (["adult alternative pop/rock", "alternative pop/rock", "adult alternative"], ["rap", "drill", "metal", "techno", "edm"]),
+    "post_grunge": (["post-grunge", "post grunge"], ["rap", "drill", "techno", "edm", "gospel"]),
+    "rap_rock": (["rap-rock", "rap rock", "rap-metal", "rap metal", "nu metal", "nü metal", "funk metal", "rapcore"], ["ambient", "folk", "gospel", "classical"]),
+    "festival_edm": (["edm", "big room", "electro house", "future bass", "complextro"], ["metal", "country", "folk", "ambient", "gospel"]),
+    "soundtracks": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
     "festive": (["christmas", "holidays"], []),
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
@@ -3535,6 +3587,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
+    "indie_rock", "adult_alt", "post_grunge", "rap_rock", "festival_edm", "soundtracks",
     "festive",
     "spring_acoustic",
     "spring_strings",
@@ -3788,6 +3841,13 @@ _PROFILE_MOODTHEME = {
     "dance_pop": ["party", "energetic", "upbeat", "happy"],
     "indie_pop": ["happy", "positive", "melodic"],
     "synth_pop": ["energetic", "cool", "retro", "upbeat"],
+    # rock / electronic / scores gap-fill
+    "indie_rock": ["energetic", "upbeat", "cool", "melodic"],
+    "adult_alt": ["emotional", "melodic", "calm", "melancholic"],
+    "post_grunge": ["energetic", "dark", "heavy", "powerful"],
+    "rap_rock": ["energetic", "heavy", "dark", "powerful"],
+    "festival_edm": ["party", "energetic", "uplifting", "upbeat"],
+    "soundtracks": ["film", "epic", "dramatic", "soundscape"],
     # Seasonal / weather
     "festive": ["christmas", "holiday"], "summer_heat": ["summer", "party"],
     "summer_breeze": ["summer", "relaxing"], "summer_roadtrip": ["summer", "travel"],
@@ -3864,6 +3924,8 @@ _PROFILE_MOODCLASS = {
     # --- Meloday+ gap-fill mixes ---
     "sad_bangers": {"danceability_hl": 1, "mood_party": 1}, "neoclassical": {"mood_acoustic": 1},
     "dance_pop": {"danceability_hl": 1, "mood_party": 1},
+    "rap_rock": {"mood_aggressive": 1}, "post_grunge": {"mood_aggressive": 1},
+    "festival_edm": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1},
     "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
     "folk_acoustic": {"mood_acoustic": 1}, "spring_acoustic": {"mood_acoustic": 1},
     "celtic_folk": {"mood_acoustic": 1}, "country_roads": {"mood_acoustic": 1},
@@ -4127,6 +4189,7 @@ _PROFILE_POPULARITY = {
     # --- Meloday+ gap-fill mixes (pop mixes lean to hits; neoclassical digs deep) ---
     "sad_bangers": 1, "power_ballads": 1, "neoclassical": -1, "swagger": 1,
     "chart_pop": 1, "dance_pop": 1, "indie_pop": 1, "synth_pop": 1,
+    "indie_rock": 1, "adult_alt": 1, "post_grunge": 1, "rap_rock": 1, "festival_edm": 1,
     # hits — the recognisable, well-known songs (decades, throwbacks, parties, sing-alongs, motivation)
     "decade_60s": 1, "decade_70s": 1, "decade_80s": 1, "decade_90s": 1, "decade_00s": 1,
     "decade_10s": 1, "decade_20s": 1,
@@ -4148,6 +4211,7 @@ _PROFILE_POPULARITY = {
 # never starves a mix; the pop mixes use it to stay recognisable rather than dredging up deep cuts.
 _PROFILE_MIN_LISTENERS = {
     "chart_pop": 500_000, "dance_pop": 400_000, "indie_pop": 150_000, "synth_pop": 150_000,
+    "indie_rock": 150_000, "adult_alt": 200_000, "post_grunge": 150_000, "rap_rock": 150_000, "festival_edm": 400_000,
 }
 
 
