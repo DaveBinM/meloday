@@ -3708,24 +3708,94 @@ _STYLE_DEFINED_PROFILES = {
 
 
 def _track_style_tags(entry):
-    """Lowercased style/genre tags for matching: Plex styles + genres, plus the Discogs-400
-    genre classifier (each 'Category---Style' split into both parts), so style matching sees the
-    richer taxonomy once a track is analysed (falls back to the Plex tags before then)."""
-    tags = [t.lower() for t in (entry.get("styles") or []) + (entry.get("genres") or [])]
+    """Lowercased style/genre tags for matching: Plex STYLES (granular) + the Discogs-400 genre
+    classifier (each 'Category---Style' split into both parts). The broad Plex GENRES (the ~7
+    mega-buckets like "Pop/Rock", "Electronic") are deliberately EXCLUDED — they're too coarse to
+    gate on and pollute membership (a single "Pop/Rock" bucket can't separate indie-rock from
+    chart-pop). Discogs carries genre (parent + 400 subgenres, ~98% coverage); Plex styles are the
+    granular fallback for the ~2% not yet Discogs-analysed."""
+    tags = [t.lower() for t in (entry.get("styles") or [])]
     for k in (entry.get("genre_discogs") or {}):
         tags += [p.lower() for p in k.split("---")]
     return tags
 
 
-# Profiles that ALSO require a dominant Discogs PARENT genre — so a stray cross-genre subgenre tag
-# (e.g. "Electronic---Happy Hardcore" on a rock track) can't drag an off-genre track into a tight mix.
-_PROFILE_GENRE_PARENT = {"rave_cave": "electronic"}
+# Every style-gated mix requires its DOMINANT Discogs parent genre to fall within an allowed set, so a
+# stray cross-genre subgenre tag (the Discogs-400 classifier spraying "hardstyle" onto pop, "smooth
+# jazz" onto a rock track, etc.) can't drag an off-genre track into the mix. Discogs is the genre
+# source of truth (parent + 400 subgenres, ~98% covered); the broad Plex genres are not used. Assigned
+# by genre family — a single parent for clean genres, a set for genuinely cross-parent mixes (jazz+soul,
+# the pop scatter, disco = funk/soul+electronic, etc.). One entry per _STYLE_DEFINED_PROFILES mix.
+_PROFILE_GENRE_PARENT = {
+    # --- Electronic ---
+    "techno": {"electronic"}, "deep_house": {"electronic"}, "trance": {"electronic"},
+    "house_party": {"electronic"}, "downtempo": {"electronic"}, "ambient_drift": {"electronic"},
+    "synthwave": {"electronic"}, "vaporwave": {"electronic"}, "dnb": {"electronic"},
+    "lofi_beats": {"electronic"}, "london_triphop": {"electronic"}, "summer_tropical": {"electronic"},
+    "uk_garage": {"electronic"}, "festival_edm": {"electronic"}, "winter_nights": {"electronic"},
+    "chiptune": {"electronic"}, "london_dubstep": {"electronic"}, "london_jungle": {"electronic"},
+    "glasgow_house": {"electronic"}, "glasgow_underground": {"electronic"}, "glasgow_late": {"electronic"},
+    "glasgow_bass": {"electronic"}, "glasgow_synth": {"electronic"}, "melbourne_club": {"electronic"},
+    "melbourne_techno": {"electronic"}, "london_garage": {"electronic"}, "summer_heat": {"electronic"},
+    "rave_cave": {"electronic"},
+    # --- Rock ---
+    "classic_rock": {"rock"}, "heavy_riffs": {"rock"}, "indie_rock": {"rock"},
+    "post_grunge": {"rock"}, "prog_rock": {"rock"}, "punk_energy": {"rock"},
+    "emo_poppunk": {"rock"}, "garage_grunge": {"rock"}, "stoner_rock": {"rock"},
+    "post_rock": {"rock"}, "britpop_rock": {"rock"}, "psych_haze": {"rock"},
+    "yacht_rock": {"rock"}, "adult_alt": {"rock"}, "summer_breeze": {"rock"},
+    "spring_jangle": {"rock"}, "autumn_embers": {"rock"}, "rockabilly_surf": {"rock"},
+    "indie_romance": {"rock"}, "london_calling": {"rock"}, "london_britpop": {"rock"},
+    "glasgow_anthems": {"rock"}, "glasgow_postpunk": {"rock"}, "glasgow_postrock": {"rock"},
+    "glasgow_indie": {"rock"}, "glasgow_dream": {"rock"}, "melbourne_indie": {"rock"},
+    "melbourne_pubrock": {"rock"}, "melbourne_postpunk": {"rock"}, "melbourne_dream": {"rock"},
+    "melbourne_garagepunk": {"rock"}, "melbourne_psych": {"rock"}, "london_indie": {"rock"},
+    # --- Jazz ---
+    "winter_jazz": {"jazz"}, "jazz_dinner": {"jazz"}, "romantic_jazz": {"jazz"},
+    "smooth_jazz": {"jazz"}, "bebop": {"jazz"}, "london_jazz": {"jazz"}, "swing_bigband": {"jazz"},
+    "autumn_jazz": {"funk / soul", "jazz"},
+    # --- Hip-Hop ---
+    "boom_bap": {"hip hop"}, "trap_mode": {"hip hop"}, "conscious_flow": {"hip hop"},
+    "g_funk": {"hip hop"}, "melbourne_hiphop": {"hip hop"},
+    # --- Funk / Soul ---
+    "neo_soul": {"funk / soul"}, "motown_soul": {"funk / soul"}, "glasgow_soul": {"funk / soul"},
+    "london_soul": {"funk / soul"}, "melbourne_soul": {"funk / soul"}, "dinner_party": {"funk / soul"},
+    "winter_cosy": {"funk / soul"}, "gospel": {"funk / soul"},
+    "funk_disco": {"electronic", "funk / soul"}, "after_hours_rnb": {"electronic", "funk / soul"},
+    # --- Folk, World, & Country ---
+    "folk_acoustic": {"folk, world, & country", "rock"}, "spring_acoustic": {"folk, world, & country", "rock"},
+    "autumn_leaves": {"folk, world, & country", "rock"}, "campfire": {"folk, world, & country", "rock"},
+    "celtic_folk": {"folk, world, & country", "rock"}, "country_roads": {"folk, world, & country", "rock"},
+    "outlaw_country": {"folk, world, & country", "rock"}, "bluegrass": {"folk, world, & country", "rock"},
+    "acoustic_romance": {"folk, world, & country", "rock"}, "glasgow_folk": {"folk, world, & country", "rock"},
+    "melbourne_folk": {"folk, world, & country", "rock"},
+    # --- Classical / Stage & Screen ---
+    "neoclassical": {"classical", "stage & screen"}, "string_quartet": {"classical", "stage & screen"},
+    "strings_romance": {"classical", "stage & screen"}, "piano_romance": {"classical", "stage & screen"},
+    "spring_strings": {"classical", "stage & screen"}, "cinematic_epic": {"classical", "stage & screen"},
+    "soundtracks": {"classical", "stage & screen"}, "london_mod": {"classical", "stage & screen"},
+    "winter_frost": {"classical", "stage & screen"},
+    # --- Pop (scatters across parents) ---
+    "chart_pop": {"electronic", "pop", "rock"}, "synth_pop": {"electronic", "pop", "rock"},
+    "synthpop_romance": {"electronic", "pop", "rock"}, "dance_pop": {"electronic", "pop", "rock"},
+    "indie_pop": {"electronic", "pop", "rock"}, "melbourne_sunset": {"electronic", "pop", "rock"},
+    "festive": {"electronic", "pop", "rock"},
+    # --- Cross-parent / edge ---
+    "industrial": {"electronic", "rock"}, "reggae_dub": {"electronic", "reggae"},
+    "london_dub": {"electronic", "reggae"}, "bass_drop": {"electronic", "hip hop"},
+    "latin_heat": {"electronic", "latin"}, "rap_rock": {"hip hop", "rock"},
+    "ska": {"reggae", "rock"}, "blues_bar": {"blues", "rock"},
+    "acid_jazz": {"electronic", "funk / soul", "jazz"}, "bossa_samba": {"jazz", "latin"},
+    "london_grime": {"electronic", "hip hop"}, "swagger": {"funk / soul", "hip hop"},
+    "afrobeat": {"electronic", "folk, world, & country", "funk / soul"}, "hyperpop": {"electronic", "pop"},
+}
 
 
 def _has_required_style(entry, profile_key):
     """True if the track carries one of the profile's required (positive) styles. Untagged
     tracks return False so genre-defined mixes never include unconfirmable tracks. Profiles in
-    _PROFILE_GENRE_PARENT additionally require that Discogs parent to dominate the classification."""
+    _PROFILE_GENRE_PARENT additionally require the track's dominant Discogs parent to fall within an
+    allowed set, so a stray cross-genre subgenre tag can't drag an off-genre track into a tight mix."""
     sig = _PROFILE_STYLE_SIGNALS.get(profile_key)
     if not sig:
         return True
@@ -3735,14 +3805,18 @@ def _has_required_style(entry, profile_key):
         return False
     if not any(sub in tag for tag in tags for sub in positive_subs):
         return False
-    req_parent = _PROFILE_GENRE_PARENT.get(profile_key)
-    if req_parent:
+    req_parents = _PROFILE_GENRE_PARENT.get(profile_key)
+    if req_parents:
         gd = entry.get("genre_discogs") or {}
         keys = list(gd.keys()) if isinstance(gd, dict) else (gd or [])
         if keys:
             parents = Counter(str(k).split("---")[0].strip().lower() for k in keys)
-            other_max = max((v for p, v in parents.items() if p != req_parent), default=0)
-            if parents.get(req_parent, 0) <= other_max:   # STRICT dominance — ties (e.g. europop/parody crossovers) rejected
+            mx = max(parents.values())
+            top = [p for p, v in parents.items() if v == mx]
+            # The track's DOMINANT Discogs parent(s) must fall within the mix's allowed set; a tie
+            # with any non-allowed parent rejects, so a stray cross-genre subgenre tag (e.g.
+            # "Electronic---Hardstyle" sprayed onto a pop track) can't drag an off-genre track in.
+            if not all(p in req_parents for p in top):
                 return False
     return True
 
@@ -8589,18 +8663,27 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         entry = essentia_cache.get(rk, {})
         if _is_showcase:
             return -(entry.get("lastfm_listeners") or 0)
-        return (
+        score = (
             _acoustic_distance_to_centroid(entry, target)
-            + _mood_tag_boost(entry, profile_key)
-            + _style_tag_boost(entry, profile_key)
-            + _moodtheme_boost(entry, profile_key)
             + _moodclass_boost(entry, profile_key)
-            + _lastfm_tag_boost(entry, profile_key)
             + _origin_boost(entry, profile_key)
             + _popularity_boost(entry, profile_key)
             + _listening_hour_boost(rk)
             + _lyric_boost(entry, profile_key)
         )
+        # Style-GATED mixes already confirmed genre membership via tags in the gate. Re-applying the
+        # external metadata-tag boosts here double-counts the same (noisy) Discogs/Plex/Last.fm tags
+        # and rewards mis-tagged mainstream (e.g. pop the Discogs-400 classifier sprays "hardstyle"
+        # onto) over genuine genre tracks — so badly that a eurodance novelty out-scored Hannah Laing
+        # in Rave Cave. So rank these on our OWN audio analysis (centroid distance + TF mood-class)
+        # plus the deliberate popularity/origin/rating leans only. Non-gated mood mixes have NO genre
+        # gate, so the tag boosts ARE their primary signal — keep them there.
+        if profile_key not in _STYLE_DEFINED_PROFILES:
+            score += (_mood_tag_boost(entry, profile_key)
+                      + _style_tag_boost(entry, profile_key)
+                      + _moodtheme_boost(entry, profile_key)
+                      + _lastfm_tag_boost(entry, profile_key))
+        return score
 
     history_rks = sorted(
         [rk for rk in essentia_cache if rk in play_counts],
