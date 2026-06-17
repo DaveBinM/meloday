@@ -2798,11 +2798,16 @@ _WORK_FOCUS_PROFILES = {"focus", "deep_work"}
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
+# Retired mixes — dropped because no membership signal survives the pure-Discogs gate: lofi_beats (Discogs
+# has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix) and adult_alt (no Discogs subgenre,
+# no Last.fm tag, and a seed centroid couldn't isolate it from generic alt-rock). Removed from the slate.
+_RETIRED_PROFILES = {"lofi_beats", "adult_alt"}
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
                      - _SEASONAL_PROFILES
-                     - _PINNED_PROFILES)
+                     - _PINNED_PROFILES
+                     - _RETIRED_PROFILES)
 
 # Category labels for diversity-aware rotation (max 2 per category in active slots).
 _PROFILE_CATEGORY = {
@@ -3444,7 +3449,7 @@ _PROFILE_STYLE_SIGNALS = {
     "summer_tropical": (["latin", "reggae", "afro", "tropical", "bossa"], []),
     "autumn_leaves": (["folk", "singer/songwriter", "americana"], []),
     "autumn_jazz": (["jazz", "soul", "smooth jazz"], []),
-    "autumn_embers": (["album rock", "heartland", "americana", "roots rock"], []),
+    "autumn_embers": (["classic rock", "blues rock", "southern rock", "arena rock", "aor"], []),  # Discogs subgenres
     "winter_frost": (["ambient", "modern composition", "classical", "experimental ambient"], []),
     "winter_cosy": (["soul", "neo-soul", "quiet storm", "smooth soul"], []),
     "winter_nights": (["downtempo", "ambient techno", "electronica", "trip-hop"], []),
@@ -3461,14 +3466,14 @@ _PROFILE_STYLE_SIGNALS = {
     "cookout": (["soul", "funk", "reggae", "r&b"], []),
     "singalong": (["album rock", "arena rock", "power pop"], []),
     "funk_disco": (["funk", "disco", "funky breaks", "neo-disco", "boogie", "euro-disco", "post-disco"], ["metal", "rap", "ambient"]),
-    "neo_soul": (["neo-soul", "quiet storm", "smooth soul", "adult contemporary r&b", "pop-soul"], ["metal", "punk", "edm"]),
-    "motown_soul": (["motown", "southern soul", "northern soul", "memphis soul", "retro-soul", "smooth soul"], ["metal", "rap", "techno"]),
+    "neo_soul": (["neo soul", "contemporary r&b", "quiet storm"], ["metal", "punk", "edm"]),  # Discogs subgenres
+    "motown_soul": (["soul", "rhythm & blues", "funk", "disco"], ["metal", "rap", "techno"]),  # Discogs subgenres (classic soul/funk)
     "after_hours_rnb": (["contemporary r&b", "alternative r&b", "new jack swing", "quiet storm"], ["metal", "punk", "country"]),
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
-    "boom_bap": (["hardcore rap", "east coast rap", "old-school rap", "alternative rap", "jazz-rap"], ["metal", "country", "ambient"]),
-    "conscious_flow": (["alternative rap", "underground rap", "jazz-rap"], ["metal", "screamo", "edm"]),
-    "g_funk": (["g-funk", "west coast rap", "gangsta rap"], ["metal", "punk", "ambient"]),
-    "trap_mode": (["trap (rap)", "dirty south", "drill", "southern rap", "hardcore rap"], ["folk", "ambient", "classical"]),
+    "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop", "conscious"], ["metal", "country", "ambient"]),  # Discogs subgenres
+    "conscious_flow": (["conscious", "jazzy hip-hop", "instrumental", "boom bap"], ["metal", "screamo", "edm"]),  # Discogs subgenres
+    "g_funk": (["g-funk", "gangsta"], ["metal", "punk", "ambient"]),  # Discogs subgenres
+    "trap_mode": (["trap", "cloud rap", "crunk", "gangsta"], ["folk", "ambient", "classical"]),  # Discogs subgenres
     "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat"], ["metal", "punk", "hardcore"]),  # dropped "downtempo" (pulled 13k generic downtempo, not lo-fi beats)
     "house_party": (["house", "tech-house", "progressive house", "club/dance", "euro-dance"], ["metal", "country", "ambient"]),
     "deep_house": (["deep house", "microhouse", "minimal techno", "tech-house", "left-field house"], ["metal", "punk", "country"]),
@@ -3487,63 +3492,63 @@ _PROFILE_STYLE_SIGNALS = {
     "punk_energy": (["pop punk", "punk revival", "hardcore punk", "skatepunk", "punk/new wave"], ["ambient", "jazz", "gospel"]),
     "garage_grunge": (["grunge", "garage rock revival", "garage punk", "proto-punk", "noise-rock"], ["ambient", "gospel", "classical"]),
     "emo_poppunk": (["emo", "emo-pop", "pop punk", "post-hardcore", "screamo"], ["ambient", "jazz", "classical"]),
-    "britpop_rock": (["britpop", "college rock", "jangle pop", "aussie rock"], ["metal", "techno", "gospel"]),
+    "britpop_rock": (["brit pop"], ["metal", "techno", "gospel"]),  # Discogs subgenre
     "blues_bar": (["blues-rock", "electric blues", "chicago blues", "regional blues", "punk blues"], ["edm", "techno", "gospel"]),
     "psych_haze": (["neo-psychedelia", "shoegaze", "space rock", "dream pop", "kraut rock"], ["gospel", "country", "rap"]),
-    "prog_rock": (["prog-rock", "art rock", "neo-prog", "experimental rock", "avant-prog"], ["rap", "country", "gospel"]),
+    "prog_rock": (["progressive rock", "prog rock"], ["rap", "country", "gospel"]),  # Last.fm community tags (Discogs can't name prog)
     "stoner_rock": (["stoner metal", "doom metal", "acid rock", "space rock"], ["gospel", "folk", "jazz"]),
     "reggae_dub": (["roots reggae", "dub", "dancehall", "ska", "contemporary reggae", "reggae-pop"], ["metal", "techno", "screamo"]),
-    "afrobeat": (["afro-beat", "afro-pop", "worldbeat", "west african", "highlife"], ["metal", "techno", "screamo"]),
+    "afrobeat": (["afrobeat", "highlife", "african", "afro-cuban", "soukous"], ["metal", "techno", "screamo"]),  # Discogs subgenres (library-thin)
     "latin_heat": (["latin pop", "salsa", "cumbia", "reggaeton", "latin dance", "tropical"], ["metal", "ambient", "screamo"]),
-    "bossa_samba": (["bossa nova", "samba", "brazilian traditions", "latin jazz"], ["metal", "techno", "screamo"]),
+    "bossa_samba": (["bossa", "samba", "latin jazz", "mpb"], ["metal", "techno", "screamo"]),  # Discogs subgenres (bossa matches bossa nova/bossanova)
     "celtic_folk": (["celtic", "celtic rock", "celtic fusion", "british folk", "traditional celtic"], ["techno", "rap", "metal"]),
     "ska": (["ska", "ska-punk", "third wave ska revival", "ska revival"], ["ambient", "techno", "drill"]),
     "bebop": (["hard bop", "bop", "post-bop", "avant-garde jazz"], ["edm", "metal", "gospel"]),
     "swing_bigband": (["swing", "big band", "swing", "retro swing", "traditional pop"], ["metal", "techno", "screamo"]),
     "smooth_jazz": (["smooth jazz", "crossover jazz", "lounge", "cool", "quiet storm"], ["metal", "punk", "drill"]),
-    "country_roads": (["contemporary country", "country-pop", "honky tonk", "nashville sound"], ["techno", "metal", "drill"]),
-    "outlaw_country": (["outlaw country", "traditional country", "alt-country", "red dirt", "bakersfield sound"], ["techno", "edm", "gospel"]),
+    "country_roads": (["country", "honky tonk", "country rock"], ["techno", "metal", "drill"]),  # Discogs subgenres
+    "outlaw_country": (["honky tonk", "bluegrass", "country rock", "country"], ["techno", "edm", "gospel"]),  # Discogs subgenres
     "bluegrass": (["bluegrass", "progressive bluegrass", "country-folk", "string bands", "new acoustic"], ["techno", "metal", "drill"]),
     "rockabilly_surf": (["rockabilly", "surf", "rockabilly revival", "psychobilly", "rock & roll"], ["techno", "drill", "gospel"]),
-    "cinematic_epic": (["film score", "original score", "soundtracks", "modern composition", "orchestral"], ["rap", "punk", "drill"]),
+    "cinematic_epic": (["soundtrack", "score", "neo-romantic"], ["rap", "punk", "drill"]),  # Discogs subgenres
     "ambient_drift": (["ambient", "dark ambient", "new age", "experimental ambient"], ["rap", "punk", "metal"]),
-    "post_rock": (["post-rock", "math rock", "experimental rock", "instrumental rock"], ["rap", "drill", "gospel"]),
-    "chiptune": (["video game music", "chiptunes"], ["metal", "gospel", "country"]),
-    "gospel": (["gospel", "black gospel", "contemporary gospel", "choral", "praise & worship"], ["metal", "techno", "drill"]),
-    "glasgow_folk": (["scottish folk", "british folk", "celtic", "singer/songwriter", "contemporary folk"], ["metal", "techno", "drill"]),
+    "post_rock": (["post rock", "math rock"], ["rap", "drill", "gospel"]),  # Discogs subgenres
+    "chiptune": (["chiptune"], ["metal", "gospel", "country"]),  # Discogs subgenre (≈ 8-bit Misfits; library-thin)
+    "gospel": (["gospel"], ["metal", "techno", "drill"]),  # Discogs subgenre
+    "glasgow_folk": (["folk", "folk rock", "neofolk", "celtic"], ["metal", "techno", "drill"]),  # Discogs subgenres
     "glasgow_dream": (["dream pop", "shoegaze", "noise pop", "neo-psychedelia"], ["metal", "techno", "drill"]),
     "glasgow_indie": (["indie pop", "twee pop", "c-86", "jangle pop", "sophisti-pop", "chamber pop"], ["metal", "techno", "drill"]),
     "glasgow_soul": (["blue-eyed soul", "pop-soul", "northern soul", "funk"], ["metal", "screamo", "drill"]),
-    "glasgow_postrock": (["post-rock", "math rock", "experimental rock", "instrumental rock"], ["rap", "drill", "gospel"]),
+    "glasgow_postrock": (["post rock", "math rock"], ["rap", "drill", "gospel"]),  # Discogs subgenres
     "glasgow_anthems": (["indie rock", "dance-rock", "britpop", "new wave/post-punk revival"], ["metal", "techno", "ambient"]),
     "glasgow_synth": (["synth pop", "new wave", "electro", "dance-rock"], ["metal", "country", "gospel"]),
     "glasgow_postpunk": (["post-punk", "new wave/post-punk revival", "punk"], ["ambient", "gospel", "classical"]),
     "glasgow_house": (["house", "left-field house", "tech-house", "disco"], ["metal", "country", "folk"]),
     "glasgow_underground": (["techno", "minimal techno", "detroit techno", "acid house"], ["folk", "country", "gospel"]),
-    "glasgow_bass": (["bass music", "idm", "trap (edm)", "left-field house"], ["folk", "country", "gospel"]),
+    "glasgow_bass": (["idm", "bassline", "dubstep", "breakbeat"], ["folk", "country", "gospel"]),  # Discogs subgenres
     "glasgow_late": (["downtempo", "trip-hop", "electronica", "ambient techno"], ["metal", "punk", "gospel"]),
     "london_dub": (["dub", "roots reggae", "dancehall", "reggae-pop"], ["metal", "techno", "screamo"]),
     "london_soul": (["blue-eyed soul", "neo-soul", "contemporary r&b", "acid jazz"], ["metal", "punk", "drill"]),
     "london_jazz": (["contemporary jazz", "jazz-funk", "spiritual jazz", "afro-beat", "acid jazz"], ["metal", "drill", "screamo"]),
     "london_triphop": (["trip-hop", "downtempo", "downbeat", "idm"], ["metal", "punk", "gospel"]),
     "london_mod": (["mod", "british invasion", "freakbeat", "merseybeat"], ["metal", "techno", "drill"]),
-    "london_britpop": (["britpop", "college rock"], ["metal", "techno", "gospel"]),
+    "london_britpop": (["brit pop"], ["metal", "techno", "gospel"]),  # Discogs subgenre
     "london_indie": (["indie rock", "new wave/post-punk revival", "garage rock revival"], ["metal", "techno", "gospel"]),
     "london_calling": (["punk", "post-punk", "oi!", "new wave"], ["ambient", "gospel", "classical"]),
     "london_garage": (["uk garage", "garage", "broken beat", "bassline"], ["metal", "country", "folk"]),
     "london_grime": (["grime", "uk drill", "bass music"], ["folk", "country", "ambient"]),
     "london_dubstep": (["dubstep", "bass music", "uk garage"], ["folk", "country", "gospel"]),
-    "london_jungle": (["jungle/drum'n'bass", "breakbeat", "ragga", "hardcore techno"], ["folk", "country", "ambient"]),
-    "melbourne_folk": (["contemporary folk", "indie folk", "singer/songwriter", "americana"], ["metal", "techno", "drill"]),
+    "london_jungle": (["jungle", "drum n bass", "breakbeat", "breaks", "big beat"], ["folk", "country", "ambient"]),  # Discogs subgenres
+    "melbourne_folk": (["folk", "folk rock", "neofolk", "celtic"], ["metal", "techno", "drill"]),  # Discogs subgenres
     "melbourne_dream": (["dream pop", "jangle pop", "indie pop", "neo-psychedelia"], ["metal", "techno", "drill"]),
-    "melbourne_soul": (["neo-soul", "jazz-funk", "acid jazz"], ["metal", "screamo", "drill"]),
+    "melbourne_soul": (["soul", "funk", "neo soul", "jazz-funk"], ["metal", "screamo", "drill"]),  # Discogs subgenres
     "melbourne_sunset": (["surf", "indie pop", "tropical", "sunshine pop"], ["metal", "drill", "techno"]),
     "melbourne_indie": (["indie rock", "alternative/indie rock", "jangle pop"], ["metal", "techno", "drill"]),
     "melbourne_pubrock": (["aussie rock", "pub rock", "album rock", "hard rock", "heartland rock"], ["techno", "ambient", "gospel"]),
-    "melbourne_hiphop": (["alternative rap", "underground rap", "contemporary rap"], ["metal", "ambient", "gospel"]),
+    "melbourne_hiphop": (["trap", "cloud rap", "conscious", "boom bap", "hardcore hip-hop"], ["metal", "ambient", "gospel"]),  # Discogs subgenres
     "melbourne_postpunk": (["post-punk", "goth rock", "new wave"], ["gospel", "ambient", "country"]),
-    "melbourne_psych": (["garage rock revival", "psychedelic/garage", "neo-psychedelia"], ["gospel", "country", "ambient"]),
-    "melbourne_garagepunk": (["garage punk", "punk revival", "proto-punk", "hardcore punk"], ["ambient", "gospel", "classical"]),
+    "melbourne_psych": (["psychedelic rock", "garage rock"], ["gospel", "country", "ambient"]),  # Discogs subgenres
+    "melbourne_garagepunk": (["punk", "pop punk", "hardcore", "melodic hardcore", "garage rock"], ["ambient", "gospel", "classical"]),  # Discogs subgenres
     "melbourne_club": (["house", "progressive house", "electro", "club/dance"], ["folk", "country", "gospel"]),
     "melbourne_techno": (["techno", "minimal techno", "tech-house", "acid house"], ["folk", "country", "gospel"]),
     # ----- style-defined genre mixes (positives required) -----
@@ -3555,9 +3560,8 @@ _PROFILE_STYLE_SIGNALS = {
                           "singer/songwriter", "americana", "new acoustic", "alt-country",
                           "anti-folk", "folk revival", "neo-traditional folk", "folk"],
                          ["metal", "rap", "edm", "techno", "house", "club/dance", "synth"]),
-    "acoustic_romance": (["singer/songwriter", "indie folk", "contemporary folk", "folk-pop",
-                          "new acoustic", "americana", "folk-rock"],
-                         ["metal", "rap", "edm", "club/dance", "techno", "house", "punk", "hardcore"]),
+    # acoustic_romance: no genre positive — selected by the Jack-Johnson seed centroid + romantic lyric
+    # themes (_SEED_ARTISTS / _PROFILE_LYRIC_THEMES), so _has_required_style returns True (ungated).
     "indie_romance":    (["indie rock", "indie pop", "dream pop", "indie folk", "indie electronic",
                           "twee pop", "chamber pop", "sadcore", "shoegaze", "slowcore",
                           "jangle pop", "noise pop", "alternative singer/songwriter"],
@@ -3788,7 +3792,7 @@ _PROFILE_GENRE_PARENT = {
     "autumn_leaves": {"folk, world, & country", "rock"}, "campfire": {"folk, world, & country", "rock"},
     "celtic_folk": {"folk, world, & country", "rock"}, "country_roads": {"folk, world, & country", "rock"},
     "outlaw_country": {"folk, world, & country", "rock"}, "bluegrass": {"folk, world, & country", "rock"},
-    "acoustic_romance": {"folk, world, & country", "rock"}, "glasgow_folk": {"folk, world, & country", "rock"},
+    "glasgow_folk": {"folk, world, & country", "rock"},
     "melbourne_folk": {"folk, world, & country", "rock"},
     # --- Classical / Stage & Screen ---
     "neoclassical": {"classical", "stage & screen"}, "string_quartet": {"classical", "stage & screen"},
@@ -3812,32 +3816,86 @@ _PROFILE_GENRE_PARENT = {
 }
 
 
+def _discogs_subgenres(entry, min_conf):
+    """Floored Discogs SUBGENRE names (the part after '---'), lowercased — the matchable genre tags for
+    the membership gate. A subgenre counts only when the classifier's confidence >= min_conf, so a
+    low-probability multi-label spray can't grant membership. The PARENT half of each 'Parent---Sub' is
+    deliberately excluded here (the parent is enforced separately in _has_required_style) — otherwise a
+    positive that is a substring of its parent name (e.g. "soul" ⊂ "Funk / Soul", "folk" ⊂ "Folk, World,
+    & Country") would match the whole parent and pull every track in the family."""
+    gd = entry.get("genre_discogs") or {}
+    if isinstance(gd, dict):
+        return [k.split("---")[-1].lower() for k, sc in gd.items() if (sc is None or sc >= min_conf)]
+    return [str(k).split("---")[-1].lower() for k in gd]
+
+
+def _entry_lastfm_tags(entry):
+    """Lowercased Last.fm community (crowd) tags for a track — artist + track level. These are genre
+    LABELS supplied by listeners, distinct from the Discogs audio-model classifier and from Plex's genre
+    tags. They're the membership source for format/scene genres an audio model can't name (post-grunge,
+    progressive rock): Discogs has no such subgenre, but the Last.fm community tags them accurately."""
+    out = set()
+    for f in ("lastfm_artist_tags", "lastfm_track_tags"):
+        v = entry.get(f)
+        if isinstance(v, dict):
+            out |= {t.lower() for t in v}
+        elif isinstance(v, (list, tuple)):
+            out |= {str(t).lower() for t in v}
+    return out
+
+
+# Format/scene genres the Discogs audio model has no label for and the acoustic centroid can't isolate
+# (verified: a Pink-Floyd/Rush-seeded centroid pulled Tiësto DJ mixes; a Nickelback/Creed one pulled
+# Springsteen/McCartney). Their membership comes from Last.fm community tags instead — still RANKED on our
+# own centroid + leans. The positive list in _PROFILE_STYLE_SIGNALS is matched against the Last.fm tags.
+_LASTFM_GATED = {"post_grunge", "prog_rock"}
+
+# festive (Christmas) is a calendar event, not a genre or a sound — neither Discogs nor the centroid can
+# express it. Gate on a holiday signal: a seasonal keyword in the title, or Plex flagging it Holiday/
+# Christmas (the one place a Plex tag is still consulted, precisely because "Christmas" isn't a sound).
+_FESTIVE_TITLE_KW = ("christmas", "xmas", "santa", "sleigh", "jingle", "noel", "navidad", "mistletoe",
+                     "yuletide", "wonderland", "auld lang", "let it snow", "holly jolly", "silent night",
+                     "feliz navidad", "deck the hall")
+
+
 def _has_required_style(entry, profile_key):
-    """True if the track carries one of the profile's required (positive) styles. Untagged
-    tracks return False so genre-defined mixes never include unconfirmable tracks. Profiles in
-    _PROFILE_GENRE_PARENT additionally require the track's dominant Discogs parent to fall within an
-    allowed set, so a stray cross-genre subgenre tag can't drag an off-genre track into a tight mix."""
+    """True if the track qualifies for a style-defined mix. Membership source by mix:
+      • most mixes → a Discogs SUBGENRE positive (confidence-floored), AND the dominant Discogs parent
+        within the mix's allowed set (_PROFILE_GENRE_PARENT). Plex styles are NOT consulted.
+      • _LASTFM_GATED mixes → a Last.fm community-tag positive (Discogs can't name these genres).
+      • festive → a holiday signal (seasonal title keyword or Plex Holiday flag).
+      • mixes with no positive list (e.g. the centroid-defined acoustic_romance) → always True; the seed
+        centroid + lyric themes do the selecting in _build_mix_tracks.
+    Untagged tracks return False for positive-gated mixes, so a mix never includes unconfirmable tracks."""
+    if profile_key == "festive":
+        title = (entry.get("title") or "").lower()
+        if any(k in title for k in _FESTIVE_TITLE_KW):
+            return True
+        return any("holiday" in s.lower() or "christmas" in s.lower() for s in (entry.get("styles") or []))
+
     sig = _PROFILE_STYLE_SIGNALS.get(profile_key)
-    if not sig:
-        return True
-    positive_subs = sig[0]
-    # Confidence-floored: a low-probability Discogs spray can't satisfy a positive (see _track_style_tags).
-    tags = _track_style_tags(entry, min_conf=_DISCOGS_TAG_FLOOR)
-    if not tags:
-        return False
-    if not any(sub in tag for tag in tags for sub in positive_subs):
-        return False
+    positive_subs = sig[0] if sig else None
+
+    if positive_subs:
+        if profile_key in _LASTFM_GATED:
+            tags = _entry_lastfm_tags(entry)                     # crowd genre labels (Discogs can't name these)
+        else:
+            tags = _discogs_subgenres(entry, _DISCOGS_TAG_FLOOR)  # Discogs subgenres only, confidence-floored
+        if not tags or not any(sub in tag for tag in tags for sub in positive_subs):
+            return False
+
+    # Dominant-Discogs-parent constraint — independent of the positive match, so it also applies to a
+    # positive-less centroid mix that sets a parent. Skipped for Last.fm-gated mixes (the community tag is
+    # the authority) and for mixes with no parent. A tie with any non-allowed parent rejects, so a stray
+    # cross-genre subgenre spray (e.g. "Electronic---Hardstyle" on a pop track) can't drag it in.
     req_parents = _PROFILE_GENRE_PARENT.get(profile_key)
-    if req_parents:
+    if req_parents and profile_key not in _LASTFM_GATED:
         gd = entry.get("genre_discogs") or {}
         keys = list(gd.keys()) if isinstance(gd, dict) else (gd or [])
         if keys:
             parents = Counter(str(k).split("---")[0].strip().lower() for k in keys)
             mx = max(parents.values())
             top = [p for p, v in parents.items() if v == mx]
-            # The track's DOMINANT Discogs parent(s) must fall within the mix's allowed set; a tie
-            # with any non-allowed parent rejects, so a stray cross-genre subgenre tag (e.g.
-            # "Electronic---Hardstyle" sprayed onto a pop track) can't drag an off-genre track in.
             if not all(p in req_parents for p in top):
                 return False
     return True
@@ -4392,6 +4450,11 @@ _LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and ove
 
 # Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
 _PROFILE_LYRIC_THEMES = {
+    # acoustic_romance — within the Jack-Johnson seed-centroid sound, lift the genuine love songs.
+    "acoustic_romance": ["romantic", "tender", "affectionate", "intimate", "devotional", "romantic_tenderness",
+                         "warm_affection", "tender_devotion", "heartfelt", "warmhearted", "romantic_warmth",
+                         "tender_reassurance", "romantic_longing", "dreamy_romantic", "warm_tenderness",
+                         "romantic_possibility", "mutual_affection", "romantic_euphoria"],
     # --- Meloday+ gap-fill mixes (neoclassical + the pop mixes omitted — not lyric-anchored) ---
     "situationship": ["yearning", "restless", "anxious", "conflicted", "uncertain", "bittersweet", "vulnerable", "unresolved_attachment", "relationship_limbo", "mixed_signals", "push_pull_dynamics", "drifting_apart", "emotional_distance", "communication_breakdown", "fear_of_abandonment", "searching_for_intimacy", "missing_someone"],
     "sad_bangers": ["euphoric_sadness", "cathartic", "bittersweet", "melancholic", "dancefloor_catharsis", "sad_banger", "post_breakup_longing", "living_in_the_moment"],
@@ -8662,6 +8725,40 @@ def _dj_order(tracks, essentia_cache, arc=False):
     return order
 
 
+# ---------------------------------------------------------------------------
+# Seed-artist centroids — a few mixes are defined by SOUND, not by any genre tag. Their target acoustic
+# fingerprint is the mean vector of artists we know belong, computed from the cache at build time (already
+# in raw entry space, so directly comparable in _acoustic_distance_to_centroid — no calibration needed).
+# acoustic_romance: gentle acoustic singer-songwriters à la Jack Johnson; the romantic lyric themes
+# (_PROFILE_LYRIC_THEMES) then pull the love songs to the top within that sound.
+# ---------------------------------------------------------------------------
+_SEED_ARTISTS = {
+    "acoustic_romance": ["jack johnson", "jason mraz", "donavon frankenreiter", "matt costa", "amos lee",
+                         "ben howard", "angus & julia stone", "city and colour", "xavier rudd",
+                         "ziggy alberts", "jose gonzalez", "josé gonzález", "iron & wine", "damien rice"],
+}
+_SEED_DIMS = ("bpm", "energy", "danceability", "brightness", "beat_confidence", "onset_rate",
+              "dynamic_complexity", "arousal", "valence", "vocal_presence")
+_SEED_CENTROID_CACHE = {}
+
+def _seed_centroid(profile_key, essentia_cache):
+    """Mean acoustic vector of a mix's seed artists (memoised). None if too few seed tracks are present."""
+    if profile_key in _SEED_CENTROID_CACHE:
+        return _SEED_CENTROID_CACHE[profile_key]
+    seeds = _SEED_ARTISTS.get(profile_key) or []
+    ents = [e for e in essentia_cache.values()
+            if any(sd in (e.get("artist") or "").lower() for sd in seeds)]
+    cen = None
+    if len(ents) >= 20:
+        cen = {}
+        for d in _SEED_DIMS:
+            vals = [e[d] for e in ents if e.get(d) is not None]
+            if vals:
+                cen[d] = sum(vals) / len(vals)
+    _SEED_CENTROID_CACHE[profile_key] = cen
+    return cen
+
+
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
     """Build the mix_size-track list for a single mix profile.
@@ -8673,6 +8770,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     genuinely too small returns short rather than re-using excluded tracks or breaking its genre.
     """
     target       = _MOOD_PROFILES[profile_key]
+    if profile_key in _SEED_ARTISTS:                # centroid-defined mix: target = mean vector of seed artists
+        _sc = _seed_centroid(profile_key, essentia_cache)
+        if _sc:
+            target = _sc
     play_counts  = Counter(str(e.ratingKey) for e in history_entries)
     _is_era      = _PROFILE_CATEGORY.get(profile_key) == "era"
     _is_geo      = _PROFILE_CATEGORY.get(profile_key) == "geo"
