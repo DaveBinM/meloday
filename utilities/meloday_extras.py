@@ -3707,16 +3707,37 @@ _STYLE_DEFINED_PROFILES = {
 }
 
 
-def _track_style_tags(entry):
-    """Lowercased style/genre tags for matching: Plex STYLES (granular) + the Discogs-400 genre
-    classifier (each 'Category---Style' split into both parts). The broad Plex GENRES (the ~7
+# The Discogs-400 genre model is MULTI-LABEL: it emits its top-6 subgenre guesses per track, each with a
+# confidence, and the low-probability tail is noise — it sprays narrow microgenres (e.g.
+# "Electronic---Hardstyle" at 0.06) onto tracks that aren't remotely that genre. A gate positive matching
+# one of those sprays drags pure misfits into a tight mix: an indie-electronic track (Metronomy), a
+# dream-pop track (Mansionair), an emo-pop track (Sleeping with Sirens) and a film-score cue (Koji Kondo)
+# all leaked into Rave Cave on a <0.11 "Hardstyle"/"Hard Trance" guess. So for genre MEMBERSHIP we only
+# trust a Discogs subgenre the classifier was reasonably confident about. 0.12 cleanly separated the noise
+# sprays (the misfits sat at 0.06–0.11; the entire <0.05 tail was Camila Cabello / RHCP / Janet Jackson)
+# from genuine tags (Hannah Laing's real hardstyle 0.15, Darude's hard-trance 0.21) and thinned no pool
+# below usable size. Plex styles are human-curated (no confidence) and always count.
+_DISCOGS_TAG_FLOOR = 0.12
+
+def _track_style_tags(entry, min_conf=0.0):
+    """Lowercased style/genre tags for matching: Plex STYLES (granular, human-curated) + the Discogs-400
+    genre classifier (each 'Category---Style' split into both parts). The broad Plex GENRES (the ~7
     mega-buckets like "Pop/Rock", "Electronic") are deliberately EXCLUDED — they're too coarse to
     gate on and pollute membership (a single "Pop/Rock" bucket can't separate indie-rock from
     chart-pop). Discogs carries genre (parent + 400 subgenres, ~98% coverage); Plex styles are the
-    granular fallback for the ~2% not yet Discogs-analysed."""
+    granular fallback for the ~2% not yet Discogs-analysed. When `min_conf` > 0, a Discogs subgenre is
+    included only if the classifier's confidence for it is at least that (the gate passes
+    `_DISCOGS_TAG_FLOOR` so a low-probability spray can't grant genre membership); Plex styles, carrying
+    no confidence, always count."""
     tags = [t.lower() for t in (entry.get("styles") or [])]
-    for k in (entry.get("genre_discogs") or {}):
-        tags += [p.lower() for p in k.split("---")]
+    gd = entry.get("genre_discogs") or {}
+    if isinstance(gd, dict):
+        for k, sc in gd.items():
+            if min_conf <= 0 or sc is None or sc >= min_conf:
+                tags += [p.lower() for p in k.split("---")]
+    else:
+        for k in gd:                                  # legacy list form: no confidence, always count
+            tags += [p.lower() for p in str(k).split("---")]
     return tags
 
 
@@ -3800,7 +3821,8 @@ def _has_required_style(entry, profile_key):
     if not sig:
         return True
     positive_subs = sig[0]
-    tags = _track_style_tags(entry)
+    # Confidence-floored: a low-probability Discogs spray can't satisfy a positive (see _track_style_tags).
+    tags = _track_style_tags(entry, min_conf=_DISCOGS_TAG_FLOOR)
     if not tags:
         return False
     if not any(sub in tag for tag in tags for sub in positive_subs):
