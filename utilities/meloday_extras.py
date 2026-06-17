@@ -3439,7 +3439,7 @@ _PROFILE_STYLE_SIGNALS = {
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
     "spring_jangle": (["indie pop", "jangle pop", "dream pop", "twee pop"], []),
-    "summer_heat": (["disco", "funk", "house", "club/dance"], []),
+    "summer_heat": (["disco", "funk", "club/dance"], []),  # dropped "house" (22k swamped the disco/funk intent)
     "summer_breeze": (["soft rock", "am pop", "adult contemporary"], []),
     "summer_tropical": (["latin", "reggae", "afro", "tropical", "bossa"], []),
     "autumn_leaves": (["folk", "singer/songwriter", "americana"], []),
@@ -3469,7 +3469,7 @@ _PROFILE_STYLE_SIGNALS = {
     "conscious_flow": (["alternative rap", "underground rap", "jazz-rap"], ["metal", "screamo", "edm"]),
     "g_funk": (["g-funk", "west coast rap", "gangsta rap"], ["metal", "punk", "ambient"]),
     "trap_mode": (["trap (rap)", "dirty south", "drill", "southern rap", "hardcore rap"], ["folk", "ambient", "classical"]),
-    "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat", "downtempo"], ["metal", "punk", "hardcore"]),
+    "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat"], ["metal", "punk", "hardcore"]),  # dropped "downtempo" (pulled 13k generic downtempo, not lo-fi beats)
     "house_party": (["house", "tech-house", "progressive house", "club/dance", "euro-dance"], ["metal", "country", "ambient"]),
     "deep_house": (["deep house", "microhouse", "minimal techno", "tech-house", "left-field house"], ["metal", "punk", "country"]),
     "techno": (["techno", "minimal techno", "detroit techno", "acid house", "industrial dance"], ["folk", "country", "gospel"]),
@@ -3477,7 +3477,7 @@ _PROFILE_STYLE_SIGNALS = {
     "dnb": (["jungle/drum'n'bass", "breakbeat", "idm", "bass music"], ["folk", "country", "ambient"]),
     "bass_drop": (["dubstep", "bass music", "grime", "trap (edm)"], ["folk", "country", "jazz"]),
     "uk_garage": (["uk garage", "garage", "bass music", "broken beat", "bassline"], ["metal", "country", "folk"]),
-    "synthwave": (["synthwave", "neo-electro", "electro", "new romantic"], ["metal", "country", "gospel"]),
+    "synthwave": (["synthwave", "neo-electro", "new romantic"], ["metal", "country", "gospel"]),  # dropped bare "electro" (substring of the "electronic" parent → pulled the whole electronic pool)
     "industrial": (["industrial", "electro-industrial", "industrial metal", "industrial dance"], ["folk", "country", "gospel"]),
     "vaporwave": (["vaporwave", "chillwave", "ambient pop", "plunderphonics"], ["metal", "punk", "hardcore"]),
     "downtempo": (["downtempo", "trip-hop", "chillwave", "idm", "ambient techno"], ["metal", "punk", "hardcore"]),
