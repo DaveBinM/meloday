@@ -151,10 +151,14 @@ These drive the harmonic- and tempo-aware bridging and flow ordering in the main
 | Subcommand | Adds | Used for |
 | --- | --- | --- |
 | `--sync-metadata` | Last.fm community genre tags + global listener counts | Genre-mix gating (for genres an audio model can't name) and popularity leans |
-| `--sync-lyrics` | Per-track lyric themes, sentiment and language (`--build-lyric-vocab` / `--apply-lyric-vocab` build the theme vocabulary) | Theme/mood mixes (e.g. Romantic, Melancholy) |
+| `--sync-lyrics-batch` | Per-track lyric themes, sentiment and language (via the OpenAI batch API) | Theme/mood mixes (e.g. Romantic, Melancholy) |
 | `--sync-geo` | Each artist's MusicBrainz country/region (`--resync-geo "<artist>"` refreshes one) | The city-scene mixes (Scotland / Australia / London) |
 | `--backfill-mb-tags` | Artist MBID + release type, read from your files' embedded Picard tags | Compilation detection (decade mixes) and exact artist identity |
 | `--sync-artist-names` then `--repair-artists` | Each artist MBID → its MusicBrainz name | A correct cache `artist` — real groups kept whole, collaborations collapsed to the primary, compilation tracks credited to the actual performer |
+
+**Run everything at once:** `pre_analyze.py --full` chains the base analysis and the syncs above in dependency order — the single command to run after adding new music. Every step stays individually runnable and is idempotent, so a step with nothing new to do is a quick no-op, and a step that fails is logged while the rest still run. `--skip-geo` / `--skip-metadata` drop those network syncs; `--limit` / `--dry-run` pass through. The lyric sync is the one exception — it's paid and runs asynchronously, so `--full` leaves it out; run it separately when you want it.
+
+**Lyrics** are that separate paid, asynchronous sync. The routine is one command: `pre_analyze.py --sync-lyrics-batch` tags new tracks via the cheaper de-duplicated OpenAI batch, automatically re-runs until nothing is left due (even when OpenAI strands a batch), then publishes the results with `apply-lyric-vocab`. `--no-apply` tags only; `--limit N` runs a single bounded pass for testing; `--sync-lyrics` is a live per-track fallback. Occasionally — after adding a lot of new music — run `--build-lyric-vocab` (review `assets/lyric_vocab.json`), then `--apply-lyric-vocab`, to fold new theme synonyms into the canonical vocabulary.
 
 Common flags: `--limit N`, `--workers N`, `--dry-run`.
 
@@ -510,7 +514,7 @@ Configuration for `meloday_extras.py`. All keys are optional with sensible defau
 | `weather_location` | *(unset)* | City name, coordinates, or airport code (e.g. `"Melbourne"`). Enables weather-triggered mood mixes (Rainy Day, Sunny, Cosy). Uses wttr.in — no API key needed. |
 | `lastfm_api_key` | *(unset)* | Last.fm API key. Enables Last.fm community tags + global play counts — used for genre-mix gating, popularity leans, and popularity-ranked Release Radar selection. Only the key is needed (not the secret). |
 | `lastfm_api_secret` | *(unset)* | Last.fm API secret. Not required for current functionality; reserved for future use. |
-| `openai_api_key` | *(unset)* | OpenAI API key. Enables the lyric-analysis sync (`pre_analyze.py --sync-lyrics`), which extracts per-track lyric themes and sentiment used by the theme/mood mixes. Optional — without it, lyric-based selection is simply skipped. |
+| `openai_api_key` | *(unset)* | OpenAI API key. Enables the lyric-analysis sync (`pre_analyze.py --sync-lyrics-batch`), which extracts per-track lyric themes and sentiment used by the theme/mood mixes. Optional — without it, lyric-based selection is simply skipped. |
 
 ### `seasonal:`
 

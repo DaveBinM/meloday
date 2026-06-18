@@ -1776,7 +1776,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     sentiment (valence profiles re-map to moods in the boost). Live per-track --sync-lyrics is the fallback."""
     client = _get_openai_client()
     if client is None:
-        log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return
+        log_msg("[ERROR] Batch tagging needs OPENAI_API_KEY (env / live config / config extras)."); return None
     try:
         import yaml
         _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
@@ -1798,8 +1798,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
             os.remove(_batch_state_path())
         except Exception:
             pass
-        _log_lyric_coverage()
-        return
+        return _log_lyric_coverage()
 
     model, effort = _lyric_llm_cfg()
     # Small `batch_size`-song batches, THROTTLED by ENQUEUED INPUT TOKENS (what OpenAI's batch-queue limit
@@ -1842,7 +1841,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     conn.close()
     if not todo:
         log_msg("[INFO] Nothing due — lyric analysis is already up to date.")
-        return
+        return 0
 
     # ---- LRCLIB fetch-dedup: group by EXACT artist+title first. Identical title => identical LRCLIB
     #      fetch, so this is safe even for live/remix (which carry a different title). Fetch ONE per
@@ -2025,7 +2024,50 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
     except Exception:
         pass
     log_msg("[INFO] Batch tagging complete.")
-    _log_lyric_coverage()
+    return _log_lyric_coverage()
+
+
+def sync_lyrics_batch_until_done(limit=None, force=False, resume=False, do_apply=True, max_passes=10):
+    """Run sync_lyrics_batch repeatedly until 0 tracks are due, then apply_lyric_vocab() — the one-command
+    lyric refresh. OpenAI occasionally strands a batch (cancelled at 0/N after ~15 min) and its tracks stay
+    due; a fresh pass re-submits them and usually finishes, so we loop instead of making the user re-run by
+    hand. Pass 1 honours force/resume; later passes are plain — never re-force (that clears the whole
+    library) and never re-resume. Stops early and leaves the rest for a later run if a pass makes NO
+    progress (due not falling — e.g. OpenAI keeps stranding the same batch), if there's no client / nothing
+    to resume (due is None), or after max_passes (override via extras.lyric_max_passes). apply runs only on
+    a clean finish (due == 0); it no-ops gracefully if no lyric_vocab.json exists yet."""
+    try:
+        import yaml
+        _ex = (yaml.safe_load(open(os.path.join(BASE_DIR, "config.yml"))) or {}).get("extras") or {}
+        max_passes = max(1, int(_ex.get("lyric_max_passes", max_passes)))
+    except Exception:
+        pass
+    # A bounded run (--limit) stays a single pass for testing: no loop, no auto-apply.
+    if limit:
+        sync_lyrics_batch(limit=limit, force=force, resume=resume)
+        return
+    due = sync_lyrics_batch(force=force, resume=resume)
+    passes = 1
+    while due:                                       # 0 or None -> exit the loop
+        if passes >= max_passes:
+            log_msg(f"[WARN] Lyric sync hit the {max_passes}-pass cap with {due:,} still due — "
+                    f"re-run --sync-lyrics-batch later to finish them.")
+            break
+        prev = due
+        due = sync_lyrics_batch()                     # plain follow-up pass
+        passes += 1
+        if due is None or due >= prev:
+            _left = f"{due:,}" if isinstance(due, int) else "some"
+            log_msg(f"[WARN] Lyric sync made no progress this pass — {_left} still due after {passes} "
+                    f"passes; likely transient OpenAI stranding, re-run --sync-lyrics-batch shortly.")
+            break
+    if due == 0:
+        log_msg(f"[INFO] All due lyrics tagged in {passes} pass(es).")
+        if do_apply:
+            log_msg("[INFO] Applying lyric vocab (raw -> canonical lyric_themes)...")
+            apply_lyric_vocab()
+        else:
+            log_msg("[INFO] --no-apply: skipped apply-lyric-vocab; run it manually to publish lyric_themes.")
 
 
 def _write_one_batch(client, b, langmap):
@@ -2091,6 +2133,7 @@ def _log_lyric_coverage():
     c.close()
     log_msg(f"[INFO] Lyric coverage now — {analysed:,} analysed, {nolyr:,} instrumental/no-lyrics, "
             f"{due:,} still due" + (" (re-run --sync-lyrics-batch to finish them)." if due else " — complete."))
+    return due
 
 
 def _write_batch_results(client, batch_ids, langmap, poll_interval=60, stuck_timeout=900):
@@ -2259,6 +2302,63 @@ def apply_lyric_vocab():
             f"{len(syn)} synonyms.")
 
 
+def run_full_pipeline(limit=None, dry_run=False, skip_geo=False, skip_metadata=False):
+    """Run the whole 'I added new music' enrichment chain end-to-end, in dependency order. This just chains
+    the existing per-flag steps — each is still runnable on its own, and each is already idempotent
+    (cache-/NULL-/staleness-driven), so re-running is cheap when little changed. Every step runs in
+    isolation: one that raises is logged and the pipeline continues, with a pass/fail summary at the end.
+
+    Order: 1 acoustic/TF analysis (bulk_analyze — also reads the MusicBrainz file-tags) -> 2 artist-name map
+    refresh (sync_artist_names, which reloads meloday._MBID_ARTIST_MAP in-process) -> 3 artist-name repair
+    (repair_artist_names, so step 3 sees step 2's fresh names) -> 4 geo / artist origin (sync_artist_origin;
+    --skip-geo) -> 5 Last.fm tags + listeners (sync_lastfm_tags; --skip-metadata).
+
+    Lyrics are intentionally NOT included (paid OpenAI API + async batch path) — run that pipeline
+    separately (--sync-lyrics-batch / --build-lyric-vocab / --apply-lyric-vocab)."""
+    import traceback
+
+    def _fmt(sec):
+        sec = int(round(sec))
+        if sec < 60:
+            return f"{sec}s"
+        if sec < 3600:
+            return f"{sec // 60}m {sec % 60:02d}s"
+        return f"{sec // 3600}h {(sec % 3600) // 60:02d}m"
+
+    steps = [
+        ("acoustic + TF analysis", lambda: bulk_analyze()),
+        ("artist-name map refresh", lambda: sync_artist_names(limit=limit)),
+        ("artist-name repair", lambda: repair_artist_names(limit=limit, dry_run=dry_run)),
+    ]
+    if not skip_geo:
+        steps.append(("geo / artist origin", lambda: sync_artist_origin(limit=limit)))
+    if not skip_metadata:
+        steps.append(("Last.fm tags + listeners", lambda: sync_lastfm_tags(limit=limit)))
+
+    total = len(steps)
+    log_msg(f"[FULL] Starting enrichment pipeline: {total} steps"
+            + (f", limit={limit}" if limit else "")
+            + (", dry-run" if dry_run else "") + ".")
+    results = []
+    t_start = time.time()
+    for i, (name, fn) in enumerate(steps, 1):
+        log_msg(f"[FULL] === step {i}/{total}: {name} ===")
+        t0 = time.time()
+        try:
+            fn()
+            results.append((name, True, time.time() - t0))
+        except Exception as e:
+            results.append((name, False, time.time() - t0))
+            log_msg(f"[FULL] step {i}/{total} ({name}) FAILED: {e}", level="error")
+            log_msg(traceback.format_exc(), level="error")
+        log_msg(f"[FULL] step {i}/{total} done in {_fmt(results[-1][2])}.")
+    ok = sum(1 for _, good, _ in results if good)
+    log_msg(f"[FULL] Pipeline complete: {ok}/{total} steps succeeded in {_fmt(time.time() - t_start)}.")
+    for name, good, dur in results:
+        log_msg(f"[FULL]   {'ok  ' if good else 'FAIL'} {_fmt(dur):>8}  {name}")
+    return results
+
+
 # --- 4. EXECUTION ---
 
 if __name__ == "__main__":
@@ -2270,8 +2370,9 @@ if __name__ == "__main__":
                 return None
         return None
     if "--sync-lyrics-batch" in sys.argv:
-        sync_lyrics_batch(limit=_arg_limit(), force="--force" in sys.argv,
-                          resume="--resume" in sys.argv)
+        sync_lyrics_batch_until_done(limit=_arg_limit(), force="--force" in sys.argv,
+                                     resume="--resume" in sys.argv,
+                                     do_apply="--no-apply" not in sys.argv)
     elif "--build-lyric-vocab" in sys.argv:
         build_lyric_vocab(min_count=_arg_limit(), cluster="--no-cluster" not in sys.argv)
     elif "--apply-lyric-vocab" in sys.argv:
@@ -2308,5 +2409,9 @@ if __name__ == "__main__":
         sync_artist_names(limit=_arg_limit())
     elif "--repair-artists" in sys.argv:
         repair_artist_names(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
+    elif "--full" in sys.argv:
+        run_full_pipeline(limit=_arg_limit(), dry_run="--dry-run" in sys.argv,
+                          skip_geo="--skip-geo" in sys.argv,
+                          skip_metadata="--skip-metadata" in sys.argv)
     else:
         bulk_analyze()
