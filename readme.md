@@ -23,7 +23,7 @@ Each update brings a **new cover, a new name, and a refreshed mix of tracks** th
 - **Generates creative titles** — Pulls from a custom mood map for names like *Meloday • Nostalgic Lo-Fi & Indie Folk for Tuesday Morning*
 - **Applies custom covers and descriptions** — The playlist gets a new look every time it updates
 - **Runs unattended** — No manual curation needed; schedule it and forget about it
-- **Generates supplementary taste-intelligence playlists** — An optional companion script adds Spotify-analogue playlists (On Repeat, Discover Weekly, Daily Mixes, and more) to your Plex library on their own schedule
+- **Generates a whole shelf of companion playlists** — An optional companion script ("Meloday+") adds Spotify-analogue playlists (On Repeat, Discover Weekly, Daily Mixes, Time Capsule…) plus ~260 contextual genre, vibe, decade and city mood mixes, each on their own schedule
 
 ## What It *Doesn't* Do
 
@@ -124,28 +124,39 @@ The mood map translates mood labels into colloquial variations — "Cheerful" mi
 
 ## The Metadata Cache
 
-`pre_analyze.py` scans your Plex library and builds a local cache of track metadata — styles, moods, genres, and year — that Meloday and the optimiser use for diversity balancing and config recommendations. Running it is worthwhile for any library, regardless of whether you use Essentia.
+`pre_analyze.py` builds a local SQLite cache (`assets/essentia_cache.db`) of per-track data that the playlists, diversity balancing, and optimiser all draw on. The base run reads Plex metadata — styles, moods, genres, year — and is worth running for any library, with or without Essentia.
 
 ```bash
 python utilities/pre_analyze.py
 ```
 
-The cache is incremental — tracks already analysed are skipped on subsequent runs. The first run may take a while on large libraries; subsequent runs only process new or changed tracks.
+It's incremental and staleness-aware: analysed tracks are skipped, and a track is only re-read when Plex reports an actual change at the track, album, or artist level. The first run on a large library takes a while; later runs only touch new or changed tracks.
 
-### Optional Enhancement: Essentia Acoustic Analysis
+### Acoustic analysis (Essentia + TensorFlow)
 
-Meloday also integrates with **[Essentia](https://essentia.upf.edu/)**, an open-source acoustic analysis library. When enabled, it enriches the cache with real audio features that further improve sonic matching:
+With **[Essentia](https://essentia.upf.edu/)** enabled (`essentia: enabled: true` in `config.yml`), the cache is enriched with real audio features:
 
-- **BPM / Tempo** — matches tracks by their actual tempo
-- **Musical key** — favours harmonically compatible transitions
-- **Energy level** — maintains consistent loudness and intensity across the playlist
-- **Production era** — keeps the sonic palette coherent across decades
+- **Signal features** — BPM, musical key, energy/loudness, danceability, spectral brightness, beat confidence, onset rate, dynamic complexity
+- **Deep-learning qualities** (bundled TensorFlow models) — **arousal & valence** (the emotional plane), **vocal presence**, a learned danceability, and **mood classes** (happy / sad / aggressive / relaxed / party / acoustic / electronic)
+- **Discogs genre classifier** — a per-track model spanning ~400 subgenres, which powers the genre-mix gating
 
-To enable, set `essentia: enabled: true` in `config.yml` and re-run `pre_analyze.py`. It will upgrade existing metadata-only cache entries with acoustic data without re-fetching the Plex metadata.
+These drive the harmonic- and tempo-aware bridging and flow ordering in the main playlist, and the acoustic centroids the mood mixes are matched against. Re-running `pre_analyze.py` upgrades existing metadata-only entries with acoustic data without re-fetching Plex metadata.
 
-> **Note:** Tracks longer than 30 minutes (DJ mixes, continuous albums) are automatically skipped for acoustic analysis — Essentia's rhythm extractor can't process files of that length. They are still cached with metadata and can appear in playlists; they just won't contribute to BPM, key, or energy matching.
+> **Note:** tracks over 30 minutes (DJ mixes, continuous albums) are skipped for acoustic analysis — Essentia's rhythm extractor can't process files that long. They're still cached with metadata and can appear in playlists. See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails on your platform.
 
-See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails on your platform.
+### Enrichment syncs
+
+`pre_analyze.py` also enriches the cache from external sources — each a subcommand, cache-driven, rate-limited, and resumable. None require Essentia.
+
+| Subcommand | Adds | Used for |
+| --- | --- | --- |
+| `--sync-metadata` | Last.fm community genre tags + global listener counts | Genre-mix gating (for genres an audio model can't name) and popularity leans |
+| `--sync-lyrics` | Per-track lyric themes, sentiment and language (`--build-lyric-vocab` / `--apply-lyric-vocab` build the theme vocabulary) | Theme/mood mixes (e.g. Romantic, Melancholy) |
+| `--sync-geo` | Each artist's MusicBrainz country/region (`--resync-geo "<artist>"` refreshes one) | The city-scene mixes (Scotland / Australia / London) |
+| `--backfill-mb-tags` | Artist MBID + release type, read from your files' embedded Picard tags | Compilation detection (decade mixes) and exact artist identity |
+| `--sync-artist-names` then `--repair-artists` | Each artist MBID → its MusicBrainz name | A correct cache `artist` — real groups kept whole, collaborations collapsed to the primary, compilation tracks credited to the actual performer |
+
+Common flags: `--limit N`, `--workers N`, `--dry-run`.
 
 ### Maintaining the Cache
 
@@ -217,7 +228,7 @@ Each playlist gets a **programmatically generated cover** in the same style as t
 
 Star ratings feed into playlist selection throughout: tracks rated ≥ 3 stars are gently prioritised over unrated tracks in scoring and sorting. Tracks rated ≤ 2 stars are excluded everywhere. The neutral point is 2.5 stars (Plex internal value 5). Only track-level ratings are used — album and artist ratings are ignored.
 
-If the same song exists on multiple albums in your library (studio release, singles compilation, Triple J Hottest 100, etc.), only one copy appears in any playlist — always the highest-scored version. Deduplication uses the track artist (resolving "Various Artists" on compilations back to the real performing artist) and a normalised title that ignores "Remastered", "Live", "Deluxe" suffixes.
+If the same song exists on multiple albums in your library (studio release, singles compilation, Triple J Hottest 100, etc.), only one copy appears in any playlist — always the highest-scored version. Deduplication keys on the track's **primary artist** — resolved from its MusicBrainz ID, so real bands stay whole, collaborations reduce to the primary, and compilation tracks are credited to the actual performer rather than the album's curator — plus a normalised title that ignores "Remastered", "Live", "Deluxe" suffixes.
 
 ### Running the script
 
@@ -230,7 +241,7 @@ python utilities/meloday_extras.py --playlist mood_mixes --reselect-moods
 python utilities/meloday_extras.py --playlist mood_mixes --time-context
 ```
 
-Available playlist IDs: `on_repeat`, `repeat_rewind`, `release_radar`, `discover_weekly`, `daily_mixes`, `rediscovery`, `time_capsule`, `deep_cuts`, `top_songs`, `all_time_favourites`, `mood_mixes`
+Available playlist IDs: `on_repeat`, `repeat_rewind`, `release_radar`, `discover_weekly`, `daily_mixes`, `rediscovery`, `time_capsule`, `time_machine`, `deep_cuts`, `top_songs`, `all_time_favourites`, `mood_mixes`
 
 ### First-time setup
 
@@ -244,6 +255,7 @@ python utilities/meloday_extras.py --playlist release_radar
 python utilities/meloday_extras.py --playlist discover_weekly
 python utilities/meloday_extras.py --playlist rediscovery
 python utilities/meloday_extras.py --playlist time_capsule
+python utilities/meloday_extras.py --playlist time_machine
 python utilities/meloday_extras.py --playlist deep_cuts
 python utilities/meloday_extras.py --playlist all_time_favourites
 python utilities/meloday_extras.py --playlist mood_mixes
@@ -257,60 +269,60 @@ python utilities/meloday_extras.py --playlist top_songs
 | --- | --- | --- | --- |
 | On Repeat | Meloday+ On Repeat | Tracks played at least twice in the past 30 days, weighted by recency × frequency. Artist cap of 3. | Weekly (Monday) |
 | Repeat Rewind | Meloday+ Repeat Rewind | Tracks that were in heavy rotation 4–10 weeks ago (min 2 plays) but haven't been played in the last 30 days — last month's On Repeat. | Weekly (Monday) |
-| Release Radar | Meloday+ Release Radar | Tracks from recently released albums ranked by acoustic taste fit. Expands from a 14-day window in 7-day steps until 30 tracks are found. One album per artist. | Weekly (Friday) |
+| Release Radar | Meloday+ Release Radar | Tracks from recently released albums ranked by acoustic taste fit. Expands from a 14-day window in 7-day steps until enough tracks are found. One album per artist. | Weekly (Friday) |
 | Discover Weekly | Meloday+ Discover Weekly | ~70% tracks from artists you've never played, ~30% from familiar artists — all unheard. Scored by acoustic affinity. Includes an exploration slice of less-obvious picks. | Weekly (Monday) |
 | Daily Mix 1–6 | Meloday+ Daily Mix 1–6 | Six 50-track mixes from k-means acoustic clustering of your listening history. Mix 1 is always your most-played cluster; numbering is stable across runs. | Daily |
 | Rediscovery | Meloday+ Rediscovery | Tracks rated ≥ 3.5 stars or played ≥ 3 times that haven't been played in 6–24 months. Longest-neglected first. | Weekly (Sunday) |
-| Time Capsule | Meloday+ Time Capsule | Music from your formative years. Set `birth_year` in config for era-anchored selection (ages 13–25); otherwise infers peak listening eras from history. | Weekly (Sunday) |
+| Time Capsule | Meloday+ Time Capsule | The standout years of your own listening history — the tracks you played heavily in your peak earlier years. Set `birth_year` for era-anchored selection (ages 13–25); otherwise it infers your peak listening eras from history. | Weekly (Sunday) |
+| Time Machine | Meloday+ Time Machine | "This time, years ago" — what you were playing during this same week in a past year, rotating through the years week to week. | Weekly (Sunday) |
 | Deep Cuts | Meloday+ Deep Cuts | Rarely-played tracks by your 15 most-listened artists in the past 6 months, ranked by similarity to each artist's well-played catalogue. Interleaved across artists. | Weekly (Sunday) |
 | Top Songs YYYY | Meloday+ Top Songs 2024 | Annual most-played playlists, one per calendar year back to `top_songs_start_year`. Past years are generated once and never regenerated; only the current year refreshes. | Monthly |
 | All-Time Favourites | Meloday+ All-Time Favourites | Your 100 most-played tracks across your entire Plex library, sorted by all-time play count (uses `viewCount` — covers your full library lifetime, not just a history window). No artist cap — reflects your actual listening, however concentrated. | Weekly (Sunday) |
-| Mood Mixes | Meloday+ Workout, Focus, etc. | Up to 5 activity/mood playlists rotating from a pool of 14 profiles. See Mood Mixes below. | See below |
+| Mood Mixes | Meloday+ Workout, Synthwave, 1980s, etc. | A balanced daily slate of ~12 general mixes drawn from ~260 genre / vibe / activity profiles, with time-of-day, weather, seasonal, decade and city mixes layered on by context. See Mood Mixes below. | See below |
 
 ### Mood Mixes
 
-14 acoustic profiles are defined. Up to 5 appear at any time, selected based on your listening habits, time of day, and weather. Each mix has 50 tracks.
+Meloday+ ships **around 260 acoustic profiles** — a deep shelf of genre, vibe, activity, time, weather, seasonal, decade, and city mixes, each a 50-track playlist. You never see all of them at once: a **balanced daily slate** of general mixes is chosen each day, and **contextual mixes layer on top** as the hour, weather, and season change.
 
-**General profiles** (rotate weekly based on acoustic fit to your recent listening):
-Workout, Running, Party, Happy Hits, Focus, Chill, Sad Songs
+**The slate.** `mood_mix_count` general mixes (default 12 — roughly one per category, for variety) are selected and held stable, refreshing `mood_mix_rotations_per_day` times a day (default 6, ~every 4 hours) so the shelf stays fresh without thrashing. Selection scores each profile by acoustic fit to your recent listening, applies a recency penalty so the same mixes don't keep reappearing, and balances across categories. `mood_mix_exclude_played_days` keeps recently-played songs out and de-duplicates tracks across the mixes currently on the shelf.
 
-**Time-of-day profiles** (appear and disappear at precise boundary hours):
+**The categories:**
 
-| Profile | Name in Plex | Active window |
-| --- | --- | --- |
-| morning | Meloday+ Good Morning | 5am – noon |
-| dinner | Meloday+ Dinner | 5pm – 9pm |
-| late_night | Meloday+ Late Night | 10pm – 2am |
-| sleep | Meloday+ Sleep | 10pm – 4am |
+- **Genre & style (125 mixes)** — Rock, Electronic, Jazz, Hip-Hop, Soul & Funk, Folk & Country, Classical and Pop, plus their sub-styles (Boom Bap, Deep House, Bebop, Motown, Britpop, Outlaw Country, Synthwave, Shoegaze…). Membership is gated on the **Discogs genre classifier** (a per-track audio model spanning ~400 subgenres) — confidence-floored so the model's noisy low-probability guesses can't leak in, and constrained to the right parent genre. For format/scene genres an audio model has no word for (post-grunge, progressive rock), membership instead comes from **Last.fm community tags**; the festive mix gates on a holiday signal. These mixes are then **ranked on your library's own acoustic analysis** rather than the external tags, so genuine tracks beat mis-tagged mainstream.
+- **Vibe, mood & activity** — Happy, Melancholy, Euphoric, Nostalgic, Romantic, Focus, Deep Work, Workout, Running, Party, Driving, Cooking and many more — selected purely by acoustic (and lyric) fit, no genre gate.
+- **Time of day** — Good Morning, Dinner, Late Night, Sleep — appear and disappear at boundary hours.
+- **Weather** (requires `weather_location`) — Rainy Day, Sunny, Cosy, Stormy, Heatwave and others, season-adjusted by your latitude so a mild winter day doesn't trigger Cosy every day.
+- **Seasonal** — Spring, Summer, Autumn and Winter mixes (and Festive in December).
+- **Decade showcases** — the 1960s through 2020s, each a recognisable canon of the era, plus nostalgia mixes (Throwback Anthems, Memory Lane, School Days). Era mixes gate on a track's **original release year** and can drop compilations / Greatest-Hits using the MusicBrainz release type read from your file tags.
+- **City scenes** — Scotland, Australia and London mixes, gated on the artist's **MusicBrainz origin**.
 
-**Weather profiles** (added/removed daily based on current conditions — requires `weather_location` in config):
+**Smarter selection.** A few mixes are defined by SOUND + THEME rather than a genre tag — e.g. Acoustic Romance is built from a **seed-artist acoustic centroid** (gentle singer-songwriters à la Jack Johnson) plus **romantic lyric themes** from per-track lyric analysis. Across all mixes, tracks you really like (rated ≥ 3.5★) are nudged in, and popularity, listening-hour and origin leans shape the picks.
 
-| Profile | Name in Plex | Triggered when |
-| --- | --- | --- |
-| rainy_day | Meloday+ Rainy Day | Raining |
-| sunny | Meloday+ Sunny | Clear and warm for the season |
-| cosy | Meloday+ Cosy | Cold for the season |
+**DJ flow ordering.** After selection, each mix's tracks are **re-sequenced for smooth transitions** — beatmatched (octave-aware tempo) and harmonically mixed (Camelot key), with no same-artist back-to-back. Four-on-the-floor dance mixes get a full **energy arc** (ease-in → build → peak → wind-down); everything else simply flows.
 
-Weather thresholds are season-adjusted using your location's latitude so a mild winter day doesn't trigger Cosy every day.
+**Operating modes** (controlled by flags):
 
-**Three operating modes** controlled by flags:
+- No flag: refreshes the general slate when a new rotation window is due, refreshes mix contents, and checks the weather.
+- `--reselect-moods`: forces a fresh general-mix selection immediately.
+- `--time-context` (run at each boundary hour): only adds/removes the time-of-day mixes for the current hour; very fast (30-day history fetch only).
 
-- No flag (daily 6am): refreshes content of existing general mixes; checks weather
-- `--reselect-moods` (weekly Monday): re-scores all 14 profiles acoustically and rotates the general mix selection
-- `--time-context` (at each time boundary): only adds/removes time-of-day mixes based on current hour; very fast (30-day history fetch only)
+### Optional: Last.fm integration
 
-### Optional: Last.fm popularity ranking
+Setting `lastfm_api_key` in the `extras:` config block pulls two signals from Last.fm (run `pre_analyze.py --sync-metadata` to populate them into the cache):
 
-Setting `lastfm_api_key` in the `extras:` config block enables Last.fm global play count data for **Release Radar** track selection — it will prefer the most-played tracks (typically singles) from each new album rather than the most acoustically central ones. Only the API key is needed; the secret is not required for read-only lookups.
+- **Community genre tags** — used to gate the genre mixes for styles an audio model can't name (post-grunge, progressive rock), and as a popularity floor for "hits-only" mixes.
+- **Global play counts** — used to lean recognisable mixes toward better-known songs, and to rank Release Radar toward each album's most-played tracks (typically the singles) rather than the most acoustically central ones.
 
-Then add your key to the `extras:` config block. The integration degrades gracefully if the key is absent or a lookup fails.
+Only the API key is needed; the secret is not required for read-only lookups. The integration degrades gracefully if the key is absent or a lookup fails.
 
 ### Scheduling
 
 ```bash
-# Daily — content refresh + weather check
+# Daily — Daily Mixes refresh once each morning
 0 6 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist daily_mixes
-0 6 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist mood_mixes
+
+# Mood mixes — rotate the general slate through the day + check weather (match mood_mix_rotations_per_day)
+0 */4 * * * /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist mood_mixes
 
 # Weekly (Mondays)
 0 6 * * 1 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist on_repeat
@@ -324,6 +336,7 @@ Then add your key to the `extras:` config block. The integration degrades gracef
 # Weekly (Sundays)
 0 6 * * 0 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist rediscovery
 0 6 * * 0 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist time_capsule
+0 6 * * 0 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist time_machine
 0 6 * * 0 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist deep_cuts
 0 6 * * 0 /path/to/.venv/bin/python /path/to/meloday/utilities/meloday_extras.py --playlist all_time_favourites
 
@@ -362,9 +375,9 @@ Meloday works best with **larger, well-tagged music libraries**.
 pip install -r requirements.txt
 ```
 
-This installs: `plexapi`, `Pillow`, `pyyaml`, `ruamel.yaml`, `tqdm`, `psutil`, `requests`
+This installs `plexapi`, `Pillow`, `pyyaml`, `ruamel.yaml`, `tqdm`, `psutil`, `requests`, `mutagen` (reads MusicBrainz tags embedded in your files), and — for the optional lyric analysis — `openai`, `tiktoken`, and `langdetect`.
 
-**Essentia** (optional, for acoustic analysis) is listed in `requirements.txt` but may require a separate install step depending on your platform. See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails.
+**Essentia** (optional, for acoustic analysis) ships as `essentia-tensorflow` in `requirements.txt`, but may require a separate install step depending on your platform. See the [Essentia installation guide](https://essentia.upf.edu/installing.html) if the pip install fails.
 
 ### 2. Configure your environment
 
@@ -437,10 +450,18 @@ When enabled, run `python utilities/meloday_cron.py` to install or update the sc
 | --- | --- | --- |
 | `enabled` | `false` | Enable Essentia acoustic matching. Requires `pre_analyze.py` to have been run. |
 | `cache_path` | `assets/essentia_cache.db` | Path to the SQLite acoustic cache |
-| `bpm_weight` | `0.15` | Influence of tempo on track distance scoring |
-| `key_weight` | `0.15` | Influence of harmonic key on track distance scoring |
-| `energy_weight` | `0.10` | Influence of energy/loudness on track distance scoring |
-| `era_weight` | `0.05` | Influence of production era (year) on track distance scoring |
+| `bpm_weight` | `0.15` | Influence of tempo on track distance |
+| `key_weight` | `0.15` | Influence of harmonic key compatibility on track distance |
+| `energy_weight` | `0.10` | Influence of loudness consistency |
+| `era_weight` | `0.05` | Influence of production era (year) |
+| `danceability_weight` | `0.08` | Influence of rhythmic danceability |
+| `brightness_weight` | `0.06` | Influence of spectral brightness (tonal darkness vs brightness) |
+| `beat_confidence_weight` | `0.07` | Influence of beat/groove strength |
+| `onset_rate_weight` | `0.05` | Influence of arrangement density |
+| `arousal_weight` | `0.10` | Influence of arousal (energy/activation) — TensorFlow models only |
+| `valence_weight` | `0.08` | Influence of valence (positive/negative mood) — TensorFlow models only |
+| `vocal_weight` | `0.04` | Influence of vocal presence — TensorFlow models only |
+| `models_dir` | `assets/models` | Directory of the Essentia-TensorFlow `.pb` model files |
 | `path_mapping` | `{}` | Optional path remapping if your script and Plex server use different file paths |
 
 ### `bridging:`
@@ -477,14 +498,19 @@ Configuration for `meloday_extras.py`. All keys are optional with sensible defau
 | `discover_weekly_size` | `30` | Number of tracks in Discover Weekly |
 | `release_radar_start_days` | `14` | Initial Release Radar window (days) |
 | `release_radar_step_days` | `7` | Days to expand if below `release_radar_min_tracks` |
-| `release_radar_min_tracks` | `30` | Keep expanding until this many tracks are found |
+| `release_radar_min_tracks` | `50` | Keep expanding the window until this many unique-artist releases are available |
 | `release_radar_max_days` | `90` | Hard cap on Release Radar window expansion |
 | `birth_year` | *(unset)* | Your year of birth. Enables era-anchored Time Capsule (ages 13–25). If unset, peak listening eras are inferred from history. |
 | `top_songs_start_year` | current year − 5 | Earliest year to generate a Top Songs playlist for. Set this to the year you started using Plex. |
-| `mood_mix_count` | `5` | Number of mood/activity mixes to show at once (from 14 profiles). |
+| `mood_mix_count` | `12` | Number of general mood mixes on the shelf at once (from ~260 profiles — roughly one per category, for a balanced slate). Contextual time / weather / season / decade / city mixes add on top. |
+| `mood_mix_rotations_per_day` | `6` | How many times a day the general mixes rotate to a fresh slate (run the generator at least this often; 6 ≈ every 4 hours). |
+| `mood_mix_exclude_played_days` | `3` | Keep songs played in the last N days out of the mixes for variety (`0` disables); also de-duplicates tracks across the mixes on the shelf. |
+| `exclude_compilations_from_era` | `true` | Drop compilations (Various Artists, Greatest Hits) from the decade/era mixes, using the MusicBrainz release type from your file tags. |
+| `era_excluded_release_types` | `["compilation"]` | Which MusicBrainz release types the decade mixes drop (add `"soundtrack"` / `"live"` to also exclude those). |
 | `weather_location` | *(unset)* | City name, coordinates, or airport code (e.g. `"Melbourne"`). Enables weather-triggered mood mixes (Rainy Day, Sunny, Cosy). Uses wttr.in — no API key needed. |
-| `lastfm_api_key` | *(unset)* | Last.fm API key. Enables popularity-ranked track selection in Release Radar. Only the key is needed (not the secret). |
+| `lastfm_api_key` | *(unset)* | Last.fm API key. Enables Last.fm community tags + global play counts — used for genre-mix gating, popularity leans, and popularity-ranked Release Radar selection. Only the key is needed (not the secret). |
 | `lastfm_api_secret` | *(unset)* | Last.fm API secret. Not required for current functionality; reserved for future use. |
+| `openai_api_key` | *(unset)* | OpenAI API key. Enables the lyric-analysis sync (`pre_analyze.py --sync-lyrics`), which extracts per-track lyric themes and sentiment used by the theme/mood mixes. Optional — without it, lyric-based selection is simply skipped. |
 
 ### `seasonal:`
 
@@ -593,4 +619,4 @@ On **Windows**, use Task Scheduler to create equivalent triggers.
 
 ## Who Made This?
 
-Forked from [trackstacker/meloday](https://github.com/trackstacker/meloday) and significantly extended with Essentia acoustic analysis, multi-dimensional diversity balancing, sonic bridging, an automatic optimiser, and various performance improvements — with assistance from [Claude Code](https://claude.ai/claude-code).
+Forked from [trackstacker/meloday](https://github.com/trackstacker/meloday) and significantly extended with Essentia + TensorFlow acoustic analysis, multi-dimensional diversity balancing, sonic bridging, an automatic optimiser, a companion "Meloday+" system of ~260 contextual mood mixes and Spotify-analogue playlists, and a Discogs / Last.fm / MusicBrainz enrichment pipeline — with assistance from [Claude Code](https://claude.ai/claude-code).
