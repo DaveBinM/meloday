@@ -978,7 +978,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
                     pass
             return data
 
-        data["artist"] = norm_text(primary_artist(track_artist_name(track)))
+        data["artist"] = canonical_artist(track)
         data["genres"] = _resolve_tags(track, "genres")
         data["styles"] = _resolve_tags(track, "styles")
         data["moods"]  = _resolve_tags(track, "moods")
@@ -1005,7 +1005,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "bpm": None, "key": None, "energy": None,
             "danceability": None, "brightness": None,
             "year": getattr(track, "year", None) or album_meta(track).get("year"),
-            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "artist": canonical_artist(track),
             "genres": _resolve_tags(track, "genres"),
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
@@ -1036,7 +1036,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "bpm": None, "key": None, "energy": None,
             "danceability": None, "brightness": None,
             "year": track_year,
-            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "artist": canonical_artist(track),
             "genres": _resolve_tags(track, "genres"),
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
@@ -1068,7 +1068,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "bpm": None, "key": None, "energy": None,
             "danceability": None, "brightness": None,
             "year": track_year,
-            "artist": norm_text(primary_artist(track_artist_name(track))),
+            "artist": canonical_artist(track),
             "genres": _resolve_tags(track, "genres"),
             "styles": _resolve_tags(track, "styles"),
             "moods":  _resolve_tags(track, "moods"),
@@ -1287,7 +1287,12 @@ def track_artist_name(track) -> str:
 
 
 # --- Dedup helpers: prefer studio albums over compilations/soundtracks ---
-_FEAT_SPLIT_RE = re.compile(r"\s*(?:feat\.?|ft\.?|featuring)\s+.*$|\s+[&x]\s+.*$", re.IGNORECASE)
+# The feat/ft markers MUST be word-bounded (\b): the old leading `\s*` let "ft" match INSIDE a word, so
+# "Daft Punk" -> "Da", "Shift K3Y" -> "Shi", "Soft Cell" -> "So" (and "Soft Cell"/"SOFT PLAY" collided on
+# "so"). `\b` mirrors clean_title's already-correct `\bft\.?\s+`. The ` & `/` x ` collab split is kept
+# (it correctly reduces "A feat./& B" credits to the primary for dedup); band/duo names like
+# "Simon & Garfunkel" are instead kept whole upstream via the artist_mbid canonical name (canonical_artist).
+_FEAT_SPLIT_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring)\s+.*$|\s+[&x]\s+.*$", re.IGNORECASE)
 
 @functools.lru_cache(maxsize=None)
 def primary_artist(name: str) -> str:
@@ -1299,6 +1304,23 @@ def primary_artist(name: str) -> str:
     # Normalize whitespace and case for comparisons
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+
+# --- Cache artist key ---
+# The cache `artist` = the track's ATTRIBUTED artist, exactly per track_artist_name's rule: the album
+# artist (grandparentTitle) normally, falling back to the track artist (originalTitle) on a Various-Artists
+# compilation. A trailing "feat./ft./featuring ..." credit is stripped, but "&" is KEPT so bands/duos stay
+# whole ("Simon & Garfunkel", not "Simon"). We deliberately do NOT key this off the file's artist_mbid:
+# that tag is the track/RECORDING artist, which on compilations/soundtracks/remixes differs from the album
+# artist you filed the track under -- a MusicBrainz cross-check showed naming by that MBID mislabels them
+# (e.g. Nina Simone's comp tracks -> "Hans Zimmer"). track_artist_name already resolves the right artist;
+# we just stop mangling it (the old primary_artist truncated "Daft Punk"->"Da" and split duos -> "Simon").
+_FEAT_SUFFIX_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring)\s+.*$", re.IGNORECASE)
+
+def canonical_artist(track) -> str:
+    """Normalised cache `artist` key: album-artist (or track-artist on a VA comp) per track_artist_name,
+    with any trailing feat./ft. credit stripped but '&' kept so duos/bands stay whole."""
+    return norm_text(_FEAT_SUFFIX_RE.sub("", track_artist_name(track)).strip())
 
 def is_various_artists(name: str) -> bool:
     return (name or "").strip().casefold() in {"various artists", "various"}

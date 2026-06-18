@@ -21,7 +21,7 @@ from meloday import (
     save_essentia_cache, ESSENTIA_ENABLED,
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
-    _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text,
+    _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
     _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags,
 )
 
@@ -846,6 +846,44 @@ def _ensure_meta_fields(conn):
     if pend:
         conn.executemany("UPDATE essentia_cache SET title=?, release_date=? WHERE rating_key=?", pend)
         conn.commit()
+
+
+def repair_artist_names(limit=None, dry_run=False):
+    """One-off: re-derive the cache `artist` for every track with the corrected canonical_artist (the album
+    artist, or the track artist on a Various-Artists comp; trailing feat./ft. stripped, but '&' kept so
+    bands/duos stay whole). Fixes entries written before the primary_artist word-boundary fix, which let
+    'ft'/'feat' match INSIDE a word — truncating 'Daft Punk'->'da', 'Shift K3Y'->'shi', 'Soft Cell'->'so'
+    (colliding with 'SOFT PLAY') — and split duos 'Simon & Garfunkel'->'simon'. One bulk Plex search;
+    only the rows whose artist actually changes are updated. `--dry-run` previews without writing."""
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    cur = {rk: a for rk, a in conn.execute("SELECT rating_key, artist FROM essentia_cache")}
+    music = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600).library.section(MUSIC_LIBRARY)
+    pend, changed, checked, samples = [], 0, 0, []
+    for t in music.search(libtype='track', container_size=5000):
+        rk = str(t.ratingKey)
+        if rk not in cur:
+            continue
+        checked += 1
+        new = canonical_artist(t)
+        if new and new != cur[rk]:
+            changed += 1
+            if len(samples) < 25:
+                samples.append(f"{cur[rk]!r}->{new!r}")
+            pend.append((new, rk))
+            if not dry_run and len(pend) >= 500:
+                conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
+                conn.commit(); pend = []
+        if limit and checked >= int(limit):
+            break
+    if not dry_run and pend:
+        conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
+        conn.commit()
+    conn.close()
+    log_msg(f"[INFO] Artist-name repair: {changed} of {checked} tracks "
+            f"{'WOULD change (dry-run)' if dry_run else 'corrected'}. e.g. " + "; ".join(samples[:25]))
+    return changed
 
 
 def _ensure_mb_file_tags(limit=None):
@@ -2208,5 +2246,7 @@ if __name__ == "__main__":
             except Exception:
                 _lim = None
         sync_lastfm_tags(limit=_lim)
+    elif "--repair-artists" in sys.argv:
+        repair_artist_names(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
     else:
         bulk_analyze()
