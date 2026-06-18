@@ -4291,12 +4291,9 @@ _ORIGIN_PENALTY = 0.15   # gentle push-out of confirmed non-local artists (keeps
 
 # Origin specs are a single `places` set (place names matched against the artist's consolidated place
 # hierarchy — the MB heading area/region/country doesn't matter) + an optional `scene` set (Last.fm
-# scene-tag fallback). City mixes are auto-built from the glasgow_/london_/melbourne_ prefixes.
+# scene-tag fallback). NOTE: the glasgow_/london_/melbourne_ CITY mixes are deliberately NOT here — they
+# use a tiered, country-bounded geo gate instead (see _PROFILE_GEO_TIERS below), not this soft boost.
 _PROFILE_ORIGIN = {}
-for _pk in _MOOD_PROFILES:
-    for _pre, _city in (("glasgow_", "glasgow"), ("london_", "london"), ("melbourne_", "melbourne")):
-        if _pk.startswith(_pre):
-            _PROFILE_ORIGIN[_pk] = {"places": {_city}, "scene": {_city}}
 
 # Geographically-rooted genre mixes: prefer artists from the genre's home turf. The style gate keeps
 # the genre coherent; origin just refines toward authentic local artists (and gently pushes out
@@ -4321,6 +4318,35 @@ _PROFILE_GEO_GATE = {
     "australia_scene": {"places": {"australia"}, "scene": {"australia"}},
     "london_scene":    {"places": {"london"},    "scene": {"london"}},
 }
+
+# City STYLE mixes (glasgow_/london_/melbourne_*): a TIERED, COUNTRY-BOUNDED geo gate (replaces the old soft
+# origin boost). Selection fills from the strictest tier first and tops up outward — city, then region, then
+# the whole nation — and DROPS anything from outside the country (or with unknown origin): a HARD bound, no
+# full-pool fallback. Each tier is an _origin_match spec (matched against the artist's consolidated `places`,
+# with a Last.fm scene-tag fallback on the city/region tiers). Tier 3 = the whole nation; the UK set names
+# the constituent countries too, since ~15% of UK artists carry a UK place name but no GB code. The pinned
+# showcase scenes (_PROFILE_GEO_GATE) are excluded — london_scene shares the london_ prefix but keeps its own
+# single hard gate + popularity rotation. This changes SELECTION only; _dj_order still orders picks sonically.
+_UK_PLACES = {"united kingdom", "england", "scotland", "wales", "northern ireland"}
+_GEO_TIERS_BY_CITY = {
+    "glasgow":   [{"places": {"glasgow"},   "scene": {"glasgow"}},
+                  {"places": {"scotland"},  "scene": {"scotland"}},
+                  {"places": _UK_PLACES}],
+    "london":    [{"places": {"london"},    "scene": {"london"}},
+                  {"places": {"england"},   "scene": {"england"}},
+                  {"places": _UK_PLACES}],
+    "melbourne": [{"places": {"melbourne"}, "scene": {"melbourne"}},
+                  {"places": {"victoria"},  "scene": {"victoria"}},
+                  {"places": {"australia"}}],
+}
+_PROFILE_GEO_TIERS = {}
+for _pk in _MOOD_PROFILES:
+    if _pk in _PROFILE_GEO_GATE:          # never touch the pinned showcase scenes (london_scene shares prefix)
+        continue
+    for _pre, _city in (("glasgow_", "glasgow"), ("london_", "london"), ("melbourne_", "melbourne")):
+        if _pk.startswith(_pre):
+            _PROFILE_GEO_TIERS[_pk] = _GEO_TIERS_BY_CITY[_city]
+            break
 
 
 def _origin_match(entry, spec):
@@ -8849,6 +8875,32 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         history_rks = _h or history_rks
         library_rks = _l or library_rks
 
+    # City STYLE mixes (glasgow_/london_/melbourne_*): TIERED, country-bounded SELECTION. A track must be
+    # IN-COUNTRY to qualify at all (matches the NATION tier) — a HARD bound with NO full-pool fallback. The
+    # nation gate also kills cross-country place-name collisions (Victoria BC, Melbourne FL, London ON,
+    # Glasgow KY). Among in-country tracks, rank city (tier 0) -> region (1) -> rest-of-nation (2) and
+    # stable-sort each pool so the fill ladder spends city artists first, topping up outward only as needed.
+    # Dual-origin artists (e.g. Jimmy Barnes: born Glasgow, based Australia) carry BOTH nations in their place
+    # hierarchy, so they correctly qualify for both. Showcases are skipped (guard) so london_scene's own gate
+    # is untouched. SELECTION only — _dj_order still sequences the chosen tracks sonically (order unaffected).
+    _tiers = None if _is_showcase else _PROFILE_GEO_TIERS.get(profile_key)
+    _tier_of = {}
+    if _tiers:
+        def _track_tier(rk):
+            e = essentia_cache.get(rk, {})
+            if not _origin_match(e, _tiers[-1]):      # nation gate: out-of-country (or unknown) -> excluded,
+                return None                           # and Victoria-BC / Melbourne-FL collisions can't leak in
+            for _i in range(len(_tiers) - 1):         # then the finest in-country tier: city (0) or region (1)
+                if _origin_match(e, _tiers[_i]):
+                    return _i
+            return len(_tiers) - 1                     # in-country but neither city nor region -> nation tier
+        for rk in history_rks + library_rks:          # disjoint (played vs not), so no double count
+            _tt = _track_tier(rk)
+            if _tt is not None:
+                _tier_of[rk] = _tt
+        history_rks = sorted((rk for rk in history_rks if rk in _tier_of), key=_tier_of.get)
+        library_rks = sorted((rk for rk in library_rks if rk in _tier_of), key=_tier_of.get)
+
     # HARD exclusion — recently-played + tracks used by other dedup-eligible mixes. UNconditional:
     # never re-admitted to reach length (we widen the pool / relax the artist cap instead).
     if hard_exclude_rks:
@@ -9015,8 +9067,11 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         def _eff_score(rk):
             t = track_map.get(rk)
             return _combined_score(rk) - _rating_dist_bonus(getattr(t, "userRating", None) if t else None)
-        history_rks = sorted(history_rks[:n_history * 8], key=_eff_score)
-        library_rks = sorted(library_rks[:n_library * 8], key=_eff_score)
+        # City mixes: tier stays the PRIMARY key (city -> region -> nation); acoustic + loved-track lean order
+        # WITHIN each tier. Selection order only — _dj_order re-sequences the final picks sonically.
+        _key = (lambda rk: (_tier_of[rk], _eff_score(rk))) if _tier_of else _eff_score
+        history_rks = sorted(history_rks[:n_history * 8], key=_key)
+        library_rks = sorted(library_rks[:n_library * 8], key=_key)
 
     if profile_key in _BALANCED_PROFILES and not _is_showcase:
         # 50/50 balance: ~half ANCHORS — tracks you'll KNOW (played, or popular on Last.fm) or already
