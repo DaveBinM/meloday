@@ -849,28 +849,33 @@ def _ensure_meta_fields(conn):
 
 
 def repair_artist_names(limit=None, dry_run=False):
-    """One-off: re-derive the cache `artist` for every track with the corrected canonical_artist (the album
-    artist, or the track artist on a Various-Artists comp; trailing feat./ft. stripped, but '&' kept so
-    bands/duos stay whole). Fixes entries written before the primary_artist word-boundary fix, which let
-    'ft'/'feat' match INSIDE a word — truncating 'Daft Punk'->'da', 'Shift K3Y'->'shi', 'Soft Cell'->'so'
-    (colliding with 'SOFT PLAY') — and split duos 'Simon & Garfunkel'->'simon'. One bulk Plex search;
-    only the rows whose artist actually changes are updated. `--dry-run` previews without writing."""
+    """One-off: re-derive the cache `artist` for every track via canonical_artist — the PRIMARY artist from
+    the file's MusicBrainz artist-ID (real Groups kept whole, collaborations -> primary, compilation tracks
+    -> the per-track performer; classical keeps the performer). Build the name map first with
+    --sync-artist-names. One bulk Plex search; only rows whose artist changes are updated. --dry-run previews."""
+    import json as _json
+    def _j(x):
+        try: return _json.loads(x) if x else None
+        except Exception: return None
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     _ensure_db_schema(conn)
-    cur = {rk: a for rk, a in conn.execute("SELECT rating_key, artist FROM essentia_cache")}
+    ent = {rk: {"artist": a, "artist_mbid": mb, "genres": _j(g), "styles": _j(st), "genre_discogs": _j(gd)}
+           for rk, a, mb, g, st, gd in conn.execute(
+               "SELECT rating_key, artist, artist_mbid, genres, styles, genre_discogs FROM essentia_cache")}
     music = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600).library.section(MUSIC_LIBRARY)
     pend, changed, checked, samples = [], 0, 0, []
     for t in music.search(libtype='track', container_size=5000):
         rk = str(t.ratingKey)
-        if rk not in cur:
+        e = ent.get(rk)
+        if e is None:
             continue
         checked += 1
-        new = canonical_artist(t)
-        if new and new != cur[rk]:
+        new = canonical_artist(t, e)
+        if new and new != e["artist"]:
             changed += 1
             if len(samples) < 25:
-                samples.append(f"{cur[rk]!r}->{new!r}")
+                samples.append(f"{e['artist']!r}->{new!r}")
             pend.append((new, rk))
             if not dry_run and len(pend) >= 500:
                 conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
@@ -884,6 +889,59 @@ def repair_artist_names(limit=None, dry_run=False):
     log_msg(f"[INFO] Artist-name repair: {changed} of {checked} tracks "
             f"{'WOULD change (dry-run)' if dry_run else 'corrected'}. e.g. " + "; ".join(samples[:25]))
     return changed
+
+
+def sync_artist_names(limit=None):
+    """Build/refresh assets/mbid_artist_names.json: each distinct artist_mbid -> its MusicBrainz artist name.
+    Incremental (only fetches MBIDs not already mapped), <=1 req/s (MB limit). canonical_artist uses this map
+    to name the cache `artist` from the file's recording-artist MBID — the authoritative primary artist, so a
+    real Group ("Mumford & Sons") stays whole while a collaboration collapses to its first-credit artist."""
+    import json as _json, urllib.request, urllib.error
+    import meloday as _md
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    mbids = {m for (m,) in conn.execute(
+        "SELECT DISTINCT artist_mbid FROM essentia_cache WHERE artist_mbid IS NOT NULL")}
+    conn.close()
+    try:
+        have = _json.load(open(_md.MBID_ARTIST_MAP_PATH, encoding="utf-8"))
+    except Exception:
+        have = {}
+    todo = [m for m in mbids if m not in have]
+    if limit:
+        todo = todo[:int(limit)]
+    if not todo:
+        log_msg(f"[INFO] artist-name map: nothing to do — {len(have)} MBIDs already named.")
+        return
+    log_msg(f"[INFO] Resolving {len(todo)} artist MBIDs -> MusicBrainz names "
+            f"(<=1 req/s, ~{len(todo) * 1.05 / 60:.0f} min)...")
+    UA = "meloday/2.2 (artist-name map; davebinm@gmail.com)"
+
+    def fetch(mbid):
+        req = urllib.request.Request(f"https://musicbrainz.org/ws/2/artist/{mbid}?fmt=json",
+                                     headers={"User-Agent": UA})
+        for _ in range(4):
+            try:
+                with urllib.request.urlopen(req, timeout=25) as r:
+                    return _json.load(r).get("name")
+            except urllib.error.HTTPError as ex:
+                if ex.code in (503, 429):
+                    time.sleep(3.0); continue
+                return None
+            except Exception:
+                time.sleep(2.0)
+        return None
+
+    for i, m in enumerate(todo):
+        nm = fetch(m)
+        if nm:
+            have[m] = nm
+        time.sleep(1.05)
+        if (i + 1) % 100 == 0:
+            _json.dump(have, open(_md.MBID_ARTIST_MAP_PATH, "w"), ensure_ascii=False)
+            log_msg(f"[INFO]   ...{i + 1}/{len(todo)} ({len(have)} named)")
+    _json.dump(have, open(_md.MBID_ARTIST_MAP_PATH, "w"), ensure_ascii=False)
+    _md._MBID_ARTIST_MAP = _md._load_mbid_artist_map()
+    log_msg(f"[INFO] artist-name map complete: {len(have)} MBIDs named.")
 
 
 def _ensure_mb_file_tags(limit=None):
@@ -2246,6 +2304,8 @@ if __name__ == "__main__":
             except Exception:
                 _lim = None
         sync_lastfm_tags(limit=_lim)
+    elif "--sync-artist-names" in sys.argv:
+        sync_artist_names(limit=_arg_limit())
     elif "--repair-artists" in sys.argv:
         repair_artist_names(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
     else:

@@ -978,7 +978,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
                     pass
             return data
 
-        data["artist"] = canonical_artist(track)
+        data["artist"] = canonical_artist(track, data)
         data["genres"] = _resolve_tags(track, "genres")
         data["styles"] = _resolve_tags(track, "styles")
         data["moods"]  = _resolve_tags(track, "moods")
@@ -1018,6 +1018,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
             "arousal": None, "valence": None, "vocal_presence": None,
         }
         data.update(_read_mb_file_tags(data.get("file_path")))
+        data["artist"] = canonical_artist(track, data)   # primary artist via MBID->MusicBrainz map
         _essentia_cache[rk] = data
         return data
 
@@ -1050,6 +1051,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
         }
         log_text(f"[DIAGNOSTIC] Skipping Essentia for '{track.title}' ({duration_ms // 60000}m — too long for RhythmExtractor).")
         data.update(_read_mb_file_tags(file_path))
+        data["artist"] = canonical_artist(track, data)   # primary artist via MBID->MusicBrainz map
         _essentia_cache[rk] = data
         return data
 
@@ -1082,6 +1084,7 @@ def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_a
         }
         _fill_missing_acoustic(data, file_path, audio=audio, track_title=track.title)
         data.update(_read_mb_file_tags(file_path))
+        data["artist"] = canonical_artist(track, data)   # primary artist via MBID->MusicBrainz map
         _essentia_cache[rk] = data
         return data
     except Exception as e:
@@ -1307,19 +1310,45 @@ def primary_artist(name: str) -> str:
 
 
 # --- Cache artist key ---
-# The cache `artist` = the track's ATTRIBUTED artist, exactly per track_artist_name's rule: the album
-# artist (grandparentTitle) normally, falling back to the track artist (originalTitle) on a Various-Artists
-# compilation. A trailing "feat./ft./featuring ..." credit is stripped, but "&" is KEPT so bands/duos stay
-# whole ("Simon & Garfunkel", not "Simon"). We deliberately do NOT key this off the file's artist_mbid:
-# that tag is the track/RECORDING artist, which on compilations/soundtracks/remixes differs from the album
-# artist you filed the track under -- a MusicBrainz cross-check showed naming by that MBID mislabels them
-# (e.g. Nina Simone's comp tracks -> "Hans Zimmer"). track_artist_name already resolves the right artist;
-# we just stop mangling it (the old primary_artist truncated "Daft Punk"->"Da" and split duos -> "Simon").
+# The cache `artist` is the track's PRIMARY artist, resolved from the file's MusicBrainz artist-ID via a
+# `mbid -> MusicBrainz name` map (assets/mbid_artist_names.json). The MBID is the recording/track artist
+# (first credit) and MusicBrainz names it authoritatively, so a real GROUP stays whole ("Mumford & Sons",
+# "Simon & Garfunkel") while a COLLABORATION collapses to its primary ("David Bowie & BT" -> "David Bowie";
+# "Max Berlin & Joakim" -> "Max Berlin"), and on compilations (incl. curator / DJ-mix comps where the album
+# artist is the curator) the per-track performer is used, not the curator. CLASSICAL is the exception: the
+# files tag the COMPOSER as the recording artist, but the user organises classical by PERFORMER, so those
+# tracks keep the track_artist_name value instead. Fallback (no/unmapped MBID, ~2%, or classical):
+# track_artist_name, feat-stripped, "&" kept so a band/duo on its own album stays whole.
+MBID_ARTIST_MAP_PATH = os.path.join(BASE_DIR, "assets", "mbid_artist_names.json")
+
+def _load_mbid_artist_map():
+    try:
+        with open(MBID_ARTIST_MAP_PATH, "r", encoding="utf-8") as f:
+            return {k: v for k, v in json.load(f).items() if k and v}
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+_MBID_ARTIST_MAP = _load_mbid_artist_map()
 _FEAT_SUFFIX_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring)\s+.*$", re.IGNORECASE)
 
-def canonical_artist(track) -> str:
-    """Normalised cache `artist` key: album-artist (or track-artist on a VA comp) per track_artist_name,
-    with any trailing feat./ft. credit stripped but '&' kept so duos/bands stay whole."""
+def _is_classical(data) -> bool:
+    """Classical tracks tag the COMPOSER as the recording artist; we keep the performer for them instead."""
+    if not data:
+        return False
+    tags = [str(t).lower() for t in (data.get("genres") or []) + (data.get("styles") or [])]
+    if any("classical" in t or "opera" in t for t in tags):
+        return True
+    gd = data.get("genre_discogs")
+    return isinstance(gd, dict) and any(str(k).split("---")[0].strip().lower() == "classical" for k in gd)
+
+def canonical_artist(track, data=None) -> str:
+    """Normalised cache `artist` key: the PRIMARY artist via the artist_mbid -> MusicBrainz-name map (groups
+    kept whole, collaborations -> primary, comp tracks -> performer). Classical keeps the performer; a missing
+    or unmapped MBID falls back to track_artist_name (feat-stripped, "&" kept)."""
+    if data and not _is_classical(data):
+        nm = _MBID_ARTIST_MAP.get(data.get("artist_mbid"))
+        if nm:
+            return norm_text(nm)
     return norm_text(_FEAT_SUFFIX_RE.sub("", track_artist_name(track)).strip())
 
 def is_various_artists(name: str) -> bool:
