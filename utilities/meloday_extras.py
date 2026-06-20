@@ -187,7 +187,6 @@ _EXTRAS_COVER_COLORS = {
     "synth_pop": ((230, 90, 210), (40, 40, 120)),
     # rock / electronic / scores gap-fill
     "indie_rock": ((210, 90, 70), (90, 40, 55)),
-    "adult_alt": ((120, 140, 180), (50, 60, 95)),
     "post_grunge": ((110, 120, 110), (45, 50, 48)),
     "rap_rock": ((180, 50, 40), (40, 30, 35)),
     "festival_edm": ((90, 70, 230), (200, 40, 170)),
@@ -486,7 +485,6 @@ _COVER_BG_STYLES = {
     "synth_pop": ("waves", 11),
     # rock / electronic / scores gap-fill
     "indie_rock": ("triangles", 12),
-    "adult_alt": ("arc_sweep", 3),
     "post_grunge": ("geometric", 9),
     "rap_rock": ("triangles", 13),
     "festival_edm": ("starburst", 5),
@@ -1105,7 +1103,6 @@ _DESCRIPTIONS = {
     "synth_pop": ["Synths and hooks.", "Neon-lit electropop.", "80s sheen, modern pulse.", "Glittering synth-pop."],
     # rock / electronic / scores gap-fill
     "indie_rock": ["Guitar-forward indie and alt-rock.", "Anthems, hooks and jangle.", "Big choruses, skinny ties.", "Indie at full volume."],
-    "adult_alt": ["Polished, grown-up alternative.", "Mature alt-rock for the drive home.", "Widescreen guitars, radio-smooth.", "Alternative, all grown up."],
     "post_grunge": ["Post-grunge radio rock.", "Loud-quiet-loud, big choruses.", "Flannel hooks, full volume.", "The 2000s rock that ruled the radio."],
     "rap_rock": ["Rap-rock and nu-metal energy.", "Riffs, rhymes and attitude.", "Drop the bass and break stuff.", "Turn-of-the-millennium aggression."],
     "festival_edm": ["Big-room, main-stage EDM.", "Hands up — festival drops.", "Build, drop, repeat.", "The anthems that close the set."],
@@ -1903,7 +1900,6 @@ _MOOD_PROFILES = {
     "synth_pop": {"bpm": 116, "energy": -10, "danceability": 0.58, "brightness": 0.42, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.66, "vocal_presence": 0.72},
     # --- Meloday+ rock / electronic / scores gap-fill (play-history-driven) ---
     "indie_rock": {"bpm": 124, "energy": -10, "danceability": 0.50, "brightness": 0.33, "beat_confidence": 0.72, "onset_rate": 5.2, "dynamic_complexity": 0.46, "arousal": 0.70, "valence": 0.58, "vocal_presence": 0.72},
-    "adult_alt": {"bpm": 108, "energy": -12, "danceability": 0.46, "brightness": 0.30, "beat_confidence": 0.64, "onset_rate": 4.2, "dynamic_complexity": 0.50, "arousal": 0.55, "valence": 0.56, "vocal_presence": 0.74},
     "post_grunge": {"bpm": 126, "energy": -8, "danceability": 0.46, "brightness": 0.24, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.46, "arousal": 0.78, "valence": 0.46, "vocal_presence": 0.70},
     "rap_rock": {"bpm": 128, "energy": -7, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.84, "onset_rate": 6.0, "dynamic_complexity": 0.44, "arousal": 0.86, "valence": 0.45, "vocal_presence": 0.66},
     "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
@@ -2353,7 +2349,6 @@ _MOOD_MIX_NAMES = {
     "synth_pop": "Synth-Pop Nights • Meloday+",
     # --- Meloday+ rock / electronic / scores gap-fill ---
     "indie_rock": "Indie Anthems • Meloday+",
-    "adult_alt": "Adult Alternative • Meloday+",
     "post_grunge": "Post-Grunge • Meloday+",
     "rap_rock": "Rap-Rock & Nu-Metal • Meloday+",
     "festival_edm": "EDM Anthems • Meloday+",
@@ -2799,10 +2794,11 @@ _WORK_FOCUS_PROFILES = {"focus", "deep_work"}
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
-# Retired mixes — dropped because no membership signal survives the pure-Discogs gate: lofi_beats (Discogs
-# has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix) and adult_alt (no Discogs subgenre,
-# no Last.fm tag, and a seed centroid couldn't isolate it from generic alt-rock). Removed from the slate.
-_RETIRED_PROFILES = {"lofi_beats", "adult_alt"}
+# Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
+# lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
+# (adult_alt was retired for the same reason and is now FULLY removed, not a soft-retired stub. WHY: its
+# style gate matched 0 tracks, so every lingering config entry — centroid, name, floor, etc. — was dead.)
+_RETIRED_PROFILES = {"lofi_beats"}
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
@@ -2816,7 +2812,7 @@ _PROFILE_CATEGORY = {
     "situationship": "romantic", "sad_bangers": "energy", "power_ballads": "emotional",
     "restless": "emotional", "neoclassical": "calm", "yacht_rock": "upbeat", "swagger": "groove",
     "chart_pop": "upbeat", "dance_pop": "energy", "indie_pop": "upbeat", "synth_pop": "upbeat",
-    "indie_rock": "upbeat", "adult_alt": "emotional", "post_grunge": "energy",
+    "indie_rock": "upbeat", "post_grunge": "energy",
     "rap_rock": "energy", "festival_edm": "energy", "soundtracks": "cinematic", "rave_cave": "energy",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "era",
@@ -3060,7 +3056,6 @@ _PROFILE_MOOD_SIGNALS = {
     "synth_pop": (["stylish", "sparkling", "bright", "lively", "sophisticated", "nocturnal"], ["aggressive", "rustic", "raw"]),
     # rock / electronic / scores gap-fill
     "indie_rock": (["lively", "stylish", "energetic", "rousing", "wry", "earnest"], ["sad", "somber", "aggressive"]),
-    "adult_alt": (["earnest", "reflective", "warm", "yearning", "stylish", "sophisticated"], ["aggressive", "raucous", "abrasive"]),
     "post_grunge": (["brooding", "gritty", "intense", "angst-ridden", "cathartic", "fierce"], ["calm", "peaceful", "cheerful"]),
     "rap_rock": (["aggressive", "brash", "intense", "swaggering", "rebellious", "visceral"], ["calm", "peaceful", "gentle"]),
     "festival_edm": (["euphoric", "exuberant", "uplifting", "sparkling", "ecstatic", "exciting"], ["sad", "melancholy", "gritty"]),
@@ -3435,7 +3430,6 @@ _PROFILE_STYLE_SIGNALS = {
     "synth_pop": (["synth pop", "synth-pop", "synthwave", "new wave", "new romantic", "neo-electro", "electroclash", "sophisti-pop", "indie electronic"], ["metal", "country", "folk", "gospel"]),
     # rock / electronic / scores gap-fill (Plex + genre_discogs spellings)
     "indie_rock": (["alternative/indie rock", "indie rock", "college rock", "jangle pop", "garage rock revival", "modern rock"], ["rap", "drill", "techno", "edm", "gospel"]),
-    "adult_alt": (["adult alternative pop/rock", "alternative pop/rock", "adult alternative"], ["rap", "drill", "metal", "techno", "edm"]),
     "post_grunge": (["post-grunge", "post grunge"], ["rap", "drill", "techno", "edm", "gospel"]),
     "rap_rock": (["rap-rock", "rap rock", "rap-metal", "rap metal", "nu metal", "nü metal", "funk metal", "rapcore"], ["ambient", "folk", "gospel", "classical"]),
     "festival_edm": (["edm", "big room", "electro house", "future bass", "complextro"], ["metal", "country", "folk", "ambient", "gospel"]),
@@ -3601,7 +3595,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "adult_alt", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave",
+    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave",
     "festive",
     "spring_acoustic",
     "spring_strings",
@@ -3769,7 +3763,7 @@ _PROFILE_GENRE_PARENT = {
     "post_grunge": {"rock"}, "prog_rock": {"rock"}, "punk_energy": {"rock"},
     "emo_poppunk": {"rock"}, "garage_grunge": {"rock"}, "stoner_rock": {"rock"},
     "post_rock": {"rock"}, "britpop_rock": {"rock"}, "psych_haze": {"rock"},
-    "yacht_rock": {"rock"}, "adult_alt": {"rock"}, "summer_breeze": {"rock"},
+    "yacht_rock": {"rock"}, "summer_breeze": {"rock"},
     "spring_jangle": {"rock"}, "autumn_embers": {"rock"}, "rockabilly_surf": {"rock"},
     "indie_romance": {"rock"}, "london_calling": {"rock"}, "london_britpop": {"rock"},
     "glasgow_anthems": {"rock"}, "glasgow_postpunk": {"rock"}, "glasgow_postrock": {"rock"},
@@ -4024,7 +4018,6 @@ _PROFILE_MOODTHEME = {
     "synth_pop": ["energetic", "cool", "retro", "upbeat"],
     # rock / electronic / scores gap-fill
     "indie_rock": ["energetic", "upbeat", "cool", "melodic"],
-    "adult_alt": ["emotional", "melodic", "calm", "melancholic"],
     "post_grunge": ["energetic", "dark", "heavy", "powerful"],
     "rap_rock": ["energetic", "heavy", "dark", "powerful"],
     "festival_edm": ["party", "energetic", "uplifting", "upbeat"],
@@ -4399,7 +4392,7 @@ _PROFILE_POPULARITY = {
     # --- Meloday+ gap-fill mixes (pop mixes lean to hits; neoclassical digs deep) ---
     "sad_bangers": 1, "power_ballads": 1, "neoclassical": -1, "swagger": 1,
     "chart_pop": 1, "dance_pop": 1, "indie_pop": 1, "synth_pop": 1,
-    "indie_rock": 1, "adult_alt": 1, "post_grunge": 1, "rap_rock": 1, "festival_edm": 1,
+    "indie_rock": 1, "post_grunge": 1, "rap_rock": 1, "festival_edm": 1,
     # hits — the recognisable, well-known songs (decades, throwbacks, parties, sing-alongs, motivation)
     "decade_60s": 1, "decade_70s": 1, "decade_80s": 1, "decade_90s": 1, "decade_00s": 1,
     "decade_10s": 1, "decade_20s": 1,
@@ -4438,13 +4431,15 @@ _PROFILE_POPULARITY = {
 # never starves a mix; the pop mixes use it to stay recognisable rather than dredging up deep cuts.
 _PROFILE_MIN_LISTENERS = {
     "chart_pop": 500_000, "dance_pop": 400_000, "indie_pop": 150_000, "synth_pop": 150_000,
-    "indie_rock": 150_000, "adult_alt": 200_000, "post_grunge": 150_000, "rap_rock": 150_000, "festival_edm": 400_000,
+    "indie_rock": 150_000, "post_grunge": 150_000, "rap_rock": 150_000, "festival_edm": 400_000,
 }
 
 # Artist top-tracks gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear
-# the global-listener floor — both must hold (an artist's signature song AND a genuinely famous one). The
-# per-artist rank map is built by `pre_analyze.py --sync-top-tracks` (assets/lastfm_artist_top_tracks.json:
-# {artist: {norm_title: rank}}); the floor reads the lastfm_listeners column.
+# the global-listener floor — both must hold (an artist's signature song AND a genuinely famous one).
+# WHY: throwback_anthems is acoustic-vibe-ranked (category "social") with no popularity floor, so obscure
+# tracks that merely fit the vibe were displacing artists' actual hits. The per-artist rank map is built by
+# `pre_analyze.py --sync-top-tracks` (assets/lastfm_artist_top_tracks.json: {artist: {norm_title: rank}});
+# the floor reads the lastfm_listeners column.
 def _load_lastfm_top_tracks():
     try:
         with open(meloday.LASTFM_TOP_TRACKS_PATH, "r", encoding="utf-8") as f:
@@ -8896,10 +8891,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         library_rks = _l or library_rks
 
     # Anthem gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear the
-    # global-listener floor — recognisable signature hits, not deep cuts that merely fit the vibe. Cheap floor
-    # first, then the top-N rank lookup (so the rank map is only consulted for already-loud tracks). Graceful
-    # ladder so it never empties the mix: combined gate -> floor-only -> the (year-windowed) pool. Selection
-    # only; _dj_order still sequences the chosen tracks sonically.
+    # global-listener floor.
+    # WHY: the mix ranks by acoustic vibe with no popularity floor, so it was surfacing deep cuts that fit the
+    # vibe over recognisable signature hits — this restricts it to each artist's actual famous tracks.
+    # Cheap floor first, then the top-N rank lookup (so the rank map is only consulted for already-loud tracks).
+    # Graceful ladder so it never empties the mix: combined gate -> floor-only -> the (year-windowed) pool.
+    # Selection only; _dj_order still sequences the chosen tracks sonically.
     _ag = _PROFILE_ANTHEM_GATE.get(profile_key)
     if _ag:
         _floor_n, _topn = _ag["min_listeners"], _ag["top_n"]

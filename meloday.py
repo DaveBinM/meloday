@@ -1959,11 +1959,14 @@ def clean_title(title):
     return title_clean
 
 
-# Typographic punctuation -> ASCII for Last.fm lookups: Last.fm keeps SEPARATE track pages for curly vs
-# straight quotes and autocorrect does NOT merge them (confirmed: "I'm Gonna Be (500 Miles)" curly ~8k
-# listeners vs straight ~1M). Used by lastfm_query_title (and, wrapped in norm_text, as the top-tracks key).
+# Typographic punctuation -> ASCII for Last.fm lookups.
+# WHY: the RAW cache title was mismatching track.getInfo — Last.fm keeps SEPARATE pages for curly vs straight
+# quotes (autocorrect won't merge them), so listener counts were silently wrong (confirmed: "I'm Gonna Be
+# (500 Miles)" curly ~8k vs straight ~1M). Used by lastfm_query_title (+ norm_text-wrapped as top-tracks key).
 _LASTFM_PUNCT = {0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"', 0x2013: "-", 0x2014: "-", 0x2026: "..."}
-# Strip a trailing " - <version tag>" suffix (covers "remaster", which the _FEATURING_RES dash patterns miss).
+# Strip a trailing " - <version tag>" suffix.
+# WHY: the _FEATURING_RES dash patterns don't cover "remaster", so "Yellow - Remastered" matched a low
+# remaster page instead of the canonical track — this general suffix stripper fixes that.
 _DASH_KW_RE = re.compile(rf"\s-\s.*(?:{_KW_ALT}).*$", re.IGNORECASE)
 
 

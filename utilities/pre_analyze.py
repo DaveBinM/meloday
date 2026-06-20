@@ -1151,10 +1151,10 @@ def resync_lastfm_titles():
     affected = [rk for rk, t in rows if lastfm_query_title(t) != t]
     log_msg(f"[INFO] resync-lastfm-titles: {len(affected):,} of {len(rows):,} tracks have a changed Last.fm "
             f"query (typographic / version-suffix) — marking stale + re-fetching (~{len(affected)/5/60:.0f} min).")
-    # Mark them stale with an OLD timestamp, NOT NULL: sync_lastfm_tags' first-run migration re-stamps
-    # (lastfm_listeners IS NOT NULL AND lastfm_synced_at IS NULL) rows back to now, so a NULL here would be
-    # undone immediately. An old timestamp dodges that guard, and _refresh_due (Last.fm cadence <=120d) still
-    # treats it as due, so the re-fetch actually runs.
+    # Mark them stale with an OLD timestamp, NOT NULL.
+    # WHY: sync_lastfm_tags' first-run migration re-stamps (lastfm_listeners IS NOT NULL AND lastfm_synced_at
+    # IS NULL) rows back to now, so a NULL here would be undone immediately. An old timestamp dodges that
+    # guard, and _refresh_due (Last.fm cadence <=120d) still treats it as due, so the re-fetch actually runs.
     stale = time.time() - 3650 * 86400
     for i in range(0, len(affected), 500):
         conn.executemany("UPDATE essentia_cache SET lastfm_synced_at=? WHERE rating_key=?",
