@@ -22,7 +22,7 @@ from meloday import (
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
-    _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags, lastfm_query_title,
+    _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags, lastfm_query_title, is_alt_recording,
 )
 
 # --- LOGGING SETUP ---
@@ -1141,16 +1141,19 @@ def sync_lastfm_tags(limit=None):
 
 
 def resync_lastfm_titles():
-    """One-time after the lastfm_query_title fix: re-fetch listener counts for the tracks whose title is now
-    queried DIFFERENTLY (typographic punctuation / version-suffix titles the old raw-title query mis-matched —
-    e.g. a curly apostrophe matched a near-dead Last.fm page). Clears lastfm_synced_at for just those rows,
-    then runs sync_lastfm_tags() to re-fetch them (a small subset, not a full --force)."""
+    """One-time after a lastfm_query_title change: re-fetch listener counts for tracks whose query result
+    changed. Two groups: (1) titles the query now normalises differently (typographic punctuation / reissue
+    suffixes the old raw-title query mis-matched — e.g. a curly apostrophe hit a near-dead Last.fm page);
+    (2) DIFFERENT-RECORDING titles (remix/live/acoustic) that previously borrowed the canonical original's
+    count and must now read their OWN page. Marks just those rows stale, then runs sync_lastfm_tags()."""
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn)
     rows = conn.execute("SELECT rating_key, title FROM essentia_cache WHERE title IS NOT NULL").fetchall()
-    affected = [rk for rk, t in rows if lastfm_query_title(t) != t]
-    log_msg(f"[INFO] resync-lastfm-titles: {len(affected):,} of {len(rows):,} tracks have a changed Last.fm "
-            f"query (typographic / version-suffix) — marking stale + re-fetching (~{len(affected)/5/60:.0f} min).")
+    # WHY is_alt_recording: a remix's NEW query == its raw title (the tag is now KEPT), so the title-changed
+    # check alone misses it — yet its cached count is still the canonical original's and must be re-fetched.
+    affected = [rk for rk, t in rows if lastfm_query_title(t) != t or is_alt_recording(t)]
+    log_msg(f"[INFO] resync-lastfm-titles: {len(affected):,} of {len(rows):,} tracks need a Last.fm re-fetch "
+            f"(typographic / reissue / different-recording) — marking stale + re-fetching (~{len(affected)/5/60:.0f} min).")
     # Mark them stale with an OLD timestamp, NOT NULL.
     # WHY: sync_lastfm_tags' first-run migration re-stamps (lastfm_listeners IS NOT NULL AND lastfm_synced_at
     # IS NULL) rows back to now, so a NULL here would be undone immediately. An old timestamp dodges that

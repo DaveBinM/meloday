@@ -36,7 +36,6 @@ from meloday import (
     load_essentia_cache,
     norm_text,
     primary_artist,
-    clean_title,
     lastfm_query_title,
     track_artist_name,
     get_bpm_distance,
@@ -5587,14 +5586,17 @@ def _artist_key(track):
 
 def _song_key(track):
     """
-    Deduplication key: normalised (track_artist, clean_title) pair.
+    Deduplication key: normalised (track_artist, lastfm_query_title) pair.
     Uses track_artist_name() which resolves the actual performing artist even
     on compilation albums where grandparentTitle is 'Various Artists' — in that
     case it falls back to track.originalTitle (where Plex stores the real artist).
-    clean_title strips Live/Remastered/Deluxe suffixes.
+    Uses lastfm_query_title: strips reissue suffixes (Remastered/Deluxe/Radio Edit) but KEEPS
+    different-recording tags (remix/live/acoustic), so those count as their OWN distinct songs.
     """
     artist = norm_text(primary_artist(track_artist_name(track)))
-    title  = norm_text(clean_title(getattr(track, "title", "") or ""))
+    # WHY: lastfm_query_title (not clean_title) so a different RECORDING (remix/live/acoustic) keys as its OWN
+    # song — independently selectable in a mix — while reissues (remaster/deluxe) still collapse onto the original.
+    title  = norm_text(lastfm_query_title(getattr(track, "title", "") or ""))
     return (artist, title)
 
 
@@ -5602,7 +5604,7 @@ def _dedup_filter(tracks, essentia_cache=None):
     """
     Remove duplicate songs from a track list, keeping the most CANONICAL copy of each (studio/original
     — not a live / remix / demo / instrumental / compilation version) at the song's best (highest-
-    scored) position. Two tracks are the same song by normalised (artist, clean_title) key — so
+    scored) position. Two tracks are the same song by normalised (artist, lastfm_query_title) key — so
     "Stars" from a studio album and "Stars" from a compilation are treated as one entry.
     """
     return _dedup_canonical(tracks, essentia_cache)
@@ -8547,8 +8549,10 @@ def _era_is_comp(entry):
 
 
 def _entry_song_key(entry):
+    # WHY: lastfm_query_title (not clean_title) — a remix/live/acoustic keys as its OWN song (own listener
+    # count, its own decade-collapse entry, not borrowing the original's popularity), reissues still collapse.
     return (norm_text(primary_artist(entry.get("artist") or "")),
-            norm_text(clean_title(entry.get("title") or "")))
+            norm_text(lastfm_query_title(entry.get("title") or "")))
 def _song_min_year_map(essentia_cache):
     """Earliest cached year per song (artist+title) — so decade/era gating uses a track's ORIGINAL
     release rather than a reissue/compilation album year (Plex `year` is the album's, which is wrong

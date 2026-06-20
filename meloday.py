@@ -1485,9 +1485,14 @@ _VERSION_KEYWORDS_SORTED = sorted([
     "rework", "re-edit", "bootleg", "vip", "session", "alternate", "take",
     "mix cut", "cut", "dj mix"
 ], key=len, reverse=True)
-_FEATURING_RES = [re.compile(p, re.IGNORECASE) for p in [
+# Feat/ft credits only — always dropped (a credit, not a different recording).
+# WHY: split out so lastfm_query_title can apply ONLY these (its version stripping is recording-aware, below),
+# while clean_title keeps using the full set incl. the dash-version forms.
+_FEAT_RES = [re.compile(p, re.IGNORECASE) for p in [
     r"\(feat\.?.*?\)", r"\[feat\.?.*?\]", r"\(ft\.?.*?\)", r"\[ft\.?.*?\]",
     r"\bfeat\.?\s+\w+(?:\s+\w+)*", r"\bfeaturing\s+\w+(?:\s+\w+)*", r"\bft\.?\s+\w+(?:\s+\w+)*",
+]]
+_FEATURING_RES = _FEAT_RES + [re.compile(p, re.IGNORECASE) for p in [
     r" - .*mix$", r" - .*dub$", r" - .*remix$", r" - .*edit$", r" - .*version$",
 ]]
 _KW_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _VERSION_KEYWORDS_SORTED)
@@ -1969,25 +1974,56 @@ _LASTFM_PUNCT = {0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"', 0x2013: "-"
 # remaster page instead of the canonical track — this general suffix stripper fixes that.
 _DASH_KW_RE = re.compile(rf"\s-\s.*(?:{_KW_ALT}).*$", re.IGNORECASE)
 
+# "Different-recording" version tags: a DIFFERENT recording from the original (its own Last.fm page + its own
+# identity), as opposed to a reissue (remaster/deluxe/radio edit/original mix = the SAME recording re-released).
+# WHY: a remix/live/acoustic/etc. is its own track — it must read its OWN listener count and be a DISTINCT song,
+# not borrow the canonical original's popularity (which pulled e.g. a DJ Enferno remix into a decade mix on the
+# real "Party Rock Anthem" count). These keywords PROTECT a (paren)/[bracket]/" - " segment from being stripped
+# by lastfm_query_title; reissue segments are still stripped.
+_RECORDING_KEYWORDS = sorted([
+    "remix", "live", "acoustic", "instrumental", "unplugged", "karaoke", "acapella", "a cappella", "demo",
+    "dub", "cover", "rework", "re-edit", "bootleg", "vip", "rehearsal", "re-recorded", "rerecorded",
+    "session", "sessions", "alternate", "take", "dj mix", "mix cut", "mashup", "flip", "refix", "reprise",
+], key=len, reverse=True)
+_RECORDING_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _RECORDING_KEYWORDS)
+_RECORDING_KW_RE = re.compile(rf"\b(?:{_RECORDING_ALT})\b", re.IGNORECASE)
+
 
 def lastfm_query_title(title):
-    """Title cleaned for a Last.fm track lookup / match. Folds typographic punctuation to ASCII and strips
-    version/remaster/feat tags that sit in (parens), [brackets] or after ' - ' — but KEEPS apostrophes and
-    does NOT remove bare version words. Unlike clean_title (whose bare-word strip mangles real titles:
-    "Take On Me" -> "on me", "Live" -> ""), this is safe to send to track.getInfo, which wants the apostrophe
-    and the real words. Wrap in norm_text() for a case/apostrophe-insensitive match key."""
+    """Title cleaned for a Last.fm track lookup / match. Folds typographic punctuation to ASCII, drops feat/ft
+    credits, and strips REISSUE version tags (remaster / deluxe / radio edit / original mix — the same
+    recording re-released) — but KEEPS apostrophes, bare words, AND any DIFFERENT-RECORDING segment
+    (remix / live / acoustic / dub / …). Unlike clean_title (whose bare-word strip mangles real titles:
+    "Take On Me" -> "on me", "Live" -> ""), this is safe to send to track.getInfo.
+    WHY keep the different-recording tag: a remix is its own track — it must query its OWN Last.fm page (not
+    the original's) and, wrapped in norm_text(), key as a DISTINCT song; reissues still collapse to canonical.
+    Wrap in norm_text() for a case/apostrophe-insensitive match key."""
     if not title:
         return ""
     t = title.translate(_LASTFM_PUNCT)
-    for pat in _FEATURING_RES:
+    for pat in _FEAT_RES:                        # feat/ft credits — always dropped
         t = pat.sub("", t).strip()
-    t = _PAREN_KW_RE.sub(" ", t)
-    t = _BRACKET_KW_RE.sub(" ", t)
-    t = _DASH_KW_RE.sub("", t)
+    # Strip a version segment ONLY if it's a reissue; KEEP it when it names a different recording.
+    # WHY: protecting remix/live/acoustic/… is what makes the remix query its own page + key as its own song.
+    _keep_rec = lambda m: m.group(0) if _RECORDING_KW_RE.search(m.group(0)) else " "
+    t = _PAREN_KW_RE.sub(_keep_rec, t)
+    t = _BRACKET_KW_RE.sub(_keep_rec, t)
+    t = _DASH_KW_RE.sub(lambda m: m.group(0) if _RECORDING_KW_RE.search(m.group(0)) else "", t)
     t = _EMPTY_PAREN_RE.sub("", t)
     t = _EMPTY_BRACKET_RE.sub("", t)
     t = re.sub(r"\s+", " ", t).strip()
     return _TRAIL_DASH_RE.sub("", t).strip()
+
+
+def is_alt_recording(title):
+    """True if the title carries a DIFFERENT-RECORDING tag (remix/live/acoustic/dub/…) in a version position —
+    (parens), [brackets] or after ' - '. A bare title word ("Live and Let Die") is NOT a version tag, so it
+    doesn't count; reissue tags (remaster/deluxe) are not alt recordings either.
+    WHY: the resync re-fetches exactly these — their cached count must flip from the canonical to their own."""
+    if not title:
+        return False
+    return any(_RECORDING_KW_RE.search(m.group(0))
+               for rx in (_PAREN_KW_RE, _BRACKET_KW_RE, _DASH_KW_RE) for m in rx.finditer(title))
 
 
 def process_tracks(tracks):
