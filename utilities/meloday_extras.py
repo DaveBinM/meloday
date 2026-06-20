@@ -37,6 +37,7 @@ from meloday import (
     norm_text,
     primary_artist,
     clean_title,
+    lastfm_query_title,
     track_artist_name,
     get_bpm_distance,
     get_harmonic_distance,
@@ -3913,7 +3914,7 @@ _PROFILE_YEAR_WINDOW = {
     "decade_00s": (2000, 2009),
     "decade_10s": (2010, 2019),
     "decade_20s": (2020, 2029),
-    "throwback_anthems": (None, _NOW_YEAR - 12),   # nothing from the last ~12 years
+    "throwback_anthems": (None, _NOW_YEAR - 10),   # nothing from the last ~10 years (throwback distance)
     "old_friends":       (None, _NOW_YEAR - 8),
     "memory_lane":       (None, _NOW_YEAR - 10),
     "school_days":       (1990, _NOW_YEAR - 12),
@@ -4438,6 +4439,33 @@ _PROFILE_POPULARITY = {
 _PROFILE_MIN_LISTENERS = {
     "chart_pop": 500_000, "dance_pop": 400_000, "indie_pop": 150_000, "synth_pop": 150_000,
     "indie_rock": 150_000, "adult_alt": 200_000, "post_grunge": 150_000, "rap_rock": 150_000, "festival_edm": 400_000,
+}
+
+# Artist top-tracks gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear
+# the global-listener floor — both must hold (an artist's signature song AND a genuinely famous one). The
+# per-artist rank map is built by `pre_analyze.py --sync-top-tracks` (assets/lastfm_artist_top_tracks.json:
+# {artist: {norm_title: rank}}); the floor reads the lastfm_listeners column.
+def _load_lastfm_top_tracks():
+    try:
+        with open(meloday.LASTFM_TOP_TRACKS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+_LASTFM_TOP_TRACKS = _load_lastfm_top_tracks()
+
+def _artist_top_rank(entry):
+    """1-based rank of this track within its artist's Last.fm top tracks, or None (unmapped artist / not a top
+    track). Matches on norm_text(lastfm_query_title(title)) — the SAME key the map was built with."""
+    ranks = _LASTFM_TOP_TRACKS.get(entry.get("artist") or "")
+    if not ranks:
+        return None
+    return ranks.get(norm_text(lastfm_query_title(entry.get("title") or "")))
+
+_PROFILE_ANTHEM_GATE = {
+    # 100k floor calibrated from the cache; RE-TUNE after the listener-column fix re-syncs (curly-quote /
+    # remaster counts rise, so a few more tracks clear the floor).
+    "throwback_anthems": {"top_n": 10, "min_listeners": 100_000},
 }
 
 
@@ -8866,6 +8894,28 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _l = [rk for rk in library_rks if _orig_in(rk)]
         history_rks = _h or history_rks
         library_rks = _l or library_rks
+
+    # Anthem gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear the
+    # global-listener floor — recognisable signature hits, not deep cuts that merely fit the vibe. Cheap floor
+    # first, then the top-N rank lookup (so the rank map is only consulted for already-loud tracks). Graceful
+    # ladder so it never empties the mix: combined gate -> floor-only -> the (year-windowed) pool. Selection
+    # only; _dj_order still sequences the chosen tracks sonically.
+    _ag = _PROFILE_ANTHEM_GATE.get(profile_key)
+    if _ag:
+        _floor_n, _topn = _ag["min_listeners"], _ag["top_n"]
+        def _floor_ok(rk):
+            return (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _floor_n
+        def _anthem(rk):
+            if not _floor_ok(rk):
+                return False
+            r = _artist_top_rank(essentia_cache.get(rk, {}))
+            return r is not None and r <= _topn
+        for _pred in (_anthem, _floor_ok):              # strictest tier that can fill; else the year pool
+            _h = [rk for rk in history_rks if _pred(rk)]
+            _l = [rk for rk in library_rks if _pred(rk)]
+            if len(_h) + len(_l) >= mix_size:
+                history_rks, library_rks = _h, _l
+                break
 
     # Geo showcase mixes: HARD origin gate — keep only tracks whose artist is from the place.
     _geo = _PROFILE_GEO_GATE.get(profile_key)

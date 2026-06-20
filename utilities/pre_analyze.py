@@ -22,7 +22,7 @@ from meloday import (
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
-    _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags,
+    _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags, lastfm_query_title,
 )
 
 # --- LOGGING SETUP ---
@@ -1127,7 +1127,8 @@ def sync_lastfm_tags(limit=None):
         rk, artist, title = item
         artist, title = artist or "", title or ""
         at = _lf_artist_tags(artist, key) if artist else {}
-        info = (_lf_get({"method": "track.getInfo", "artist": artist, "track": title}, key).get("track")
+        info = (_lf_get({"method": "track.getInfo", "artist": artist,
+                         "track": lastfm_query_title(title)}, key).get("track")
                 or {}) if (artist and title) else {}
         tt = _lf_parse(info); listeners = int(info.get("listeners") or 0)
         disp = f"{artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}"
@@ -1137,6 +1138,87 @@ def sync_lastfm_tags(limit=None):
         "UPDATE essentia_cache SET lastfm_artist_tags=?, lastfm_track_tags=?, lastfm_listeners=?, "
         "lastfm_synced_at=? WHERE rating_key=?", workers, "Last.fm", verbose)
     log_msg(f"\n[INFO] Last.fm sync complete: {n} tracks.")
+
+
+def resync_lastfm_titles():
+    """One-time after the lastfm_query_title fix: re-fetch listener counts for the tracks whose title is now
+    queried DIFFERENTLY (typographic punctuation / version-suffix titles the old raw-title query mis-matched —
+    e.g. a curly apostrophe matched a near-dead Last.fm page). Clears lastfm_synced_at for just those rows,
+    then runs sync_lastfm_tags() to re-fetch them (a small subset, not a full --force)."""
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn)
+    rows = conn.execute("SELECT rating_key, title FROM essentia_cache WHERE title IS NOT NULL").fetchall()
+    affected = [rk for rk, t in rows if lastfm_query_title(t) != t]
+    log_msg(f"[INFO] resync-lastfm-titles: {len(affected):,} of {len(rows):,} tracks have a changed Last.fm "
+            f"query (typographic / version-suffix) — marking stale + re-fetching (~{len(affected)/5/60:.0f} min).")
+    # Mark them stale with an OLD timestamp, NOT NULL: sync_lastfm_tags' first-run migration re-stamps
+    # (lastfm_listeners IS NOT NULL AND lastfm_synced_at IS NULL) rows back to now, so a NULL here would be
+    # undone immediately. An old timestamp dodges that guard, and _refresh_due (Last.fm cadence <=120d) still
+    # treats it as due, so the re-fetch actually runs.
+    stale = time.time() - 3650 * 86400
+    for i in range(0, len(affected), 500):
+        conn.executemany("UPDATE essentia_cache SET lastfm_synced_at=? WHERE rating_key=?",
+                         [(stale, rk) for rk in affected[i:i + 500]])
+    conn.commit(); conn.close()
+    if affected:
+        sync_lastfm_tags()
+
+
+def sync_artist_top_tracks(limit=None):
+    """Build/refresh assets/lastfm_artist_top_tracks.json: per cache `artist`, the Last.fm top-~50 track
+    titles -> 1-based RANK (stored as {norm_title: rank}). Incremental (only artists not yet mapped),
+    <=5 req/s. Titles are keyed by norm_text(lastfm_query_title(...)) — the SAME key the gate uses to look a
+    track up. RANK only: the throwback-anthems 'widely known' floor reads the (now-fixed) lastfm_listeners
+    column. Per-artist, so it backfills the whole library at once."""
+    key = _load_lastfm_key()
+    if not key:
+        log_msg("[ERROR] No extras.lastfm_api_key in config — cannot sync artist top tracks.", level="error")
+        return
+    import json as _json
+    import meloday as _md
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    artists = sorted({a for (a,) in conn.execute(
+        "SELECT DISTINCT artist FROM essentia_cache WHERE artist IS NOT NULL AND artist != ''")})
+    conn.close()
+    try:
+        have = _json.load(open(_md.LASTFM_TOP_TRACKS_PATH, encoding="utf-8"))
+    except Exception:
+        have = {}
+    todo = [a for a in artists if a not in have]
+    if limit:
+        todo = todo[:int(limit)]
+    if not todo:
+        log_msg(f"[INFO] artist top-tracks: nothing to do — {len(have)} artists already mapped.")
+        return
+    log_msg(f"[INFO] Fetching Last.fm top tracks for {len(todo):,} artists "
+            f"(<=5 req/s, ~{len(todo) / 5 / 60:.0f} min)...")
+    global _LF_RL
+    _LF_RL = _RateLimiter(5.0)
+
+    def fetch(artist):
+        data = _lf_get({"method": "artist.gettoptracks", "artist": artist, "limit": 50}, key)
+        tracks = ((data.get("toptracks") or {}).get("track")) or []
+        if isinstance(tracks, dict):
+            tracks = [tracks]
+        ranks = {}
+        for i, t in enumerate(tracks):                 # gettoptracks returns them in rank order
+            k = norm_text(lastfm_query_title(t.get("name") or ""))
+            if k and k not in ranks:                   # keep the best (lowest) rank on a normalised collision
+                ranks[k] = i + 1
+        return artist, ranks
+
+    import concurrent.futures
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_workers_arg(6)) as ex:
+        for artist, ranks in ex.map(fetch, todo):
+            if ranks:
+                have[artist] = ranks
+            done += 1
+            if done % 200 == 0:
+                _json.dump(have, open(_md.LASTFM_TOP_TRACKS_PATH, "w"), ensure_ascii=False)
+                log_msg(f"[INFO]   ...{done}/{len(todo)} ({len(have)} mapped)")
+    _json.dump(have, open(_md.LASTFM_TOP_TRACKS_PATH, "w"), ensure_ascii=False)
+    log_msg(f"[INFO] artist top-tracks complete: {len(have)} artists mapped.")
 
 
 # --- METADATA SYNC: MusicBrainz artist origin (full place hierarchy; per-artist; rate-limited) ---
@@ -2334,6 +2416,7 @@ def run_full_pipeline(limit=None, dry_run=False, skip_geo=False, skip_metadata=F
         steps.append(("geo / artist origin", lambda: sync_artist_origin(limit=limit)))
     if not skip_metadata:
         steps.append(("Last.fm tags + listeners", lambda: sync_lastfm_tags(limit=limit)))
+        steps.append(("Last.fm artist top tracks", lambda: sync_artist_top_tracks(limit=limit)))
 
     total = len(steps)
     log_msg(f"[FULL] Starting enrichment pipeline: {total} steps"
@@ -2405,6 +2488,10 @@ if __name__ == "__main__":
             except Exception:
                 _lim = None
         sync_lastfm_tags(limit=_lim)
+    elif "--resync-lastfm-titles" in sys.argv:
+        resync_lastfm_titles()
+    elif "--sync-top-tracks" in sys.argv:
+        sync_artist_top_tracks(limit=_arg_limit())
     elif "--sync-artist-names" in sys.argv:
         sync_artist_names(limit=_arg_limit())
     elif "--repair-artists" in sys.argv:

@@ -1320,6 +1320,7 @@ def primary_artist(name: str) -> str:
 # tracks keep the track_artist_name value instead. Fallback (no/unmapped MBID, ~2%, or classical):
 # track_artist_name, feat-stripped, "&" kept so a band/duo on its own album stays whole.
 MBID_ARTIST_MAP_PATH = os.path.join(BASE_DIR, "assets", "mbid_artist_names.json")
+LASTFM_TOP_TRACKS_PATH = os.path.join(BASE_DIR, "assets", "lastfm_artist_top_tracks.json")
 
 def _load_mbid_artist_map():
     try:
@@ -1956,6 +1957,34 @@ def clean_title(title):
     title_clean = _TRAIL_DASH_RE.sub("", title_clean)     # trim trailing spaces or hyphens
 
     return title_clean
+
+
+# Typographic punctuation -> ASCII for Last.fm lookups: Last.fm keeps SEPARATE track pages for curly vs
+# straight quotes and autocorrect does NOT merge them (confirmed: "I'm Gonna Be (500 Miles)" curly ~8k
+# listeners vs straight ~1M). Used by lastfm_query_title (and, wrapped in norm_text, as the top-tracks key).
+_LASTFM_PUNCT = {0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"', 0x2013: "-", 0x2014: "-", 0x2026: "..."}
+# Strip a trailing " - <version tag>" suffix (covers "remaster", which the _FEATURING_RES dash patterns miss).
+_DASH_KW_RE = re.compile(rf"\s-\s.*(?:{_KW_ALT}).*$", re.IGNORECASE)
+
+
+def lastfm_query_title(title):
+    """Title cleaned for a Last.fm track lookup / match. Folds typographic punctuation to ASCII and strips
+    version/remaster/feat tags that sit in (parens), [brackets] or after ' - ' — but KEEPS apostrophes and
+    does NOT remove bare version words. Unlike clean_title (whose bare-word strip mangles real titles:
+    "Take On Me" -> "on me", "Live" -> ""), this is safe to send to track.getInfo, which wants the apostrophe
+    and the real words. Wrap in norm_text() for a case/apostrophe-insensitive match key."""
+    if not title:
+        return ""
+    t = title.translate(_LASTFM_PUNCT)
+    for pat in _FEATURING_RES:
+        t = pat.sub("", t).strip()
+    t = _PAREN_KW_RE.sub(" ", t)
+    t = _BRACKET_KW_RE.sub(" ", t)
+    t = _DASH_KW_RE.sub("", t)
+    t = _EMPTY_PAREN_RE.sub("", t)
+    t = _EMPTY_BRACKET_RE.sub("", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return _TRAIL_DASH_RE.sub("", t).strip()
 
 
 def process_tracks(tracks):
