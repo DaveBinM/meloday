@@ -2,6 +2,9 @@ logs/lyric_batch_state.json
 logs/lyric_backfill.log
 assets/mood_mix_history.json
 assets/geo_scene_rotation.json
+# Regenerable per-artist maps (built by pre_analyze syncs) — not tracked
+assets/mbid_artist_names.json
+assets/lastfm_artist_top_tracks.json
 
 # Dev-only: holds the real Plex token + OpenAI key — never commit
 live/
