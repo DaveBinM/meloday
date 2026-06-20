@@ -58,7 +58,10 @@ def parse_tracks(xml_text: str):
             })
     # If Plex already sorts by similarity, this will already be ordered,
     # but sorting by distance is safe.
-    items.sort(key=lambda x: (x["distance"] is None, x["distance"]))
+    # None-distance items sort last; substitute +inf so two None distances never compare
+    # None < None (a TypeError) when their leading is-None flags tie.
+    items.sort(key=lambda x: (x["distance"] is None,
+                              x["distance"] if x["distance"] is not None else float("inf")))
     return items
 
 def main():

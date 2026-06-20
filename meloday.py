@@ -1760,7 +1760,11 @@ def fetch_historical_tracks(period):
         adjacent_entries = [
             entry for entry in all_history
             if entry.ratingKey not in excluded_keys
-            and entry.viewedAt.hour in adjacent_hours
+            and entry.viewedAt is not None
+            # WHY: mirror the primary loop's tz handling — match on the effective-timezone
+            # hour (not raw UTC) and guard None, or this fallback selects the wrong hours
+            # under a travel/non-UTC tz and crashes on entries without a viewedAt.
+            and _viewedAt_to_effective(entry.viewedAt).hour in adjacent_hours
         ]
         if adjacent_entries:
             log_text("[SELECTION] No direct daypart matches. Using adjacent-period history fallback.")
@@ -2507,7 +2511,11 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
     artist_limit = round(MAX_TRACKS * ARTIST_RATIO)
 
     
-    now = datetime.now()
+    # WHY: use the effective ("travel") timezone, not naive system-local — exclude_start is
+    # compared against plexapi's naive-UTC lastViewedAt below, so both must be normalised the
+    # same way (see fetch_sonically_similar_tracks). Otherwise the recency window is offset by
+    # the server's UTC offset and ignores the travel tz.
+    now = get_effective_now()
     exclude_start = now - timedelta(days=EXCLUDE_PLAYED_DAYS)
 
     # Cross-gap rejection cache: tracks that failed a static filter (exclusion label,
@@ -2610,7 +2618,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
 
                     # B. FAST RECENCY CHECK
                     last_p = getattr(bridge, "lastViewedAt", None)
-                    if last_p and last_p >= exclude_start:
+                    if last_p and _viewedAt_to_effective(last_p) >= exclude_start:
                         d_print(f"  [!] Skipping '{bridge.title}': Recently played.")
                         continue
                     

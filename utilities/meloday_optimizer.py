@@ -152,26 +152,38 @@ def run_optimizer():
 
     cache_data = {}
     if os.path.exists(cache_path):
+        conn = None
+        skipped = 0
         try:
             conn = sqlite3.connect(cache_path, timeout=10)
             for row in conn.execute(
                 "SELECT rating_key, bpm, energy, year, styles, genres, moods, danceability, brightness "
                 "FROM essentia_cache"
             ):
-                rk, bpm, energy, year, styles_json, genres_json, moods_json, danceability, brightness = row
-                cache_data[rk] = {
-                    "bpm":          bpm,
-                    "energy":       energy,
-                    "year":         year,
-                    "styles":       json.loads(styles_json) if styles_json else [],
-                    "genres":       json.loads(genres_json) if genres_json else [],
-                    "moods":        json.loads(moods_json)  if moods_json  else [],
-                    "danceability": danceability,
-                    "brightness":   brightness,
-                }
-            conn.close()
-        except Exception:
-            pass
+                # WHY: parse each row in its own try so one corrupt JSON column skips just that
+                # row — previously a single bad row aborted the whole load (and silently
+                # truncated the dataset the recommendations are computed from).
+                try:
+                    rk, bpm, energy, year, styles_json, genres_json, moods_json, danceability, brightness = row
+                    cache_data[rk] = {
+                        "bpm":          bpm,
+                        "energy":       energy,
+                        "year":         year,
+                        "styles":       json.loads(styles_json) if styles_json else [],
+                        "genres":       json.loads(genres_json) if genres_json else [],
+                        "moods":        json.loads(moods_json)  if moods_json  else [],
+                        "danceability": danceability,
+                        "brightness":   brightness,
+                    }
+                except Exception:
+                    skipped += 1
+            if skipped:
+                log_msg(f"[WARN] Skipped {skipped} unreadable/corrupt cache row(s) while loading.", level="error")
+        except Exception as e:
+            log_msg(f"[WARN] Could not read Essentia cache: {e}", level="error")
+        finally:
+            if conn is not None:
+                conn.close()
 
     # Read playlist target size from config — used to derive all ratio recommendations below.
     MAX_TRACKS_CFG = config['playlist'].get('max_tracks', 50)

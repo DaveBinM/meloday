@@ -1338,7 +1338,6 @@ def sync_artist_origin(limit=None):
     log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s) "
             f"— {n_mbid} via exact MBID, {len(artists) - n_mbid} by name.")
     q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time(); _last = [0.0]
-    now2 = time.time()
 
     def _writer():
         wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
@@ -1349,6 +1348,9 @@ def sync_artist_origin(limit=None):
                 break
             key, origin = it
             oj = json.dumps(origin) if origin else None
+            # WHY: stamp geo_synced_at when the row is actually written, not a single time
+            # captured before the sync started — a long run would back-date every track to t0.
+            now2 = time.time()
             for rk in artist_tracks[key]:
                 batch.append((oj, now2, rk)); cnt["t"] += 1
             cnt["a"] += 1
@@ -2040,6 +2042,13 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
                     log_msg(f"\n[INFO] batch-queue limit hit; draining a batch before retrying...")
                     _drain(block=True); continue
                 if attempt == 7:
+                    # WHY: the input file may already be uploaded even though batch.create
+                    # failed — delete it before bailing so we don't leak orphaned OpenAI files.
+                    if up is not None:
+                        try:
+                            client.files.delete(up.id)
+                        except Exception:
+                            pass
                     log_msg(f"\n[ERROR] batch submit failed after retries: {e}"); raise
                 time.sleep(5)
         batch_ids.append(b.id); inflight[b.id] = tok; _save_state()
