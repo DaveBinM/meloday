@@ -435,12 +435,32 @@ _CANONICAL_COLUMNS = (
     "lyric_themes_raw TEXT, artist_mbid TEXT, release_types TEXT"
 )
 
+# Per-process memo of DB file paths whose essentia_cache schema is already confirmed canonical.
+# WHY: lets repeated connections in one process (load/save/upsert in meloday, every pre_analyze
+# phase + worker) skip the ~40 failed ALTER TABLE attempts and the reorder PRAGMA scan after the
+# first check. Safe: the schema is only ever mutated by this function, so a path that verified
+# canonical stays canonical for the life of the process.
+_SCHEMA_VERIFIED_PATHS = set()
+
 def _ensure_db_schema(conn):
     """Creates or migrates the essentia_cache table to the canonical schema."""
+    try:
+        db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+    except Exception:
+        db_path = None
+    # Fast path: this DB file's schema was already verified canonical this process.
+    if db_path and db_path in _SCHEMA_VERIFIED_PATHS:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        return
+
     conn.execute(f"CREATE TABLE IF NOT EXISTS essentia_cache ({_CANONICAL_COLUMNS})")
     conn.execute("PRAGMA journal_mode=WAL")
 
-    # Step 1: Add any columns missing from older databases
+    # Step 1: Add any columns missing from older databases. Read existing columns ONCE and
+    # ALTER only the absent ones — on a current DB this skips ~40 failed ALTER statements per
+    # connection (the dominant per-connection cost once the schema is stable).
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(essentia_cache)").fetchall()}
     for col_name, col_def in (
         ("styles",               "styles TEXT"),
         ("danceability",         "danceability REAL"),
@@ -483,11 +503,13 @@ def _ensure_db_schema(conn):
         ("artist_mbid",          "artist_mbid TEXT"),
         ("release_types",        "release_types TEXT"),
     ):
+        if col_name in existing_cols:
+            continue  # already present — skip the doomed ALTER attempt
         try:
             conn.execute(f"ALTER TABLE essentia_cache ADD COLUMN {col_def}")
             m_print(f"[INFO] DB migration: added column '{col_name}' to essentia_cache.")
         except Exception:
-            pass  # Column already exists
+            pass  # Column already exists (concurrent migration)
 
     # Step 2: Reorder table to canonical column sequence if needed.
     # Triggered when:
@@ -501,6 +523,7 @@ def _ensure_db_schema(conn):
         ("danceability" in col_names and col_names.index("danceability") != col_names.index("energy") + 1) or
         "beat_confidence" not in col_names
     )
+    reorder_ok = True
     if needs_reorder:
         m_print("[INFO] DB migration: reordering table to canonical schema...")
         try:
@@ -552,10 +575,16 @@ def _ensure_db_schema(conn):
             conn.commit()
             m_print("[INFO] DB migration: schema reorder complete.")
         except Exception as reorder_err:
+            reorder_ok = False
             m_print(f"[ERROR] DB migration: schema reorder failed: {reorder_err}")
 
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+
+    # Memoise only when the schema is genuinely canonical now (no reorder needed, or it
+    # succeeded), so a failed migration is retried on the next connection rather than skipped.
+    if db_path and reorder_ok:
+        _SCHEMA_VERIFIED_PATHS.add(db_path)
 
 def _entry_to_row(rk, d):
     return (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),

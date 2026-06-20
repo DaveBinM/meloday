@@ -8572,6 +8572,32 @@ def _song_min_year_map(essentia_cache):
     return m
 
 
+_HISTORY_PLAY_COUNTS_CACHE = {}   # id(history_entries) -> Counter of plays per rating_key
+def _history_play_counts(history_entries):
+    """Per-track play Counter, memoised on the history_entries object so the several mix builds in
+    one run share a single pass over the (large) play history instead of rebuilding it each time."""
+    cid = id(history_entries)
+    pc = _HISTORY_PLAY_COUNTS_CACHE.get(cid)
+    if pc is None:
+        pc = Counter(str(e.ratingKey) for e in history_entries)
+        _HISTORY_PLAY_COUNTS_CACHE.clear()   # only the current run's history object is ever needed
+        _HISTORY_PLAY_COUNTS_CACHE[cid] = pc
+    return pc
+
+
+_OWN_DEPTH_CACHE = {}   # id(essentia_cache) -> Counter of tracks per (lowercased) artist
+def _artist_own_depth(essentia_cache):
+    """Library depth per artist (track count), memoised per cache object — each geo showcase mix
+    needs it and it's a full-cache scan."""
+    cid = id(essentia_cache)
+    d = _OWN_DEPTH_CACHE.get(cid)
+    if d is None:
+        d = Counter((e.get("artist") or "").strip().lower() for e in essentia_cache.values())
+        _OWN_DEPTH_CACHE.clear()
+        _OWN_DEPTH_CACHE[cid] = d
+    return d
+
+
 _NONCANON_SUBSTR = ("instrumental", "unplugged", "karaoke", "remix", "acoustic", "rehearsal",
                     "acapella", "a cappella", "re-recorded", "rerecorded", "sessions")
 # In the TITLE, only treat "live"/"demo" as a version marker when it's delimited ("(Live)", "- Live",
@@ -8827,7 +8853,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _sc = _seed_centroid(profile_key, essentia_cache)
         if _sc:
             target = _sc
-    play_counts  = Counter(str(e.ratingKey) for e in history_entries)
+    play_counts  = _history_play_counts(history_entries)
     _is_era      = _PROFILE_CATEGORY.get(profile_key) == "era"
     _is_geo      = _PROFILE_CATEGORY.get(profile_key) == "geo"
     _is_showcase = _is_era or _is_geo          # decade + geo mixes: popularity-ranked, gated, deduped
@@ -8861,22 +8887,26 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       + _lastfm_tag_boost(entry, profile_key))
         return score
 
+    # Candidate keys to score. Style-defined mixes (Synth-Pop Romance, Folk & Acoustic, the
+    # jazz/classical/indie mixes) keep only tracks whose styles match the genre so the mix stays
+    # genre-pure — apply that hard gate BEFORE scoring so _combined_score (6-10 boost fns/track)
+    # runs over the eligible subset (often ~1-2% of the library) rather than the whole cache.
+    # WHY output-identical: filtering then sorting == sorting then filtering for a deterministic
+    # key, and this style gate has no fallback.
+    if profile_key in _STYLE_DEFINED_PROFILES:
+        _cand_keys = [rk for rk in essentia_cache
+                      if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
+    else:
+        _cand_keys = list(essentia_cache)
+
     history_rks = sorted(
-        [rk for rk in essentia_cache if rk in play_counts],
+        [rk for rk in _cand_keys if rk in play_counts],
         key=lambda rk: (_combined_score(rk), -play_counts.get(rk, 0))
     )
     library_rks = sorted(
-        [rk for rk in essentia_cache if not play_counts.get(rk)],
+        [rk for rk in _cand_keys if not play_counts.get(rk)],
         key=_combined_score
     )
-
-    # Style-defined mixes (Synth-Pop Romance, Folk & Acoustic, the jazz/classical/indie
-    # mixes): keep only tracks whose styles match the genre, so the mix stays genre-pure.
-    if profile_key in _STYLE_DEFINED_PROFILES:
-        history_rks = [rk for rk in history_rks
-                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
-        library_rks = [rk for rk in library_rks
-                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
 
     # Decade/era + nostalgia mixes: keep only era-appropriate tracks, gating on the song's EARLIEST
     # year across the library (its original release) rather than the album year — so reissues and
@@ -8981,7 +9011,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         # global-fame ranking, which buried locally-loved bands (Biffy Clyro, The Snuts, Twin Atlantic, …).
         _sk = lambda e: "\t".join(_entry_song_key(e))
         _excl_songs = {_sk(essentia_cache[rk]) for rk in (hard_exclude_rks or ()) if rk in essentia_cache}
-        own_depth   = Counter((e.get("artist") or "").strip().lower() for e in essentia_cache.values())
+        own_depth   = _artist_own_depth(essentia_cache)
         by_artist   = defaultdict(list)
         for rk in dict.fromkeys(history_rks + library_rks):
             a = (essentia_cache.get(rk, {}).get("artist") or "").strip().lower()
