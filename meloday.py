@@ -538,37 +538,28 @@ def _ensure_db_schema(conn):
         except Exception as backup_err:
             m_print(f"[WARN] DB migration: could not back up database: {backup_err}")
         try:
-            # Map last_synced → track_updated_at for backward compat; album/artist default to NULL.
-            has_last_synced = "last_synced"           in col_names
-            has_dance       = "danceability"         in col_names
-            has_bright      = "brightness"           in col_names
-            has_beat_conf   = "beat_confidence"      in col_names
-            has_int_loud    = "integrated_loudness"  in col_names
-            has_onset       = "onset_rate"           in col_names
-            has_dyn_comp    = "dynamic_complexity"   in col_names
-            has_arousal     = "arousal"              in col_names
-            has_valence     = "valence"              in col_names
-            has_vocal       = "vocal_presence"       in col_names
+            # Carry EVERY canonical column through, in canonical order: copy it if the old table
+            # had it, else default to NULL. track_updated_at falls back to the legacy last_synced
+            # column. Deriving the column list from _CANONICAL_COLUMNS keeps this correct as the
+            # schema grows — the previous hardcoded 22-column SELECT silently dropped every newer
+            # column (moodtheme, genre_discogs, embeddings, lastfm, lyrics, …) on reorder and, once
+            # the table reached 49 columns, failed outright ("49 columns but 22 values supplied").
+            old_cols = set(col_names)
+            canonical_names = [part.strip().split()[0] for part in _CANONICAL_COLUMNS.split(",")]
+            select_exprs = []
+            for c in canonical_names:
+                if c == "track_updated_at" and "last_synced" in old_cols:
+                    select_exprs.append(f"last_synced AS {c}")
+                elif c in old_cols:
+                    select_exprs.append(c)
+                else:
+                    select_exprs.append(f"NULL AS {c}")
             conn.execute("DROP TABLE IF EXISTS essentia_cache_reordered")
             conn.execute(f"CREATE TABLE essentia_cache_reordered ({_CANONICAL_COLUMNS})")
-            conn.execute(f"""
-                INSERT INTO essentia_cache_reordered
-                SELECT rating_key, bpm, key, energy,
-                       {'danceability'        if has_dance     else 'NULL'},
-                       {'brightness'          if has_bright    else 'NULL'},
-                       year, artist, genres, styles, moods, file_path,
-                       {'last_synced'         if has_last_synced else 'NULL'} AS track_updated_at,
-                       NULL AS album_updated_at,
-                       NULL AS artist_updated_at,
-                       {'beat_confidence'     if has_beat_conf else 'NULL'} AS beat_confidence,
-                       {'integrated_loudness' if has_int_loud  else 'NULL'} AS integrated_loudness,
-                       {'onset_rate'          if has_onset     else 'NULL'} AS onset_rate,
-                       {'dynamic_complexity'  if has_dyn_comp  else 'NULL'} AS dynamic_complexity,
-                       {'arousal'             if has_arousal   else 'NULL'} AS arousal,
-                       {'valence'             if has_valence   else 'NULL'} AS valence,
-                       {'vocal_presence'      if has_vocal     else 'NULL'} AS vocal_presence
-                FROM essentia_cache
-            """)
+            conn.execute(
+                f"INSERT INTO essentia_cache_reordered ({', '.join(canonical_names)}) "
+                f"SELECT {', '.join(select_exprs)} FROM essentia_cache"
+            )
             conn.commit()
             conn.execute("DROP TABLE essentia_cache")
             conn.execute("ALTER TABLE essentia_cache_reordered RENAME TO essentia_cache")
