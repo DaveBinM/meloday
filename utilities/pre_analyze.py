@@ -2625,10 +2625,13 @@ def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
                       [(d.get("emb_effnet"), d.get("emb_musicnn"), rk) for rk, d in pending.items()])
         c.commit(); c.close()
 
-    # emb_only=True → workers load just the 2 embedding extractors (not all ~13 models): faster
-    # startup + ~half the RAM, so per_worker_gb drops 1.3 → 0.7 and more workers fit.
+    # emb_only=True → workers load just the 2 embedding extractors (not all ~13 models), so they're
+    # lighter than a full TF worker (1.3). But budget 1.1 GB/worker, NOT 0.7: the TF C++ runtime alone
+    # is ~0.7 GB and observed worker RSS is ~1.0 GB. WHY: 0.7 made _bf_worker_count over-pack workers
+    # (e.g. 12 on a 30 GB box shared with Plex/Lidarr) and overcommit RAM → swap filled. 1.1 sizes the
+    # pool honestly (~8 workers here) so the backfill stays a considerate background job.
     ok, nofile, err = _parallel_essentia_backfill(
-        todo, _emb_flush, load_tf=True, force_emb=True, per_worker_gb=0.7, emb_only=True,
+        todo, _emb_flush, load_tf=True, force_emb=True, per_worker_gb=1.1, emb_only=True,
         workers=workers, nice=nice, label="sync_embeddings")
     print(f"[INFO] sync_embeddings: backfilled {ok} tracks ({nofile} files not found, {err} errors)")
 
