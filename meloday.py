@@ -146,6 +146,10 @@ PATH_MAPPING         = ess_cfg.get("path_mapping", {})
 _TF_AVAILABLE     = False
 _TF_MODELS_LOADED = False
 _effnet_model = _musicnn_model = _av_model = _vocal_model = None
+# When True, _fill_missing_acoustic re-runs the TF block for tracks that already have the other TF fields
+# but never had their embeddings stored, so `pre_analyze.py --sync-embeddings` can backfill emb_effnet/
+# emb_musicnn. Default off so normal (incremental) analysis never re-processes complete tracks. (audit Tier-4)
+_FORCE_EMB_BACKFILL = False
 # Optional high-level classification heads (run on the same EffNet/MusiCNN embeddings).
 # Absent model files are skipped, so these fields simply stay null until the models exist.
 _mood_models       = {}    # cache_field -> (head, "musicnn"|"effnet", positive_class_index)
@@ -760,7 +764,10 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
                         # are loaded — otherwise these stay null and don't force re-analysis)
                         or (bool(_mood_models) and data.get("mood_happy") is None)
                         or (_moodtheme_model is not None and data.get("moodtheme") is None)
-                        or (_genre_model is not None and data.get("genre_discogs") is None))
+                        or (_genre_model is not None and data.get("genre_discogs") is None)
+                        # --sync-embeddings backfill: re-run the TF block for tracks that have the other TF
+                        # fields but never had their embeddings stored (audit Tier-4)
+                        or (_FORCE_EMB_BACKFILL and bool(_mood_models) and data.get("emb_effnet") is None))
 
     needs_base = any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
                       needs_dance, needs_brightness, needs_onset, needs_dyn_comp])

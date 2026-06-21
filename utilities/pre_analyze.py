@@ -2396,6 +2396,66 @@ def apply_lyric_vocab():
             f"{len(syn)} synonyms.")
 
 
+def sync_embeddings(limit=None, dry_run=False):
+    """Backfill emb_effnet / emb_musicnn for cache rows that lack them by re-running the Essentia-TF
+    embedding models on the audio. WHY: embeddings were added after most tracks were analysed (~65% lack
+    them), and the extras "sounds-like" features (discovery / seed mixes / Daily-Mix clustering / DJ flow)
+    use them with graceful fallback, so coverage directly improves them. Heavy (a 16 kHz decode + two
+    embedding forward-passes per track); runs single-process in the main interpreter where the TF models
+    are loaded. --limit / --dry-run supported; safe to re-run (it only touches NULL-embedding rows).
+    (audit Tier-4 embeddings backfill)"""
+    import meloday
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+    conn.execute("PRAGMA journal_mode=WAL")
+    meloday._ensure_db_schema(conn)
+    total = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE emb_effnet IS NULL").fetchone()[0]
+    print(f"[INFO] sync_embeddings: {total} tracks missing embeddings")
+    if dry_run:
+        conn.close(); return
+    if not meloday._TF_MODELS_LOADED:
+        print("[ERROR] sync_embeddings: TF models not loaded (essentia-tensorflow + model files + mood heads required).")
+        conn.close(); return
+    # Pre-fill the existing base + high-level TF fields so only the two embedding models run per track (no
+    # 44.1 kHz base decode, no head re-compute); the force flag makes the TF block fire on the missing embeddings.
+    cols = ("bpm", "key", "energy", "integrated_loudness", "danceability", "brightness", "onset_rate",
+            "dynamic_complexity", "beat_confidence", "arousal", "valence", "vocal_presence",
+            "mood_happy", "moodtheme", "genre_discogs")
+    rows = conn.execute(
+        "SELECT rating_key, file_path, " + ", ".join(cols) +
+        " FROM essentia_cache WHERE emb_effnet IS NULL AND file_path IS NOT NULL"
+    ).fetchall()
+    if limit:
+        rows = rows[:limit]
+    meloday._FORCE_EMB_BACKFILL = True
+    pend, done, missing = [], 0, 0
+    try:
+        for n, row in enumerate(rows, 1):
+            rk, fp = row[0], row[1]
+            if not fp or not os.path.exists(fp):
+                missing += 1; continue
+            data = {c: row[2 + i] for i, c in enumerate(cols)}
+            data["emb_effnet"]  = None
+            data["emb_musicnn"] = None
+            try:
+                meloday._fill_missing_acoustic(data, fp)
+            except Exception:
+                continue
+            if data.get("emb_effnet") is not None:
+                pend.append((data["emb_effnet"], data["emb_musicnn"], rk)); done += 1
+            if len(pend) >= 50:
+                conn.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?", pend)
+                conn.commit(); pend.clear()
+            if n % 500 == 0:
+                print(f"[INFO] sync_embeddings: {n}/{len(rows)} processed, {done} backfilled")
+        if pend:
+            conn.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?", pend)
+            conn.commit()
+    finally:
+        meloday._FORCE_EMB_BACKFILL = False
+        conn.close()
+    print(f"[INFO] sync_embeddings: backfilled {done} tracks ({missing} files not found)")
+
+
 def run_full_pipeline(limit=None, dry_run=False, skip_geo=False, skip_metadata=False):
     """Run the whole 'I added new music' enrichment chain end-to-end, in dependency order. This just chains
     the existing per-flag steps — each is still runnable on its own, and each is already idempotent
@@ -2508,6 +2568,8 @@ if __name__ == "__main__":
         sync_artist_names(limit=_arg_limit())
     elif "--repair-artists" in sys.argv:
         repair_artist_names(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
+    elif "--sync-embeddings" in sys.argv:
+        sync_embeddings(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
     elif "--full" in sys.argv:
         run_full_pipeline(limit=_arg_limit(), dry_run="--dry-run" in sys.argv,
                           skip_geo="--skip-geo" in sys.argv,
