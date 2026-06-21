@@ -1886,448 +1886,2536 @@ def _pick_description(playlist_id, era=None, styles=None):
 # ---------------------------------------------------------------------------
 _MOOD_PROFILES = {
     # --- Meloday+ gap-fill mixes: 7 vibe gaps + 4-mix pop family ---
+# ── situationship → "Situationship Mix" ───────────────────────────────────────────────────
+# Theme:    Yearning, searching, bittersweet, wistful, tense.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "situationship": {"bpm": 90, "energy": -15, "danceability": 0.30, "brightness": 0.16, "beat_confidence": 0.50, "onset_rate": 3.2, "dynamic_complexity": 0.60, "arousal": 0.46, "valence": 0.42, "vocal_presence": 0.74},
+# ── sad_bangers → "Sad Bangers Mix" ───────────────────────────────────────────────────────
+# Theme:    Cathartic, bittersweet, melancholy, energetic, lively.
+# Sound:    Upbeat 124bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · soft daypart lean · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "sad_bangers": {"bpm": 124, "energy": -8, "danceability": 0.70, "brightness": 0.34, "beat_confidence": 0.78, "onset_rate": 6.0, "dynamic_complexity": 0.40, "arousal": 0.80, "valence": 0.32, "vocal_presence": 0.72},
+# ── power_ballads → "Lighters Up" ─────────────────────────────────────────────────────────
+# Theme:    Dramatic, passionate, theatrical, rousing, anthemic.
+# Sound:    Slow 78bpm, mid energy, low groove; warm-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · floor 100k listeners · pop +1 · lyric-themes · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "power_ballads": {"bpm": 78, "energy": -11, "danceability": 0.24, "brightness": 0.26, "beat_confidence": 0.48, "onset_rate": 3.2, "dynamic_complexity": 0.72, "arousal": 0.55, "valence": 0.52, "vocal_presence": 0.86},
+# ── restless → "Can't Switch Off" ─────────────────────────────────────────────────────────
+# Theme:    Tense, anxious, urgent, nervous, searching.
+# Sound:    Mid 116bpm, mid energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "restless": {"bpm": 116, "energy": -11, "danceability": 0.40, "brightness": 0.24, "beat_confidence": 0.62, "onset_rate": 5.5, "dynamic_complexity": 0.55, "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.62},
+# ── neoclassical → "Neoclassical Calm" ────────────────────────────────────────────────────
+# Theme:    Peaceful, elegant, graceful, reflective, poignant.
+# Sound:    Slow 78bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: neo-classical, modern composition, chamber music, classical crossover, contemporary instrumental, classical.
+# Criteria: style gate parent {classical, stage & screen} · pop -1 · soft daypart lean · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "neoclassical": {"bpm": 78, "energy": -19, "danceability": 0.16, "brightness": 0.22, "beat_confidence": 0.22, "onset_rate": 1.8, "dynamic_complexity": 0.76, "arousal": 0.24, "valence": 0.52, "vocal_presence": 0.18},
+# ── yacht_rock → "Yacht Rock Mix" ─────────────────────────────────────────────────────────
+# Theme:    Smooth, warm, mellow, sophisticated, sunny.
+# Sound:    Mid 102bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soft rock, adult contemporary, sophisti-pop, blue-eyed soul, pop-soul, quiet storm.
+# Criteria: style gate parent {funk / soul, pop, rock} · pop +0.5 · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "yacht_rock": {"bpm": 102, "energy": -13, "danceability": 0.48, "brightness": 0.36, "beat_confidence": 0.60, "onset_rate": 4.0, "dynamic_complexity": 0.50, "arousal": 0.46, "valence": 0.70, "vocal_presence": 0.68},
+# ── swagger → "Swagger Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Swaggering, brash, confident, stylish, street-smart.
+# Sound:    Mid-slow 96bpm, mid energy, very danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: contemporary rap, hardcore rap, contemporary r&b, g-funk, funk, west coast rap.
+# Criteria: style gate parent {funk / soul, hip hop} · pop +1 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "swagger": {"bpm": 96, "energy": -11, "danceability": 0.62, "brightness": 0.22, "beat_confidence": 0.66, "onset_rate": 4.0, "dynamic_complexity": 0.42, "arousal": 0.58, "valence": 0.60, "vocal_presence": 0.80},
+# ── chart_pop → "Pop Hits" ────────────────────────────────────────────────────────────────
+# Theme:    Happy, lively, bright, fun, upbeat.
+# Sound:    Mid 116bpm, mid energy, very danceable; bright, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: contemporary pop/rock, dance-pop, teen pop, vocal pop, traditional pop, pop idol….
+# Criteria: style gate parent {electronic, pop, rock} · floor 500k listeners · pop +1 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "chart_pop": {"bpm": 116, "energy": -9, "danceability": 0.66, "brightness": 0.50, "beat_confidence": 0.70, "onset_rate": 4.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.78, "vocal_presence": 0.80},
+# ── dance_pop → "Dancefloor Pop" ──────────────────────────────────────────────────────────
+# Theme:    Energetic, celebratory, fun, exuberant, lively.
+# Sound:    Upbeat 122bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: dance-pop, dance-rock, alternative dance, euro-dance, eurodance, hi-nrg….
+# Criteria: style gate parent {electronic, pop, rock} · floor 400k listeners · pop +1 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "dance_pop": {"bpm": 122, "energy": -8, "danceability": 0.74, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.0, "dynamic_complexity": 0.40, "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.76},
+# ── indie_pop → "Indie Darlings" ──────────────────────────────────────────────────────────
+# Theme:    Bright, playful, sweet, quirky, sparkling.
+# Sound:    Mid 112bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: indie pop, left-field pop, jangle pop, twee pop, chamber pop, baroque pop….
+# Criteria: style gate parent {electronic, pop, rock} · floor 150k listeners · pop +1 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "indie_pop": {"bpm": 112, "energy": -12, "danceability": 0.50, "brightness": 0.40, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.50, "arousal": 0.55, "valence": 0.68, "vocal_presence": 0.74},
+# ── synth_pop → "Synth-Pop Nights" ────────────────────────────────────────────────────────
+# Theme:    Stylish, sparkling, bright, lively, sophisticated.
+# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: synth pop, synth-pop, synthwave, new wave, new romantic, neo-electro….
+# Criteria: style gate parent {electronic, pop, rock} · floor 150k listeners · pop +1 · soft daypart lean · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "synth_pop": {"bpm": 116, "energy": -10, "danceability": 0.58, "brightness": 0.42, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.66, "vocal_presence": 0.72},
     # --- Meloday+ rock / electronic / scores gap-fill (play-history-driven) ---
+# ── indie_rock → "Indie Anthems" ──────────────────────────────────────────────────────────
+# Theme:    Lively, stylish, energetic, rousing, wry.
+# Sound:    Upbeat 124bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: alternative/indie rock, indie rock, college rock, jangle pop, garage rock revival, modern rock.
+# Criteria: style gate parent {rock} · floor 150k listeners · pop +1 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "indie_rock": {"bpm": 124, "energy": -10, "danceability": 0.50, "brightness": 0.33, "beat_confidence": 0.72, "onset_rate": 5.2, "dynamic_complexity": 0.46, "arousal": 0.70, "valence": 0.58, "vocal_presence": 0.72},
+# ── post_grunge → "Post-Grunge" ───────────────────────────────────────────────────────────
+# Theme:    Brooding, gritty, intense, angst-ridden, cathartic.
+# Sound:    Upbeat 126bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Last.fm-tag-gated (audio model can't name it): post-grunge, post grunge.
+# Criteria: Last.fm gate · floor 150k listeners · pop +1 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "post_grunge": {"bpm": 126, "energy": -8, "danceability": 0.46, "brightness": 0.24, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.46, "arousal": 0.78, "valence": 0.46, "vocal_presence": 0.70},
+# ── rap_rock → "Rap-Rock & Nu-Metal" ──────────────────────────────────────────────────────
+# Theme:    Aggressive, brash, intense, swaggering, rebellious.
+# Sound:    Upbeat 128bpm, high energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: rap-rock, rap rock, rap-metal, rap metal, nu metal, nü metal….
+# Criteria: style gate parent {hip hop, rock} · floor 150k listeners · pop +1 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "rap_rock": {"bpm": 128, "energy": -7, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.84, "onset_rate": 6.0, "dynamic_complexity": 0.44, "arousal": 0.86, "valence": 0.45, "vocal_presence": 0.66},
+# ── festival_edm → "EDM Anthems" ──────────────────────────────────────────────────────────
+# Theme:    Euphoric, exuberant, uplifting, sparkling, ecstatic.
+# Sound:    Upbeat 128bpm, high energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: edm, big room, electro house, future bass, complextro.
+# Criteria: style gate parent {electronic} · floor 400k listeners · pop +1 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
+# ── soundtracks → "Soundtracks & Scores" ──────────────────────────────────────────────────
+# Theme:    Epic, dramatic, majestic, atmospheric, reflective.
+# Sound:    Mid-slow 92bpm, low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soundtrack, original score, film score, tv soundtrack, film music, movie theme….
+# Criteria: style gate parent {classical, stage & screen} · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "soundtracks": {"bpm": 92, "energy": -15, "danceability": 0.24, "brightness": 0.22, "beat_confidence": 0.42, "onset_rate": 2.8, "dynamic_complexity": 0.70, "arousal": 0.40, "valence": 0.50, "vocal_presence": 0.18},
+# ── rave_cave → "Rave Cave" ───────────────────────────────────────────────────────────────
+# Theme:    Euphoric, aggressive, pounding, relentless, ecstatic.
+# Sound:    Upbeat 132bpm, mid energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: donk, hard house, hard trance, hardstyle, hard techno, schranz….
+# Criteria: style gate parent {electronic} · 50/50 balanced · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "rave_cave": {"bpm": 132, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.66, "vocal_presence": 0.45},
     # ---- 7 decade mixes (era) ----
+# ── decade_60s → "60s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Upbeat 120bpm, low energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  1960–1969 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
+# ── decade_70s → "70s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Mid 116bpm, mid energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  1970–1979 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
+# ── decade_80s → "80s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Upbeat 122bpm, mid energy, danceable; bright.
+# Era/Geo:  1980–1989 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_80s": {"bpm": 122, "energy": -9, "danceability": 0.6, "brightness": 0.42, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.7, "vocal_presence": 0.74},
+# ── decade_90s → "90s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Mid 110bpm, mid energy, danceable; bright.
+# Era/Geo:  1990–1999 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_90s": {"bpm": 110, "energy": -9, "danceability": 0.56, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.6, "vocal_presence": 0.74},
+# ── decade_00s → "00s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Era/Geo:  2000–2009 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_00s": {"bpm": 116, "energy": -8, "danceability": 0.6, "brightness": 0.43, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.62, "vocal_presence": 0.76},
+# ── decade_10s → "10s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Mid 114bpm, high energy, very danceable; bright.
+# Era/Geo:  2010–2019 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_10s": {"bpm": 114, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.6, "vocal_presence": 0.74},
+# ── decade_20s → "20s Mix" ────────────────────────────────────────────────────────────────
+# Theme:    Rousing, energetic, stylish, playful.
+# Sound:    Mid 112bpm, high energy, very danceable; bright.
+# Era/Geo:  2020–2029 · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "decade_20s": {"bpm": 112, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.6, "valence": 0.58, "vocal_presence": 0.74},
     # ---- 3 geo showcase mixes (origin-gated, popularity-ranked like the decades; targets only feed
     #      the rotation sim-guard, not selection) ----
+# ── scotland_scene → "Sounds of Scotland" ─────────────────────────────────────────────────
+# Theme:    Geo mix.
+# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · origin-gated: scotland.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · popularity-ranked (no floor) · PINNED · moodclass · cat:geo
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "scotland_scene":  {"bpm": 116, "energy": -9, "danceability": 0.54, "brightness": 0.40, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.60, "valence": 0.55, "vocal_presence": 0.76},
+# ── australia_scene → "Sounds of Australia" ───────────────────────────────────────────────
+# Theme:    Geo mix.
+# Sound:    Upbeat 122bpm, high energy, danceable; bright, vocal-forward.
+# Era/Geo:  Any era · origin-gated: australia.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · popularity-ranked (no floor) · PINNED · moodclass · cat:geo
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "australia_scene": {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
+# ── london_scene → "Sounds of London" ─────────────────────────────────────────────────────
+# Theme:    Geo mix.
+# Sound:    Upbeat 118bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · origin-gated: london.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · popularity-ranked (no floor) · PINNED · moodclass · cat:geo
+# Flow:     Day-seeded shuffle (showcase — no DJ re-order).
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "london_scene":    {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
     # ---- 25 weather/seasonal mixes ----
+# ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
+# Theme:    Dramatic, ominous, brooding, volatile, intense.
+# Sound:    Mid-slow 80bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weather-gated · lyric-themes · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "stormy": {"bpm": 80, "energy": -12, "danceability": 0.3, "brightness": 0.12, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.45, "valence": 0.35, "vocal_presence": 0.45},
+# ── foggy → "Foggy Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Soothing, mysterious, atmospheric, eerie, dreamy.
+# Sound:    Slow 78bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "foggy": {"bpm": 78, "energy": -16, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.45, "vocal_presence": 0.45},
+# ── snow_day → "Snow Day Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Soothing, gentle, delicate, playful.
+# Sound:    Mid-slow 88bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "snow_day": {"bpm": 88, "energy": -15, "danceability": 0.3, "brightness": 0.3, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.35, "valence": 0.65, "vocal_presence": 0.5},
+# ── heatwave → "Heatwave Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Languid, sultry, sparkling, mellow, dreamy.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "heatwave": {"bpm": 92, "energy": -13, "danceability": 0.4, "brightness": 0.4, "beat_confidence": 0.5, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.58, "vocal_presence": 0.5},
+# ── frosty → "Frosty Mix" ─────────────────────────────────────────────────────────────────
+# Theme:    Delicate, austere, refined, gentle.
+# Sound:    Mid-slow 82bpm, low energy, low groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "frosty": {"bpm": 82, "energy": -15, "danceability": 0.28, "brightness": 0.32, "beat_confidence": 0.48, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.55, "vocal_presence": 0.45},
+# ── grey_skies → "Grey Skies Mix" ─────────────────────────────────────────────────────────
+# Theme:    Melancholy, reflective, austere, somber, introspective.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weather-gated · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "grey_skies": {"bpm": 82, "energy": -15, "danceability": 0.26, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.4, "vocal_presence": 0.6},
+# ── windy → "Windy Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Nervous, driving, volatile, energetic.
+# Sound:    Mid 110bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "windy": {"bpm": 110, "energy": -11, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.55, "arousal": 0.62, "valence": 0.55, "vocal_presence": 0.6},
+# ── clear_night → "Clear Night Mix" ───────────────────────────────────────────────────────
+# Theme:    Soothing, nocturnal, ethereal, dreamy, spacious.
+# Sound:    Slow 76bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (20, 5) · weather-gated · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "clear_night": {"bpm": 76, "energy": -16, "danceability": 0.25, "brightness": 0.16, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.62, "arousal": 0.2, "valence": 0.55, "vocal_presence": 0.45},
+# ── festive → "Festive Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Joyous, warm, nostalgic, celebratory, cheerful.
+# Sound:    Mid 100bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Holiday-signal gated (seasonal title keyword or Plex Holiday flag).
+# Criteria: holiday gate · pop +0.5 · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "festive": {"bpm": 100, "energy": -11, "danceability": 0.45, "brightness": 0.4, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.55, "valence": 0.78, "vocal_presence": 0.7},
+# ── spring_bloom → "Spring Bloom Mix" ─────────────────────────────────────────────────────
+# Theme:    Bright, joyous, sunny, lively.
+# Sound:    Mid 105bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · season:spring · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "spring_bloom": {"bpm": 105, "energy": -12, "danceability": 0.48, "brightness": 0.42, "beat_confidence": 0.65, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.75, "vocal_presence": 0.65},
+# ── spring_acoustic → "Spring Acoustic Mix" ───────────────────────────────────────────────
+# Theme:    Warm, earthy, gentle, pastoral, wistful.
+# Sound:    Mid-slow 95bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: folk, singer/songwriter, americana, indie folk.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · season:spring · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "spring_acoustic": {"bpm": 95, "energy": -14, "danceability": 0.32, "brightness": 0.28, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.4, "valence": 0.65, "vocal_presence": 0.7},
+# ── spring_strings → "Spring Strings Mix" ─────────────────────────────────────────────────
+# Theme:    Graceful, uplifting, elegant, optimistic, soothing.
+# Sound:    Mid-slow 92bpm, low energy, low groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: classical, modern composition, chamber, orchestral.
+# Criteria: style gate parent {classical, stage & screen} · season:spring · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "spring_strings": {"bpm": 92, "energy": -14, "danceability": 0.28, "brightness": 0.3, "beat_confidence": 0.52, "onset_rate": 3.5, "dynamic_complexity": 0.68, "arousal": 0.45, "valence": 0.62, "vocal_presence": 0.35},
+# ── spring_jangle → "Spring Jangle Mix" ───────────────────────────────────────────────────
+# Theme:    Wistful, charming, lively, wry, bright.
+# Sound:    Mid 110bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: indie pop, jangle pop, dream pop, twee pop.
+# Criteria: style gate parent {rock} · pop +0.5 · season:spring · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "spring_jangle": {"bpm": 110, "energy": -12, "danceability": 0.45, "brightness": 0.32, "beat_confidence": 0.68, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.68, "vocal_presence": 0.7},
+# ── summer_heat → "Summer Heat Mix" ───────────────────────────────────────────────────────
+# Theme:    Lively, exuberant, sexy, carefree, euphoric.
+# Sound:    Upbeat 118bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: disco, funk, club/dance.
+# Criteria: style gate parent {electronic, funk / soul} · pop +1 · season:summer · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "summer_heat": {"bpm": 118, "energy": -10, "danceability": 0.72, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.55},
+# ── summer_breeze → "Summer Breeze Mix" ───────────────────────────────────────────────────
+# Theme:    Mellow, warm, smooth, easygoing, sunny.
+# Sound:    Mid 100bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soft rock, adult contemporary, sophisti-pop.
+# Criteria: style gate parent {pop, rock} · pop +0.5 · season:summer · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "summer_breeze": {"bpm": 100, "energy": -13, "danceability": 0.45, "brightness": 0.4, "beat_confidence": 0.58, "onset_rate": 4, "dynamic_complexity": 0.52, "arousal": 0.45, "valence": 0.7, "vocal_presence": 0.65},
+# ── summer_roadtrip → "Summer Roadtrip Mix" ───────────────────────────────────────────────
+# Theme:    Carefree, exuberant, anthemic, rousing, joyous.
+# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +0.5 · season:summer · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "summer_roadtrip": {"bpm": 116, "energy": -11, "danceability": 0.55, "brightness": 0.4, "beat_confidence": 0.74, "onset_rate": 5.5, "dynamic_complexity": 0.48, "arousal": 0.65, "valence": 0.78, "vocal_presence": 0.72},
+# ── summer_tropical → "Summer Tropical Mix" ───────────────────────────────────────────────
+# Theme:    Warm, sunny, lively, sensual, carefree.
+# Sound:    Mid 102bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: latin, reggae, afro, tropical, bossa.
+# Criteria: style gate parent {electronic, folk, world, & country, funk / soul, latin, reggae} · pop +0.5 · season:summer · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "summer_tropical": {"bpm": 102, "energy": -11, "danceability": 0.62, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.6, "valence": 0.78, "vocal_presence": 0.62},
+# ── autumn_leaves → "Autumn Leaves Mix" ───────────────────────────────────────────────────
+# Theme:    Warm, nostalgic, wistful, rustic, mellow.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: folk, singer/songwriter, americana.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · season:autumn · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "autumn_leaves": {"bpm": 90, "energy": -14, "danceability": 0.32, "brightness": 0.26, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.6, "arousal": 0.4, "valence": 0.55, "vocal_presence": 0.7},
+# ── autumn_jazz → "Autumn Jazz Mix" ───────────────────────────────────────────────────────
+# Theme:    Smooth, warm, sophisticated, mellow, sultry.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: jazz, soul, smooth jazz.
+# Criteria: style gate parent {funk / soul, jazz} · season:autumn · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "autumn_jazz": {"bpm": 92, "energy": -13, "danceability": 0.38, "brightness": 0.24, "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.62, "arousal": 0.42, "valence": 0.6, "vocal_presence": 0.55},
+# ── autumn_rain → "Autumn Rain Mix" ───────────────────────────────────────────────────────
+# Theme:    Melancholy, wistful, reflective, brooding, somber.
+# Sound:    Mid-slow 84bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · season:autumn · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "autumn_rain": {"bpm": 84, "energy": -14, "danceability": 0.28, "brightness": 0.16, "beat_confidence": 0.52, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.35, "valence": 0.42, "vocal_presence": 0.62},
+# ── autumn_embers → "Autumn Embers Mix" ───────────────────────────────────────────────────
+# Theme:    Warm, rousing, earthy, gritty, nostalgic.
+# Sound:    Mid 108bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: classic rock, blues rock, southern rock, arena rock, aor.
+# Criteria: style gate parent {rock} · pop +0.5 · season:autumn · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "autumn_embers": {"bpm": 108, "energy": -11, "danceability": 0.45, "brightness": 0.28, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.52, "arousal": 0.6, "valence": 0.55, "vocal_presence": 0.65},
+# ── winter_frost → "Winter Frost Mix" ─────────────────────────────────────────────────────
+# Theme:    Delicate, ethereal, atmospheric, soothing, austere.
+# Sound:    Mid-slow 80bpm, low energy, low groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: ambient, modern composition, classical, experimental ambient.
+# Criteria: style gate parent {classical, electronic, stage & screen} · season:winter · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "winter_frost": {"bpm": 80, "energy": -16, "danceability": 0.26, "brightness": 0.3, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.66, "arousal": 0.25, "valence": 0.55, "vocal_presence": 0.3},
+# ── winter_cosy → "Winter Cosy Mix" ───────────────────────────────────────────────────────
+# Theme:    Warm, intimate, smooth, tender, sensual.
+# Sound:    Mid-slow 88bpm, low energy, moderate groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soul, neo-soul, quiet storm, smooth soul.
+# Criteria: style gate parent {funk / soul} · pop +0.5 · season:winter · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "winter_cosy": {"bpm": 88, "energy": -14, "danceability": 0.42, "brightness": 0.24, "beat_confidence": 0.58, "onset_rate": 4, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.62, "vocal_presence": 0.78},
+# ── winter_nights → "Winter Nights Mix" ───────────────────────────────────────────────────
+# Theme:    Nocturnal, hypnotic, atmospheric, mellow, dreamy.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: downtempo, ambient techno, electronica, trip-hop.
+# Criteria: style gate parent {electronic} · pop +0.5 · hour-gate (18, 3) · season:winter · lyric-themes · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "winter_nights": {"bpm": 92, "energy": -14, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.32, "valence": 0.5, "vocal_presence": 0.45},
+# ── winter_jazz → "Winter Jazz Mix" ───────────────────────────────────────────────────────
+# Theme:    Smooth, warm, mellow, sophisticated, intimate.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: smooth jazz, jazz, lounge, vocal jazz.
+# Criteria: style gate parent {jazz} · season:winter · moodclass · cat:seasonal
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "winter_jazz": {"bpm": 90, "energy": -14, "danceability": 0.38, "brightness": 0.24, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.32, "valence": 0.6, "vocal_presence": 0.55},
     # ---- 50 added mood/vibe mixes (emotional & contextual) ----
+# ── hopeful → "Brighter Days" ─────────────────────────────────────────────────────────────
+# Theme:    Optimistic, uplifting, bright, innocent.
+# Sound:    Mid-slow 95bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "hopeful": {"bpm": 95, "energy": -13, "danceability": 0.35, "brightness": 0.3, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.65},
+# ── yearning → "Longing" ──────────────────────────────────────────────────────────────────
+# Theme:    Yearning, wistful, tender, plaintive.
+# Sound:    Mid-slow 88bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "yearning": {"bpm": 88, "energy": -15, "danceability": 0.25, "brightness": 0.14, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.42, "valence": 0.45, "vocal_presence": 0.7},
+# ── triumphant → "Victory Lap" ────────────────────────────────────────────────────────────
+# Theme:    Triumphant, rousing, majestic, anthemic, epic.
+# Sound:    Mid 110bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "triumphant": {"bpm": 110, "energy": -10, "danceability": 0.45, "brightness": 0.34, "beat_confidence": 0.68, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.68, "valence": 0.75, "vocal_presence": 0.62},
+# ── serene → "Calm Waters" ────────────────────────────────────────────────────────────────
+# Theme:    Soothing, peaceful, calm, gentle.
+# Sound:    Slow 78bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "serene": {"bpm": 78, "energy": -18, "danceability": 0.22, "brightness": 0.2, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.65, "arousal": 0.16, "valence": 0.68, "vocal_presence": 0.4},
+# ── tender → "Soft Spot" ──────────────────────────────────────────────────────────────────
+# Theme:    Tender, gentle, warm, sentimental, sweet.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "tender": {"bpm": 82, "energy": -16, "danceability": 0.28, "brightness": 0.22, "beat_confidence": 0.48, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.28, "valence": 0.68, "vocal_presence": 0.68},
+# ── defiant → "No Apologies" ──────────────────────────────────────────────────────────────
+# Theme:    Defiant, fierce, brash, rebellious.
+# Sound:    Upbeat 120bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "defiant": {"bpm": 120, "energy": -9, "danceability": 0.45, "brightness": 0.24, "beat_confidence": 0.75, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.72, "valence": 0.45, "vocal_presence": 0.68},
+# ── vulnerable → "Heart on Sleeve" ────────────────────────────────────────────────────────
+# Theme:    Vulnerable, delicate, intimate.
+# Sound:    Mid-slow 80bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "vulnerable": {"bpm": 80, "energy": -16, "danceability": 0.24, "brightness": 0.14, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.62, "arousal": 0.35, "valence": 0.35, "vocal_presence": 0.7},
+# ── awe_wonder → "Awe & Wonder Mix" ───────────────────────────────────────────────────────
+# Theme:    Majestic, ethereal, epic, spiritual, reverent.
+# Sound:    Mid-slow 92bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · soft daypart lean · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "awe_wonder": {"bpm": 92, "energy": -13, "danceability": 0.25, "brightness": 0.22, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.7, "arousal": 0.45, "valence": 0.6, "vocal_presence": 0.4},
+# ── grief_release → "Letting Go" ──────────────────────────────────────────────────────────
+# Theme:    Elegiac, plaintive, somber, cathartic, anguished.
+# Sound:    Slow 72bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "grief_release": {"bpm": 72, "energy": -16, "danceability": 0.2, "brightness": 0.12, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.68, "arousal": 0.38, "valence": 0.18, "vocal_presence": 0.62},
+# ── sunrise → "Sunrise Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Optimistic, gentle, bright, warm.
+# Sound:    Mid-slow 96bpm, low energy, moderate groove; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (4, 10) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "sunrise": {"bpm": 96, "energy": -14, "danceability": 0.35, "brightness": 0.4, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.38, "valence": 0.68, "vocal_presence": 0.55},
+# ── blue_hour → "Blue Hour Mix" ───────────────────────────────────────────────────────────
+# Theme:    Wistful, atmospheric, reflective, nocturnal, poignant.
+# Sound:    Mid-slow 85bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (16, 21) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "blue_hour": {"bpm": 85, "energy": -15, "danceability": 0.28, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.55, "vocal_presence": 0.55},
+# ── midnight → "Midnight Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Nocturnal, dark, intimate, hypnotic, brooding.
+# Sound:    Mid-slow 80bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (22, 4) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "midnight": {"bpm": 80, "energy": -15, "danceability": 0.35, "brightness": 0.08, "beat_confidence": 0.52, "onset_rate": 2.8, "dynamic_complexity": 0.55, "arousal": 0.38, "valence": 0.4, "vocal_presence": 0.55},
+# ── three_am → "3am Thoughts" ─────────────────────────────────────────────────────────────
+# Theme:    Nocturnal, lonely, nervous, hypnotic, weary.
+# Sound:    Mid-slow 84bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hour-gate (23, 5) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "three_am": {"bpm": 84, "energy": -15, "danceability": 0.32, "brightness": 0.1, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.42, "valence": 0.35, "vocal_presence": 0.55},
+# ── golden_afternoon → "Golden Afternoon Mix" ─────────────────────────────────────────────
+# Theme:    Warm, mellow, languid, agreeable, summery.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (12, 18) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "golden_afternoon": {"bpm": 92, "energy": -14, "danceability": 0.35, "brightness": 0.34, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.55, "arousal": 0.4, "valence": 0.68, "vocal_presence": 0.6},
+# ── overcast → "Overcast Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Melancholy, reflective, austere, somber, introspective.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "overcast": {"bpm": 82, "energy": -15, "danceability": 0.26, "brightness": 0.14, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.3, "valence": 0.4, "vocal_presence": 0.6},
+# ── starlit → "Starlit Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Ethereal, dreamy, spacious, atmospheric, meditative.
+# Sound:    Slow 76bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hour-gate (20, 5) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "starlit": {"bpm": 76, "energy": -17, "danceability": 0.22, "brightness": 0.16, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.65, "arousal": 0.2, "valence": 0.6, "vocal_presence": 0.45},
+# ── witching_hour → "Witching Hour Mix" ───────────────────────────────────────────────────
+# Theme:    Eerie, mysterious, ominous, nocturnal.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hour-gate (21, 5) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "witching_hour": {"bpm": 90, "energy": -14, "danceability": 0.32, "brightness": 0.1, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.45, "valence": 0.35, "vocal_presence": 0.5},
+# ── monday_motivation → "Monday Motivation Mix" ───────────────────────────────────────────
+# Theme:    Rousing, energetic, confident.
+# Sound:    Mid 110bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · hour-gate (5, 12) · weekday [0] · lyric-themes · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "monday_motivation": {"bpm": 110, "energy": -11, "danceability": 0.48, "brightness": 0.34, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.48, "arousal": 0.65, "valence": 0.65, "vocal_presence": 0.62},
+# ── midweek_reset → "Midweek Reset Mix" ───────────────────────────────────────────────────
+# Theme:    Rousing, reflective, driving, cheerful.
+# Sound:    Mid 100bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weekday [1, 2, 3] · lyric-themes · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "midweek_reset": {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.3, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.5, "arousal": 0.5, "valence": 0.6, "vocal_presence": 0.6},
+# ── friday_feeling → "Finally Friday" ─────────────────────────────────────────────────────
+# Theme:    Exuberant, lively, carefree, fun, celebratory.
+# Sound:    Mid 116bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · hour-gate (11, 19) · weekday [4] · lyric-themes · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "friday_feeling": {"bpm": 116, "energy": -10, "danceability": 0.58, "brightness": 0.38, "beat_confidence": 0.75, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.66, "valence": 0.78, "vocal_presence": 0.62},
+# ── sunday_scaries → "Sunday Scaries Mix" ─────────────────────────────────────────────────
+# Theme:    Nervous, wistful, bittersweet, weary, reflective.
+# Sound:    Mid-slow 86bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (15, 23) · weekday [6] · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "sunday_scaries": {"bpm": 86, "energy": -14, "danceability": 0.3, "brightness": 0.16, "beat_confidence": 0.52, "onset_rate": 3, "dynamic_complexity": 0.58, "arousal": 0.45, "valence": 0.4, "vocal_presence": 0.62},
+# ── treat_yourself → "Treat Yourself Mix" ─────────────────────────────────────────────────
+# Theme:    Stylish, confident, hedonistic, sexy, exuberant.
+# Sound:    Mid 108bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "treat_yourself": {"bpm": 108, "energy": -11, "danceability": 0.55, "brightness": 0.32, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.6, "valence": 0.72, "vocal_presence": 0.62},
+# ── dinner_party → "Dinner Party Mix" ─────────────────────────────────────────────────────
+# Theme:    Sophisticated, warm, smooth, stylish, cosmopolitan.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: vocal jazz, soul, lounge, bossa nova, smooth.
+# Criteria: style gate parent {funk / soul, jazz} · pop +0.5 · hour-gate (17, 23) · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "dinner_party": {"bpm": 100, "energy": -13, "danceability": 0.45, "brightness": 0.28, "beat_confidence": 0.6, "onset_rate": 4, "dynamic_complexity": 0.55, "arousal": 0.45, "valence": 0.65, "vocal_presence": 0.55},
+# ── housework_hustle → "Tidy Up" ──────────────────────────────────────────────────────────
+# Theme:    Lively, exuberant, playful, carefree.
+# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop +1 · soft daypart lean · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "housework_hustle": {"bpm": 116, "energy": -11, "danceability": 0.58, "brightness": 0.4, "beat_confidence": 0.74, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.64, "valence": 0.74, "vocal_presence": 0.62},
+# ── study_session → "Brain Food" ──────────────────────────────────────────────────────────
+# Theme:    Cerebral, calm, reflective, mellow, hypnotic.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "study_session": {"bpm": 90, "energy": -15, "danceability": 0.3, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.3},
+# ── wind_down → "Wind-Down Mix" ───────────────────────────────────────────────────────────
+# Theme:    Soothing, calm, gentle, languid, relaxed.
+# Sound:    Slow 72bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (18, 2) · moodclass · cat:occasion
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "wind_down": {"bpm": 72, "energy": -17, "danceability": 0.25, "brightness": 0.2, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.62, "arousal": 0.18, "valence": 0.62, "vocal_presence": 0.45},
+# ── yoga_stretch → "Yoga & Stretch Mix" ───────────────────────────────────────────────────
+# Theme:    Soothing, gentle, meditative, graceful, spiritual.
+# Sound:    Mid-slow 90bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "yoga_stretch": {"bpm": 90, "energy": -16, "danceability": 0.28, "brightness": 0.22, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.62, "vocal_presence": 0.35},
+# ── meditation → "Meditation Mix" ─────────────────────────────────────────────────────────
+# Theme:    Meditative, soothing, spiritual, spacious, devotional.
+# Sound:    Slow 64bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "meditation": {"bpm": 64, "energy": -20, "danceability": 0.12, "brightness": 0.14, "beat_confidence": 0.25, "onset_rate": 1, "dynamic_complexity": 0.72, "arousal": 0.12, "valence": 0.6, "vocal_presence": 0.15},
+# ── deep_reading → "Lost in a Book" ───────────────────────────────────────────────────────
+# Theme:    Cerebral, calm, atmospheric, intimate, reflective.
+# Sound:    Mid-slow 82bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "deep_reading": {"bpm": 82, "energy": -17, "danceability": 0.2, "brightness": 0.16, "beat_confidence": 0.42, "onset_rate": 2, "dynamic_complexity": 0.65, "arousal": 0.3, "valence": 0.5, "vocal_presence": 0.25},
+# ── creative_flow → "In the Flow" ─────────────────────────────────────────────────────────
+# Theme:    Freewheeling, lively, hypnotic, playful, kinetic.
+# Sound:    Mid 102bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "creative_flow": {"bpm": 102, "energy": -13, "danceability": 0.42, "brightness": 0.26, "beat_confidence": 0.6, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.46, "valence": 0.62, "vocal_presence": 0.45},
+# ── gaming → "Game On" ────────────────────────────────────────────────────────────────────
+# Theme:    Energetic, intense, driving, kinetic, exciting.
+# Sound:    Upbeat 130bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "gaming": {"bpm": 130, "energy": -9, "danceability": 0.52, "brightness": 0.26, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.72, "valence": 0.55, "vocal_presence": 0.4},
+# ── gardening → "Green Thumb" ─────────────────────────────────────────────────────────────
+# Theme:    Warm, pastoral, sunny, carefree, earthy.
+# Sound:    Mid 100bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "gardening": {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.36, "beat_confidence": 0.6, "onset_rate": 4.5, "dynamic_complexity": 0.52, "arousal": 0.42, "valence": 0.7, "vocal_presence": 0.6},
+# ── spa_bath → "Spa Day" ──────────────────────────────────────────────────────────────────
+# Theme:    Soothing, relaxed, gentle, delicate.
+# Sound:    Slow 70bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "spa_bath": {"bpm": 70, "energy": -18, "danceability": 0.18, "brightness": 0.18, "beat_confidence": 0.4, "onset_rate": 1.5, "dynamic_complexity": 0.68, "arousal": 0.16, "valence": 0.65, "vocal_presence": 0.3},
+# ── power_nap → "Forty Winks" ─────────────────────────────────────────────────────────────
+# Theme:    Delicate, languid, dreamy, atmospheric, hypnotic.
+# Sound:    Slow 66bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "power_nap": {"bpm": 66, "energy": -19, "danceability": 0.15, "brightness": 0.14, "beat_confidence": 0.3, "onset_rate": 1.2, "dynamic_complexity": 0.7, "arousal": 0.12, "valence": 0.55, "vocal_presence": 0.25},
+# ── throwback_anthems → "Throwback Anthems Mix" ───────────────────────────────────────────
+# Theme:    Nostalgic, exuberant, celebratory, fun, rousing.
+# Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  up to 2016 · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · anthem gate (top-10 + 100k floor) · pop +1 · soft daypart lean · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "throwback_anthems": {"bpm": 118, "energy": -10, "danceability": 0.55, "brightness": 0.34, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.68, "valence": 0.78, "vocal_presence": 0.7},
+# ── old_friends → "Old Friends Mix" ───────────────────────────────────────────────────────
+# Theme:    Warm, nostalgic, joyous, sentimental, good-natured.
+# Sound:    Mid 105bpm, low energy, danceable; warm-toned.
+# Era/Geo:  up to 2018 · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · soft daypart lean · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "old_friends": {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.5, "arousal": 0.5, "valence": 0.72, "vocal_presence": 0.7},
+# ── campfire → "Campfire Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Warm, rustic, earthy, gentle, earnest.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: folk, singer/songwriter, americana, indie folk, acoustic.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "campfire": {"bpm": 92, "energy": -14, "danceability": 0.32, "brightness": 0.26, "beat_confidence": 0.52, "onset_rate": 3.5, "dynamic_complexity": 0.6, "arousal": 0.35, "valence": 0.65, "vocal_presence": 0.68},
+# ── cookout → "Cookout Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Sunny, carefree, fun, warm, summery.
+# Sound:    Mid 108bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · soft daypart lean · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "cookout": {"bpm": 108, "energy": -11, "danceability": 0.52, "brightness": 0.36, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.48, "arousal": 0.56, "valence": 0.78, "vocal_presence": 0.65},
+# ── game_night → "Game Night Mix" ─────────────────────────────────────────────────────────
+# Theme:    Playful, fun, lively, witty, exuberant.
+# Sound:    Mid 112bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (18, 1) · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "game_night": {"bpm": 112, "energy": -11, "danceability": 0.52, "brightness": 0.34, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.55, "valence": 0.75, "vocal_presence": 0.62},
+# ── singalong → "Singalong Mix" ───────────────────────────────────────────────────────────
+# Theme:    Anthemic, joyous, rousing, exuberant, celebratory.
+# Sound:    Upbeat 120bpm, mid energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · floor 100k listeners · pop +1 · soft daypart lean · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "singalong": {"bpm": 120, "energy": -10, "danceability": 0.5, "brightness": 0.34, "beat_confidence": 0.74, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.7, "valence": 0.78, "vocal_presence": 0.78},
+# ── school_days → "School Days Mix" ───────────────────────────────────────────────────────
+# Theme:    Nostalgic, playful, bittersweet, lively, carefree.
+# Sound:    Mid 116bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  1990–2014 · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "school_days": {"bpm": 116, "energy": -11, "danceability": 0.52, "brightness": 0.34, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.62, "vocal_presence": 0.7},
+# ── memory_lane → "Memory Lane Mix" ───────────────────────────────────────────────────────
+# Theme:    Nostalgic, wistful, sentimental, tender, reflective.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  up to 2016 · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:social
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "memory_lane": {"bpm": 90, "energy": -14, "danceability": 0.32, "brightness": 0.22, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.68},
+# ── crush → "Crushing" ────────────────────────────────────────────────────────────────────
+# Theme:    Sweet, playful, optimistic, gleeful, tender.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "crush": {"bpm": 100, "energy": -12, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.72, "vocal_presence": 0.7},
+# ── slow_burn → "Slow Burn Mix" ───────────────────────────────────────────────────────────
+# Theme:    Yearning, tender, intimate, sensual, sultry.
+# Sound:    Mid-slow 84bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "slow_burn": {"bpm": 84, "energy": -15, "danceability": 0.3, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.58, "arousal": 0.4, "valence": 0.58, "vocal_presence": 0.75},
+# ── moving_on → "Over It" ─────────────────────────────────────────────────────────────────
+# Theme:    Bittersweet, optimistic, rousing, cathartic, defiant.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "moving_on": {"bpm": 100, "energy": -12, "danceability": 0.45, "brightness": 0.26, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.52, "arousal": 0.5, "valence": 0.5, "vocal_presence": 0.72},
+# ── loved_up → "Loved Up Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Ecstatic, warm, tender, sentimental, joyous.
+# Sound:    Mid-slow 96bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "loved_up": {"bpm": 96, "energy": -12, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.6, "onset_rate": 4, "dynamic_complexity": 0.52, "arousal": 0.5, "valence": 0.8, "vocal_presence": 0.75},
+# ── long_distance → "Miles Apart" ─────────────────────────────────────────────────────────
+# Theme:    Yearning, wistful, tender, poignant.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "long_distance": {"bpm": 82, "energy": -15, "danceability": 0.28, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.6, "arousal": 0.4, "valence": 0.45, "vocal_presence": 0.72},
+# ── flirty → "Make a Move" ────────────────────────────────────────────────────────────────
+# Theme:    Playful, sexy, fun, lively, sensual.
+# Sound:    Mid 104bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "flirty": {"bpm": 104, "energy": -12, "danceability": 0.52, "brightness": 0.3, "beat_confidence": 0.65, "onset_rate": 4.5, "dynamic_complexity": 0.48, "arousal": 0.55, "valence": 0.72, "vocal_presence": 0.7},
+# ── devotion → "All Yours" ────────────────────────────────────────────────────────────────
+# Theme:    Devotional, tender, earnest, warm, reverent.
+# Sound:    Mid-slow 86bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "devotion": {"bpm": 86, "energy": -14, "danceability": 0.32, "brightness": 0.22, "beat_confidence": 0.52, "onset_rate": 3, "dynamic_complexity": 0.58, "arousal": 0.34, "valence": 0.7, "vocal_presence": 0.75},
+# ── wedding_day → "Wedding Day Mix" ───────────────────────────────────────────────────────
+# Theme:    Joyous, tender, celebratory, romantic, triumphant.
+# Sound:    Mid 100bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "wedding_day": {"bpm": 100, "energy": -11, "danceability": 0.45, "brightness": 0.34, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.82, "vocal_presence": 0.72},
     # ---- 86 added mixes (50 genre gaps + 36 city scenes) ----
+# ── funk_disco → "Funk & Disco Mix" ───────────────────────────────────────────────────────
+# Theme:    Rollicking, lively, stylish, exuberant, sexy.
+# Sound:    Mid 116bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: funk, disco, funky breaks, neo-disco, boogie, euro-disco….
+# Criteria: style gate parent {electronic, funk / soul} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "funk_disco": {"bpm": 116, "energy": -11, "danceability": 0.74, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.62},
+# ── neo_soul → "Neo-Soul & Quiet Storm Mix" ───────────────────────────────────────────────
+# Theme:    Sensual, smooth, warm, sophisticated, intimate.
+# Sound:    Mid-slow 82bpm, low energy, moderate groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: neo soul, contemporary r&b, quiet storm.
+# Criteria: style gate parent {funk / soul} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "neo_soul": {"bpm": 82, "energy": -15, "danceability": 0.4, "brightness": 0.22, "beat_confidence": 0.45, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.35, "valence": 0.62, "vocal_presence": 0.8},
+# ── motown_soul → "Motown & Classic Soul Mix" ─────────────────────────────────────────────
+# Theme:    Joyous, lively, warm, celebratory, sweet.
+# Sound:    Upbeat 122bpm, mid energy, very danceable; bright, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soul, rhythm & blues, funk, disco.
+# Criteria: style gate parent {funk / soul} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "motown_soul": {"bpm": 122, "energy": -11, "danceability": 0.62, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.62, "valence": 0.82, "vocal_presence": 0.85},
+# ── after_hours_rnb → "After-Hours R&B Mix" ───────────────────────────────────────────────
+# Theme:    Sensual, sultry, nocturnal, smooth, intimate.
+# Sound:    Mid-slow 96bpm, low energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: contemporary r&b, alternative r&b, new jack swing, quiet storm.
+# Criteria: style gate parent {electronic, funk / soul} · pop +0.5 · hour-gate (21, 4) · lyric-themes · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "after_hours_rnb": {"bpm": 96, "energy": -13, "danceability": 0.5, "brightness": 0.16, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.45, "arousal": 0.45, "valence": 0.55, "vocal_presence": 0.78},
+# ── acid_jazz → "Acid Jazz & Jazz-Funk Mix" ───────────────────────────────────────────────
+# Theme:    Lively, rollicking, stylish, cosmopolitan, smooth.
+# Sound:    Mid 108bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: acid jazz, jazz-funk, soul jazz, jazz-house, fusion, clubjazz.
+# Criteria: style gate parent {electronic, funk / soul, jazz} · pop +0.5 · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "acid_jazz": {"bpm": 108, "energy": -12, "danceability": 0.55, "brightness": 0.3, "beat_confidence": 0.6, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.62, "valence": 0.65, "vocal_presence": 0.55},
+# ── boom_bap → "Boom Bap Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Swaggering, confident, stylish, street-smart, gritty.
+# Sound:    Mid-slow 92bpm, low energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: boom bap, hardcore hip-hop, jazzy hip-hop, conscious.
+# Criteria: style gate parent {hip hop} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "boom_bap": {"bpm": 92, "energy": -12, "danceability": 0.55, "brightness": 0.18, "beat_confidence": 0.62, "onset_rate": 4, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.55, "vocal_presence": 0.8},
+# ── conscious_flow → "Conscious Flow Mix" ─────────────────────────────────────────────────
+# Theme:    Thoughtful, reflective, stylish, earnest, literate.
+# Sound:    Mid-slow 90bpm, low energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: conscious, jazzy hip-hop, instrumental, boom bap.
+# Criteria: style gate parent {hip hop} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "conscious_flow": {"bpm": 90, "energy": -13, "danceability": 0.48, "brightness": 0.2, "beat_confidence": 0.55, "onset_rate": 3.8, "dynamic_complexity": 0.55, "arousal": 0.5, "valence": 0.5, "vocal_presence": 0.78},
+# ── g_funk → "G-Funk & West Coast Mix" ────────────────────────────────────────────────────
+# Theme:    Laid-back, swaggering, sunny, confident, stylish.
+# Sound:    Mid-slow 94bpm, low energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: g-funk, gangsta.
+# Criteria: style gate parent {hip hop} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "g_funk": {"bpm": 94, "energy": -12, "danceability": 0.58, "brightness": 0.24, "beat_confidence": 0.6, "onset_rate": 4, "dynamic_complexity": 0.42, "arousal": 0.55, "valence": 0.6, "vocal_presence": 0.78},
+# ── trap_mode → "Trap Mode Mix" ───────────────────────────────────────────────────────────
+# Theme:    Dark, aggressive, brash, menacing, swaggering.
+# Sound:    Fast 140bpm, mid energy, very danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: trap, cloud rap, crunk, gangsta.
+# Criteria: style gate parent {hip hop} · pop +0.5 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "trap_mode": {"bpm": 140, "energy": -9, "danceability": 0.62, "brightness": 0.1, "beat_confidence": 0.72, "onset_rate": 3, "dynamic_complexity": 0.35, "arousal": 0.78, "valence": 0.35, "vocal_presence": 0.62},
+# ── lofi_beats → "Lo-Fi Beats Mix" ────────────────────────────────────────────────────────
+# Theme:    Mellow, hypnotic, relaxed, nostalgic, soothing.
+# Sound:    Mid-slow 84bpm, low energy, danceable; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: instrumental hip-hop, lo-fi, trip-hop, downbeat.
+# Criteria: style gate parent {electronic} · pop -1 · soft daypart lean · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "lofi_beats": {"bpm": 84, "energy": -16, "danceability": 0.45, "brightness": 0.14, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.48, "arousal": 0.25, "valence": 0.5, "vocal_presence": 0.22},
+# ── house_party → "House Party Mix" ───────────────────────────────────────────────────────
+# Theme:    Lively, exuberant, stylish, carefree, euphoric.
+# Sound:    Upbeat 123bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: house, tech-house, progressive house, club/dance, euro-dance.
+# Criteria: style gate parent {electronic} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "house_party": {"bpm": 123, "energy": -9, "danceability": 0.78, "brightness": 0.4, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.72, "valence": 0.74, "vocal_presence": 0.55},
+# ── deep_house → "Deep House Late Mix" ────────────────────────────────────────────────────
+# Theme:    Hypnotic, stylish, nocturnal, smooth, cosmopolitan.
+# Sound:    Upbeat 122bpm, mid energy, very danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: deep house, microhouse, minimal techno, tech-house, left-field house.
+# Criteria: style gate parent {electronic} · pop +0.5 · soft daypart lean · moodclass · cat:atmospheric
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "deep_house": {"bpm": 122, "energy": -11, "danceability": 0.66, "brightness": 0.18, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.4, "arousal": 0.55, "valence": 0.55, "vocal_presence": 0.4},
+# ── techno → "Techno Warehouse Mix" ───────────────────────────────────────────────────────
+# Theme:    Hypnotic, dark, driving, intense, nocturnal.
+# Sound:    Upbeat 130bpm, mid energy, very danceable; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: techno, minimal techno, detroit techno, acid house, industrial dance.
+# Criteria: style gate parent {electronic} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "techno": {"bpm": 130, "energy": -9, "danceability": 0.62, "brightness": 0.12, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.32, "arousal": 0.8, "valence": 0.4, "vocal_presence": 0.2},
+# ── trance → "Trance Heights Mix" ─────────────────────────────────────────────────────────
+# Theme:    Euphoric, uplifting, exuberant, sparkling, ecstatic.
+# Sound:    Upbeat 138bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: trance, progressive trance, goa trance, euro-dance, hi-nrg.
+# Criteria: style gate parent {electronic} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "trance": {"bpm": 138, "energy": -8, "danceability": 0.66, "brightness": 0.4, "beat_confidence": 0.82, "onset_rate": 5.8, "dynamic_complexity": 0.38, "arousal": 0.82, "valence": 0.7, "vocal_presence": 0.45},
+# ── dnb → "Drum & Bass Mix" ───────────────────────────────────────────────────────────────
+# Theme:    Energetic, kinetic, driving, rousing, exciting.
+# Sound:    Fast 174bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: jungle/drum'n'bass, breakbeat, idm, bass music.
+# Criteria: style gate parent {electronic} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "dnb": {"bpm": 174, "energy": -8, "danceability": 0.55, "brightness": 0.28, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.4, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
+# ── bass_drop → "Bass Drop Mix" ───────────────────────────────────────────────────────────
+# Theme:    Heavy, dark, intense, menacing, visceral.
+# Sound:    Fast 142bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: dubstep, bass music, grime, trap (edm).
+# Criteria: style gate parent {electronic, hip hop} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "bass_drop": {"bpm": 142, "energy": -8, "danceability": 0.58, "brightness": 0.16, "beat_confidence": 0.8, "onset_rate": 4.5, "dynamic_complexity": 0.38, "arousal": 0.82, "valence": 0.42, "vocal_presence": 0.4},
+# ── uk_garage → "UK Garage & 2-Step Mix" ──────────────────────────────────────────────────
+# Theme:    Stylish, lively, swaggering, sexy, exuberant.
+# Sound:    Upbeat 134bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: uk garage, garage, bass music, broken beat, bassline.
+# Criteria: style gate parent {electronic} · pop +0.5 · lyric-themes · moodclass · cat:groove
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "uk_garage": {"bpm": 134, "energy": -10, "danceability": 0.7, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
+# ── synthwave → "Synthwave & Retrowave Mix" ───────────────────────────────────────────────
+# Theme:    Nostalgic, nocturnal, stylish, hypnotic, atmospheric.
+# Sound:    Mid 110bpm, low energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: synthwave, neo-electro, new romantic.
+# Criteria: style gate parent {electronic} · pop +0.5 · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "synthwave": {"bpm": 110, "energy": -12, "danceability": 0.5, "brightness": 0.2, "beat_confidence": 0.65, "onset_rate": 3.8, "dynamic_complexity": 0.42, "arousal": 0.55, "valence": 0.55, "vocal_presence": 0.3},
+# ── industrial → "Industrial & EBM Mix" ───────────────────────────────────────────────────
+# Theme:    Aggressive, harsh, menacing, cold, intense.
+# Sound:    Upbeat 126bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: industrial, electro-industrial, industrial metal, industrial dance.
+# Criteria: style gate parent {electronic, rock} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "industrial": {"bpm": 126, "energy": -8, "danceability": 0.5, "brightness": 0.14, "beat_confidence": 0.8, "onset_rate": 5, "dynamic_complexity": 0.4, "arousal": 0.82, "valence": 0.3, "vocal_presence": 0.4},
+# ── vaporwave → "Vaporwave & Chillsynth Mix" ──────────────────────────────────────────────
+# Theme:    Hypnotic, dreamy, nostalgic, trippy, languid.
+# Sound:    Mid-slow 80bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: vaporwave, chillwave, ambient pop, plunderphonics.
+# Criteria: style gate parent {electronic} · pop -1 · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "vaporwave": {"bpm": 80, "energy": -16, "danceability": 0.42, "brightness": 0.22, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.5, "arousal": 0.25, "valence": 0.55, "vocal_presence": 0.3},
+# ── downtempo → "Downtempo Drift Mix" ─────────────────────────────────────────────────────
+# Theme:    Hypnotic, mellow, atmospheric, nocturnal, dreamy.
+# Sound:    Mid-slow 96bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: downtempo, trip-hop, chillwave, idm, ambient techno.
+# Criteria: style gate parent {electronic} · pop -1 · soft daypart lean · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "downtempo": {"bpm": 96, "energy": -15, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.3, "valence": 0.52, "vocal_presence": 0.4},
+# ── hyperpop → "Hyperpop & Glitch Mix" ────────────────────────────────────────────────────
+# Theme:    Manic, exuberant, playful, brash, ecstatic.
+# Sound:    Fast 150bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: hyperpop, glitch, bubblegum, social media pop.
+# Criteria: style gate parent {electronic, pop} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "hyperpop": {"bpm": 150, "energy": -8, "danceability": 0.66, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 6.5, "dynamic_complexity": 0.38, "arousal": 0.8, "valence": 0.62, "vocal_presence": 0.62},
+# ── classic_rock → "Classic Rock Mix" ─────────────────────────────────────────────────────
+# Theme:    Rousing, swaggering, brash, confident, exuberant.
+# Sound:    Upbeat 122bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: album rock, arena rock, hard rock, blues-rock, southern rock, american trad rock.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "classic_rock": {"bpm": 122, "energy": -10, "danceability": 0.5, "brightness": 0.32, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.48, "arousal": 0.68, "valence": 0.62, "vocal_presence": 0.62},
+# ── heavy_riffs → "Heavy Riffs Mix" ───────────────────────────────────────────────────────
+# Theme:    Aggressive, intense, fierce, brash, visceral.
+# Sound:    Upbeat 130bpm, high energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: heavy metal, hard rock, alternative metal, nü metal, funk metal, metalcore.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "heavy_riffs": {"bpm": 130, "energy": -7, "danceability": 0.45, "brightness": 0.18, "beat_confidence": 0.82, "onset_rate": 6, "dynamic_complexity": 0.45, "arousal": 0.85, "valence": 0.35, "vocal_presence": 0.55},
+# ── punk_energy → "Punk Energy Mix" ───────────────────────────────────────────────────────
+# Theme:    Aggressive, rebellious, brash, raucous, defiant.
+# Sound:    Fast 165bpm, mid energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: pop punk, punk revival, hardcore punk, skatepunk, punk/new wave.
+# Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "punk_energy": {"bpm": 165, "energy": -8, "danceability": 0.42, "brightness": 0.26, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.45, "arousal": 0.88, "valence": 0.45, "vocal_presence": 0.7},
+# ── garage_grunge → "Garage & Grunge Mix" ─────────────────────────────────────────────────
+# Theme:    Gritty, brash, rebellious, raw, fierce.
+# Sound:    Upbeat 124bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: grunge, garage rock revival, garage punk, proto-punk, noise-rock.
+# Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "garage_grunge": {"bpm": 124, "energy": -9, "danceability": 0.45, "brightness": 0.2, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.65},
+# ── emo_poppunk → "Emo & Pop-Punk Mix" ────────────────────────────────────────────────────
+# Theme:    Angst-ridden, cathartic, earnest, yearning, fierce.
+# Sound:    Upbeat 135bpm, mid energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: emo, emo-pop, pop punk, post-hardcore, screamo.
+# Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "emo_poppunk": {"bpm": 135, "energy": -9, "danceability": 0.45, "brightness": 0.24, "beat_confidence": 0.8, "onset_rate": 6, "dynamic_complexity": 0.45, "arousal": 0.78, "valence": 0.4, "vocal_presence": 0.78},
+# ── britpop_rock → "Britpop & Madchester Mix" ─────────────────────────────────────────────
+# Theme:    Swaggering, lively, stylish, wry, exuberant.
+# Sound:    Upbeat 120bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: brit pop.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "britpop_rock": {"bpm": 120, "energy": -10, "danceability": 0.52, "brightness": 0.3, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.65, "valence": 0.62, "vocal_presence": 0.7},
+# ── blues_bar → "Blues Bar Mix" ───────────────────────────────────────────────────────────
+# Theme:    Gritty, earthy, passionate, gutsy, sultry.
+# Sound:    Mid 100bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: blues-rock, electric blues, chicago blues, regional blues, punk blues.
+# Criteria: style gate parent {blues, rock} · pop +0.5 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "blues_bar": {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.24, "beat_confidence": 0.6, "onset_rate": 4, "dynamic_complexity": 0.55, "arousal": 0.58, "valence": 0.45, "vocal_presence": 0.68},
+# ── psych_haze → "Psych Haze Mix" ─────────────────────────────────────────────────────────
+# Theme:    Hypnotic, dreamy, trippy, atmospheric, druggy.
+# Sound:    Mid-slow 96bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: neo-psychedelia, shoegaze, space rock, dream pop, kraut rock.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "psych_haze": {"bpm": 96, "energy": -14, "danceability": 0.35, "brightness": 0.16, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.42, "valence": 0.5, "vocal_presence": 0.55},
+# ── prog_rock → "Prog & Art Rock Mix" ─────────────────────────────────────────────────────
+# Theme:    Complex, elaborate, cerebral, epic, sprawling.
+# Sound:    Mid 110bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Last.fm-tag-gated (audio model can't name it): progressive rock, prog rock.
+# Criteria: Last.fm gate · pop +0.5 · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "prog_rock": {"bpm": 110, "energy": -12, "danceability": 0.4, "brightness": 0.22, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.58, "valence": 0.5, "vocal_presence": 0.55},
+# ── stoner_rock → "Stoner & Desert Rock Mix" ──────────────────────────────────────────────
+# Theme:    Heavy, hypnotic, gritty, brooding, druggy.
+# Sound:    Mid 110bpm, mid energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: stoner metal, doom metal, acid rock, space rock.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "stoner_rock": {"bpm": 110, "energy": -9, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.72, "onset_rate": 4.5, "dynamic_complexity": 0.5, "arousal": 0.7, "valence": 0.4, "vocal_presence": 0.55},
+# ── reggae_dub → "Reggae & Dub Mix" ───────────────────────────────────────────────────────
+# Theme:    Warm, laid-back, mellow, spiritual, sunny.
+# Sound:    Slow 76bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: roots reggae, dub, dancehall, ska, contemporary reggae, reggae-pop.
+# Criteria: style gate parent {reggae} · pop +0.5 · lyric-themes · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "reggae_dub": {"bpm": 76, "energy": -13, "danceability": 0.48, "brightness": 0.28, "beat_confidence": 0.6, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.4, "valence": 0.65, "vocal_presence": 0.6},
+# ── afrobeat → "Afrobeat Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Warm, lively, exuberant, spiritual, celebratory.
+# Sound:    Mid 110bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: afrobeat, highlife, african, afro-cuban, soukous.
+# Criteria: style gate parent {electronic, folk, world, & country, funk / soul} · pop +0.5 · lyric-themes · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "afrobeat": {"bpm": 110, "energy": -11, "danceability": 0.6, "brightness": 0.34, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.65, "valence": 0.72, "vocal_presence": 0.6},
+# ── latin_heat → "Latin Heat Mix" ─────────────────────────────────────────────────────────
+# Theme:    Warm, lively, sexy, exuberant, celebratory.
+# Sound:    Mid 100bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: latin pop, salsa, cumbia, reggaeton, latin dance, tropical.
+# Criteria: style gate parent {electronic, latin} · pop +0.5 · lyric-themes · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "latin_heat": {"bpm": 100, "energy": -11, "danceability": 0.62, "brightness": 0.36, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.7, "valence": 0.78, "vocal_presence": 0.65},
+# ── bossa_samba → "Bossa & Samba Mix" ─────────────────────────────────────────────────────
+# Theme:    Warm, smooth, sophisticated, sensual, mellow.
+# Sound:    Mid-slow 95bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: bossa, samba, latin jazz, mpb.
+# Criteria: style gate parent {jazz, latin} · pop +0.5 · lyric-themes · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "bossa_samba": {"bpm": 95, "energy": -15, "danceability": 0.45, "brightness": 0.3, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.62, "arousal": 0.4, "valence": 0.65, "vocal_presence": 0.55},
+# ── celtic_folk → "Celtic & Folk Traditions Mix" ──────────────────────────────────────────
+# Theme:    Rousing, earthy, nostalgic, warm, pastoral.
+# Sound:    Mid 110bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: celtic, celtic rock, celtic fusion, british folk, traditional celtic.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · lyric-themes · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "celtic_folk": {"bpm": 110, "energy": -13, "danceability": 0.35, "brightness": 0.28, "beat_confidence": 0.6, "onset_rate": 4.5, "dynamic_complexity": 0.62, "arousal": 0.55, "valence": 0.6, "vocal_presence": 0.62},
+# ── ska → "Ska & Two-Tone Mix" ────────────────────────────────────────────────────────────
+# Theme:    Lively, exuberant, playful, rousing, carefree.
+# Sound:    Fast 145bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: ska, ska-punk, third wave ska revival, ska revival.
+# Criteria: style gate parent {reggae, rock} · pop +0.5 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "ska": {"bpm": 145, "energy": -10, "danceability": 0.58, "brightness": 0.34, "beat_confidence": 0.8, "onset_rate": 6.5, "dynamic_complexity": 0.45, "arousal": 0.75, "valence": 0.72, "vocal_presence": 0.65},
+# ── bebop → "Bebop Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Energetic, elaborate, kinetic, complex, exciting.
+# Sound:    Fast 165bpm, low energy, moderate groove; warm-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: hard bop, bop, post-bop, avant-garde jazz.
+# Criteria: style gate parent {jazz} · pop +0.5 · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "bebop": {"bpm": 165, "energy": -12, "danceability": 0.4, "brightness": 0.3, "beat_confidence": 0.65, "onset_rate": 7, "dynamic_complexity": 0.72, "arousal": 0.78, "valence": 0.55, "vocal_presence": 0.2},
+# ── swing_bigband → "Swing & Big Band Mix" ────────────────────────────────────────────────
+# Theme:    Lively, exuberant, celebratory, brassy, playful.
+# Sound:    Fast 150bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: swing, big band, swing, retro swing, traditional pop.
+# Criteria: style gate parent {jazz, pop} · pop +0.5 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "swing_bigband": {"bpm": 150, "energy": -12, "danceability": 0.55, "brightness": 0.34, "beat_confidence": 0.7, "onset_rate": 6, "dynamic_complexity": 0.65, "arousal": 0.72, "valence": 0.78, "vocal_presence": 0.62},
+# ── smooth_jazz → "Smooth Jazz & Lounge Mix" ──────────────────────────────────────────────
+# Theme:    Smooth, mellow, sophisticated, relaxed, elegant.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: smooth jazz, crossover jazz, lounge, cool, quiet storm.
+# Criteria: style gate parent {funk / soul, jazz} · pop +0.5 · soft daypart lean · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "smooth_jazz": {"bpm": 92, "energy": -16, "danceability": 0.38, "brightness": 0.24, "beat_confidence": 0.45, "onset_rate": 3, "dynamic_complexity": 0.62, "arousal": 0.32, "valence": 0.58, "vocal_presence": 0.45},
+# ── country_roads → "Country Roads Mix" ───────────────────────────────────────────────────
+# Theme:    Warm, earnest, cheerful, nostalgic.
+# Sound:    Mid 105bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: country, honky tonk, country rock.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "country_roads": {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.34, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.52, "arousal": 0.55, "valence": 0.65, "vocal_presence": 0.72},
+# ── outlaw_country → "Outlaw & Alt-Country Mix" ───────────────────────────────────────────
+# Theme:    Gritty, earthy, earnest, rebellious, weary.
+# Sound:    Mid 108bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: honky tonk, bluegrass, country rock, country.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "outlaw_country": {"bpm": 108, "energy": -13, "danceability": 0.42, "brightness": 0.26, "beat_confidence": 0.6, "onset_rate": 4.5, "dynamic_complexity": 0.58, "arousal": 0.58, "valence": 0.52, "vocal_presence": 0.72},
+# ── bluegrass → "Bluegrass & Banjo Mix" ───────────────────────────────────────────────────
+# Theme:    Lively, rousing, earthy, pastoral, rustic.
+# Sound:    Upbeat 120bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: bluegrass, progressive bluegrass, country-folk, string bands, new acoustic.
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "bluegrass": {"bpm": 120, "energy": -13, "danceability": 0.45, "brightness": 0.36, "beat_confidence": 0.65, "onset_rate": 6.5, "dynamic_complexity": 0.65, "arousal": 0.62, "valence": 0.68, "vocal_presence": 0.65},
+# ── rockabilly_surf → "Rockabilly & Surf Mix" ─────────────────────────────────────────────
+# Theme:    Lively, playful, rousing, nostalgic, exuberant.
+# Sound:    Fast 150bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: rockabilly, surf, rockabilly revival, psychobilly, rock & roll.
+# Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "rockabilly_surf": {"bpm": 150, "energy": -11, "danceability": 0.55, "brightness": 0.36, "beat_confidence": 0.78, "onset_rate": 6.5, "dynamic_complexity": 0.5, "arousal": 0.72, "valence": 0.7, "vocal_presence": 0.6},
+# ── cinematic_epic → "Cinematic Epic Mix" ─────────────────────────────────────────────────
+# Theme:    Epic, dramatic, majestic, monumental, theatrical.
+# Sound:    Mid-slow 95bpm, low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: soundtrack, score, neo-romantic.
+# Criteria: style gate parent {classical, stage & screen} · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "cinematic_epic": {"bpm": 95, "energy": -13, "danceability": 0.25, "brightness": 0.24, "beat_confidence": 0.45, "onset_rate": 3, "dynamic_complexity": 0.7, "arousal": 0.55, "valence": 0.5, "vocal_presence": 0.2},
+# ── ambient_drift → "Ambient Drift Mix" ───────────────────────────────────────────────────
+# Theme:    Atmospheric, meditative, ethereal, soothing, spacious.
+# Sound:    Slow 62bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: ambient, dark ambient, new age, experimental ambient.
+# Criteria: style gate parent {electronic} · pop -1 · soft daypart lean · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "ambient_drift": {"bpm": 62, "energy": -20, "danceability": 0.12, "brightness": 0.1, "beat_confidence": 0.2, "onset_rate": 1, "dynamic_complexity": 0.75, "arousal": 0.1, "valence": 0.5, "vocal_presence": 0.06},
+# ── post_rock → "Post-Rock Crescendo Mix" ─────────────────────────────────────────────────
+# Theme:    Atmospheric, majestic, cathartic, epic, brooding.
+# Sound:    Mid 100bpm, low energy, moderate groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: post rock, math rock.
+# Criteria: style gate parent {rock} · pop -1 · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "post_rock": {"bpm": 100, "energy": -13, "danceability": 0.3, "brightness": 0.18, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.68, "arousal": 0.55, "valence": 0.48, "vocal_presence": 0.25},
+# ── chiptune → "8-Bit & Game Mix" ─────────────────────────────────────────────────────────
+# Theme:    Playful, lively, nostalgic, exuberant, quirky.
+# Sound:    Upbeat 130bpm, mid energy, danceable; bright, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: chiptune.
+# Criteria: style gate parent {electronic} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "chiptune": {"bpm": 130, "energy": -10, "danceability": 0.55, "brightness": 0.45, "beat_confidence": 0.75, "onset_rate": 6, "dynamic_complexity": 0.42, "arousal": 0.72, "valence": 0.65, "vocal_presence": 0.2},
+# ── gospel → "Gospel & Choir Mix" ─────────────────────────────────────────────────────────
+# Theme:    Spiritual, joyous, uplifting, reverent, exuberant.
+# Sound:    Mid 112bpm, mid energy, danceable; bright, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: gospel.
+# Criteria: style gate parent {funk / soul} · pop +0.5 · soft daypart lean · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "gospel": {"bpm": 112, "energy": -11, "danceability": 0.48, "brightness": 0.4, "beat_confidence": 0.65, "onset_rate": 5, "dynamic_complexity": 0.55, "arousal": 0.65, "valence": 0.72, "vocal_presence": 0.85},
+# ── glasgow_folk → "Glasgow Folk Mix" ─────────────────────────────────────────────────────
+# Theme:    Earnest, nostalgic, warm, pastoral, wistful.
+# Sound:    Mid-slow 88bpm, low energy, low groove; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: folk, folk rock, neofolk, celtic.
+# Criteria: style gate parent {folk, world, & country, rock} · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_folk": {"bpm": 88, "energy": -15, "danceability": 0.28, "brightness": 0.26, "beat_confidence": 0.5, "onset_rate": 4, "dynamic_complexity": 0.65, "arousal": 0.45, "valence": 0.6, "vocal_presence": 0.7},
+# ── glasgow_dream → "Glasgow Dream Mix" ───────────────────────────────────────────────────
+# Theme:    Dreamy, hypnotic, atmospheric, wistful, ethereal.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: dream pop, shoegaze, noise pop, neo-psychedelia.
+# Criteria: style gate parent {rock} · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_dream": {"bpm": 92, "energy": -15, "danceability": 0.3, "brightness": 0.16, "beat_confidence": 0.52, "onset_rate": 3.5, "dynamic_complexity": 0.58, "arousal": 0.4, "valence": 0.55, "vocal_presence": 0.55},
+# ── glasgow_indie → "Glasgow Indie Mix" ───────────────────────────────────────────────────
+# Theme:    Wry, wistful, witty, stylish, literate.
+# Sound:    Mid 110bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: indie pop, twee pop, c-86, jangle pop, sophisti-pop, chamber pop.
+# Criteria: style gate parent {rock} · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_indie": {"bpm": 110, "energy": -14, "danceability": 0.42, "brightness": 0.28, "beat_confidence": 0.6, "onset_rate": 5, "dynamic_complexity": 0.52, "arousal": 0.55, "valence": 0.58, "vocal_presence": 0.72},
+# ── glasgow_soul → "Glasgow Soul Mix" ─────────────────────────────────────────────────────
+# Theme:    Warm, stylish, smooth, sophisticated, lively.
+# Sound:    Mid 104bpm, low energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: blue-eyed soul, pop-soul, northern soul, funk.
+# Criteria: style gate parent {funk / soul} · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "glasgow_soul": {"bpm": 104, "energy": -12, "danceability": 0.55, "brightness": 0.3, "beat_confidence": 0.65, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.65, "vocal_presence": 0.78},
+# ── glasgow_postrock → "Glasgow Post-Rock Mix" ────────────────────────────────────────────
+# Theme:    Atmospheric, majestic, cathartic, brooding, epic.
+# Sound:    Mid 100bpm, low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: post rock, math rock.
+# Criteria: style gate parent {rock} · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_postrock": {"bpm": 100, "energy": -14, "danceability": 0.28, "brightness": 0.16, "beat_confidence": 0.55, "onset_rate": 3.5, "dynamic_complexity": 0.68, "arousal": 0.55, "valence": 0.48, "vocal_presence": 0.2},
+# ── glasgow_anthems → "Glasgow Anthems Mix" ───────────────────────────────────────────────
+# Theme:    Swaggering, exuberant, lively, confident, rousing.
+# Sound:    Upbeat 120bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: indie rock, dance-rock, britpop, new wave/post-punk revival.
+# Criteria: style gate parent {rock} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_anthems": {"bpm": 120, "energy": -10, "danceability": 0.55, "brightness": 0.3, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.68, "valence": 0.62, "vocal_presence": 0.68},
+# ── glasgow_synth → "Glasgow Synth Mix" ───────────────────────────────────────────────────
+# Theme:    Stylish, nocturnal, hypnotic, atmospheric, yearning.
+# Sound:    Mid 116bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: synth pop, new wave, electro, dance-rock.
+# Criteria: style gate parent {electronic, pop, rock} · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_synth": {"bpm": 116, "energy": -11, "danceability": 0.52, "brightness": 0.22, "beat_confidence": 0.7, "onset_rate": 4.5, "dynamic_complexity": 0.42, "arousal": 0.55, "valence": 0.6, "vocal_presence": 0.6},
+# ── glasgow_postpunk → "Glasgow Post-Punk Mix" ────────────────────────────────────────────
+# Theme:    Angular, rebellious, brash, nervous, defiant.
+# Sound:    Upbeat 132bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: post-punk, new wave/post-punk revival, punk.
+# Criteria: style gate parent {rock} · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_postpunk": {"bpm": 132, "energy": -10, "danceability": 0.48, "brightness": 0.22, "beat_confidence": 0.78, "onset_rate": 6, "dynamic_complexity": 0.48, "arousal": 0.78, "valence": 0.5, "vocal_presence": 0.62},
+# ── glasgow_house → "Glasgow House Mix" ───────────────────────────────────────────────────
+# Theme:    Hypnotic, stylish, lively, cosmopolitan, nocturnal.
+# Sound:    Upbeat 124bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: house, left-field house, tech-house, disco.
+# Criteria: style gate parent {electronic} · lyric-themes · moodclass · cat:groove
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "glasgow_house": {"bpm": 124, "energy": -10, "danceability": 0.7, "brightness": 0.26, "beat_confidence": 0.78, "onset_rate": 5, "dynamic_complexity": 0.4, "arousal": 0.65, "valence": 0.6, "vocal_presence": 0.45},
+# ── glasgow_underground → "Glasgow Underground Mix" ───────────────────────────────────────
+# Theme:    Hypnotic, dark, driving, nocturnal, intense.
+# Sound:    Upbeat 130bpm, mid energy, very danceable; dark-toned, near-instrumental.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: techno, minimal techno, detroit techno, acid house.
+# Criteria: style gate parent {electronic} · pop -1 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "glasgow_underground": {"bpm": 130, "energy": -9, "danceability": 0.62, "brightness": 0.12, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.34, "arousal": 0.8, "valence": 0.42, "vocal_presence": 0.2},
+# ── glasgow_bass → "Glasgow Bass Mix" ─────────────────────────────────────────────────────
+# Theme:    Kinetic, playful, quirky, exuberant, bright.
+# Sound:    Fast 140bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: idm, bassline, dubstep, breakbeat.
+# Criteria: style gate parent {electronic} · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "glasgow_bass": {"bpm": 140, "energy": -9, "danceability": 0.58, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5, "dynamic_complexity": 0.4, "arousal": 0.78, "valence": 0.55, "vocal_presence": 0.45},
+# ── glasgow_late → "Glasgow Late Mix" ─────────────────────────────────────────────────────
+# Theme:    Hypnotic, nocturnal, mellow, atmospheric, stylish.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Glasgow.
+# Music:    Genre-pure: downtempo, trip-hop, electronica, ambient techno.
+# Criteria: style gate parent {electronic} · hour-gate (21, 4) · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "glasgow_late": {"bpm": 90, "energy": -15, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.5, "onset_rate": 3, "dynamic_complexity": 0.55, "arousal": 0.3, "valence": 0.5, "vocal_presence": 0.4},
+# ── london_dub → "London Dub Mix" ─────────────────────────────────────────────────────────
+# Theme:    Warm, laid-back, hypnotic, spiritual, mellow.
+# Sound:    Slow 76bpm, low energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: dub, roots reggae, dancehall, reggae-pop.
+# Criteria: style gate parent {reggae} · moodclass · cat:global
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_dub": {"bpm": 76, "energy": -13, "danceability": 0.48, "brightness": 0.24, "beat_confidence": 0.58, "onset_rate": 3, "dynamic_complexity": 0.58, "arousal": 0.4, "valence": 0.62, "vocal_presence": 0.55},
+# ── london_soul → "London Soul Mix" ───────────────────────────────────────────────────────
+# Theme:    Passionate, sultry, stylish, smooth, sophisticated.
+# Sound:    Mid-slow 96bpm, low energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: blue-eyed soul, neo-soul, contemporary r&b, acid jazz.
+# Criteria: style gate parent {funk / soul} · lyric-themes · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "london_soul": {"bpm": 96, "energy": -12, "danceability": 0.52, "brightness": 0.26, "beat_confidence": 0.62, "onset_rate": 4, "dynamic_complexity": 0.52, "arousal": 0.5, "valence": 0.62, "vocal_presence": 0.82},
+# ── london_jazz → "London Jazz Mix" ───────────────────────────────────────────────────────
+# Theme:    Lively, spiritual, cosmopolitan, cerebral, warm.
+# Sound:    Mid 108bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: contemporary jazz, jazz-funk, spiritual jazz, afro-beat, acid jazz.
+# Criteria: style gate parent {jazz} · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_jazz": {"bpm": 108, "energy": -12, "danceability": 0.5, "brightness": 0.28, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.62, "arousal": 0.62, "valence": 0.62, "vocal_presence": 0.45},
+# ── london_triphop → "London Trip-Hop Mix" ────────────────────────────────────────────────
+# Theme:    Nocturnal, hypnotic, brooding, atmospheric, theatrical.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: trip-hop, downtempo, downbeat, idm.
+# Criteria: style gate parent {electronic} · moodclass · cat:cinematic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_triphop": {"bpm": 90, "energy": -15, "danceability": 0.42, "brightness": 0.14, "beat_confidence": 0.52, "onset_rate": 3, "dynamic_complexity": 0.58, "arousal": 0.32, "valence": 0.48, "vocal_presence": 0.55},
+# ── london_mod → "London Mod Mix" ─────────────────────────────────────────────────────────
+# Theme:    Lively, acerbic, stylish, rousing, exuberant.
+# Sound:    Upbeat 124bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: mod, beat, merseybeat, freakbeat, british invasion, british rhythm & blues….
+# Criteria: EXACT-style gate parent {rock} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_mod": {"bpm": 124, "energy": -11, "danceability": 0.52, "brightness": 0.34, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.48, "arousal": 0.68, "valence": 0.65, "vocal_presence": 0.68},
+# ── london_britpop → "London Britpop Mix" ─────────────────────────────────────────────────
+# Theme:    Swaggering, witty, lively, stylish, wry.
+# Sound:    Upbeat 122bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: brit pop.
+# Criteria: style gate parent {rock} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_britpop": {"bpm": 122, "energy": -10, "danceability": 0.52, "brightness": 0.3, "beat_confidence": 0.7, "onset_rate": 5, "dynamic_complexity": 0.45, "arousal": 0.65, "valence": 0.62, "vocal_presence": 0.7},
+# ── london_indie → "London Indie Mix" ─────────────────────────────────────────────────────
+# Theme:    Angular, lively, brash, nervous, stylish.
+# Sound:    Upbeat 130bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: indie rock, new wave/post-punk revival, garage rock revival.
+# Criteria: style gate parent {rock} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_indie": {"bpm": 130, "energy": -10, "danceability": 0.52, "brightness": 0.28, "beat_confidence": 0.78, "onset_rate": 6, "dynamic_complexity": 0.45, "arousal": 0.72, "valence": 0.58, "vocal_presence": 0.68},
+# ── london_calling → "London Calling Mix" ─────────────────────────────────────────────────
+# Theme:    Rebellious, brash, defiant, raucous, gritty.
+# Sound:    Fast 142bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: punk, post-punk, oi!, new wave.
+# Criteria: style gate parent {rock} · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "london_calling": {"bpm": 142, "energy": -9, "danceability": 0.45, "brightness": 0.26, "beat_confidence": 0.82, "onset_rate": 6.5, "dynamic_complexity": 0.48, "arousal": 0.78, "valence": 0.55, "vocal_presence": 0.68},
+# ── london_garage → "London Garage Mix" ───────────────────────────────────────────────────
+# Theme:    Stylish, lively, swaggering, sexy, exuberant.
+# Sound:    Upbeat 134bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: uk garage, garage, broken beat, bassline.
+# Criteria: style gate parent {electronic} · lyric-themes · moodclass · cat:groove
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "london_garage": {"bpm": 134, "energy": -10, "danceability": 0.7, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
+# ── london_grime → "London Grime Mix" ─────────────────────────────────────────────────────
+# Theme:    Aggressive, brash, menacing, gritty, defiant.
+# Sound:    Fast 140bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: grime, uk drill, bass music.
+# Criteria: style gate parent {electronic, hip hop} · lyric-themes · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "london_grime": {"bpm": 140, "energy": -9, "danceability": 0.58, "brightness": 0.14, "beat_confidence": 0.8, "onset_rate": 4, "dynamic_complexity": 0.38, "arousal": 0.82, "valence": 0.42, "vocal_presence": 0.62},
+# ── london_dubstep → "London Dubstep Mix" ─────────────────────────────────────────────────
+# Theme:    Heavy, dark, menacing, hypnotic, intense.
+# Sound:    Fast 142bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: dubstep, bass music, uk garage.
+# Criteria: style gate parent {electronic} · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "london_dubstep": {"bpm": 142, "energy": -9, "danceability": 0.55, "brightness": 0.14, "beat_confidence": 0.78, "onset_rate": 4, "dynamic_complexity": 0.4, "arousal": 0.8, "valence": 0.42, "vocal_presence": 0.4},
+# ── london_jungle → "London Jungle Mix" ───────────────────────────────────────────────────
+# Theme:    Kinetic, manic, driving, rousing, exciting.
+# Sound:    Fast 172bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to London.
+# Music:    Genre-pure: jungle, drum n bass, breakbeat, breaks, big beat.
+# Criteria: style gate parent {electronic} · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "london_jungle": {"bpm": 172, "energy": -8, "danceability": 0.55, "brightness": 0.24, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.42, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
+# ── melbourne_folk → "Melbourne Folk Mix" ─────────────────────────────────────────────────
+# Theme:    Warm, earnest, wistful, pastoral, gentle.
+# Sound:    Mid-slow 92bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: folk, folk rock, neofolk, celtic.
+# Criteria: style gate parent {folk, world, & country, rock} · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_folk": {"bpm": 92, "energy": -15, "danceability": 0.3, "brightness": 0.28, "beat_confidence": 0.52, "onset_rate": 4, "dynamic_complexity": 0.62, "arousal": 0.45, "valence": 0.6, "vocal_presence": 0.72},
+# ── melbourne_dream → "Melbourne Dream Mix" ───────────────────────────────────────────────
+# Theme:    Dreamy, hypnotic, atmospheric, wistful, mellow.
+# Sound:    Mid-slow 96bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: dream pop, jangle pop, indie pop, neo-psychedelia.
+# Criteria: style gate parent {rock} · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_dream": {"bpm": 96, "energy": -14, "danceability": 0.34, "brightness": 0.2, "beat_confidence": 0.55, "onset_rate": 4, "dynamic_complexity": 0.55, "arousal": 0.42, "valence": 0.58, "vocal_presence": 0.58},
+# ── melbourne_soul → "Melbourne Soul Mix" ─────────────────────────────────────────────────
+# Theme:    Passionate, stylish, warm, lively, sophisticated.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: soul, funk, neo soul, jazz-funk.
+# Criteria: style gate parent {funk / soul} · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "melbourne_soul": {"bpm": 100, "energy": -12, "danceability": 0.55, "brightness": 0.28, "beat_confidence": 0.62, "onset_rate": 4.5, "dynamic_complexity": 0.55, "arousal": 0.55, "valence": 0.65, "vocal_presence": 0.78},
+# ── melbourne_sunset → "Melbourne Sunset Mix" ─────────────────────────────────────────────
+# Theme:    Warm, carefree, sunny, summery, mellow.
+# Sound:    Mid 105bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: surf, indie pop, tropical, sunshine pop.
+# Criteria: style gate parent {electronic, pop, rock} · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_sunset": {"bpm": 105, "energy": -12, "danceability": 0.5, "brightness": 0.42, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.72, "vocal_presence": 0.65},
+# ── melbourne_indie → "Melbourne Indie Mix" ───────────────────────────────────────────────
+# Theme:    Wry, witty, laid-back, stylish, charming.
+# Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: indie rock, alternative/indie rock, jangle pop.
+# Criteria: style gate parent {rock} · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_indie": {"bpm": 118, "energy": -11, "danceability": 0.48, "brightness": 0.3, "beat_confidence": 0.68, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.62, "valence": 0.6, "vocal_presence": 0.72},
+# ── melbourne_pubrock → "Melbourne Pub Rock Mix" ──────────────────────────────────────────
+# Theme:    Rousing, gutsy, swaggering, brash, raucous.
+# Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: aussie rock, pub rock, album rock, hard rock, heartland rock.
+# Criteria: style gate parent {rock} · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_pubrock": {"bpm": 118, "energy": -10, "danceability": 0.48, "brightness": 0.28, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.48, "arousal": 0.7, "valence": 0.6, "vocal_presence": 0.65},
+# ── melbourne_hiphop → "Melbourne Hip-Hop Mix" ────────────────────────────────────────────
+# Theme:    Laid-back, earnest, witty, street-smart, warm.
+# Sound:    Mid-slow 92bpm, low energy, danceable; dark-toned, vocal-forward.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: trap, cloud rap, conscious, boom bap, hardcore hip-hop.
+# Criteria: style gate parent {hip hop} · lyric-themes · moodclass · cat:groove
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "melbourne_hiphop": {"bpm": 92, "energy": -12, "danceability": 0.52, "brightness": 0.24, "beat_confidence": 0.62, "onset_rate": 4, "dynamic_complexity": 0.5, "arousal": 0.55, "valence": 0.55, "vocal_presence": 0.8},
+# ── melbourne_postpunk → "Melbourne Post-Punk Mix" ────────────────────────────────────────
+# Theme:    Dark, angular, brooding, menacing, intense.
+# Sound:    Upbeat 128bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: post-punk, goth rock, new wave.
+# Criteria: style gate parent {rock} · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_postpunk": {"bpm": 128, "energy": -9, "danceability": 0.46, "brightness": 0.16, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.62},
+# ── melbourne_psych → "Melbourne Psych Mix" ───────────────────────────────────────────────
+# Theme:    Hypnotic, trippy, manic, driving, druggy.
+# Sound:    Upbeat 132bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: psychedelic rock, garage rock.
+# Criteria: style gate parent {rock} · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_psych": {"bpm": 132, "energy": -9, "danceability": 0.45, "brightness": 0.2, "beat_confidence": 0.78, "onset_rate": 6, "dynamic_complexity": 0.52, "arousal": 0.8, "valence": 0.5, "vocal_presence": 0.55},
+# ── melbourne_garagepunk → "Melbourne Garage Punk Mix" ────────────────────────────────────
+# Theme:    Aggressive, raucous, rebellious, brash, fierce.
+# Sound:    Fast 150bpm, mid energy, danceable; dark-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: punk, pop punk, hardcore, melodic hardcore, garage rock.
+# Criteria: style gate parent {rock} · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "melbourne_garagepunk": {"bpm": 150, "energy": -8, "danceability": 0.45, "brightness": 0.22, "beat_confidence": 0.82, "onset_rate": 7, "dynamic_complexity": 0.48, "arousal": 0.85, "valence": 0.45, "vocal_presence": 0.65},
+# ── melbourne_club → "Melbourne Club Mix" ─────────────────────────────────────────────────
+# Theme:    Exuberant, lively, euphoric, driving, bright.
+# Sound:    Upbeat 128bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: house, progressive house, electro, club/dance.
+# Criteria: style gate parent {electronic} · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "melbourne_club": {"bpm": 128, "energy": -8, "danceability": 0.74, "brightness": 0.34, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.8, "valence": 0.68, "vocal_presence": 0.45},
+# ── melbourne_techno → "Melbourne Techno Mix" ─────────────────────────────────────────────
+# Theme:    Hypnotic, dark, driving, nocturnal, intense.
+# Sound:    Upbeat 130bpm, mid energy, very danceable; dark-toned, near-instrumental.
+# Era/Geo:  Any era · geo-tiered to Melbourne.
+# Music:    Genre-pure: techno, minimal techno, tech-house, acid house.
+# Criteria: style gate parent {electronic} · pop -1 · moodclass · cat:energy
+# Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
+# Enhance:  emb for sub-style clustering
     "melbourne_techno": {"bpm": 130, "energy": -9, "danceability": 0.62, "brightness": 0.12, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.34, "arousal": 0.8, "valence": 0.42, "vocal_presence": 0.2},
     # General activity / mood profiles (rotation by acoustic fit)
     # beat_confidence: groove/pulse strength (0=loose, 1=driving)
     # onset_rate: note density in onsets/sec
     # dynamic_complexity: loudness variance (low=compressed, high=dynamic; 0.3=EDM, 0.6=folk/jazz)
     # arousal/valence/vocal_presence: TF-derived — None-safe, only scored when data exists
+# ── workout → "Beast Mode" ────────────────────────────────────────────────────────────────
+# Theme:    Energetic, aggressive, powerful, intense, triumphant.
+# Sound:    Fast 150bpm, high energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · hour-gate (5, 22) · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  integrated_loudness steadiness (now applied); emb_musicnn similarity (fuzzy mix, no genre gate)
     "workout":    {"bpm": 150, "energy": -7,  "danceability": 0.60, "brightness": 0.30,
                    "beat_confidence": 0.85, "onset_rate": 7.0, "dynamic_complexity": 0.40,
                    "arousal": 0.80, "valence": 0.65, "vocal_presence": 0.60},
+# ── running → "Runner's High" ─────────────────────────────────────────────────────────────
+# Theme:    Energetic, powerful, lively, rousing, driving.
+# Sound:    Fast 160bpm, high energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · hour-gate (5, 22) · lyric-themes · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  integrated_loudness steadiness (now applied); emb_musicnn similarity (fuzzy mix, no genre gate)
     "running":    {"bpm": 160, "energy": -6,  "danceability": 0.45, "brightness": 0.28,
                    "beat_confidence": 0.80, "onset_rate": 6.0, "dynamic_complexity": 0.42,
                    "arousal": 0.85, "valence": 0.60, "vocal_presence": 0.55},
+# ── party → "Party Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Celebratory, energetic, euphoric, fun, carefree.
+# Sound:    Upbeat 125bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "party":      {"bpm": 125, "energy": -9,  "danceability": 0.78, "brightness": 0.38,
                    "beat_confidence": 0.75, "onset_rate": 6.5, "dynamic_complexity": 0.35,
                    "arousal": 0.75, "valence": 0.80, "vocal_presence": 0.70},
+# ── happy → "Happy Hits" ──────────────────────────────────────────────────────────────────
+# Theme:    Happy, lively, euphoric, joyous, cheerful.
+# Sound:    Upbeat 118bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop +1 · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "happy":      {"bpm": 118, "energy": -11, "danceability": 0.65, "brightness": 0.48,
                    "beat_confidence": 0.65, "onset_rate": 5.5, "dynamic_complexity": 0.45,
                    "arousal": 0.65, "valence": 0.85, "vocal_presence": 0.75},
+# ── focus → "In the Zone" ─────────────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, meditative, relaxed, atmospheric.
+# Sound:    Mid-slow 90bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hour-gate (5, 17) · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  integrated_loudness steadiness (now applied); emb_musicnn similarity (fuzzy mix, no genre gate)
     "focus":      {"bpm":  90, "energy": -18, "danceability": 0.22, "brightness": 0.10,
                    "beat_confidence": 0.30, "onset_rate": 2.0, "dynamic_complexity": 0.65,
                    "arousal": 0.25, "valence": 0.55, "vocal_presence": 0.15},
+# ── chill → "Chill Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Calm, laid-back, mellow, relaxed, peaceful.
+# Sound:    Mid-slow 82bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "chill":      {"bpm":  82, "energy": -15, "danceability": 0.32, "brightness": 0.16,
                    "beat_confidence": 0.45, "onset_rate": 3.0, "dynamic_complexity": 0.55,
                    "arousal": 0.30, "valence": 0.65, "vocal_presence": 0.45},
+# ── melancholy → "In My Feels" ────────────────────────────────────────────────────────────
+# Theme:    Sad, melancholy, bittersweet, somber, plaintive.
+# Sound:    Slow 68bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "melancholy": {"bpm":  68, "energy": -15, "danceability": 0.15, "brightness": 0.07,
                    "beat_confidence": 0.35, "onset_rate": 2.5, "dynamic_complexity": 0.60,
                    "arousal": 0.25, "valence": 0.20, "vocal_presence": 0.65},
     # Time-of-day profiles (boosted when current time matches their window)
+# ── morning → "Rise & Shine" ──────────────────────────────────────────────────────────────
+# Theme:    Cheerful, calm, peaceful, gentle, springlike.
+# Sound:    Mid 100bpm, low energy, moderate groove; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hard-time (5, 12) · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "morning":    {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.45,
                    "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.55,
                    "arousal": 0.50, "valence": 0.70, "vocal_presence": 0.55},
+# ── dinner → "Dinner Mix" ─────────────────────────────────────────────────────────────────
+# Theme:    Romantic, sophisticated, elegant, smooth, mellow.
+# Sound:    Mid-slow 88bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hard-time (17, 21) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "dinner":     {"bpm":  88, "energy": -19, "danceability": 0.25, "brightness": 0.22,
                    "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.65,
                    "arousal": 0.25, "valence": 0.60, "vocal_presence": 0.40},
+# ── late_night → "Late Night Feels" ───────────────────────────────────────────────────────
+# Theme:    Dark, introspective, brooding, atmospheric, hypnotic.
+# Sound:    Slow 78bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hard-time (22, 2) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "late_night": {"bpm":  78, "energy": -14, "danceability": 0.42, "brightness": 0.05,
                    "beat_confidence": 0.50, "onset_rate": 3.5, "dynamic_complexity": 0.52,
                    "arousal": 0.40, "valence": 0.35, "vocal_presence": 0.50},
+# ── sleep → "Drift Off" ───────────────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, dreamy, soothing, languid.
+# Sound:    Slow 65bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hard-time (21, 4) · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  integrated_loudness steadiness (now applied); emb_musicnn similarity (fuzzy mix, no genre gate)
     "sleep":      {"bpm":  65, "energy": -23, "danceability": 0.10, "brightness": 0.03,
                    "beat_confidence": 0.15, "onset_rate": 1.0, "dynamic_complexity": 0.70,
                    "arousal": 0.10, "valence": 0.50, "vocal_presence": 0.10},
     # Weather-triggered profiles (boosted when conditions match)
+# ── rainy_day → "Rainy Day Mix" ───────────────────────────────────────────────────────────
+# Theme:    Melancholy, bittersweet, introspective, nostalgic, wistful.
+# Sound:    Slow 72bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weather-gated · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "rainy_day":  {"bpm":  72, "energy": -16, "danceability": 0.18, "brightness": 0.09,
                    "beat_confidence": 0.30, "onset_rate": 2.0, "dynamic_complexity": 0.62,
                    "arousal": 0.25, "valence": 0.30, "vocal_presence": 0.60},
+# ── sunny → "Sunny Mix" ───────────────────────────────────────────────────────────────────
+# Theme:    Happy, lively, carefree, fun, joyous.
+# Sound:    Mid 108bpm, mid energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weather-gated · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "sunny":      {"bpm": 108, "energy": -11, "danceability": 0.58, "brightness": 0.52,
                    "beat_confidence": 0.65, "onset_rate": 5.0, "dynamic_complexity": 0.48,
                    "arousal": 0.70, "valence": 0.85, "vocal_presence": 0.65},
+# ── cosy → "Cosy Mix" ─────────────────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, warm, reassuring, nostalgic.
+# Sound:    Slow 75bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · weather-gated · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "cosy":       {"bpm":  75, "energy": -16, "danceability": 0.20, "brightness": 0.18,
                    "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.62,
                    "arousal": 0.25, "valence": 0.65, "vocal_presence": 0.45},
     # ----------------------------------------------------------------
     # Mood / Emotional
     # ----------------------------------------------------------------
+# ── nostalgia_mix → "Take Me Back" ────────────────────────────────────────────────────────
+# Theme:    Nostalgic, wistful, bittersweet, sentimental, autumnal.
+# Sound:    Mid-slow 88bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "nostalgia_mix":    {"bpm":  88, "energy": -14, "danceability": 0.28, "brightness": 0.15,
                          "beat_confidence": 0.35, "onset_rate": 2.5, "dynamic_complexity": 0.58,
                          "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.70},
+# ── dreamy_mix → "Dreamy Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Dreamy, ethereal, atmospheric, spacey, trippy.
+# Sound:    Mid-slow 85bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "dreamy_mix":       {"bpm":  85, "energy": -18, "danceability": 0.25, "brightness": 0.12,
                          "beat_confidence": 0.25, "onset_rate": 2.0, "dynamic_complexity": 0.60,
                          "arousal": 0.20, "valence": 0.55, "vocal_presence": 0.50},
+# ── moody_mix → "In a Mood" ───────────────────────────────────────────────────────────────
+# Theme:    Dark, introspective, brooding, melancholy, gloomy.
+# Sound:    Slow 78bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "moody_mix":        {"bpm":  78, "energy": -16, "danceability": 0.22, "brightness": 0.08,
                          "beat_confidence": 0.40, "onset_rate": 2.8, "dynamic_complexity": 0.58,
                          "arousal": 0.35, "valence": 0.30, "vocal_presence": 0.60},
+# ── emotional → "All the Feels" ───────────────────────────────────────────────────────────
+# Theme:    Passionate, poignant, bittersweet, intense, powerful.
+# Sound:    Mid-slow 95bpm, low energy, moderate groove; warm-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "emotional":        {"bpm":  95, "energy": -12, "danceability": 0.35, "brightness": 0.25,
                          "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.65,
                          "arousal": 0.50, "valence": 0.45, "vocal_presence": 0.85},
+# ── bittersweet → "Happy-Sad" ─────────────────────────────────────────────────────────────
+# Theme:    Bittersweet, nostalgic, wistful, sad, melancholy.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "bittersweet":      {"bpm":  82, "energy": -15, "danceability": 0.25, "brightness": 0.18,
                          "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
                          "arousal": 0.35, "valence": 0.45, "vocal_presence": 0.70},
+# ── cathartic → "Let It Out" ──────────────────────────────────────────────────────────────
+# Theme:    Intense, powerful, dramatic, triumphant, passionate.
+# Sound:    Mid 108bpm, mid energy, moderate groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "cathartic":        {"bpm": 108, "energy": -10, "danceability": 0.38, "brightness": 0.22,
                          "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.70,
                          "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.80},
+# ── confidence_boost → "Feelin' Myself" ───────────────────────────────────────────────────
+# Theme:    Confident, powerful, lively, gutsy, swaggering.
+# Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "confidence_boost": {"bpm": 118, "energy":  -9, "danceability": 0.58, "brightness": 0.35,
                          "beat_confidence": 0.70, "onset_rate": 5.5, "dynamic_complexity": 0.40,
                          "arousal": 0.68, "valence": 0.72, "vocal_presence": 0.70},
+# ── empowering → "Unstoppable" ────────────────────────────────────────────────────────────
+# Theme:    Triumphant, powerful, rousing, anthemic, mighty.
+# Sound:    Upbeat 128bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · soft daypart lean · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "empowering":       {"bpm": 128, "energy":  -8, "danceability": 0.50, "brightness": 0.30,
                          "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.55,
                          "arousal": 0.75, "valence": 0.70, "vocal_presence": 0.75},
+# ── euphoric → "Cloud Nine" ───────────────────────────────────────────────────────────────
+# Theme:    Euphoric, ecstatic, lively, carefree, thrilling.
+# Sound:    Upbeat 132bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "euphoric":         {"bpm": 132, "energy":  -8, "danceability": 0.72, "brightness": 0.42,
                          "beat_confidence": 0.80, "onset_rate": 6.5, "dynamic_complexity": 0.35,
                          "arousal": 0.85, "valence": 0.90, "vocal_presence": 0.65},
+# ── angst_mix → "Big Feelings" ────────────────────────────────────────────────────────────
+# Theme:    Angry, aggressive, intense, nervous, rebellious.
+# Sound:    Upbeat 138bpm, mid energy, moderate groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "angst_mix":        {"bpm": 138, "energy":  -9, "danceability": 0.40, "brightness": 0.22,
                          "beat_confidence": 0.65, "onset_rate": 6.0, "dynamic_complexity": 0.55,
                          "arousal": 0.78, "valence": 0.25, "vocal_presence": 0.82},
+# ── romantic_mix → "Romantic Mix" ─────────────────────────────────────────────────────────
+# Theme:    Romantic, passionate, tender, intimate, sensual.
+# Sound:    Mid-slow 88bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "romantic_mix":     {"bpm":  88, "energy": -16, "danceability": 0.28, "brightness": 0.20,
                          "beat_confidence": 0.32, "onset_rate": 2.5, "dynamic_complexity": 0.60,
                          "arousal": 0.28, "valence": 0.70, "vocal_presence": 0.72},
+# ── daydreaming → "Head in the Clouds" ────────────────────────────────────────────────────
+# Theme:    Dreamy, atmospheric, calm, peaceful, ethereal.
+# Sound:    Mid-slow 80bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "daydreaming":      {"bpm":  80, "energy": -19, "danceability": 0.20, "brightness": 0.10,
                          "beat_confidence": 0.22, "onset_rate": 1.8, "dynamic_complexity": 0.62,
                          "arousal": 0.18, "valence": 0.60, "vocal_presence": 0.55},
+# ── fresh_start → "Fresh Start Mix" ───────────────────────────────────────────────────────
+# Theme:    Optimistic, idealistic, cheerful, bright, springlike.
+# Sound:    Mid 105bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (4, 10) · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "fresh_start":      {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.40,
                          "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.50,
                          "arousal": 0.52, "valence": 0.78, "vocal_presence": 0.65},
     # ----------------------------------------------------------------
     # Aesthetic / Time-of-Day (general pool; soft time boost in rotation)
     # ----------------------------------------------------------------
+# ── main_character → "Main Character Mix" ─────────────────────────────────────────────────
+# Theme:    Confident, dramatic, powerful, swaggering, triumphant.
+# Sound:    Mid 115bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "main_character":   {"bpm": 115, "energy": -10, "danceability": 0.48, "brightness": 0.30,
                          "beat_confidence": 0.62, "onset_rate": 5.0, "dynamic_complexity": 0.55,
                          "arousal": 0.65, "valence": 0.58, "vocal_presence": 0.72},
+# ── golden_hour → "Golden Hour Mix" ───────────────────────────────────────────────────────
+# Theme:    Nostalgic, wistful, warm, optimistic, summery.
+# Sound:    Mid-slow 95bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (16, 21) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "golden_hour":      {"bpm":  95, "energy": -13, "danceability": 0.35, "brightness": 0.28,
                          "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.55,
                          "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.62},
+# ── sunset_mix → "Sunset Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Nostalgic, wistful, bittersweet, mellow, introspective.
+# Sound:    Mid-slow 85bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (16, 21) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "sunset_mix":       {"bpm":  85, "energy": -16, "danceability": 0.25, "brightness": 0.18,
                          "beat_confidence": 0.35, "onset_rate": 2.8, "dynamic_complexity": 0.60,
                          "arousal": 0.32, "valence": 0.62, "vocal_presence": 0.55},
+# ── after_dark → "After Dark Mix" ─────────────────────────────────────────────────────────
+# Theme:    Dark, brooding, atmospheric, nocturnal, sensual.
+# Sound:    Mid 105bpm, low energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (20, 6) · lyric-themes · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "after_dark":       {"bpm": 105, "energy": -12, "danceability": 0.52, "brightness": 0.08,
                          "beat_confidence": 0.60, "onset_rate": 4.5, "dynamic_complexity": 0.42,
                          "arousal": 0.48, "valence": 0.38, "vocal_presence": 0.55},
     # ----------------------------------------------------------------
     # Time / Occasion (general pool; soft time boost in rotation)
     # ----------------------------------------------------------------
+# ── after_work → "Clock Out" ──────────────────────────────────────────────────────────────
+# Theme:    Lively, relaxed, mellow, laid-back, easygoing.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (15, 20) · weekday [0, 1, 2, 3, 4] · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "after_work":       {"bpm": 100, "energy": -12, "danceability": 0.45, "brightness": 0.30,
                          "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.50,
                          "arousal": 0.48, "valence": 0.65, "vocal_presence": 0.60},
+# ── friday_night → "Friday Night Mix" ─────────────────────────────────────────────────────
+# Theme:    Fun, energetic, carefree, lively, celebratory.
+# Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · hour-gate (18, 3) · weekday [4] · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "friday_night":     {"bpm": 118, "energy": -10, "danceability": 0.60, "brightness": 0.35,
                          "beat_confidence": 0.68, "onset_rate": 5.5, "dynamic_complexity": 0.42,
                          "arousal": 0.68, "valence": 0.78, "vocal_presence": 0.68},
+# ── weekend_mix → "Weekend Mix" ───────────────────────────────────────────────────────────
+# Theme:    Lively, happy, carefree, relaxed, fun.
+# Sound:    Mid 100bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weekday [5, 6] · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "weekend_mix":      {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.32,
                          "beat_confidence": 0.50, "onset_rate": 4.0, "dynamic_complexity": 0.52,
                          "arousal": 0.48, "valence": 0.72, "vocal_presence": 0.62},
+# ── sunday_morning → "Slow Sunday" ────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, gentle, warm, relaxed.
+# Sound:    Mid-slow 82bpm, low energy, low groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (5, 12) · weekday [6] · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "sunday_morning":   {"bpm":  82, "energy": -16, "danceability": 0.28, "brightness": 0.30,
                          "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
                          "arousal": 0.32, "valence": 0.72, "vocal_presence": 0.60},
+# ── lazy_sunday → "Lazy Sunday Mix" ───────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, relaxed, laid-back, easygoing.
+# Sound:    Slow 70bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · soft daypart lean · weekday [6] · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "lazy_sunday":      {"bpm":  70, "energy": -19, "danceability": 0.20, "brightness": 0.20,
                          "beat_confidence": 0.28, "onset_rate": 2.0, "dynamic_complexity": 0.65,
                          "arousal": 0.22, "valence": 0.68, "vocal_presence": 0.55},
+# ── brunch_mix → "Bottomless Brunch" ──────────────────────────────────────────────────────
+# Theme:    Happy, cheerful, lively, carefree, fun.
+# Sound:    Mid 100bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (8, 13) · weekday [5, 6] · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "brunch_mix":       {"bpm": 100, "energy": -13, "danceability": 0.42, "brightness": 0.35,
                          "beat_confidence": 0.50, "onset_rate": 3.8, "dynamic_complexity": 0.52,
                          "arousal": 0.48, "valence": 0.78, "vocal_presence": 0.65},
+# ── date_night → "Date Night Mix" ─────────────────────────────────────────────────────────
+# Theme:    Romantic, intimate, smooth, elegant, tender.
+# Sound:    Mid-slow 88bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (18, 1) · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "date_night":       {"bpm":  88, "energy": -17, "danceability": 0.28, "brightness": 0.22,
                          "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.62,
                          "arousal": 0.28, "valence": 0.68, "vocal_presence": 0.62},
     # ----------------------------------------------------------------
     # Activity / Driving
     # ----------------------------------------------------------------
+# ── driving_mix → "Windows Down" ──────────────────────────────────────────────────────────
+# Theme:    Energetic, lively, powerful, confident, driving.
+# Sound:    Mid 110bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "driving_mix":      {"bpm": 110, "energy": -10, "danceability": 0.50, "brightness": 0.32,
                          "beat_confidence": 0.62, "onset_rate": 4.8, "dynamic_complexity": 0.50,
                          "arousal": 0.58, "valence": 0.68, "vocal_presence": 0.70},
+# ── night_drive → "Night Drive Mix" ───────────────────────────────────────────────────────
+# Theme:    Dark, brooding, atmospheric, introspective, nocturnal.
+# Sound:    Mid 100bpm, low energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (19, 4) · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "night_drive":      {"bpm": 100, "energy": -12, "danceability": 0.48, "brightness": 0.08,
                          "beat_confidence": 0.55, "onset_rate": 3.8, "dynamic_complexity": 0.45,
                          "arousal": 0.42, "valence": 0.35, "vocal_presence": 0.52},
+# ── driving_singalong → "Sing in the Car" ─────────────────────────────────────────────────
+# Theme:    Lively, fun, energetic, carefree, cheerful.
+# Sound:    Mid 112bpm, mid energy, danceable; warm-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "driving_singalong":{"bpm": 112, "energy": -10, "danceability": 0.55, "brightness": 0.38,
                          "beat_confidence": 0.65, "onset_rate": 5.0, "dynamic_complexity": 0.48,
                          "arousal": 0.62, "valence": 0.78, "vocal_presence": 0.85},
+# ── road_trip → "Open Road" ───────────────────────────────────────────────────────────────
+# Theme:    Lively, energetic, carefree, fun, optimistic.
+# Sound:    Mid 108bpm, mid energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "road_trip":        {"bpm": 108, "energy": -11, "danceability": 0.48, "brightness": 0.35,
                          "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.52,
                          "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.72},
+# ── commute_mix → "Beat the Traffic" ──────────────────────────────────────────────────────
+# Theme:    Lively, mellow, laid-back, easygoing, relaxed.
+# Sound:    Mid 100bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (6, 9) · weekday [0, 1, 2, 3, 4] · lyric-themes · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "commute_mix":      {"bpm": 100, "energy": -12, "danceability": 0.42, "brightness": 0.28,
                          "beat_confidence": 0.52, "onset_rate": 4.0, "dynamic_complexity": 0.52,
                          "arousal": 0.48, "valence": 0.62, "vocal_presence": 0.65},
+# ── walking_mix → "Walk It Out" ───────────────────────────────────────────────────────────
+# Theme:    Lively, energetic, carefree, optimistic, fun.
+# Sound:    Mid 105bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "walking_mix":      {"bpm": 105, "energy": -12, "danceability": 0.48, "brightness": 0.32,
                          "beat_confidence": 0.58, "onset_rate": 4.5, "dynamic_complexity": 0.50,
                          "arousal": 0.52, "valence": 0.68, "vocal_presence": 0.68},
     # ----------------------------------------------------------------
     # Social / Nostalgia
     # ----------------------------------------------------------------
+# ── party_throwback → "Party Throwback Mix" ───────────────────────────────────────────────
+# Theme:    Celebratory, energetic, fun, carefree, boisterous.
+# Sound:    Upbeat 128bpm, mid energy, very danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "party_throwback":  {"bpm": 128, "energy":  -8, "danceability": 0.72, "brightness": 0.42,
                          "beat_confidence": 0.75, "onset_rate": 6.0, "dynamic_complexity": 0.38,
                          "arousal": 0.78, "valence": 0.78, "vocal_presence": 0.70},
     # ----------------------------------------------------------------
     # Weather / Season (managed by _WEATHER_PROFILES / _SEASONAL_PROFILES)
     # ----------------------------------------------------------------
+# ── beach_vibes → "Beach Vibes Mix" ───────────────────────────────────────────────────────
+# Theme:    Happy, carefree, summery, relaxed, fun.
+# Sound:    Mid 100bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · weather-gated · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "beach_vibes":      {"bpm": 100, "energy": -13, "danceability": 0.55, "brightness": 0.48,
                          "beat_confidence": 0.55, "onset_rate": 4.0, "dynamic_complexity": 0.50,
                          "arousal": 0.52, "valence": 0.82, "vocal_presence": 0.65},
+# ── summer_evening → "Summer Evening Mix" ─────────────────────────────────────────────────
+# Theme:    Warm, carefree, relaxed, summery, mellow.
+# Sound:    Mid 100bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (17, 22) · lyric-themes · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "summer_evening":   {"bpm": 100, "energy": -13, "danceability": 0.50, "brightness": 0.30,
                          "beat_confidence": 0.52, "onset_rate": 4.0, "dynamic_complexity": 0.50,
                          "arousal": 0.48, "valence": 0.75, "vocal_presence": 0.62},
+# ── autumn_mix → "Autumn Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Nostalgic, wistful, melancholy, introspective, bittersweet.
+# Sound:    Mid-slow 80bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "autumn_mix":       {"bpm":  80, "energy": -15, "danceability": 0.25, "brightness": 0.18,
                          "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.60,
                          "arousal": 0.35, "valence": 0.55, "vocal_presence": 0.65},
+# ── winter_mix → "Winter Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, melancholy, atmospheric, nostalgic.
+# Sound:    Slow 75bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "winter_mix":       {"bpm":  75, "energy": -17, "danceability": 0.22, "brightness": 0.12,
                          "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.62,
                          "arousal": 0.28, "valence": 0.45, "vocal_presence": 0.60},
+# ── spring_mix → "Spring Mix" ─────────────────────────────────────────────────────────────
+# Theme:    Optimistic, cheerful, springlike, bright, sunny.
+# Sound:    Mid 105bpm, low energy, danceable; bright.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:upbeat
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "spring_mix":       {"bpm": 105, "energy": -12, "danceability": 0.45, "brightness": 0.42,
                          "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.52,
                          "arousal": 0.55, "valence": 0.78, "vocal_presence": 0.62},
     # ----------------------------------------------------------------
     # Romance
     # ----------------------------------------------------------------
+# ── modern_romance → "Modern Romance Mix" ─────────────────────────────────────────────────
+# Theme:    Romantic, passionate, tender, poignant, yearning.
+# Sound:    Mid-slow 88bpm, low energy, moderate groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "modern_romance":   {"bpm":  88, "energy": -15, "danceability": 0.32, "brightness": 0.22,
                          "beat_confidence": 0.40, "onset_rate": 3.0, "dynamic_complexity": 0.52,
                          "arousal": 0.35, "valence": 0.70, "vocal_presence": 0.75},
+# ── late_night_romance → "Late Night Romance Mix" ─────────────────────────────────────────
+# Theme:    Romantic, intimate, sensual, yearning, dark.
+# Sound:    Slow 72bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (19, 4) · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "late_night_romance":{"bpm": 72, "energy": -18, "danceability": 0.22, "brightness": 0.08,
                          "beat_confidence": 0.28, "onset_rate": 2.0, "dynamic_complexity": 0.62,
                          "arousal": 0.28, "valence": 0.62, "vocal_presence": 0.72},
+# ── romantic_dinner → "Romantic Dinner Mix" ───────────────────────────────────────────────
+# Theme:    Romantic, elegant, sophisticated, smooth, intimate.
+# Sound:    Mid-slow 80bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (17, 23) · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "romantic_dinner":  {"bpm":  80, "energy": -20, "danceability": 0.20, "brightness": 0.18,
                          "beat_confidence": 0.25, "onset_rate": 2.0, "dynamic_complexity": 0.65,
                          "arousal": 0.22, "valence": 0.62, "vocal_presence": 0.55},
+# ── love_songs → "Love Songs" ─────────────────────────────────────────────────────────────
+# Theme:    Romantic, passionate, tender, poignant, earnest.
+# Sound:    Mid-slow 90bpm, low energy, moderate groove; warm-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "love_songs":       {"bpm":  90, "energy": -14, "danceability": 0.30, "brightness": 0.25,
                          "beat_confidence": 0.42, "onset_rate": 3.0, "dynamic_complexity": 0.62,
                          "arousal": 0.42, "valence": 0.75, "vocal_presence": 0.82},
+# ── slow_dance → "Slow Dance Mix" ─────────────────────────────────────────────────────────
+# Theme:    Romantic, tender, intimate, sensual, passionate.
+# Sound:    Slow 68bpm, very low energy, low groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "slow_dance":       {"bpm":  68, "energy": -18, "danceability": 0.18, "brightness": 0.15,
                          "beat_confidence": 0.28, "onset_rate": 1.8, "dynamic_complexity": 0.65,
                          "arousal": 0.22, "valence": 0.68, "vocal_presence": 0.78},
+# ── candlelight → "Candlelight Mix" ───────────────────────────────────────────────────────
+# Theme:    Romantic, elegant, peaceful, gentle, intimate.
+# Sound:    Slow 72bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · hour-gate (17, 3) · lyric-themes · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "candlelight":      {"bpm":  72, "energy": -20, "danceability": 0.15, "brightness": 0.15,
                          "beat_confidence": 0.22, "onset_rate": 1.5, "dynamic_complexity": 0.70,
                          "arousal": 0.18, "valence": 0.62, "vocal_presence": 0.65},
+# ── first_date → "First Date Mix" ─────────────────────────────────────────────────────────
+# Theme:    Romantic, optimistic, sweet, tender, gentle.
+# Sound:    Mid-slow 95bpm, low energy, moderate groove; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "first_date":       {"bpm":  95, "energy": -14, "danceability": 0.38, "brightness": 0.30,
                          "beat_confidence": 0.45, "onset_rate": 3.5, "dynamic_complexity": 0.55,
                          "arousal": 0.42, "valence": 0.72, "vocal_presence": 0.70},
+# ── romantic_jazz → "Romantic Jazz Mix" ───────────────────────────────────────────────────
+# Theme:    Romantic, sophisticated, smooth, elegant, intimate.
+# Sound:    Slow 78bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: vocal jazz, smooth jazz, cool, piano jazz, crossover jazz, jazz-pop….
+# Criteria: style gate parent {jazz} · lyric-themes · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "romantic_jazz":    {"bpm":  78, "energy": -20, "danceability": 0.22, "brightness": 0.18,
                          "beat_confidence": 0.30, "onset_rate": 2.5, "dynamic_complexity": 0.70,
                          "arousal": 0.22, "valence": 0.65, "vocal_presence": 0.72},
+# ── jazz_dinner → "Jazz Dinner Mix" ───────────────────────────────────────────────────────
+# Theme:    Sophisticated, elegant, smooth, mellow, relaxed.
+# Sound:    Mid-slow 85bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: vocal jazz, jazz, cool, smooth jazz, crossover jazz, piano jazz….
+# Criteria: style gate parent {jazz} · hour-gate (17, 23) · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "jazz_dinner":      {"bpm":  85, "energy": -21, "danceability": 0.25, "brightness": 0.20,
                          "beat_confidence": 0.28, "onset_rate": 2.8, "dynamic_complexity": 0.72,
                          "arousal": 0.20, "valence": 0.60, "vocal_presence": 0.50},
+# ── string_quartet → "String Quartet Mix" ─────────────────────────────────────────────────
+# Theme:    Elegant, graceful, sophisticated, refined, stately.
+# Sound:    Mid-slow 80bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: chamber music, classical crossover, orchestral, neo-classical, modern composition, concerto….
+# Criteria: style gate parent {classical, stage & screen} · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "string_quartet":   {"bpm":  80, "energy": -19, "danceability": 0.18, "brightness": 0.20,
                          "beat_confidence": 0.20, "onset_rate": 2.0, "dynamic_complexity": 0.75,
                          "arousal": 0.22, "valence": 0.58, "vocal_presence": 0.30},
+# ── strings_romance → "Strings & Romance Mix" ─────────────────────────────────────────────
+# Theme:    Romantic, elegant, graceful, majestic, lush.
+# Sound:    Slow 75bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: orchestral, chamber music, classical crossover, neo-classical, modern composition, chamber pop….
+# Criteria: style gate parent {classical, stage & screen} · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "strings_romance":  {"bpm":  75, "energy": -20, "danceability": 0.15, "brightness": 0.18,
                          "beat_confidence": 0.18, "onset_rate": 1.8, "dynamic_complexity": 0.75,
                          "arousal": 0.20, "valence": 0.65, "vocal_presence": 0.32},
+# ── piano_romance → "Piano Romance Mix" ───────────────────────────────────────────────────
+# Theme:    Romantic, peaceful, tender, intimate, gentle.
+# Sound:    Slow 72bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: piano jazz, neo-classical, modern composition, contemporary instrumental, keyboard, classical crossover….
+# Criteria: style gate parent {classical, stage & screen} · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "piano_romance":    {"bpm":  72, "energy": -22, "danceability": 0.15, "brightness": 0.16,
                          "beat_confidence": 0.18, "onset_rate": 1.5, "dynamic_complexity": 0.72,
                          "arousal": 0.18, "valence": 0.62, "vocal_presence": 0.35},
+# ── acoustic_romance → "Acoustic Romance Mix" ─────────────────────────────────────────────
+# Theme:    Romantic, earnest, tender, organic, intimate.
+# Sound:    Slow 78bpm, very low energy, low groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Seed-defined by sound: Jack Johnson, Jason Mraz, Donavon Frankenreiter, …
+# Criteria: style gate · pop +0.5 · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "acoustic_romance": {"bpm":  78, "energy": -18, "danceability": 0.22, "brightness": 0.20,
                          "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.65,
                          "arousal": 0.28, "valence": 0.68, "vocal_presence": 0.78},
+# ── indie_romance → "Indie Romance Mix" ───────────────────────────────────────────────────
+# Theme:    Romantic, dreamy, melancholy, bittersweet, wistful.
+# Sound:    Mid-slow 85bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: indie rock, indie pop, dream pop, indie folk, indie electronic, twee pop….
+# Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "indie_romance":    {"bpm":  85, "energy": -17, "danceability": 0.28, "brightness": 0.18,
                          "beat_confidence": 0.38, "onset_rate": 2.8, "dynamic_complexity": 0.62,
                          "arousal": 0.32, "valence": 0.65, "vocal_presence": 0.72},
+# ── synthpop_romance → "Synth-Pop Romance Mix" ────────────────────────────────────────────
+# Theme:    Romantic, dreamy, nostalgic, yearning, poignant.
+# Sound:    Mid 100bpm, low energy, danceable; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: synth pop, synthwave, new romantic, new wave, indie electronic, dance-pop….
+# Criteria: style gate parent {electronic, pop, rock} · pop +0.5 · lyric-themes · moodclass · cat:romantic
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering; lyric_lang=en gate
     "synthpop_romance": {"bpm": 100, "energy": -13, "danceability": 0.48, "brightness": 0.15,
                          "beat_confidence": 0.55, "onset_rate": 3.8, "dynamic_complexity": 0.45,
                          "arousal": 0.40, "valence": 0.68, "vocal_presence": 0.62},
     # ----------------------------------------------------------------
     # Gap fills
     # ----------------------------------------------------------------
+# ── evening_unwind → "Unwind" ─────────────────────────────────────────────────────────────
+# Theme:    Calm, peaceful, mellow, relaxed, smooth.
+# Sound:    Slow 78bpm, very low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · hour-gate (17, 2) · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "evening_unwind":   {"bpm":  78, "energy": -17, "danceability": 0.22, "brightness": 0.15,
                          "beat_confidence": 0.32, "onset_rate": 2.2, "dynamic_complexity": 0.62,
                          "arousal": 0.28, "valence": 0.58, "vocal_presence": 0.50},
+# ── heartbreak → "Broken Hearts Club" ─────────────────────────────────────────────────────
+# Theme:    Sad, yearning, lonely, anguished, tragic.
+# Sound:    Slow 75bpm, low energy, low groove; dark-toned, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · lyric-themes · moodclass · cat:emotional
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "heartbreak":       {"bpm":  75, "energy": -14, "danceability": 0.18, "brightness": 0.07,
                          "beat_confidence": 0.32, "onset_rate": 2.0, "dynamic_complexity": 0.65,
                          "arousal": 0.45, "valence": 0.12, "vocal_presence": 0.88},
+# ── pre_party → "Pre-Party Mix" ───────────────────────────────────────────────────────────
+# Theme:    Energetic, fun, carefree, lively, celebratory.
+# Sound:    Upbeat 122bpm, mid energy, very danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · soft daypart lean · weekday [4, 5] · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "pre_party":        {"bpm": 122, "energy":  -9, "danceability": 0.65, "brightness": 0.38,
                          "beat_confidence": 0.72, "onset_rate": 5.8, "dynamic_complexity": 0.40,
                          "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.68},
+# ── cool_down → "Catch Your Breath" ───────────────────────────────────────────────────────
+# Theme:    Calm, relaxed, peaceful, mellow, gentle.
+# Sound:    Slow 78bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "cool_down":        {"bpm":  78, "energy": -14, "danceability": 0.28, "brightness": 0.20,
                          "beat_confidence": 0.42, "onset_rate": 3.0, "dynamic_complexity": 0.55,
                          "arousal": 0.30, "valence": 0.60, "vocal_presence": 0.50},
+# ── cooking_mix → "Kitchen Disco" ─────────────────────────────────────────────────────────
+# Theme:    Lively, happy, carefree, fun, cheerful.
+# Sound:    Mid 102bpm, low energy, danceable; warm-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · soft daypart lean · moodclass · cat:activity
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate)
     "cooking_mix":      {"bpm": 102, "energy": -12, "danceability": 0.48, "brightness": 0.38,
                          "beat_confidence": 0.55, "onset_rate": 4.2, "dynamic_complexity": 0.50,
                          "arousal": 0.52, "valence": 0.75, "vocal_presence": 0.65},
+# ── deep_work → "Locked In" ───────────────────────────────────────────────────────────────
+# Theme:    Calm, atmospheric, meditative, peaceful, soothing.
+# Sound:    Mid-slow 88bpm, very low energy, low groove; dark-toned, near-instrumental.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate).
+# Criteria: no genre gate · pop -1 · hour-gate (5, 17) · moodclass · cat:calm
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  integrated_loudness steadiness (now applied); emb_musicnn similarity (fuzzy mix, no genre gate)
     "deep_work":        {"bpm":  88, "energy": -17, "danceability": 0.18, "brightness": 0.08,
                          "beat_confidence": 0.25, "onset_rate": 1.8, "dynamic_complexity": 0.68,
                          "arousal": 0.22, "valence": 0.52, "vocal_presence": 0.12},
+# ── folk_acoustic → "Folk & Acoustic Mix" ─────────────────────────────────────────────────
+# Theme:    Earthy, organic, rustic, pastoral, earnest.
+# Sound:    Mid-slow 82bpm, low energy, low groove; dark-toned.
+# Era/Geo:  Any era · any origin.
+# Music:    Genre-pure: indie folk, contemporary folk, folk-rock, folk-pop, singer/songwriter, americana….
+# Criteria: style gate parent {folk, world, & country, rock} · pop +0.5 · moodclass · cat:atmospheric
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb for sub-style clustering
     "folk_acoustic":    {"bpm":  82, "energy": -16, "danceability": 0.25, "brightness": 0.22,
                          "beat_confidence": 0.38, "onset_rate": 2.5, "dynamic_complexity": 0.68,
                          "arousal": 0.30, "valence": 0.62, "vocal_presence": 0.75},
+# ── celebration → "Celebration Mix" ───────────────────────────────────────────────────────
+# Theme:    Celebratory, triumphant, happy, euphoric, lively.
+# Sound:    Upbeat 125bpm, mid energy, very danceable; bright, vocal-forward.
+# Era/Geo:  Any era · any origin.
+# Music:    Mood/centroid-led (no genre gate), with lyric-theme pull.
+# Criteria: no genre gate · pop +1 · lyric-themes · moodclass · cat:energy
+# Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
+# Enhance:  emb_musicnn similarity (fuzzy mix, no genre gate); lyric_lang=en gate
     "celebration":      {"bpm": 125, "energy":  -8, "danceability": 0.62, "brightness": 0.42,
                          "beat_confidence": 0.72, "onset_rate": 5.8, "dynamic_complexity": 0.45,
                          "arousal": 0.78, "valence": 0.90, "vocal_presence": 0.78},
@@ -7127,6 +9215,14 @@ def _generate_daily_mix_cover(plex, tracks, mix_key, title, subtitle=None):
 
 # --- 1. On Repeat ---
 
+# ── build_on_repeat → "On Repeat" ─────────────────────────────────────────────────────────
+# Theme:    What you're hammering right now — genuine current obsession.
+# Sound:    N/A (personalisation, not acoustic).
+# Era/Geo:  Any era · your library.
+# Music:    Songs played ≥2× in the last 30 days, your top-rated copies.
+# Criteria: 30-day window (never expands) · ≥2 plays · drop userRating≤4 · ≤3/artist · recency×rating score · no listener floor.
+# Flow:     Score-ranked: recency × rating, top first.
+# Enhance:  skipCount could deprioritise tracks you skip.
 def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
     """
     Tracks you can't stop playing right now. Fixed 30-day window — Spotify never
@@ -7189,6 +9285,14 @@ def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
 
 # --- 2. Repeat Rewind ---
 
+# ── build_repeat_rewind → "Repeat Rewind" ─────────────────────────────────────────────────
+# Theme:    Last month's obsessions you've since gone quiet on.
+# Sound:    N/A (personalisation).
+# Era/Geo:  Any era · your library.
+# Music:    Tracks heavy 4–10 weeks ago, not played in the last 30 days.
+# Criteria: plays 30–70d ago · NOT in last 30d · ≥2 (rating-weighted) · ≤2/artist · no listener floor.
+# Flow:     Ranked by peak-window play frequency.
+# Enhance:  skipCount.
 def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
     """
     Tracks that were in heavy rotation 4–10 weeks ago but haven't been played
@@ -7323,6 +9427,14 @@ def _select_album_reps(album, tracks, essentia_cache):
     return [primary] + (acoustic if acoustic else [])
 
 
+# ── build_release_radar → "Release Radar" ─────────────────────────────────────────────────
+# Theme:    New releases that match your taste.
+# Sound:    Matches your listening centroid (acoustic + Last.fm-tag affinity).
+# Era/Geo:  Released in the last 14–90 days · any origin.
+# Music:    1–2 reps per new album (Last.fm playcount + acoustic centrality), known-artists first.
+# Criteria: expanding 14–90d window · 0.65 acoustic + 0.35 tag affinity · album-dedup · no listener floor.
+# Flow:     Newest release first (known-artists prioritised within each week).
+# Enhance:  emb nearest-neighbour for sharper “sounds-like”; release_types for album-vs-single lean.
 def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_keys,
                         history_entries=None):
     """
@@ -7445,6 +9557,14 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
 
 # --- 4. Discover Weekly ---
 
+# ── build_discover_weekly → "Discover Weekly" ─────────────────────────────────────────────
+# Theme:    Your weekly mixtape of fresh, never-played music.
+# Sound:    Acoustically adjacent to your taste, in a discovery sweet-spot (not mega-hits, not noise).
+# Era/Geo:  Any era · any origin.
+# Music:    70% new-artist / 30% familiar, 20% stretch picks; never-played; 1/artist + 1/album.
+# Criteria: centroid affinity + discovery sweet-spot · viewCount=0 · interleaved · day-seeded · no listener floor.
+# Flow:     Round-robin interleave: safe-new -> familiar -> stretch.
+# Enhance:  emb_musicnn NN for “adjacent but surprising”.
 def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
                           excluded_album_keys, target=30):
     """
@@ -7578,6 +9698,14 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
 
 # --- 5. Daily Mixes ---
 
+# ── build_daily_mixes → "Daily Mix 1–6" ───────────────────────────────────────────────────
+# Theme:    Spotify-style clustered mixes of your library.
+# Sound:    Each mix = one k-means acoustic cluster (internally cohesive).
+# Era/Geo:  Any era · your library.
+# Music:    40% history + 60% library closest to each cluster centroid.
+# Criteria: k-means++ on ~10 acoustic dims (numpy) · centroid-ranked · per-cluster proportional · no listener floor.
+# Flow:     Centroid-distance ranked within each k-means cluster (closest first).
+# Enhance:  emb_effnet clusters would beat the 10-d acoustic clustering.
 def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                       n_mixes=6, mix_size=50):
     """
@@ -7723,6 +9851,14 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
 
 # --- 6. Rediscovery Mix ---
 
+# ── build_rediscovery → "Rediscovery" ─────────────────────────────────────────────────────
+# Theme:    Tracks you loved but haven't touched in 6–24 months.
+# Sound:    N/A (personalisation).
+# Era/Geo:  Any era · your library.
+# Music:    Rating≥7★ OR ≥3 plays, last played 6–24 months ago, longest-neglected first.
+# Criteria: last-play 6–24mo · loved (≥7★ or ≥3 plays) · ≤cap/artist · no listener floor.
+# Flow:     Longest-neglected first (oldest last-play).
+# Enhance:  skipCount.
 def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
     """
     Tracks you loved (rated ≥ 7 or played ≥ 3 times) but haven't touched
@@ -7787,6 +9923,14 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
 
 # --- 7. Time Capsule ---
 
+# ── build_time_capsule → "Time Capsule" ───────────────────────────────────────────────────
+# Theme:    A snapshot of your standout earlier PLAY-years (not release years).
+# Sound:    N/A (personalisation).
+# Era/Geo:  Your top play-years (≥2 apart, before the last 3) · your library.
+# Music:    The tracks you played most in those years, now gone quiet.
+# Criteria: top-3 play-years via Plex API · gone-quiet 90d · interleaved · canonical-dedup · no listener floor.
+# Flow:     Round-robin interleave across your standout play-years.
+# Enhance:  —
 def build_time_capsule(plex, music, history_entries, essentia_cache, excluded_album_keys, target=30):
     """Nostalgia mix from your STANDOUT EARLIER YEARS — the tracks you actually PLAYED during those years
     (not what was released then), that you've since gone quiet on. The years + per-year play counts come from
@@ -7882,6 +10026,14 @@ def build_time_capsule(plex, music, history_entries, essentia_cache, excluded_al
 _TIME_MACHINE_TITLE_RE = re.compile(r"^[A-Z][a-z]{2,8} \d{4} • Meloday\+$")
 
 
+# ── build_time_machine → "“Month YYYY” (rotating)" ────────────────────────────────────────
+# Theme:    This time, years ago — what you played around today's date in a past year.
+# Sound:    N/A (personalisation).
+# Era/Geo:  ±21 days around today in a rotating past year · your library.
+# Music:    Your most-played tracks in that window; featured year rotates ~weekly.
+# Criteria: ±21d window · gone-quiet 90d · weekly year rotation · canonical-dedup · no listener floor.
+# Flow:     Most-played-in-window first.
+# Enhance:  —
 def build_time_machine(plex, music, history_entries, essentia_cache, excluded_album_keys, target=30):
     """'This time, years ago' — the tracks you were playing around today's date in a single past year
     (e.g. 'June 2019'), rotating the featured year ~weekly. Returns (tracks, 'Month YYYY')."""
@@ -7936,6 +10088,14 @@ def build_time_machine(plex, music, history_entries, essentia_cache, excluded_al
 
 # --- 8. Artist Deep Cuts ---
 
+# ── build_deep_cuts → "Deep Cuts" ─────────────────────────────────────────────────────────
+# Theme:    Unheard album tracks from the artists you love most.
+# Sound:    Ranked to each artist's own well-played centroid.
+# Era/Geo:  Any era · your library.
+# Music:    ≤2-play tracks from your top-15 artists (last 6mo), rating-bonused.
+# Criteria: top-15 artists (6mo) · ≤2 plays · artist-centroid distance + rating bonus · round-robin · no listener floor.
+# Flow:     Round-robin interleave across your top-15 artists.
+# Enhance:  emb_musicnn NN to the artist's sound for tighter deep cuts.
 def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
                     target=40, top_artists_n=15, tracks_per_artist=3):
     """
@@ -8035,6 +10195,14 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
 
 # --- 9. Top Songs by Year ---
 
+# ── build_top_songs → "Top Songs YYYY" ────────────────────────────────────────────────────
+# Theme:    Your most-played tracks of each calendar year.
+# Sound:    N/A (personalisation).
+# Era/Geo:  Per calendar year · your library.
+# Music:    That year's most-played, ≤5/artist.
+# Criteria: per-year top plays · ≥20 distinct · drop userRating≤4 · past years immutable (+prev-year 60d grace) · no listener floor.
+# Flow:     Most-played first (per calendar year).
+# Enhance:  skipCount.
 def build_top_songs(plex, history_entries, excluded_album_keys,
                     target=100, min_distinct=20, existing_playlists=None):
     """
@@ -8116,6 +10284,14 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
 
 # --- 10. All-Time Favourites ---
 
+# ── build_all_time_favourites → "All-Time Favourites" ─────────────────────────────────────
+# Theme:    Your lifetime most-played tracks.
+# Sound:    N/A (personalisation).
+# Era/Geo:  Any era · your library.
+# Music:    Highest viewCount; your most-played copy of each song.
+# Criteria: viewCount:desc · stop at 0-play · inline (not canonical) dedup · no listener floor.
+# Flow:     Most-played first (viewCount).
+# Enhance:  skipCount.
 def build_all_time_favourites(music, excluded_album_keys, target=100):
     """
     All-time most-played tracks using track.viewCount — no history fetch needed.
