@@ -2687,6 +2687,16 @@ _TIME_SOFT_BOOSTS = {
     "ambient_drift":      (21,  5, 0.12),
     "downtempo":          (21,  3, 0.10),
     "deep_house":         (21,  4, 0.10),
+    # --- audit-added daypart leans (Tier 1/2) ---
+    "synth_pop":          (19,  2, 0.08),   # WHY: name is "Synth-Pop Nights" but had no evening bias (synth_pop-1)
+    "situationship":      (18, 24, 0.08),   # WHY: parity with its new-romance siblings' evening lean (situationship-1)
+    "sad_bangers":        (20,  2, 0.06),   # WHY: cathartic dance-cry peaks on a night out (sad_bangers-1)
+    "restless":           (21,  3, 0.06),   # WHY: its late-night/intrusive-thoughts frame skews night (restless-1)
+    "neoclassical":       (19, 24, 0.06),   # WHY: contemplative listening skews evening (neoclassical-1)
+    "triumphant":         ( 6, 11, 0.06),   # WHY: morning-motivation context (triumphant-1)
+    "empowering":         ( 6, 11, 0.06),   # WHY: morning-motivation context (empowering-1)
+    "awe_wonder":         (20,  1, 0.06),   # WHY: awe/cosmic listening skews night (awe_wonder-1)
+    "moving_on":          (18, 24, 0.06),   # WHY: parity with romance siblings (moving_on-1)
 }
 
 # Day-of-week boosts — applied on top of soft time boosts for profiles with a natural weekday.
@@ -2715,6 +2725,7 @@ _WEEKDAY_BOOSTS = {
     "housework_hustle":  ({5, 6},  0.10),   # weekend chores
     "cookout":           ({5, 6},  0.10),   # weekend
     "gospel":            ({6},     0.10),   # Sunday
+    "sad_bangers":       ({4, 5},  0.06),   # WHY: night-out lean (audit sad_bangers-1)
 }
 
 # Hard day-of-week gates — profiles excluded from the pool entirely on the wrong day.
@@ -2778,10 +2789,14 @@ _HOUR_RESTRICTED = {
     "sunday_morning":    ( 5, 12),  # morning (+ {6})
     "clear_night":       (20,  5),  # weather-managed, but night by definition
     "summer_evening":    (17, 22),  # season-managed, but an evening mix
+    "sunset_mix":        (16, 21),  # WHY: dusk mix — every other dusk/night atmospheric mix is hard-gated (audit sunset_mix-1)
+    "starlit":           (20,  5),  # WHY: night mix — consistency with its peers (audit starlit-1)
 }
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
 _WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes", "stormy", "foggy", "snow_day", "heatwave", "frosty", "grey_skies", "windy", "clear_night"}
+# NOTE: "overcast" is deliberately NOT weather-gated — it is the anytime introspective twin of the
+# weather-gated "grey_skies" (same mood signals), available all day rather than only when it's cloudy. (audit overcast-1)
 
 # Season-conditional profiles — triggered by current calendar season; no weather API needed.
 _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening", "festive"}
@@ -3421,7 +3436,7 @@ _PROFILE_STYLE_SIGNALS = {
     # the others are hard-gated. Pop lists carry BOTH Plex + genre_discogs spellings) ---
     "power_ballads": (["arena rock", "album rock", "soft rock", "adult contemporary", "hard rock", "contemporary pop/rock"], ["rap", "techno", "drill"]),
     "neoclassical": (["neo-classical", "modern composition", "chamber music", "classical crossover", "contemporary instrumental", "classical"], ["film score", "original score", "soundtracks", "rap", "metal", "punk"]),
-    "yacht_rock": (["soft rock", "am pop", "adult contemporary", "sophisti-pop", "blue-eyed soul", "pop-soul", "quiet storm"], ["metal", "rap", "punk", "techno", "drill", "hardcore"]),
+    "yacht_rock": (["soft rock", "adult contemporary", "sophisti-pop", "blue-eyed soul", "pop-soul", "quiet storm"], ["metal", "rap", "punk", "techno", "drill", "hardcore"]),  # WHY: dropped "am pop" — substring ⊂ "dream pop" (2845-track leak) (audit substr-fix)
     "swagger": (["contemporary rap", "hardcore rap", "contemporary r&b", "g-funk", "funk", "west coast rap"], ["folk", "ambient", "classical", "metal", "country"]),
     "chart_pop": (["contemporary pop/rock", "dance-pop", "teen pop", "vocal pop", "traditional pop", "pop idol", "social media pop", "europop", "euro-pop", "power pop", "bubblegum", "sunshine pop", "brill building pop", "pop-soul"], ["punk", "metal", "experimental", "country"]),
     "dance_pop": (["dance-pop", "dance-rock", "alternative dance", "euro-dance", "eurodance", "hi-nrg", "nu-disco", "italo-disco", "euro-disco", "post-disco", "electroclash", "eurobeat"], ["metal", "folk", "ambient", "country"]),
@@ -3439,7 +3454,7 @@ _PROFILE_STYLE_SIGNALS = {
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
     "spring_jangle": (["indie pop", "jangle pop", "dream pop", "twee pop"], []),
     "summer_heat": (["disco", "funk", "club/dance"], []),  # dropped "house" (22k swamped the disco/funk intent)
-    "summer_breeze": (["soft rock", "am pop", "adult contemporary"], []),
+    "summer_breeze": (["soft rock", "adult contemporary", "sophisti-pop"], []),  # WHY: dropped "am pop" (⊂ "dream pop"); +sophisti-pop keeps breadth (audit substr-fix)
     "summer_tropical": (["latin", "reggae", "afro", "tropical", "bossa"], []),
     "autumn_leaves": (["folk", "singer/songwriter", "americana"], []),
     "autumn_jazz": (["jazz", "soul", "smooth jazz"], []),
@@ -3525,7 +3540,7 @@ _PROFILE_STYLE_SIGNALS = {
     "london_soul": (["blue-eyed soul", "neo-soul", "contemporary r&b", "acid jazz"], ["metal", "punk", "drill"]),
     "london_jazz": (["contemporary jazz", "jazz-funk", "spiritual jazz", "afro-beat", "acid jazz"], ["metal", "drill", "screamo"]),
     "london_triphop": (["trip-hop", "downtempo", "downbeat", "idm"], ["metal", "punk", "gospel"]),
-    "london_mod": (["mod", "british invasion", "freakbeat", "merseybeat"], ["metal", "techno", "drill"]),
+    "london_mod": (["mod", "beat", "merseybeat", "freakbeat", "british invasion", "british rhythm & blues", "garage rock", "garage rock revival"], ["metal", "techno", "drill"]),  # WHY: EXACT-matched (see _STYLE_EXACT_PROFILES) so "mod"≠"modern"; adds beat/garage 60s scene (audit london_mod-1)
     "london_britpop": (["brit pop"], ["metal", "techno", "gospel"]),  # Discogs subgenre
     "london_indie": (["indie rock", "new wave/post-punk revival", "garage rock revival"], ["metal", "techno", "gospel"]),
     "london_calling": (["punk", "post-punk", "oi!", "new wave"], ["ambient", "gospel", "classical"]),
@@ -3750,35 +3765,45 @@ _PROFILE_GENRE_PARENT = {
     "techno": {"electronic"}, "deep_house": {"electronic"}, "trance": {"electronic"},
     "house_party": {"electronic"}, "downtempo": {"electronic"}, "ambient_drift": {"electronic"},
     "synthwave": {"electronic"}, "vaporwave": {"electronic"}, "dnb": {"electronic"},
-    "lofi_beats": {"electronic"}, "london_triphop": {"electronic"}, "summer_tropical": {"electronic"},
+    "lofi_beats": {"electronic"}, "london_triphop": {"electronic"},
+    # WHY: tropical names latin/reggae/bossa, not just electronic tropical-house (audit summer_tropical-1)
+    "summer_tropical": {"electronic", "latin", "reggae", "folk, world, & country", "funk / soul"},
     "uk_garage": {"electronic"}, "festival_edm": {"electronic"}, "winter_nights": {"electronic"},
     "chiptune": {"electronic"}, "london_dubstep": {"electronic"}, "london_jungle": {"electronic"},
     "glasgow_house": {"electronic"}, "glasgow_underground": {"electronic"}, "glasgow_late": {"electronic"},
-    "glasgow_bass": {"electronic"}, "glasgow_synth": {"electronic"}, "melbourne_club": {"electronic"},
-    "melbourne_techno": {"electronic"}, "london_garage": {"electronic"}, "summer_heat": {"electronic"},
+    "glasgow_bass": {"electronic"},
+    "glasgow_synth": {"electronic", "rock", "pop"},  # WHY: admits new-wave/synth-pop (Rock/Pop parent) e.g. Simple Minds (audit glasgow_synth-1)
+    "melbourne_club": {"electronic"},
+    "melbourne_techno": {"electronic"}, "london_garage": {"electronic"},
+    "summer_heat": {"electronic", "funk / soul"},  # WHY: admits the disco/funk it names (Funk/Soul parent), +1479 (audit summer_heat-1)
     "rave_cave": {"electronic"},
     # --- Rock ---
     "classic_rock": {"rock"}, "heavy_riffs": {"rock"}, "indie_rock": {"rock"},
     "post_grunge": {"rock"}, "prog_rock": {"rock"}, "punk_energy": {"rock"},
     "emo_poppunk": {"rock"}, "garage_grunge": {"rock"}, "stoner_rock": {"rock"},
     "post_rock": {"rock"}, "britpop_rock": {"rock"}, "psych_haze": {"rock"},
-    "yacht_rock": {"rock"}, "summer_breeze": {"rock"},
+    # WHY: both admit AM-pop/blue-eyed-soul (Pop / Funk&Soul parent) (audit yacht_rock-1 / summer_breeze-1)
+    "yacht_rock": {"rock", "pop", "funk / soul"}, "summer_breeze": {"rock", "pop"},
     "spring_jangle": {"rock"}, "autumn_embers": {"rock"}, "rockabilly_surf": {"rock"},
     "indie_romance": {"rock"}, "london_calling": {"rock"}, "london_britpop": {"rock"},
     "glasgow_anthems": {"rock"}, "glasgow_postpunk": {"rock"}, "glasgow_postrock": {"rock"},
     "glasgow_indie": {"rock"}, "glasgow_dream": {"rock"}, "melbourne_indie": {"rock"},
     "melbourne_pubrock": {"rock"}, "melbourne_postpunk": {"rock"}, "melbourne_dream": {"rock"},
     "melbourne_garagepunk": {"rock"}, "melbourne_psych": {"rock"}, "london_indie": {"rock"},
+    # WHY: london_mod is 60s mod/beat/garage ROCK — was wrongly under Classical, so it played modern-classical/film-scores (audit london_mod-1)
+    "london_mod": {"rock"},
     # --- Jazz ---
     "winter_jazz": {"jazz"}, "jazz_dinner": {"jazz"}, "romantic_jazz": {"jazz"},
-    "smooth_jazz": {"jazz"}, "bebop": {"jazz"}, "london_jazz": {"jazz"}, "swing_bigband": {"jazz"},
+    # WHY: smooth_jazz admits quiet-storm (Funk/Soul); swing_bigband admits traditional-pop (Pop) (audit smooth_jazz-1 / swing_bigband-1)
+    "smooth_jazz": {"jazz", "funk / soul"}, "bebop": {"jazz"}, "london_jazz": {"jazz"}, "swing_bigband": {"jazz", "pop"},
     "autumn_jazz": {"funk / soul", "jazz"},
     # --- Hip-Hop ---
     "boom_bap": {"hip hop"}, "trap_mode": {"hip hop"}, "conscious_flow": {"hip hop"},
     "g_funk": {"hip hop"}, "melbourne_hiphop": {"hip hop"},
     # --- Funk / Soul ---
     "neo_soul": {"funk / soul"}, "motown_soul": {"funk / soul"}, "glasgow_soul": {"funk / soul"},
-    "london_soul": {"funk / soul"}, "melbourne_soul": {"funk / soul"}, "dinner_party": {"funk / soul"},
+    "london_soul": {"funk / soul"}, "melbourne_soul": {"funk / soul"},
+    "dinner_party": {"funk / soul", "jazz"},  # WHY: names vocal-jazz/bossa (Jazz parent), rejected under funk/soul-only (audit dinner_party-1)
     "winter_cosy": {"funk / soul"}, "gospel": {"funk / soul"},
     "funk_disco": {"electronic", "funk / soul"}, "after_hours_rnb": {"electronic", "funk / soul"},
     # --- Folk, World, & Country ---
@@ -3792,16 +3817,17 @@ _PROFILE_GENRE_PARENT = {
     "neoclassical": {"classical", "stage & screen"}, "string_quartet": {"classical", "stage & screen"},
     "strings_romance": {"classical", "stage & screen"}, "piano_romance": {"classical", "stage & screen"},
     "spring_strings": {"classical", "stage & screen"}, "cinematic_epic": {"classical", "stage & screen"},
-    "soundtracks": {"classical", "stage & screen"}, "london_mod": {"classical", "stage & screen"},
-    "winter_frost": {"classical", "stage & screen"},
+    "soundtracks": {"classical", "stage & screen"},
+    "winter_frost": {"classical", "stage & screen", "electronic"},  # WHY: admits ambient (Electronic parent), the frost half currently rejected (audit winter_frost-1)
     # --- Pop (scatters across parents) ---
     "chart_pop": {"electronic", "pop", "rock"}, "synth_pop": {"electronic", "pop", "rock"},
     "synthpop_romance": {"electronic", "pop", "rock"}, "dance_pop": {"electronic", "pop", "rock"},
     "indie_pop": {"electronic", "pop", "rock"}, "melbourne_sunset": {"electronic", "pop", "rock"},
     "festive": {"electronic", "pop", "rock"},
     # --- Cross-parent / edge ---
-    "industrial": {"electronic", "rock"}, "reggae_dub": {"electronic", "reggae"},
-    "london_dub": {"electronic", "reggae"}, "bass_drop": {"electronic", "hip hop"},
+    "industrial": {"electronic", "rock"},
+    # WHY: "dub"⊂"dubstep" leaked 59% dubstep into these reggae mixes; reggae-only parent rejects Electronic dubstep (audit dub fix)
+    "reggae_dub": {"reggae"}, "london_dub": {"reggae"}, "bass_drop": {"electronic", "hip hop"},
     "latin_heat": {"electronic", "latin"}, "rap_rock": {"hip hop", "rock"},
     "ska": {"reggae", "rock"}, "blues_bar": {"blues", "rock"},
     "acid_jazz": {"electronic", "funk / soul", "jazz"}, "bossa_samba": {"jazz", "latin"},
@@ -3844,6 +3870,13 @@ def _entry_lastfm_tags(entry):
 # own centroid + leans. The positive list in _PROFILE_STYLE_SIGNALS is matched against the Last.fm tags.
 _LASTFM_GATED = {"post_grunge", "prog_rock"}
 
+# Profiles whose positive subgenres are matched EXACTLY (==) against Discogs subgenres, not as substrings.
+# WHY: short positives like "mod" substring-match unrelated subgenres ("mod" ⊂ "modern"/"modal"), which made
+# london_mod serve modern-classical/film-scores instead of 60s mod-rock (offline-verified: 5977 wrong tracks).
+# Exact match captures the genuine "mod"/"beat"/"garage rock" subgenres only. The general fix for the whole
+# substring-leak class is word-boundary matching (see the audit's Tier-4 roadmap). (audit london_mod-1)
+_STYLE_EXACT_PROFILES = {"london_mod"}
+
 # festive (Christmas) is a calendar event, not a genre or a sound — neither Discogs nor the centroid can
 # express it. Gate on a holiday signal: a seasonal keyword in the title, or Plex flagging it Holiday/
 # Christmas (the one place a Plex tag is still consulted, precisely because "Christmas" isn't a sound).
@@ -3875,7 +3908,11 @@ def _has_required_style(entry, profile_key):
             tags = _entry_lastfm_tags(entry)                     # crowd genre labels (Discogs can't name these)
         else:
             tags = _discogs_subgenres(entry, _DISCOGS_TAG_FLOOR)  # Discogs subgenres only, confidence-floored
-        if not tags or not any(sub in tag for tag in tags for sub in positive_subs):
+        if profile_key in _STYLE_EXACT_PROFILES:
+            matched = any(sub == tag for tag in tags for sub in positive_subs)   # exact: "mod" must not match "modern"
+        else:
+            matched = any(sub in tag for tag in tags for sub in positive_subs)   # substring (default)
+        if not tags or not matched:
             return False
 
     # Dominant-Discogs-parent constraint — independent of the positive match, so it also applies to a
@@ -4420,6 +4457,7 @@ _PROFILE_POPULARITY = {
     "ska": 0.5, "swing_bigband": 0.5, "yacht_rock": 0.5, "folk_acoustic": 0.5,
     "festive": 0.5, "autumn_embers": 0.5, "autumn_leaves": 0.5, "spring_jangle": 0.5, "spring_acoustic": 0.5,
     "summer_breeze": 0.5, "summer_tropical": 0.5, "winter_cosy": 0.5, "winter_nights": 0.5,
+    "summer_roadtrip": 0.5,  # WHY: highway-singalong recognisability nudge (audit summer_roadtrip-1)
     "acoustic_romance": 0.5, "indie_romance": 0.5, "synthpop_romance": 0.5,
     "dinner_party": 0.5, "campfire": 0.5,
 }
@@ -4431,6 +4469,7 @@ _PROFILE_POPULARITY = {
 _PROFILE_MIN_LISTENERS = {
     "chart_pop": 500_000, "dance_pop": 400_000, "indie_pop": 150_000, "synth_pop": 150_000,
     "indie_rock": 150_000, "post_grunge": 150_000, "rap_rock": 150_000, "festival_edm": 400_000,
+    "power_ballads": 100_000, "singalong": 100_000,  # WHY: keep "Lighters Up"/"Singalong" to songs people know (audit power_ballads-1 / singalong-1)
 }
 
 # Artist top-tracks gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear
@@ -7153,7 +7192,7 @@ def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
 def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
     """
     Tracks that were in heavy rotation 4–10 weeks ago but haven't been played
-    in the last 21 days — the previous month's On Repeat.
+    in the last 30 days — the previous month's On Repeat.
     """
     now = datetime.now(tz=timezone.utc)
     silence_cutoff = now - timedelta(days=30)
@@ -8838,6 +8877,30 @@ def _seed_centroid(profile_key, essentia_cache):
     return cen
 
 
+# ---------------------------------------------------------------------------
+# Loudness-consistency lean — pacing mixes prefer steady-loudness (low LRA) tracks
+# ---------------------------------------------------------------------------
+# integrated_loudness holds the EBU R128 loudness RANGE (LRA, in LU): low = steady/compressed dynamics,
+# high = big quiet↔loud swings. workout/running/focus/deep_work/sleep flow better with steady loudness
+# (cadence, concentration, no jarring jumps), so they lean toward LOW LRA. WHY: integrated_loudness was
+# collected but unused — this is the audit's activity-loudness-1. It's a separate axis from `energy`
+# (which is LUFS), so it does not double-count with the centroid. (cache LRA median ≈6.4, p75 ≈10.)
+_LOUDNESS_WEIGHT  = 0.06
+_LOUDNESS_LRA_CAP = 12.0
+_PACING_PROFILES  = {"workout", "running", "focus", "deep_work", "sleep"}
+
+
+def _loudness_consistency_boost(entry, profile_key):
+    """Favour steady-loudness (low LRA) tracks in pacing mixes; no-op elsewhere or when data is missing."""
+    if profile_key not in _PACING_PROFILES:
+        return 0.0
+    lra = entry.get("integrated_loudness")
+    if lra is None:
+        return 0.0
+    steadiness = 1.0 - min(1.0, lra / _LOUDNESS_LRA_CAP)   # 1.0 = perfectly steady … 0.0 = very dynamic
+    return -_LOUDNESS_WEIGHT * steadiness
+
+
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
     """Build the mix_size-track list for a single mix profile.
@@ -8871,6 +8934,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _origin_boost(entry, profile_key)
             + _popularity_boost(entry, profile_key)
             + _listening_hour_boost(rk)
+            + _loudness_consistency_boost(entry, profile_key)
             + _lyric_boost(entry, profile_key)
         )
         # Style-GATED mixes already confirmed genre membership via tags in the gate. Re-applying the
