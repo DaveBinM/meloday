@@ -3410,7 +3410,7 @@ _MOOD_PROFILES = {
 # Sound:    Upbeat 124bpm, mid energy, danceable; warm-toned.
 # Era/Geo:  Any era · geo-tiered to London.
 # Music:    Genre-pure: mod, beat, merseybeat, freakbeat, british invasion, british rhythm & blues….
-# Criteria: EXACT-style gate parent {rock} · moodclass · cat:upbeat
+# Criteria: style gate parent {rock} · moodclass · cat:upbeat
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb for sub-style clustering
     "london_mod": {"bpm": 124, "energy": -11, "danceability": 0.52, "brightness": 0.34, "beat_confidence": 0.72, "onset_rate": 5.5, "dynamic_complexity": 0.48, "arousal": 0.68, "valence": 0.65, "vocal_presence": 0.68},
@@ -5576,7 +5576,7 @@ _PROFILE_STYLE_SIGNALS = {
     "deep_house": (["deep house", "microhouse", "minimal techno", "tech-house", "left-field house"], ["metal", "punk", "country"]),
     "techno": (["techno", "minimal techno", "detroit techno", "acid house", "industrial dance"], ["folk", "country", "gospel"]),
     "trance": (["trance", "progressive trance", "goa trance", "euro-dance", "hi-nrg"], ["metal", "country", "blues"]),
-    "dnb": (["jungle/drum'n'bass", "breakbeat", "idm", "bass music"], ["folk", "country", "ambient"]),
+    "dnb": (["jungle", "drum'n'bass", "breakbeat", "idm", "bass music"], ["folk", "country", "ambient"]),  # WHY: split the "jungle/drum'n'bass" composite — word-boundary matching treats them as two separate positives (audit substr-fix-systemic)
     "bass_drop": (["dubstep", "bass music", "grime", "trap (edm)"], ["folk", "country", "jazz"]),
     "uk_garage": (["uk garage", "garage", "bass music", "broken beat", "bassline"], ["metal", "country", "folk"]),
     "synthwave": (["synthwave", "neo-electro", "new romantic"], ["metal", "country", "gospel"]),  # dropped bare "electro" (substring of the "electronic" parent → pulled the whole electronic pool)
@@ -5628,7 +5628,7 @@ _PROFILE_STYLE_SIGNALS = {
     "london_soul": (["blue-eyed soul", "neo-soul", "contemporary r&b", "acid jazz"], ["metal", "punk", "drill"]),
     "london_jazz": (["contemporary jazz", "jazz-funk", "spiritual jazz", "afro-beat", "acid jazz"], ["metal", "drill", "screamo"]),
     "london_triphop": (["trip-hop", "downtempo", "downbeat", "idm"], ["metal", "punk", "gospel"]),
-    "london_mod": (["mod", "beat", "merseybeat", "freakbeat", "british invasion", "british rhythm & blues", "garage rock", "garage rock revival"], ["metal", "techno", "drill"]),  # WHY: EXACT-matched (see _STYLE_EXACT_PROFILES) so "mod"≠"modern"; adds beat/garage 60s scene (audit london_mod-1)
+    "london_mod": (["mod", "beat", "merseybeat", "freakbeat", "british invasion", "british rhythm & blues", "garage rock", "garage rock revival"], ["metal", "techno", "drill"]),  # WHY: word-boundary matched so "mod"≠"modern"; adds beat/garage 60s scene (audit london_mod-1)
     "london_britpop": (["brit pop"], ["metal", "techno", "gospel"]),  # Discogs subgenre
     "london_indie": (["indie rock", "new wave/post-punk revival", "garage rock revival"], ["metal", "techno", "gospel"]),
     "london_calling": (["punk", "post-punk", "oi!", "new wave"], ["ambient", "gospel", "classical"]),
@@ -5937,6 +5937,34 @@ def _discogs_subgenres(entry, min_conf):
     return [str(k).split("---")[-1].lower() for k in gd]
 
 
+# Word-boundary genre matching. WHY: the membership gate matched a positive against a Discogs subgenre as a
+# plain SUBSTRING (`sub in tag`), so a short positive leaked into an unrelated subgenre — "mod" ⊂ "modern",
+# "am pop" ⊂ "dream pop", "dub" ⊂ "dubstep". Matching whole TOKENS instead fixes the entire leak class while
+# still matching every legitimate multi-word / hyphenated positive ("deep house", "synth-pop", "contemporary
+# pop/rock") and the space↔hyphen spelling variants. Replaces the per-profile _STYLE_EXACT_PROFILES hack.
+# (audit substr-fix-systemic)
+_STYLE_TOK_RE    = re.compile(r"[\s\-&/,']+")   # boundaries: space, hyphen, ampersand, slash, comma, apostrophe
+_STYLE_TOK_CACHE = {}                            # genre string -> token tuple (bounded: a few hundred subgenres)
+
+def _style_tokens(s):
+    toks = _STYLE_TOK_CACHE.get(s)
+    if toks is None:
+        toks = tuple(t for t in _STYLE_TOK_RE.split(s.lower()) if t)
+        _STYLE_TOK_CACHE[s] = toks
+    return toks
+
+def _positive_matches(positive, tag):
+    """True if `positive`'s tokens occur as a contiguous run within `tag`'s tokens. So "mod" matches the
+    subgenre "mod" but NOT "modern"/"modal"; "house" matches "deep house"/"tech-house" but not "microhouse";
+    "synth-pop" matches the "synth pop" spelling variant. Composite positives must be pre-split (see dnb)."""
+    pt = _style_tokens(positive)
+    if not pt:
+        return False
+    tt = _style_tokens(tag)
+    n = len(pt)
+    return any(tt[i:i + n] == pt for i in range(len(tt) - n + 1))
+
+
 def _entry_lastfm_tags(entry):
     """Lowercased Last.fm community (crowd) tags for a track — artist + track level. These are genre
     LABELS supplied by listeners, distinct from the Discogs audio-model classifier and from Plex's genre
@@ -5958,12 +5986,8 @@ def _entry_lastfm_tags(entry):
 # own centroid + leans. The positive list in _PROFILE_STYLE_SIGNALS is matched against the Last.fm tags.
 _LASTFM_GATED = {"post_grunge", "prog_rock"}
 
-# Profiles whose positive subgenres are matched EXACTLY (==) against Discogs subgenres, not as substrings.
-# WHY: short positives like "mod" substring-match unrelated subgenres ("mod" ⊂ "modern"/"modal"), which made
-# london_mod serve modern-classical/film-scores instead of 60s mod-rock (offline-verified: 5977 wrong tracks).
-# Exact match captures the genuine "mod"/"beat"/"garage rock" subgenres only. The general fix for the whole
-# substring-leak class is word-boundary matching (see the audit's Tier-4 roadmap). (audit london_mod-1)
-_STYLE_EXACT_PROFILES = {"london_mod"}
+# (Retired _STYLE_EXACT_PROFILES: london_mod's "mod" no longer leaks into "modern" now that the gate uses
+#  word-boundary token matching for ALL profiles — see _positive_matches above. audit substr-fix-systemic.)
 
 # festive (Christmas) is a calendar event, not a genre or a sound — neither Discogs nor the centroid can
 # express it. Gate on a holiday signal: a seasonal keyword in the title, or Plex flagging it Holiday/
@@ -5996,11 +6020,9 @@ def _has_required_style(entry, profile_key):
             tags = _entry_lastfm_tags(entry)                     # crowd genre labels (Discogs can't name these)
         else:
             tags = _discogs_subgenres(entry, _DISCOGS_TAG_FLOOR)  # Discogs subgenres only, confidence-floored
-        if profile_key in _STYLE_EXACT_PROFILES:
-            matched = any(sub == tag for tag in tags for sub in positive_subs)   # exact: "mod" must not match "modern"
-        else:
-            matched = any(sub in tag for tag in tags for sub in positive_subs)   # substring (default)
-        if not tags or not matched:
+        # Word-boundary token match (see _positive_matches): "mod" matches the subgenre "mod" but not
+        # "modern", "dub" not "dubstep", "am pop" not "dream pop" — the systemic fix for the leak class.
+        if not tags or not any(_positive_matches(sub, tag) for tag in tags for sub in positive_subs):
             return False
 
     # Dominant-Discogs-parent constraint — independent of the positive match, so it also applies to a
@@ -7214,11 +7236,56 @@ def build_excluded_album_keys(music):
     return excluded
 
 
+# ---------------------------------------------------------------------------
+# Audio embeddings — "sounds-like" similarity (emb_effnet: 1280-d, mean-pooled, then L2-normalised)
+# ---------------------------------------------------------------------------
+# emb_effnet is the EffNet-Discogs genre-head embedding computed during analysis (~35% coverage today,
+# growing via `pre_analyze.py --sync-embeddings`). It captures sub-style/timbre the 10-d acoustic centroid
+# can't. EVERY consumer treats a None vector as "fall back to the acoustic path", so partial coverage and a
+# missing numpy degrade gracefully. WHY: emb_effnet/emb_musicnn were collected but unused (audit Tier-4).
+_EMB_FIELD  = "emb_effnet"
+_EMB_WEIGHT = 0.30          # pull toward a profile's seed embedding-centroid in _combined_score
+
+def _track_emb(entry):
+    """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / empty)."""
+    if not _NUMPY_AVAILABLE:
+        return None
+    blob = entry.get(_EMB_FIELD)
+    if not blob:
+        return None
+    try:
+        v = np.frombuffer(blob, dtype=np.float32)
+    except (TypeError, ValueError):
+        return None
+    if v.size == 0:
+        return None
+    n = float(np.linalg.norm(v))
+    return (v / n) if n else None
+
+def _emb_cosine(a, b):
+    """Cosine similarity of two already-normalised embeddings (a dot product); 0.0 if either is None."""
+    if a is None or b is None:
+        return 0.0
+    return float(np.dot(a, b))
+
+def _emb_centroid(rks, essentia_cache):
+    """Mean of the normalised embeddings over a set of ratingKeys, renormalised. None if <5 present."""
+    if not _NUMPY_AVAILABLE:
+        return None
+    vs = [v for v in (_track_emb(essentia_cache.get(str(rk), {})) for rk in rks) if v is not None]
+    if len(vs) < 5:
+        return None
+    m = np.mean(vs, axis=0)
+    n = float(np.linalg.norm(m))
+    return (m / n) if n else None
+
+
 def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
     """
     Compute acoustic/taste centroid from the top-N most-played tracks.
     Returns dict with bpm/energy/danceability/brightness/year means
-    plus styles_counter and genres_counter weighted by play count.
+    plus styles_counter and genres_counter weighted by play count,
+    and an "emb" key — the mean normalised embedding of those tracks (None if numpy/coverage absent).
     """
     play_counts = Counter(str(e.ratingKey) for e in history_entries)
     top_keys = [rk for rk, _ in play_counts.most_common(top_n)]
@@ -7267,6 +7334,7 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
         "styles_counter": styles_counter,
         "genres_counter": genres_counter,
         "lastfm_counter": lastfm_counter,
+        "emb": _emb_centroid(top_keys, essentia_cache),   # mean normalised embedding of the top-N played
     }
 
 
@@ -7611,10 +7679,20 @@ def _tag_overlap_score(entry, centroid):
 
 
 def acoustic_affinity(rk, centroid, essentia_cache):
-    """0–1 similarity: 60% acoustic distance (inverted) + 40% tag overlap."""
+    """0–1 similarity. Base = 60% acoustic distance (inverted) + 40% tag overlap. When the centroid carries
+    an embedding ("emb", e.g. compute_listening_centroid) AND the track has one, blend the base 50/50 with
+    the embedding cosine ("sounds-like"). A track (or centroid) without an embedding falls back to the base
+    — graceful under partial coverage. WHY: sharper discovery than the 10-d centroid + tags (audit Tier-4)."""
     entry = essentia_cache.get(str(rk), {})
-    return (0.6 * (1.0 - _acoustic_distance_to_centroid(entry, centroid))
+    base = (0.6 * (1.0 - _acoustic_distance_to_centroid(entry, centroid))
             + 0.4 * _tag_overlap_score(entry, centroid))
+    cen_emb = centroid.get("emb") if isinstance(centroid, dict) else None
+    if cen_emb is not None:
+        v = _track_emb(entry)
+        if v is not None:
+            emb_aff = 0.5 + 0.5 * _emb_cosine(v, cen_emb)   # cosine [-1,1] -> affinity [0,1]
+            return 0.5 * base + 0.5 * emb_aff
+    return base
 
 
 def _album_acoustic_centroid(rks, essentia_cache):
@@ -9502,6 +9580,10 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
             # even on a brand-new track) match the listening profile — the best-aligned track stands in.
             tag_aff      = max((_tag_overlap_score(essentia_cache.get(rk, {}), centroid) for rk in rks), default=0.0)
             affinity     = 0.65 * ac_aff + 0.35 * tag_aff
+            alb_emb = _emb_centroid(rks, essentia_cache)                        # does the album "sound like" the listening profile?
+            cen_emb = centroid.get("emb") if isinstance(centroid, dict) else None
+            if alb_emb is not None and cen_emb is not None:
+                affinity = 0.5 * affinity + 0.5 * (0.5 + 0.5 * _emb_cosine(alb_emb, cen_emb))
             reps         = _select_album_reps(album, tracks, essentia_cache)
             artist_key   = _artist_key(reps[0]) if reps else ""
             album_data.append((rel, affinity, album.ratingKey, artist_key, reps))
@@ -9709,7 +9791,7 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
 def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                       n_mixes=6, mix_size=50):
     """
-    N Daily Mixes built via k-means acoustic clustering. Requires numpy.
+    N Daily Mixes built via k-means clustering on audio embeddings (acoustic 4-d fallback). Requires numpy.
     Each mix: 40% history tracks from the cluster, 60% library tracks closest to centroid.
     Returns list of (playlist_name, description, tracks) tuples.
     """
@@ -9742,7 +9824,33 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
         return []
 
     X = np.array(feature_rows, dtype=np.float32)
-    centroids, labels = _kmeans_fit(X, k=n_mixes)
+
+    # Cluster on audio EMBEDDINGS ("sounds-like") where available, assigning the rest by acoustic nearest-
+    # centroid; fall back entirely to acoustic 4-d clustering when embeddings are too sparse. WHY: richer,
+    # more coherent clusters than bpm/energy/dance/brightness alone (audit Tier-4). centroids stay in
+    # acoustic-4d space so the downstream history/library/distance code is unchanged.
+    emb_idx, emb_mat = [], []
+    for _i, _rk in enumerate(cache_rks):
+        _v = _track_emb(essentia_cache.get(_rk, {}))
+        if _v is not None:
+            emb_idx.append(_i); emb_mat.append(_v)
+    if len(emb_idx) >= n_mixes * 50:
+        _, emb_labels = _kmeans_fit(np.array(emb_mat, dtype=np.float32), k=n_mixes)
+        labels = np.full(len(cache_rks), -1, dtype=int)
+        for _j, _i in enumerate(emb_idx):
+            labels[_i] = int(emb_labels[_j])
+        centroids = np.zeros((n_mixes, X.shape[1]), dtype=np.float32)   # acoustic-4d mean of each cluster's embedded members
+        for _c in range(n_mixes):
+            _m = labels == _c
+            centroids[_c] = X[_m].mean(axis=0) if _m.any() else X.mean(axis=0)
+        _miss = np.where(labels == -1)[0]                              # no-embedding tracks -> nearest cluster acoustically
+        if len(_miss):
+            _d = np.stack([np.linalg.norm(X[_miss] - centroids[_c], axis=1) for _c in range(n_mixes)], axis=1)
+            labels[_miss] = np.argmin(_d, axis=1)
+        xlog(f"[INFO] daily_mixes: embedding-clustered ({len(emb_idx)}/{len(cache_rks)} embedded)")
+    else:
+        centroids, labels = _kmeans_fit(X, k=n_mixes)
+        xlog(f"[INFO] daily_mixes: acoustic-clustered (only {len(emb_idx)} embedded — too sparse for embeddings)")
 
     # Build lookup: rk -> (array_index, cluster_id)
     rk_to_idx = {rk: i for i, rk in enumerate(cache_rks)}
@@ -10144,8 +10252,9 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
             continue
 
         artist_centroid = _album_acoustic_centroid(well_played_rks, essentia_cache) if well_played_rks else {}
+        artist_emb      = _emb_centroid(well_played_rks, essentia_cache) if well_played_rks else None  # "sounds-like" the artist's well-played cuts
 
-        # Score deep cuts by distance to artist's well-played centroid.
+        # Score deep cuts by distance to the artist's well-played centroid (acoustic + embedding "sounds-like").
         # Resolve a larger pool so rating bonus can surface high-rated tracks
         # that sit slightly further from the centroid.
         has_acoustic = any(artist_centroid.get(f) for f in ("bpm", "energy"))
@@ -10154,6 +10263,10 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
             entry = essentia_cache.get(rk, {})
             score = (1.0 - _acoustic_distance_to_centroid(entry, artist_centroid)
                      if has_acoustic else 0.5)
+            if artist_emb is not None:
+                v = _track_emb(entry)
+                if v is not None:
+                    score = 0.5 * score + 0.5 * (0.5 + 0.5 * _emb_cosine(v, artist_emb))
             scored.append((score, rk))
         scored.sort(reverse=True)
 
@@ -10953,9 +11066,10 @@ _DJ_ARC_PROFILES = {
 _DJ_ARC_WEIGHT = 2.0   # how strongly the energy ARC pulls vs adjacent-transition smoothness
 
 
-def _dj_transition(ea, eb):
-    """DJ transition cost between two cache entries — beatmatch + harmonic key + energy (the DJ
-    essentials), offline. Lower = smoother mix. Same-artist back-to-back is heavily penalised."""
+def _dj_transition(ea, eb, emb_a=None, emb_b=None):
+    """DJ transition cost between two cache entries — beatmatch + harmonic key + energy + a light embedding
+    "sounds-like" term (the DJ essentials), offline. Lower = smoother mix. Same-artist back-to-back is
+    heavily penalised. emb_a/emb_b are precomputed normalised embeddings (None -> the emb term is skipped)."""
     d  = 2.0 * get_bpm_distance(ea.get("bpm"), eb.get("bpm"))        # octave-aware tempo (reused)
     d += 1.5 * get_harmonic_distance(ea.get("key"), eb.get("key"))   # Camelot-wheel key (reused)
     en_a, en_b = ea.get("energy"), eb.get("energy")
@@ -10963,6 +11077,8 @@ def _dj_transition(ea, eb):
         d += min(abs(en_a - en_b) / 10.0, 1.0)
     if ea.get("artist") and ea.get("artist") == eb.get("artist"):
         d += 2.0
+    if emb_a is not None and emb_b is not None:
+        d += 0.5 * (1.0 - _emb_cosine(emb_a, emb_b))   # "sounds-like" tiebreak; skipped when either lacks an embedding
     return d
 
 
@@ -10972,9 +11088,11 @@ def _dj_order(tracks, essentia_cache, arc=False):
     selection is unchanged. Pure-acoustic, no Plex calls."""
     if len(tracks) < 4:
         return tracks
-    ent = {str(t.ratingKey): essentia_cache.get(str(t.ratingKey), {}) for t in tracks}
+    ent  = {str(t.ratingKey): essentia_cache.get(str(t.ratingKey), {}) for t in tracks}
+    embs = {rk: _track_emb(e) for rk, e in ent.items()}   # precompute once — _dj_transition is called O(n²)
     def _c(a, b):
-        return _dj_transition(ent[str(a.ratingKey)], ent[str(b.ratingKey)])
+        ka, kb = str(a.ratingKey), str(b.ratingKey)
+        return _dj_transition(ent[ka], ent[kb], embs[ka], embs[kb])
 
     if not arc:
         rem = tracks[1:]; order = [tracks[0]]; cur = order[0]
@@ -11053,6 +11171,46 @@ def _seed_centroid(profile_key, essentia_cache):
     return cen
 
 
+# Embedding seed-artists — like _SEED_ARTISTS but used ONLY for the embedding "sounds-like" pull in
+# _combined_score (they do NOT swap the acoustic centroid the way _SEED_ARTISTS does), so they sharpen the
+# audit's broad/fuzzy mixes without disturbing their hand-tuned centroid or gate. acoustic_romance reuses
+# its _SEED_ARTISTS list. WHY: emb_effnet was collected but unused (audit Tier-4: seed & fuzzy mixes).
+_EMB_SEEDS = {
+    "acoustic_romance": _SEED_ARTISTS["acoustic_romance"],
+    # situationship: yearning bedroom-pop / alt-R&B about undefined relationships
+    "situationship": ["clairo", "steve lacy", "the marias", "omar apollo", "snail mail", "beabadoobee",
+                      "gracie abrams", "holly humberstone", "phoebe bridgers", "boygenius"],
+    # indie_rock: big indie / alt-rock anthems
+    "indie_rock": ["the killers", "arctic monkeys", "kings of leon", "the strokes", "interpol", "foals",
+                   "two door cinema club", "phoenix", "vampire weekend", "bloc party", "franz ferdinand"],
+}
+_SEED_EMB_CENTROID_CACHE = {}
+
+def _seed_emb_centroid(profile_key, essentia_cache):
+    """Mean normalised embedding of a profile's _EMB_SEEDS artists (memoised). None if <5 present / no numpy."""
+    if profile_key in _SEED_EMB_CENTROID_CACHE:
+        return _SEED_EMB_CENTROID_CACHE[profile_key]
+    seeds = _EMB_SEEDS.get(profile_key) or []
+    cen = None
+    if seeds and _NUMPY_AVAILABLE:
+        rks = [rk for rk, e in essentia_cache.items()
+               if any(sd in (e.get("artist") or "").lower() for sd in seeds)]
+        cen = _emb_centroid(rks, essentia_cache)
+    _SEED_EMB_CENTROID_CACHE[profile_key] = cen
+    return cen
+
+def _embedding_boost(entry, profile_key, essentia_cache):
+    """Pull a track toward a profile's seed embedding-centroid ("sounds like the seeds"). No-op for profiles
+    without _EMB_SEEDS, or when the track / centroid has no embedding (graceful under partial coverage)."""
+    cen = _seed_emb_centroid(profile_key, essentia_cache)
+    if cen is None:
+        return 0.0
+    v = _track_emb(entry)
+    if v is None:
+        return 0.0
+    return -_EMB_WEIGHT * _emb_cosine(v, cen)   # negative = pull (closer in sound -> better/lower score)
+
+
 # ---------------------------------------------------------------------------
 # Loudness-consistency lean — pacing mixes prefer steady-loudness (low LRA) tracks
 # ---------------------------------------------------------------------------
@@ -11075,6 +11233,30 @@ def _loudness_consistency_boost(entry, profile_key):
         return 0.0
     steadiness = 1.0 - min(1.0, lra / _LOUDNESS_LRA_CAP)   # 1.0 = perfectly steady … 0.0 = very dynamic
     return -_LOUDNESS_WEIGHT * steadiness
+
+
+# ---------------------------------------------------------------------------
+# Danceability co-signal — dance/EDM mixes deprioritise clearly-non-danceable tracks
+# ---------------------------------------------------------------------------
+# danceability_hl is the MusiCNN high-level danceability classifier (0–1), a second opinion distinct from the
+# Essentia danceability already in the centroid. The Discogs style gate can still let through the occasional
+# ballad / interlude / ambient cut that carries the genre tag but isn't danceable; for the dance/EDM mixes
+# (the DJ-arc set) we softly PUSH DOWN tracks the classifier scores clearly non-danceable. SOFT, not a gate —
+# the dance subset already averages ~0.93, so this only nudges the rare misfire and never thins the pool.
+# WHY: danceability_hl was collected but unused. (audit danceability-co-gate — implemented as a soft penalty)
+_DANCE_PROFILES       = _DJ_ARC_PROFILES        # the 20 hard-gated dance/EDM mixes
+_DANCE_FLOOR          = 0.50                     # below this, a dance-mix track is nudged down
+_DANCE_PENALTY_WEIGHT = 0.30                     # push at danceability_hl=0; scales with the shortfall below the floor
+
+
+def _danceability_penalty(entry, profile_key):
+    """Soft push-down for clearly-non-danceable tracks in dance/EDM mixes; no-op elsewhere / when missing."""
+    if profile_key not in _DANCE_PROFILES:
+        return 0.0
+    dhl = entry.get("danceability_hl")
+    if dhl is None or dhl >= _DANCE_FLOOR:
+        return 0.0
+    return _DANCE_PENALTY_WEIGHT * (_DANCE_FLOOR - dhl)   # positive = worse score (pushed down)
 
 
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
@@ -11111,6 +11293,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _popularity_boost(entry, profile_key)
             + _listening_hour_boost(rk)
             + _loudness_consistency_boost(entry, profile_key)
+            + _danceability_penalty(entry, profile_key)
+            + _embedding_boost(entry, profile_key, essentia_cache)
             + _lyric_boost(entry, profile_key)
         )
         # Style-GATED mixes already confirmed genre membership via tags in the gate. Re-applying the
