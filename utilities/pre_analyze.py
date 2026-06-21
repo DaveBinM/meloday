@@ -47,6 +47,12 @@ worker_plex = None
 def init_worker():
     """Initializes a single Plex session per worker process."""
     global worker_plex
+    # WHY: nice the analysis workers so a full bulk_analyze yields CPU to the daily Meloday cron / other
+    # work under contention (full speed when the box is idle). (audit Tier-4: considerate analysis)
+    try:
+        os.nice(10)
+    except Exception:
+        pass
     # Raise the soft FD limit to the hard limit. Essentia's native C++ decoders can leak
     # file descriptors during audio analysis. On Linux the default soft limit (1024) can
     # be exhausted after several hundred tracks per worker, causing the result pipe write
@@ -297,6 +303,169 @@ def analysis_worker(track_id, plex_track_ts=None, plex_album_ts=None, plex_artis
         return str(track_id), None, str(e)
 
 # --- 3. CORE ANALYSIS LOGIC ---
+
+# ---------------------------------------------------------------------------
+# Reusable parallel CPU-bound essentia backfill (embeddings + base/TF post-passes)
+# ---------------------------------------------------------------------------
+# WHY: the embedding backfill and the base/TF post-passes are the same shape — run _fill_missing_acoustic
+# on the audio for a list of tracks, write the computed columns back — and were each SINGLE-THREADED (the TF
+# post-pass, serial in the main process, was the analysis bottleneck on a fresh run). This one helper runs
+# them on a spawn ProcessPool: nice'd + RAM-capped workers that LEAVE A CORE FREE (full speed on an idle box,
+# auto-yields to the daily cron under contention — nice only matters when something else wants the CPU), a
+# live rate/ETA line, main-process-only DB writes (no SQLite lock contention), and a per-track SIGALRM so a
+# stalled mount can't hang a worker. Resumable: callers select only NULL rows + the helper commits in batches.
+_bf_active_ex = [None]   # mutable ref so the atexit hook can hard-kill whichever pool is live (fast Ctrl-C)
+def _bf_kill_workers():
+    ex = _bf_active_ex[0]
+    if ex is None:
+        return
+    for p in (getattr(ex, "_processes", None) or {}).values():
+        try: p.kill()
+        except Exception: pass
+atexit.register(_bf_kill_workers)
+
+def _bf_init(force_emb, nice):
+    """Worker initialiser: set the embedding-backfill flag and (optionally) lower CPU priority."""
+    import meloday
+    meloday._FORCE_EMB_BACKFILL = bool(force_emb)
+    if nice:
+        try: os.nice(10)
+        except Exception: pass
+
+def _essentia_backfill_worker(rk, file_path, data):
+    """Compute the missing acoustic/TF fields for one track and return the updated `data` dict. TF models
+    are loaded (or not) per the MELODAY_SKIP_TF_MODELS the helper set before the pool spawned. A per-track
+    SIGALRM turns a stalled decode into a skip rather than freezing the worker."""
+    import meloday
+    if not file_path or not os.path.exists(file_path):
+        return rk, None, "nofile"
+    try:
+        if hasattr(signal, "SIGALRM"):
+            signal.signal(signal.SIGALRM, _sigalrm_handler)
+            signal.alarm(90)
+        try:
+            meloday._fill_missing_acoustic(data, file_path)
+        finally:
+            if hasattr(signal, "SIGALRM"):
+                signal.alarm(0)
+    except Exception as e:
+        return rk, None, f"err:{e}"
+    return rk, data, None
+
+def _bf_worker_count(per_worker_gb, override=None):
+    """CPU-bound worker count: leave >=1 core free, capped by available RAM at per_worker_gb each."""
+    if override:
+        return max(1, int(override))
+    try:
+        import psutil
+        physical = psutil.cpu_count(logical=False) or os.cpu_count() or 2
+        avail = psutil.virtual_memory().available
+        headroom = max(1024 ** 3, int(avail * 0.15))
+        ram_cap = max(1, int((avail - headroom) // int(per_worker_gb * 1024 ** 3)))
+        return max(1, min(physical - 1, ram_cap))   # -1: always leave a core for the OS / cron / SSH
+    except Exception:
+        return max(1, (os.cpu_count() or 2) - 1)
+
+def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worker_gb,
+                                workers=None, nice=True, label="backfill", update_cache=None):
+    """Run _essentia_backfill_worker over `todo` (list of (rk, file_path, data)) on a nice'd spawn pool;
+    write results ONLY here (main process) via flush_fn({rk: data}) in batches of 100. workers==1 keeps the
+    single-process path. Returns (ok, nofile, err). Resumable + Ctrl-C-safe (flushes pending on exit)."""
+    total = len(todo)
+    if total == 0:
+        return 0, 0, 0
+    n = _bf_worker_count(per_worker_gb, workers)
+    print(f"[INFO] {label}: {total} tracks · {n} worker(s){' · nice' if nice else ''} · resumable (Ctrl-C safe)")
+    ok = nofile = err = 0
+    pending = {}
+    start = time.time()
+    last_paint = [0.0]
+    def _paint(done):
+        now = time.time()
+        if now - last_paint[0] < 1.0 and done < total:
+            return
+        last_paint[0] = now
+        rate = done / max(0.1, now - start)
+        eta = timedelta(seconds=int((total - done) / max(0.01, rate)))
+        log_msg(f"{label}: [{done}/{total}] {rate:.1f}/s · ETA {eta} · {ok} ok {nofile} nofile {err} err ", end='\r')
+    def _consume(rk, data, e):
+        nonlocal ok, nofile, err
+        if e == "nofile":
+            nofile += 1
+        elif e:
+            err += 1
+        elif data is not None:
+            ok += 1
+            if update_cache is not None:
+                update_cache[rk] = data
+            pending[rk] = data
+            if len(pending) >= 100:
+                flush_fn(pending); pending.clear()
+
+    if n == 1:                                   # single-process fallback (today's behaviour, no pool)
+        import meloday
+        meloday._FORCE_EMB_BACKFILL = bool(force_emb)
+        if nice:
+            try: os.nice(10)
+            except Exception: pass
+        try:
+            for i, (rk, fp, data) in enumerate(todo, 1):
+                _, r_data, e = _essentia_backfill_worker(rk, fp, data)
+                _consume(rk, r_data, e); _paint(i)
+        finally:
+            if pending:
+                try: flush_fn(pending)
+                except Exception: pass
+            meloday._FORCE_EMB_BACKFILL = False
+            log_msg("")
+        return ok, nofile, err
+
+    # Toggle TF loading for the spawned workers (they inherit MELODAY_SKIP_TF_MODELS at import).
+    _prev_skip = os.environ.get("MELODAY_SKIP_TF_MODELS")
+    if load_tf:
+        os.environ.pop("MELODAY_SKIP_TF_MODELS", None)
+    else:
+        os.environ["MELODAY_SKIP_TF_MODELS"] = "1"
+    mp_ctx = multiprocessing.get_context("spawn")
+    executor = concurrent.futures.ProcessPoolExecutor(
+        max_workers=n, mp_context=mp_ctx, initializer=_bf_init, initargs=(force_emb, nice))
+    _bf_active_ex[0] = executor
+    it = iter(todo)
+    inflight = {}
+    done = 0
+    try:
+        for _ in range(n * 3):                   # prime the pool (bounded in-flight, ~3x workers)
+            try: rk, fp, data = next(it)
+            except StopIteration: break
+            inflight[executor.submit(_essentia_backfill_worker, rk, fp, data)] = rk
+        while inflight:
+            finished, _ = concurrent.futures.wait(
+                list(inflight), timeout=1.0, return_when=concurrent.futures.FIRST_COMPLETED)
+            for fut in finished:
+                rk = inflight.pop(fut)
+                try:
+                    _, r_data, e = fut.result()
+                except Exception as ex:
+                    r_data, e = None, f"err:{ex}"
+                done += 1
+                _consume(rk, r_data, e)
+                try: nrk, nfp, ndata = next(it)  # keep the pool fed
+                except StopIteration: pass
+                else: inflight[executor.submit(_essentia_backfill_worker, nrk, nfp, ndata)] = nrk
+            _paint(done)
+    finally:
+        if pending:
+            try: flush_fn(pending)
+            except Exception: pass
+        executor.shutdown(wait=False, cancel_futures=True)
+        _bf_active_ex[0] = None
+        if _prev_skip is None:
+            os.environ.pop("MELODAY_SKIP_TF_MODELS", None)
+        else:
+            os.environ["MELODAY_SKIP_TF_MODELS"] = _prev_skip
+        log_msg("")
+    return ok, nofile, err
+
 
 def bulk_analyze():
     """
@@ -717,25 +886,12 @@ def bulk_analyze():
     if base_todo:
         log_msg(f"\n[INFO] Base-features post-pass: {len(base_todo)} tracks still need "
                 f"onset_rate / dynamic_complexity / integrated_loudness.")
-        log_msg(f"[INFO] Running single-threaded in main process. Re-run to resume if interrupted.")
-        base_pending = {}
-        base_start = time.time()
-        for base_i, (rk, file_path) in enumerate(base_todo):
-            data = _essentia_cache[rk]
-            try:
-                _fill_missing_acoustic(data, file_path)
-            except Exception as e:
-                logger.error(f"[BASE] _fill_missing_acoustic failed for rk={rk}: {e}")
-            _essentia_cache[rk] = data
-            base_pending[rk] = data
-            if len(base_pending) >= 200 or base_i == len(base_todo) - 1:
-                upsert_essentia_cache_entries(base_pending)
-                base_pending.clear()
-            base_elapsed = time.time() - base_start
-            base_avg = base_elapsed / max(1, base_i + 1)
-            base_eta = timedelta(seconds=int((len(base_todo) - base_i - 1) * base_avg))
-            log_msg(f"Base: [{base_i + 1}/{len(base_todo)}] | {base_avg:.1f}s/track | Est: {base_eta} ", end='\r')
-        log_msg(f"\n[INFO] Base-features post-pass complete.")
+        # Parallel: base features need no TF, so workers are light (~0.6 GB) — see _parallel_essentia_backfill.
+        base_rows = [(rk, fp, _essentia_cache[rk]) for rk, fp in base_todo]
+        _b_ok, _b_nf, _b_err = _parallel_essentia_backfill(
+            base_rows, upsert_essentia_cache_entries, load_tf=False, force_emb=False,
+            per_worker_gb=0.6, label="Base-features", update_cache=_essentia_cache)
+        log_msg(f"[INFO] Base-features post-pass complete ({_b_ok} ok, {_b_nf} nofile, {_b_err} err).")
 
     # --- TF POST-PASS ---
     # arousal, valence, vocal_presence require TF inference. Loading the TF C++ runtime
@@ -765,27 +921,13 @@ def bulk_analyze():
                     f"(high-level heads loaded: {len(_mood_models)} mood/danceability"
                     f"{', moodtheme' if _moodtheme_model is not None else ''}"
                     f"{', genre400' if _genre_model is not None else ''}).")
-            log_msg(f"[INFO] Running single-threaded in main process. Ctrl+C pauses; re-run to resume.")
-            tf_pending = {}
-            tf_start = time.time()
-            for tf_i, (rk, file_path) in enumerate(tf_todo):
-                data = _essentia_cache[rk]
-                try:
-                    _fill_missing_acoustic(data, file_path)
-                except Exception as e:
-                    logger.error(f"[TF] Failed for {rk}: {e}")
-                _essentia_cache[rk] = data
-                tf_pending[rk] = data
-                if len(tf_pending) >= 200 or tf_i == len(tf_todo) - 1:
-                    # targeted UPDATE (analysis columns only) so a concurrent Last.fm/MB sync
-                    # isn't clobbered; the post-pass only touches tracks already in the cache.
-                    update_analysis_columns(tf_pending)
-                    tf_pending.clear()
-                tf_elapsed = time.time() - tf_start
-                tf_avg = tf_elapsed / max(1, tf_i + 1)
-                tf_eta = timedelta(seconds=int((len(tf_todo) - tf_i - 1) * tf_avg))
-                log_msg(f"TF: [{tf_i + 1}/{len(tf_todo)}] | {tf_avg:.1f}s/track | Est: {tf_eta} ", end='\r')
-            log_msg(f"\n[INFO] TF post-pass complete.")
+            # Parallel: TF workers each load the models (~1.3 GB) — RAM-capped + nice'd so they yield to the
+            # cron. flush via update_analysis_columns = targeted UPDATE (analysis cols only, no sync clobber).
+            tf_rows = [(rk, fp, _essentia_cache[rk]) for rk, fp in tf_todo]
+            _t_ok, _t_nf, _t_err = _parallel_essentia_backfill(
+                tf_rows, update_analysis_columns, load_tf=True, force_emb=False,
+                per_worker_gb=1.3, label="TF post-pass", update_cache=_essentia_cache)
+            log_msg(f"[INFO] TF post-pass complete ({_t_ok} ok, {_t_nf} nofile, {_t_err} err).")
 
     log_msg(f"\n--- Success! Analysis and Sync complete. ---")
     log_msg(f"Total tracks in cache: {len(_essentia_cache)}")
@@ -2396,14 +2538,13 @@ def apply_lyric_vocab():
             f"{len(syn)} synonyms.")
 
 
-def sync_embeddings(limit=None, dry_run=False):
+def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
     """Backfill emb_effnet / emb_musicnn for cache rows that lack them by re-running the Essentia-TF
-    embedding models on the audio. WHY: embeddings were added after most tracks were analysed (~65% lack
-    them), and the extras "sounds-like" features (discovery / seed mixes / Daily-Mix clustering / DJ flow)
-    use them with graceful fallback, so coverage directly improves them. Heavy (a 16 kHz decode + two
-    embedding forward-passes per track); runs single-process in the main interpreter where the TF models
-    are loaded. --limit / --dry-run supported; safe to re-run (it only touches NULL-embedding rows).
-    (audit Tier-4 embeddings backfill)"""
+    embedding models on the audio — PARALLEL (nice'd, RAM-capped, live ETA) via _parallel_essentia_backfill.
+    WHY: embeddings were added after most tracks were analysed (~65% lack them); the extras "sounds-like"
+    features (discovery / seed mixes / Daily-Mix clustering / DJ flow) use them with graceful fallback, so
+    coverage directly improves them. --workers N / --no-nice / --dry-run / --limit; safe to re-run (only
+    touches NULL-embedding rows). (audit Tier-4 embeddings backfill)"""
     import meloday
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
     conn.execute("PRAGMA journal_mode=WAL")
@@ -2415,8 +2556,9 @@ def sync_embeddings(limit=None, dry_run=False):
     if not meloday._TF_MODELS_LOADED:
         print("[ERROR] sync_embeddings: TF models not loaded (essentia-tensorflow + model files + mood heads required).")
         conn.close(); return
-    # Pre-fill the existing base + high-level TF fields so only the two embedding models run per track (no
-    # 44.1 kHz base decode, no head re-compute); the force flag makes the TF block fire on the missing embeddings.
+    # Pre-fill the existing base + high-level TF fields into `data` so only the two embedding models run per
+    # track (no 44.1 kHz base decode, no head re-compute); the per-worker _FORCE_EMB_BACKFILL flag fires the
+    # TF block on the missing embeddings.
     cols = ("bpm", "key", "energy", "integrated_loudness", "danceability", "brightness", "onset_rate",
             "dynamic_complexity", "beat_confidence", "arousal", "valence", "vocal_presence",
             "mood_happy", "moodtheme", "genre_discogs")
@@ -2424,36 +2566,24 @@ def sync_embeddings(limit=None, dry_run=False):
         "SELECT rating_key, file_path, " + ", ".join(cols) +
         " FROM essentia_cache WHERE emb_effnet IS NULL AND file_path IS NOT NULL"
     ).fetchall()
+    conn.close()
     if limit:
         rows = rows[:limit]
-    meloday._FORCE_EMB_BACKFILL = True
-    pend, done, missing = [], 0, 0
-    try:
-        for n, row in enumerate(rows, 1):
-            rk, fp = row[0], row[1]
-            if not fp or not os.path.exists(fp):
-                missing += 1; continue
-            data = {c: row[2 + i] for i, c in enumerate(cols)}
-            data["emb_effnet"]  = None
-            data["emb_musicnn"] = None
-            try:
-                meloday._fill_missing_acoustic(data, fp)
-            except Exception:
-                continue
-            if data.get("emb_effnet") is not None:
-                pend.append((data["emb_effnet"], data["emb_musicnn"], rk)); done += 1
-            if len(pend) >= 50:
-                conn.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?", pend)
-                conn.commit(); pend.clear()
-            if n % 500 == 0:
-                print(f"[INFO] sync_embeddings: {n}/{len(rows)} processed, {done} backfilled")
-        if pend:
-            conn.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?", pend)
-            conn.commit()
-    finally:
-        meloday._FORCE_EMB_BACKFILL = False
-        conn.close()
-    print(f"[INFO] sync_embeddings: backfilled {done} tracks ({missing} files not found)")
+    todo = [(row[0], row[1], {c: row[2 + i] for i, c in enumerate(cols)}) for row in rows]
+
+    def _emb_flush(pending):
+        if not pending:
+            return
+        c = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?",
+                      [(d.get("emb_effnet"), d.get("emb_musicnn"), rk) for rk, d in pending.items()])
+        c.commit(); c.close()
+
+    ok, nofile, err = _parallel_essentia_backfill(
+        todo, _emb_flush, load_tf=True, force_emb=True, per_worker_gb=1.3,
+        workers=workers, nice=nice, label="sync_embeddings")
+    print(f"[INFO] sync_embeddings: backfilled {ok} tracks ({nofile} files not found, {err} errors)")
 
 
 def run_full_pipeline(limit=None, dry_run=False, skip_geo=False, skip_metadata=False):
@@ -2569,7 +2699,12 @@ if __name__ == "__main__":
     elif "--repair-artists" in sys.argv:
         repair_artist_names(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
     elif "--sync-embeddings" in sys.argv:
-        sync_embeddings(limit=_arg_limit(), dry_run="--dry-run" in sys.argv)
+        _w = None
+        if "--workers" in sys.argv:
+            try: _w = int(sys.argv[sys.argv.index("--workers") + 1])
+            except Exception: _w = None
+        sync_embeddings(limit=_arg_limit(), dry_run="--dry-run" in sys.argv,
+                        workers=_w, nice="--no-nice" not in sys.argv)
     elif "--full" in sys.argv:
         run_full_pipeline(limit=_arg_limit(), dry_run="--dry-run" in sys.argv,
                           skip_geo="--skip-geo" in sys.argv,
