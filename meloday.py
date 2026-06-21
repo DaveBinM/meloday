@@ -169,6 +169,28 @@ _MOOD_HEAD_SPECS = (
     ("danceability_hl", "danceability-msd-musicnn-1",    "musicnn", 0),
 )
 
+# Cap each spawned analysis worker's BLAS/OpenMP/TF threads to 1 so N workers don't
+# oversubscribe the CPU (N × all-core threads → thrash). Set in the parent before spawning;
+# workers inherit at import. Local copy (pre_analyze has the same — meloday can't import it
+# without a cycle). Used around the cache-miss re-analysis pool during playlist generation.
+_THREAD_CAP_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                    "TF_NUM_INTRAOP_THREADS", "TF_NUM_INTEROP_THREADS")
+
+def _set_thread_caps():
+    """Cap every numeric-lib threadpool to 1 in subsequently-spawned workers; return prior values."""
+    prev = {k: os.environ.get(k) for k in _THREAD_CAP_VARS}
+    for k in _THREAD_CAP_VARS:
+        os.environ[k] = "1"
+    return prev
+
+def _restore_env(prev):
+    """Restore env vars captured by _set_thread_caps (None → unset)."""
+    for k, v in prev.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
 # MELODAY_SKIP_TF_MODELS is set by pre_analyze.py in the main process before spawning
 # workers. With 'spawn' context, workers re-import meloday.py; loading the TF C++
 # runtime + three .pb models in every worker simultaneously uses ~700 MB–1 GB per
@@ -184,7 +206,15 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
             _musicnn_path = os.path.join(_models_dir, "msd-musicnn-1.pb")
             _av_path      = os.path.join(_models_dir, "deam-msd-musicnn-2.pb")
             _vocal_path   = os.path.join(_models_dir, "voice_instrumental-discogs-effnet-1.pb")
-            if all(os.path.isfile(p) for p in [_effnet_path, _musicnn_path, _av_path, _vocal_path]):
+            # MELODAY_EMB_ONLY (set by pre_analyze --sync-embeddings) loads ONLY the two embedding
+            # extractors and skips av/vocal + the high-level heads — ~2 models instead of ~13, so
+            # workers start faster and use ~half the RAM (more fit). WHY: the embedding backfill
+            # needs only emb_effnet/emb_musicnn; the heads already exist on the tracks it targets,
+            # so loading them is pure waste. Only the embedding files are required in this mode.
+            _emb_only = bool(os.environ.get('MELODAY_EMB_ONLY'))
+            _required_models = ([_effnet_path, _musicnn_path] if _emb_only
+                                else [_effnet_path, _musicnn_path, _av_path, _vocal_path])
+            if all(os.path.isfile(p) for p in _required_models):
                 # Two embedding extractors (both expect 16 kHz mono):
                 #   EffNet-Discogs → 1280-dim, feeds the voice/instrumental head.
                 #   MusiCNN-MSD    →  200-dim, feeds the DEAM valence/arousal head.
@@ -194,41 +224,43 @@ if ESSENTIA_AVAILABLE and not os.environ.get('MELODAY_SKIP_TF_MODELS'):
                     graphFilename=_effnet_path,  output="PartitionedCall:1")
                 _musicnn_model = es.TensorflowPredictMusiCNN(
                     graphFilename=_musicnn_path, output="model/dense/BiasAdd")
-                _av_model      = es.TensorflowPredict2D(
-                    graphFilename=_av_path,      output="model/Identity:0")
-                _vocal_model   = es.TensorflowPredict2D(
-                    graphFilename=_vocal_path,   output="model/Softmax")
-                _TF_MODELS_LOADED = True
+                _TF_MODELS_LOADED = True   # the embeddings alone are enough to run the TF block
 
-                # Optional high-level heads (downloaded into models_dir separately). Each runs
-                # on the embeddings already extracted above; missing files are skipped.
-                def _ld_head(_base, _out, _inp=None):
-                    _p = os.path.join(_models_dir, _base + ".pb")
-                    if not os.path.isfile(_p):
-                        return None
-                    try:  # per-head guard so one bad model can't skip the others
-                        if _inp:
-                            return es.TensorflowPredict2D(graphFilename=_p, input=_inp, output=_out)
-                        return es.TensorflowPredict2D(graphFilename=_p, output=_out)
-                    except Exception:
-                        return None
+                if not _emb_only:
+                    _av_model      = es.TensorflowPredict2D(
+                        graphFilename=_av_path,      output="model/Identity:0")
+                    _vocal_model   = es.TensorflowPredict2D(
+                        graphFilename=_vocal_path,   output="model/Softmax")
 
-                def _ld_classes(_base):
-                    try:
-                        with open(os.path.join(_models_dir, _base + ".json")) as _jf:
-                            return json.load(_jf).get("classes", [])
-                    except Exception:
-                        return []
+                    # Optional high-level heads (downloaded into models_dir separately). Each runs
+                    # on the embeddings already extracted above; missing files are skipped.
+                    def _ld_head(_base, _out, _inp=None):
+                        _p = os.path.join(_models_dir, _base + ".pb")
+                        if not os.path.isfile(_p):
+                            return None
+                        try:  # per-head guard so one bad model can't skip the others
+                            if _inp:
+                                return es.TensorflowPredict2D(graphFilename=_p, input=_inp, output=_out)
+                            return es.TensorflowPredict2D(graphFilename=_p, output=_out)
+                        except Exception:
+                            return None
 
-                for _field, _base, _emb, _idx in _MOOD_HEAD_SPECS:
-                    _h = _ld_head(_base, "model/Softmax")
-                    if _h is not None:
-                        _mood_models[_field] = (_h, _emb, _idx)
-                _moodtheme_model   = _ld_head("mtg_jamendo_moodtheme-discogs-effnet-1", "model/Sigmoid")
-                _MOODTHEME_CLASSES = _ld_classes("mtg_jamendo_moodtheme-discogs-effnet-1")
-                _genre_model       = _ld_head("genre_discogs400-discogs-effnet-1", "PartitionedCall:0",
-                                              "serving_default_model_Placeholder")
-                _GENRE400_CLASSES  = _ld_classes("genre_discogs400-discogs-effnet-1")
+                    def _ld_classes(_base):
+                        try:
+                            with open(os.path.join(_models_dir, _base + ".json")) as _jf:
+                                return json.load(_jf).get("classes", [])
+                        except Exception:
+                            return []
+
+                    for _field, _base, _emb, _idx in _MOOD_HEAD_SPECS:
+                        _h = _ld_head(_base, "model/Softmax")
+                        if _h is not None:
+                            _mood_models[_field] = (_h, _emb, _idx)
+                    _moodtheme_model   = _ld_head("mtg_jamendo_moodtheme-discogs-effnet-1", "model/Sigmoid")
+                    _MOODTHEME_CLASSES = _ld_classes("mtg_jamendo_moodtheme-discogs-effnet-1")
+                    _genre_model       = _ld_head("genre_discogs400-discogs-effnet-1", "PartitionedCall:0",
+                                                  "serving_default_model_Placeholder")
+                    _GENRE400_CLASSES  = _ld_classes("genre_discogs400-discogs-effnet-1")
     except Exception:
         pass
 
@@ -766,8 +798,10 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
                         or (_moodtheme_model is not None and data.get("moodtheme") is None)
                         or (_genre_model is not None and data.get("genre_discogs") is None)
                         # --sync-embeddings backfill: re-run the TF block for tracks that have the other TF
-                        # fields but never had their embeddings stored (audit Tier-4)
-                        or (_FORCE_EMB_BACKFILL and bool(_mood_models) and data.get("emb_effnet") is None))
+                        # fields but never had their embeddings stored (audit Tier-4). Gate on the embedding
+                        # model, NOT _mood_models — emb-only mode loads no heads, so a _mood_models gate would
+                        # make needs_tf False and skip the very backfill this flag requests.
+                        or (_FORCE_EMB_BACKFILL and _effnet_model is not None and data.get("emb_effnet") is None))
 
     needs_base = any([needs_bpm, needs_beat_conf, needs_key, needs_energy, needs_int_loud,
                       needs_dance, needs_brightness, needs_onset, needs_dyn_comp])
@@ -870,15 +904,19 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
             audio_tf    = es.MonoLoader(filename=file_path, sampleRate=16000, resampleQuality=4)()
             emb_effnet  = _np.asarray(_effnet_model(audio_tf))    # (n, 1280) → vocal head
             emb_musicnn = _np.asarray(_musicnn_model(audio_tf))   # (n,  200) → DEAM head
-            av  = _np.asarray(_av_model(emb_musicnn))             # (n, 2): [valence, arousal], 1–9 scale
-            voc = _np.asarray(_vocal_model(emb_effnet))           # (n, 2): softmax [instrumental, voice]
             # DEAM emits valence then arousal on the 1–9 annotation scale → normalise to 0–1.
-            if data.get("valence") is None:
-                data["valence"]        = round((float(av[:, 0].mean()) - 1.0) / 8.0, 4)
-            if data.get("arousal") is None:
-                data["arousal"]        = round((float(av[:, 1].mean()) - 1.0) / 8.0, 4)
             # voice_instrumental classes are [instrumental, voice] → vocal_presence = P(voice).
-            if data.get("vocal_presence") is None:
+            # WHY guarded: run each model only if it's loaded AND its field is missing — skips the
+            # wasted av/vocal passes on tracks that already have them (the --sync-embeddings backfill
+            # targets exactly such tracks) and avoids touching the unloaded models in emb-only mode.
+            if _av_model is not None and (data.get("valence") is None or data.get("arousal") is None):
+                av = _np.asarray(_av_model(emb_musicnn))             # (n, 2): [valence, arousal], 1–9 scale
+                if data.get("valence") is None:
+                    data["valence"]        = round((float(av[:, 0].mean()) - 1.0) / 8.0, 4)
+                if data.get("arousal") is None:
+                    data["arousal"]        = round((float(av[:, 1].mean()) - 1.0) / 8.0, 4)
+            if _vocal_model is not None and data.get("vocal_presence") is None:
+                voc = _np.asarray(_vocal_model(emb_effnet))          # (n, 2): softmax [instrumental, voice]
                 data["vocal_presence"] = round(float(voc[:, 1].mean()), 4)
 
             # High-level heads on the SAME embeddings; each filled only if currently missing.
@@ -901,7 +939,10 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
                     if float(_p) >= 0.03
                 }
             # Cache the mean embeddings so any future head needs no audio re-read.
-            if _mood_models and data.get("emb_effnet") is None:
+            # WHY no _mood_models gate: emb-only mode (--sync-embeddings) loads no heads, but must
+            # still persist the vectors it was launched to backfill. emb_effnet/emb_musicnn are
+            # always computed above whenever this TF block runs, so the store is safe.
+            if data.get("emb_effnet") is None:
                 data["emb_effnet"]  = emb_effnet.mean(axis=0).astype(_np.float32).tobytes()
                 data["emb_musicnn"] = emb_musicnn.mean(axis=0).astype(_np.float32).tobytes()
         except Exception as tf_err:
@@ -3088,6 +3129,11 @@ def main():
                 log_text(f"[DIAGNOSTIC] Cache miss/stale: Analyzing {len(to_analyze)} tracks.")
                 cpu_workers = get_optimal_workers(task_type="cpu")
                 new_entries = {}
+                # Cap each spawned worker to 1 thread so N analysis workers don't oversubscribe the
+                # CPU (N × all-core BLAS/TF). Restored right after the pool so the main process's own
+                # numpy work (sonic refinement, embedding cosine) keeps full threading. Precautionary
+                # — base Essentia is largely single-threaded — and matches the pre_analyze pools.
+                _prev_caps = _set_thread_caps()
                 with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
                     # Use submit/as_completed so one crashing worker doesn't abort the whole batch
                     futures = {executor.submit(analysis_worker, tid, *ts_map[tid]): tid for tid in to_analyze}
@@ -3099,6 +3145,7 @@ def main():
                                 new_entries[str(tid)] = data
                         except Exception as e:
                             log_text(f"[WARN] Analysis worker failed for track {futures[future]}: {e}")
+                _restore_env(_prev_caps)
                 _upsert_cache_entries(new_entries)
             else:
                 log_text("[OK] All tracks are cached and up-to-date.")

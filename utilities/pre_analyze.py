@@ -366,8 +366,33 @@ def _bf_worker_count(per_worker_gb, override=None):
     except Exception:
         return max(1, (os.cpu_count() or 2) - 1)
 
+# Single-thread the numeric libs (TF / BLAS / OpenMP) inside spawned analysis workers.
+# WHY: each worker is one of N processes; if TF/BLAS each grab all logical cores, N workers ×
+# ~cores threads massively oversubscribe the CPU and thrash (this is what dragged the parallel
+# embedding backfill to ~0.4 tracks/sec). Capping to 1 thread/worker gives clean N-way
+# parallelism. These env vars are read by the libs only at import, so they must be set in the
+# PARENT before spawning — workers inherit them, exactly like MELODAY_SKIP_TF_MODELS.
+_THREAD_CAP_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                    "TF_NUM_INTRAOP_THREADS", "TF_NUM_INTEROP_THREADS")
+
+def _set_thread_caps():
+    """Cap every numeric-lib threadpool to 1 in subsequently-spawned workers; return prior values."""
+    prev = {k: os.environ.get(k) for k in _THREAD_CAP_VARS}
+    for k in _THREAD_CAP_VARS:
+        os.environ[k] = "1"
+    return prev
+
+def _restore_env(prev):
+    """Restore env vars captured by _set_thread_caps (None → unset)."""
+    for k, v in prev.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
 def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worker_gb,
-                                workers=None, nice=True, label="backfill", update_cache=None):
+                                workers=None, nice=True, label="backfill", update_cache=None,
+                                emb_only=False):
     """Run _essentia_backfill_worker over `todo` (list of (rk, file_path, data)) on a nice'd spawn pool;
     write results ONLY here (main process) via flush_fn({rk: data}) in batches of 100. workers==1 keeps the
     single-process path. Returns (ok, nofile, err). Resumable + Ctrl-C-safe (flushes pending on exit)."""
@@ -420,12 +445,20 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
             log_msg("")
         return ok, nofile, err
 
-    # Toggle TF loading for the spawned workers (they inherit MELODAY_SKIP_TF_MODELS at import).
+    # Toggle TF loading / emb-only / thread caps for the spawned workers (they inherit these env
+    # vars at import). Thread caps are the dominant speed fix; emb_only loads only the 2 embedding
+    # models (not all ~13) so workers start faster and use ~half the RAM (more fit).
     _prev_skip = os.environ.get("MELODAY_SKIP_TF_MODELS")
+    _prev_emb_only = os.environ.get("MELODAY_EMB_ONLY")
     if load_tf:
         os.environ.pop("MELODAY_SKIP_TF_MODELS", None)
     else:
         os.environ["MELODAY_SKIP_TF_MODELS"] = "1"
+    if emb_only:
+        os.environ["MELODAY_EMB_ONLY"] = "1"
+    else:
+        os.environ.pop("MELODAY_EMB_ONLY", None)
+    _prev_caps = _set_thread_caps()
     mp_ctx = multiprocessing.get_context("spawn")
     executor = concurrent.futures.ProcessPoolExecutor(
         max_workers=n, mp_context=mp_ctx, initializer=_bf_init, initargs=(force_emb, nice))
@@ -463,6 +496,11 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
             os.environ.pop("MELODAY_SKIP_TF_MODELS", None)
         else:
             os.environ["MELODAY_SKIP_TF_MODELS"] = _prev_skip
+        if _prev_emb_only is None:
+            os.environ.pop("MELODAY_EMB_ONLY", None)
+        else:
+            os.environ["MELODAY_EMB_ONLY"] = _prev_emb_only
+        _restore_env(_prev_caps)
         log_msg("")
     return ok, nofile, err
 
@@ -698,6 +736,10 @@ def bulk_analyze():
         # per worker and causes OOM when N workers start simultaneously. TF features
         # (arousal/valence/vocal_presence) are filled in the main-process TF post-pass below.
         os.environ['MELODAY_SKIP_TF_MODELS'] = '1'
+        # Cap each base-feature worker to 1 thread so N spawned workers don't oversubscribe the
+        # CPU (precautionary — base Essentia is largely single-threaded, but this guards any
+        # BLAS/FFT threading and matches the backfill helper). Restored after the parallel phase.
+        _prev_caps_bulk = _set_thread_caps()
 
         batch_idx = 0
         while batch_idx < len(batches) and not aborted:
@@ -866,6 +908,9 @@ def bulk_analyze():
         # Flush remaining parallel-phase saves
         if pending_saves:
             upsert_essentia_cache_entries(pending_saves)
+        # Restore host threading now the worker pool is done; the post-passes below run via
+        # _parallel_essentia_backfill, which re-applies the caps around their own pools.
+        _restore_env(_prev_caps_bulk)
 
     del track_infos  # free ~1 GB of PlexAPI track data regardless of whether workers ran
 
@@ -2580,8 +2625,10 @@ def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
                       [(d.get("emb_effnet"), d.get("emb_musicnn"), rk) for rk, d in pending.items()])
         c.commit(); c.close()
 
+    # emb_only=True → workers load just the 2 embedding extractors (not all ~13 models): faster
+    # startup + ~half the RAM, so per_worker_gb drops 1.3 → 0.7 and more workers fit.
     ok, nofile, err = _parallel_essentia_backfill(
-        todo, _emb_flush, load_tf=True, force_emb=True, per_worker_gb=1.3,
+        todo, _emb_flush, load_tf=True, force_emb=True, per_worker_gb=0.7, emb_only=True,
         workers=workers, nice=nice, label="sync_embeddings")
     print(f"[INFO] sync_embeddings: backfilled {ok} tracks ({nofile} files not found, {err} errors)")
 
