@@ -336,6 +336,16 @@ def _essentia_backfill_worker(rk, file_path, data):
     """Compute the missing acoustic/TF fields for one track and return the updated `data` dict. TF models
     are loaded (or not) per the MELODAY_SKIP_TF_MODELS the helper set before the pool spawned. A per-track
     SIGALRM turns a stalled decode into a skip rather than freezing the worker."""
+    # Dormant fault-injection hook (resilience testing only — never set in production). With
+    # MELODAY_BF_FAULT_RATE set, the worker hard-exits on the poison key or at that probability and
+    # otherwise echoes `data` back without touching essentia, so the rebuild-on-break path can be
+    # exercised on a box with no audio/models.
+    _fault = os.environ.get("MELODAY_BF_FAULT_RATE")
+    if _fault:
+        import random as _rnd
+        if rk == os.environ.get("MELODAY_BF_POISON") or _rnd.random() < float(_fault):
+            os._exit(1)
+        return rk, data, None
     import meloday
     if not file_path or not os.path.exists(file_path):
         return rk, None, "nofile"
@@ -389,6 +399,15 @@ def _restore_env(prev):
             os.environ.pop(k, None)
         else:
             os.environ[k] = v
+
+# Resilience knobs for the spawn pool below. A worker dying abruptly (OOM, or a file that hard-crashes
+# the essentia/TF C runtime) marks the WHOLE ProcessPoolExecutor broken — every later submit()/result()
+# raises BrokenProcessPool. Instead of aborting a multi-hour run, the pool is rebuilt and the unfinished
+# items resumed (see _parallel_essentia_backfill).
+from concurrent.futures.process import BrokenProcessPool as _BrokenProcessPool
+_BF_RESTART_CAP  = 40   # absolute max pool rebuilds before giving up (resumable — re-run continues)
+_BF_WORKER_FLOOR = 4    # never self-throttle workers below this on repeated breaks
+_BF_MAX_ATTEMPTS = 3    # an item in-flight across this many breaks is a poison pill → skip it as err
 
 def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worker_gb,
                                 workers=None, nice=True, label="backfill", update_cache=None,
@@ -445,9 +464,10 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
             log_msg("")
         return ok, nofile, err
 
-    # Toggle TF loading / emb-only / thread caps for the spawned workers (they inherit these env
-    # vars at import). Thread caps are the dominant speed fix; emb_only loads only the 2 embedding
-    # models (not all ~13) so workers start faster and use ~half the RAM (more fit).
+    # Toggle TF loading / emb-only / thread caps for the spawned workers (they inherit these env vars
+    # at import). Thread caps are the dominant speed fix; emb_only loads only the 2 embedding models
+    # (not all ~13). Set ONCE here and restored in the outer finally — they persist across the pool
+    # rebuilds below.
     _prev_skip = os.environ.get("MELODAY_SKIP_TF_MODELS")
     _prev_emb_only = os.environ.get("MELODAY_EMB_ONLY")
     if load_tf:
@@ -460,37 +480,87 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
         os.environ.pop("MELODAY_EMB_ONLY", None)
     _prev_caps = _set_thread_caps()
     mp_ctx = multiprocessing.get_context("spawn")
-    executor = concurrent.futures.ProcessPoolExecutor(
-        max_workers=n, mp_context=mp_ctx, initializer=_bf_init, initargs=(force_emb, nice))
-    _bf_active_ex[0] = executor
-    it = iter(todo)
-    inflight = {}
+    _backoff = float(os.environ.get("MELODAY_BF_BACKOFF", "3"))   # post-break pause (override for tests)
+
+    # Resilient pool loop. If a worker dies abruptly the executor is poisoned (BrokenProcessPool on
+    # every submit/result), so we flush, tear it down, rebuild with FEWER workers (breaks are ~always
+    # memory pressure) and resume the items that haven't completed. `completed` drives the resume;
+    # `attempts` skips a file that keeps crashing the runtime so it can't loop forever.
+    completed = set()
+    attempts = {}
     done = 0
+    n_cur = n
+    restarts = 0
+    executor = None
+    inflight = {}
+    def _submit(item):                 # +1 attempt then queue; executor.submit() raises if pool is broken
+        attempts[item[0]] = attempts.get(item[0], 0) + 1
+        inflight[executor.submit(_essentia_backfill_worker, *item)] = item[0]
     try:
-        for _ in range(n * 3):                   # prime the pool (bounded in-flight, ~3x workers)
-            try: rk, fp, data = next(it)
-            except StopIteration: break
-            inflight[executor.submit(_essentia_backfill_worker, rk, fp, data)] = rk
-        while inflight:
-            finished, _ = concurrent.futures.wait(
-                list(inflight), timeout=1.0, return_when=concurrent.futures.FIRST_COMPLETED)
-            for fut in finished:
-                rk = inflight.pop(fut)
-                try:
-                    _, r_data, e = fut.result()
-                except Exception as ex:
-                    r_data, e = None, f"err:{ex}"
-                done += 1
-                _consume(rk, r_data, e)
-                try: nrk, nfp, ndata = next(it)  # keep the pool fed
-                except StopIteration: pass
-                else: inflight[executor.submit(_essentia_backfill_worker, nrk, nfp, ndata)] = nrk
-            _paint(done)
+        while True:
+            remaining = [item for item in todo if item[0] not in completed]
+            # Drop poison pills (kept breaking the pool) so one bad file can't loop the rebuild forever.
+            pruned = []
+            for item in remaining:
+                if attempts.get(item[0], 0) >= _BF_MAX_ATTEMPTS:
+                    _consume(item[0], None, "err:repeated worker crash"); completed.add(item[0]); done += 1
+                else:
+                    pruned.append(item)
+            remaining = pruned
+            if not remaining:
+                break
+
+            executor = concurrent.futures.ProcessPoolExecutor(
+                max_workers=n_cur, mp_context=mp_ctx, initializer=_bf_init, initargs=(force_emb, nice))
+            _bf_active_ex[0] = executor
+            it = iter(remaining)
+            inflight = {}
+            broke = False
+            try:
+                for _ in range(n_cur * 3):       # prime the pool (bounded in-flight, ~3x workers)
+                    try: item = next(it)
+                    except StopIteration: break
+                    _submit(item)
+                while inflight:
+                    finished, _ = concurrent.futures.wait(
+                        list(inflight), timeout=1.0, return_when=concurrent.futures.FIRST_COMPLETED)
+                    for fut in finished:
+                        rk = inflight.pop(fut)
+                        try:
+                            _, r_data, e = fut.result()
+                        except _BrokenProcessPool:
+                            raise                # bubble out to rebuild — NOT a per-task error
+                        except Exception as ex:
+                            r_data, e = None, f"err:{ex}"
+                        done += 1; completed.add(rk); _consume(rk, r_data, e)
+                        try: nxt = next(it)      # keep the pool fed
+                        except StopIteration: pass
+                        else: _submit(nxt)
+                    _paint(done)
+            except _BrokenProcessPool:
+                broke = True
+            finally:
+                if pending:
+                    try: flush_fn(pending); pending.clear()
+                    except Exception: pass
+                executor.shutdown(wait=False, cancel_futures=True)
+                _bf_active_ex[0] = None
+            if not broke:
+                break                            # clean finish — every item reached a terminal state
+            restarts += 1
+            left = sum(1 for item in todo if item[0] not in completed)
+            if restarts > _BF_RESTART_CAP:
+                log_msg(f"\n[ERROR] {label}: worker pool broke {restarts}× — stopping ({left} tracks "
+                        f"left; resumable, just re-run to continue).")
+                break
+            n_cur = max(_BF_WORKER_FLOOR, int(n_cur * 0.75))
+            log_msg(f"\n[WARN] {label}: worker pool broke (likely OOM) — {ok} ok so far; rebuilding "
+                    f"with {n_cur} worker(s), {left} left (restart {restarts}/{_BF_RESTART_CAP}).")
+            time.sleep(_backoff)                 # let OOM-reclaimed memory settle before respawning
     finally:
         if pending:
             try: flush_fn(pending)
             except Exception: pass
-        executor.shutdown(wait=False, cancel_futures=True)
         _bf_active_ex[0] = None
         if _prev_skip is None:
             os.environ.pop("MELODAY_SKIP_TF_MODELS", None)
