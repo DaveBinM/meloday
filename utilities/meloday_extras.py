@@ -6968,6 +6968,9 @@ def _upsert_extras_playlist(plex, name, tracks, description,
     existing_playlists:  pre-fetched {title: playlist_obj} dict; avoids a full plex.playlists()
                          call per update. Populated in main() and passed through.
     """
+    # Single chokepoint for EVERY extras playlist: show the canonical (studio-original) copy of each song.
+    # Post-selection, order-preserving — ranking/length unchanged; live/remix/extended keep their own copy.
+    tracks = _canonicalize_tracks(plex, tracks, meloday._essentia_cache)
     valid = [t for t in tracks if getattr(t, "ratingKey", None)]
     if not valid:
         xlog(f"[WARN] '{name}': no valid tracks — skipping.")
@@ -12841,7 +12844,7 @@ _EXCLUDE_COMPS_FROM_ERA     = bool(_extras.get("exclude_compilations_from_era", 
 _ERA_EXCLUDED_RELEASE_TYPES = {str(t).lower() for t in
                                (_extras.get("era_excluded_release_types") or ["compilation"])}
 _COMP_FOLDER_CUES = ("greatest hits", "best of", "the best of", "very best of", "anthology",
-                     "the collection", "the essential", "compilation")
+                     "the collection", "the essential", "compilation", "superhits", "super hits")
 
 
 def _comp_folder_fallback(file_path):
@@ -12858,13 +12861,15 @@ def _comp_folder_fallback(file_path):
     return any(cue in album_folder for cue in _COMP_FOLDER_CUES)
 
 
-def _era_is_comp(entry):
-    """True if a track's release is a compilation (excluded from decade mixes). Uses the cached MB
-    `release_types` when present; falls back to the file-path folder heuristic when it isn't (NULL/empty)."""
+def _is_compilation(entry):
+    """True if a track's release is a compilation. PRIMARY signal: the cached MB `release_types` (Picard
+    tags); FALLBACK when those are absent (NULL/empty): the file-path folder heuristic (Various Artists /
+    hits-comp album name). Used to keep mixes on the studio original AND to drop comps from decade mixes."""
     rt = entry.get("release_types")
     if rt:
         return bool({str(t).lower() for t in rt} & _ERA_EXCLUDED_RELEASE_TYPES)
     return _comp_folder_fallback(entry.get("file_path"))
+_era_is_comp = _is_compilation   # decade-mix code keeps its original name
 
 
 def _entry_song_key(entry):
@@ -12922,13 +12927,23 @@ def _version_penalty(title, album):
         pen += 4
     if "various artists" in album:
         pen += 2
-    if "greatest hits" in album or "best of" in album or "compilation" in album:
+    if any(cue in album for cue in _COMP_FOLDER_CUES):   # hits-comp album name (name fallback)
         pen += 1
     return pen
+_NONCANON_RELEASE_TYPES = {"live", "demo", "dj-mix"}   # non-studio MB release types -> penalise the copy
 def _canonical_penalty(entry):
-    """Version penalty for a CACHE entry (album = the file-path's album folder)."""
+    """Version penalty for a CACHE entry (album = the file-path's album folder). Non-studio releases —
+    compilations AND live/demo/dj-mix albums — are pushed down via the MB release-type signal (reliable
+    even when the album name gives nothing away, e.g. the live album "Bullet In A Bible") so the studio
+    original wins the canonical pick. Lower = more canonical."""
     parts = (entry.get("file_path") or "").split("/")
-    return _version_penalty(entry.get("title"), parts[-2] if len(parts) >= 2 else (entry.get("file_path") or ""))
+    album = parts[-2] if len(parts) >= 2 else (entry.get("file_path") or "")
+    pen = _version_penalty(entry.get("title"), album)
+    if _is_compilation(entry):
+        pen += 2
+    if {str(t).lower() for t in (entry.get("release_types") or [])} & _NONCANON_RELEASE_TYPES:
+        pen += 4
+    return pen
 def _canonical_penalty_track(t):
     """Version penalty for a Plex Track (album = parentTitle)."""
     return _version_penalty(getattr(t, "title", ""), getattr(t, "parentTitle", ""))
@@ -13005,8 +13020,9 @@ def _geo_overdue_bonus(last_ord, cur_ord):
 def _dedup_canonical(tracks, essentia_cache=None):
     """Collapse same-song duplicate Track objects to the most CANONICAL copy (studio/original — not
     live / remix / demo / instrumental / compilation), keeping the song at its best (first / highest-
-    scored) position in the list. Uses the cache entry (by rating key) for the version penalty. For
-    LIBRARY-pulled playlists — leave history-reflecting ones (On Repeat etc.) showing what was played."""
+    scored) position in the list. Uses the cache entry (by rating key) for the version penalty. NOTE:
+    the play-history playlists (On Repeat etc.) rank by plays first, then swap to the canonical copy via
+    _canonicalize_tracks — so the canonical preference is applied everywhere, not skipped here."""
     best, order = {}, []
     for t in tracks:
         sk = _song_key(t)
@@ -13020,6 +13036,48 @@ def _dedup_canonical(tracks, essentia_cache=None):
         elif cs < best[sk][0]:
             best[sk] = (cs, t)
     return [best[sk][1] for sk in order]
+
+
+_CANONICAL_RK_CACHE = {}   # id(essentia_cache) -> {song_key -> canonical rk}
+def _canonical_rk_map(essentia_cache):
+    """Map each song to the rating-key of its CANONICAL copy (studio original over live/remix/comp),
+    computed once per cache (mirrors _song_min_year_map). Meaningfully-different recordings (remix /
+    extended / live / acoustic) carry their own song key via lastfm_query_title, so each is its own
+    canonical copy; a song with a single copy maps to itself."""
+    cid = id(essentia_cache)
+    m = _CANONICAL_RK_CACHE.get(cid)
+    if m is None:
+        best = {}                                   # song_key -> (penalty, year, rk)
+        for rk, e in essentia_cache.items():
+            sk = _entry_song_key(e)
+            if not sk[1]:                            # no title -> can't group
+                continue
+            cand = (_canonical_penalty(e), e.get("year") or 9999, rk)
+            if sk not in best or cand < best[sk]:
+                best[sk] = cand
+        m = {sk: cand[2] for sk, cand in best.items()}
+        _CANONICAL_RK_CACHE.clear()                 # only the current run's cache is ever needed
+        _CANONICAL_RK_CACHE[cid] = m
+    return m
+
+
+def _canonicalize_tracks(plex, tracks, essentia_cache):
+    """Swap each track for the canonical copy of its song (studio original over live/remix/compilation),
+    preserving order and length. Selection/ranking is already done — this only changes WHICH copy shows,
+    so it's safe even on play-ranked playlists (On Repeat etc.). Meaningfully-different recordings and
+    single-copy songs map to themselves (no-op). Resolves only the copies that actually change."""
+    if not tracks or not essentia_cache:
+        return tracks
+    cmap = _canonical_rk_map(essentia_cache)
+    targets = []                                    # (original track, canonical rk)
+    for t in tracks:
+        rk = str(t.ratingKey)
+        e  = essentia_cache.get(rk)
+        sk = _entry_song_key(e) if e else _song_key(t)
+        targets.append((t, cmap.get(sk, rk)))
+    need = {cr for t, cr in targets if cr != str(t.ratingKey)}
+    swapped = resolve_tracks_by_keys(plex, list(need)) if need else {}
+    return [swapped.get(cr) or t for t, cr in targets]   # fall back to the original if it can't resolve
 
 
 # ---------------------------------------------------------------------------

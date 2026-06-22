@@ -2056,6 +2056,7 @@ _RECORDING_KEYWORDS = sorted([
     "remix", "live", "acoustic", "instrumental", "unplugged", "karaoke", "acapella", "a cappella", "demo",
     "dub", "cover", "rework", "re-edit", "bootleg", "vip", "rehearsal", "re-recorded", "rerecorded",
     "session", "sessions", "alternate", "take", "dj mix", "mix cut", "mashup", "flip", "refix", "reprise",
+    "extended",   # extended mix/edit/version = a meaningfully different (longer) recording -> its own song
 ], key=len, reverse=True)
 _RECORDING_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _RECORDING_KEYWORDS)
 _RECORDING_KW_RE = re.compile(rf"\b(?:{_RECORDING_ALT})\b", re.IGNORECASE)
