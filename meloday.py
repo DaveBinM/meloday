@@ -1557,7 +1557,7 @@ _VERSION_KEYWORDS_SORTED = sorted([
 # WHY: split out so lastfm_query_title can apply ONLY these (its version stripping is recording-aware, below),
 # while clean_title keeps using the full set incl. the dash-version forms.
 _FEAT_RES = [re.compile(p, re.IGNORECASE) for p in [
-    r"\(feat\.?.*?\)", r"\[feat\.?.*?\]", r"\(ft\.?.*?\)", r"\[ft\.?.*?\]",
+    r"\(feat\b\.?.*?\)", r"\[feat\b\.?.*?\]", r"\(ft\b\.?.*?\)", r"\[ft\b\.?.*?\]",   # \b: don't eat "(FTampa Remix)"
     r"\bfeat\.?\s+\w+(?:\s+\w+)*", r"\bfeaturing\s+\w+(?:\s+\w+)*", r"\bft\.?\s+\w+(?:\s+\w+)*",
 ]]
 _FEATURING_RES = _FEAT_RES + [re.compile(p, re.IGNORECASE) for p in [
@@ -2059,7 +2059,10 @@ _RECORDING_KEYWORDS = sorted([
     "extended",   # extended mix/edit/version = a meaningfully different (longer) recording -> its own song
 ], key=len, reverse=True)
 _RECORDING_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _RECORDING_KEYWORDS)
-_RECORDING_KW_RE = re.compile(rf"\b(?:{_RECORDING_ALT})\b", re.IGNORECASE)
+# `…|\bre-?mix\w*`: the version-keyword strip matches "remix" as a substring (so it strips "(Remixed)",
+# "(Remixes)", "(Remix1)"), so the KEEP test must match those same inflected forms or they'd collapse onto
+# the studio cut. The stem keeps every remix-rooted form distinct (premix etc. excluded by the \b).
+_RECORDING_KW_RE = re.compile(rf"\b(?:{_RECORDING_ALT})\b|\bre-?mix\w*", re.IGNORECASE)
 
 
 def lastfm_query_title(title):
