@@ -236,10 +236,21 @@ EXPLICIT.update({
 })
 
 CAT2CLUSTER = {
- "calm":"calm","atmospheric":"ambient","romantic":"romance","emotional":"emotional",
- "energy":"energetic","upbeat":"pop","groove":"soul_funk","activity":"energetic",
- "seasonal":"atmos","occasion":"party","social":"party","cinematic":"cinematic",
- "era":"pop","global":"latin_global","geo":"misc",
+ # genre / sound families
+ "rock_classic":"rock","rock_indie":"rock","rock_psych":"rock","rock_punk":"metal_punk","rock_heavy":"metal_punk",
+ "pop":"pop","electronic_house_techno":"electronic","electronic_bass":"electronic","electronic_edm_pop":"electronic",
+ "electronic_chill":"ambient","hiphop":"hiphop","soul_funk_rnb":"soul_funk","jazz_lounge":"jazz",
+ "folk_acoustic":"folk","country":"folk","world_latin":"latin_global","reggae_ska":"latin_global",
+ "instrumental_cinematic":"cinematic",
+ # mood / theme families
+ "happy_bright":"pop","party_fun":"party","euphoric_triumphant":"energetic","defiant_intense":"energetic",
+ "melancholy_blue":"emotional","heartbreak_longing":"emotional","nostalgic_throwback":"emotional",
+ "romantic":"romance","calm_unwind":"calm","dreamy_ethereal":"ambient",
+ # activity
+ "workout_energy":"energetic","focus_study":"calm","wellness_sleep":"calm","driving":"energetic",
+ # functional / context
+ "weather":"atmos","time_of_day":"atmos","season_autumn":"atmos","season_winter":"atmos",
+ "season_spring":"atmos","season_summer":"atmos","festive":"party","era":"pop","geo_scene":"misc",
 }
 
 EXEMPT = {f"daily_mix_{i}" for i in range(1,7)} | {"release_radar","discover_weekly","top_songs"}
