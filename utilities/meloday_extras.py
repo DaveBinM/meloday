@@ -190,17 +190,17 @@ _EXTRAS_COVER_COLORS = {
     "rap_rock": ((180, 50, 40), (40, 30, 35)),
     "festival_edm": ((90, 70, 230), (200, 40, 170)),
     "soundtracks": ((200, 170, 90), (30, 40, 80)),
-    "rave_cave": ((40, 230, 120), (15, 12, 30)),
+    "rave_cave": ((40, 230, 140), (90, 22, 150)),          # acid-green grid over UV purple (rave)
     # ---- 7 decade mixes (era) ----
     "decade_60s": ((240, 150, 60), (200, 70, 120)),
     "decade_70s": ((230, 160, 50), (150, 70, 40)),
     "decade_80s": ((255, 70, 180), (60, 200, 230)),
-    "decade_90s": ((120, 90, 200), (40, 160, 150)),
+    "decade_90s": ((230, 60, 180), (40, 200, 200)),   # 90s hot-pink → cyan
     "decade_00s": ((80, 140, 240), (180, 100, 220)),
     "decade_10s": ((40, 200, 190), (255, 110, 120)),
     "decade_20s": ((150, 120, 255), (90, 200, 220)),
     # ---- 3 geo showcase mixes ----
-    "scotland_scene":  ((80, 110, 145), (32, 48, 78)),     # slate-blue (Scottish mist)
+    "scotland_scene":  ((200, 76, 24), (150, 52, 16)),     # Irn-Bru orange (tartan ground)
     "australia_scene": ((225, 125, 60), (140, 55, 50)),    # sunset orange/red
     "london_scene":    ((125, 85, 130), (48, 38, 68)),     # urban purple
     "stormy": ((60, 70, 95), (20, 24, 40)),
@@ -211,12 +211,12 @@ _EXTRAS_COVER_COLORS = {
     "grey_skies": ((130, 135, 145), (64, 67, 76)),
     "windy": ((40, 150, 150), (18, 80, 90)),
     "clear_night": ((30, 40, 80), (150, 160, 200)),
-    "festive": ((200, 40, 50), (30, 120, 60)),
+    "festive": ((186, 34, 44), (20, 92, 52)),     # deep Christmas red → pine green
     "spring_bloom": ((120, 200, 120), (240, 150, 180)),
     "spring_acoustic": ((150, 190, 120), (80, 120, 70)),
     "spring_strings": ((180, 210, 190), (110, 150, 170)),
     "spring_jangle": ((140, 200, 170), (200, 160, 200)),
-    "summer_heat": ((255, 120, 160), (150, 40, 120)),
+    "summer_heat": ((255, 128, 36), (190, 40, 28)),        # blazing hot orange → deep red
     "summer_breeze": ((255, 200, 120), (120, 180, 200)),
     "summer_roadtrip": ((255, 160, 60), (60, 150, 200)),
     "summer_tropical": ((255, 140, 60), (40, 170, 150)),
@@ -237,7 +237,7 @@ _EXTRAS_COVER_COLORS = {
     "vulnerable": ((140, 120, 160), (60, 50, 75)),
     "awe_wonder": ((60, 90, 150), (20, 30, 70)),
     "grief_release": ((70, 80, 100), (30, 35, 50)),
-    "sunrise": ((255, 170, 90), (255, 210, 140)),
+    "sunrise": ((86, 58, 128), (255, 196, 138)),           # deep violet sky → peach/gold horizon
     "blue_hour": ((60, 80, 140), (25, 30, 65)),
     "midnight": ((30, 35, 70), (12, 14, 30)),
     "three_am": ((40, 60, 70), (18, 25, 32)),
@@ -265,13 +265,13 @@ _EXTRAS_COVER_COLORS = {
     "throwback_anthems": ((230, 120, 60), (40, 110, 120)),
     "old_friends": ((230, 160, 80), (130, 80, 40)),
     "campfire": ((220, 110, 50), (90, 40, 25)),
-    "cookout": ((240, 90, 60), (240, 180, 60)),
+    "cookout": ((238, 96, 52), (40, 120, 66)),         # BBQ red → picnic green (more contrast)
     "game_night": ((150, 80, 200), (70, 35, 110)),
     "singalong": ((240, 70, 120), (120, 30, 80)),
     "school_days": ((90, 140, 200), (230, 190, 60)),
     "memory_lane": ((180, 140, 110), (90, 65, 50)),
     "crush": ((255, 130, 170), (180, 60, 120)),
-    "slow_burn": ((150, 40, 70), (60, 20, 40)),
+    "slow_burn": ((176, 66, 40), (58, 22, 28)),            # smouldering ember (smoke family)
     "moving_on": ((210, 130, 70), (60, 80, 120)),
     "loved_up": ((255, 120, 140), (200, 60, 90)),
     "long_distance": ((80, 70, 140), (150, 50, 70)),
@@ -290,11 +290,11 @@ _EXTRAS_COVER_COLORS = {
     "lofi_beats": ((90, 80, 120), (40, 35, 60)),
     "house_party": ((230, 120, 180), (120, 40, 110)),
     "deep_house": ((40, 70, 90), (15, 30, 45)),
-    "techno": ((60, 70, 80), (20, 25, 32)),
+    "techno": ((40, 210, 220), (46, 16, 64)),              # neon cyan circuit traces over deep purple (warehouse)
     "trance": ((60, 120, 220), (20, 40, 130)),
     "dnb": ((40, 180, 160), (15, 70, 70)),
     "bass_drop": ((90, 40, 140), (35, 15, 60)),
-    "uk_garage": ((200, 160, 40), (90, 70, 15)),
+    "uk_garage": ((60, 200, 220), (110, 30, 170)),         # neon club lasers (cyan → purple)
     "synthwave": ((200, 40, 160), (40, 20, 90)),
     "industrial": ((70, 75, 80), (25, 28, 32)),
     "vaporwave": ((255, 140, 200), (90, 60, 160)),
@@ -306,7 +306,7 @@ _EXTRAS_COVER_COLORS = {
     "garage_grunge": ((110, 110, 90), (45, 45, 35)),
     "emo_poppunk": ((210, 60, 120), (90, 25, 70)),
     "britpop_rock": ((90, 160, 200), (35, 70, 110)),
-    "blues_bar": ((150, 90, 40), (70, 40, 18)),
+    "blues_bar": ((168, 104, 48), (34, 30, 52)),           # dim smoky bar — warm amber over indigo
     "psych_haze": ((120, 60, 180), (50, 25, 90)),
     "prog_rock": ((60, 90, 130), (25, 40, 65)),
     "stoner_rock": ((150, 80, 40), (60, 30, 18)),
@@ -402,7 +402,7 @@ _EXTRAS_COVER_COLORS = {
     "moody_mix":          (( 55,  55, 110), ( 25,  25,  70)),  # dark slate blue
     "emotional":          ((180,  70, 110), (110,  30,  65)),  # deep rose-mauve
     "bittersweet":        ((200, 130,  60), (130,  70,  25)),  # warm amber-rust
-    "cathartic":          ((180,  40,  80), (110,  15,  45)),  # crimson-burgundy
+    "cathartic":          (( 44,  70, 128), (224,  96,  72)),  # deep blue → coral (high contrast through smoke)
     "confidence_boost":   ((192, 158,  42), (135, 105,  14)),  # deeper brass-gold
     "empowering":         ((170,  50, 220), (100,  20, 160)),  # bright violet
     "euphoric":           ((240,  80, 140), (170,  20,  90)),  # hot pink-coral
@@ -466,418 +466,331 @@ _EXTRAS_COVER_COLORS = {
 }
 
 
-# Background style per cover key — (style_name, variant_int) or plain string (v=0).
-# 13 style families: geometric, circles, radial, waves, floating_circles, rays,
-#   arc_sweep, aurora, triangles, diamond, starburst, chevrons, spiral
+# Background style per cover key — (style_name, variant_int). Bespoke per playlist: the family
+# reflects the playlist's genre/mood; weather is literal (rain->ripples/rainfall, etc.); variant
+# indices beyond a family's base table are the base pattern h-mirrored (see _render_bg). Generated
+# collision-free + genre-true; guarded by cover_validator.py. daily_mix/release_radar left as-is.
 _COVER_BG_STYLES = {
-    # --- Meloday+ gap-fill mixes ---
-    "situationship": ("waves", 13),
-    "sad_bangers": ("starburst", 3),
-    "power_ballads": ("rays", 14),
-    "restless": ("chevrons", 2),
-    "neoclassical": ("aurora", 2),
-    "yacht_rock": ("waves", 8),
-    "swagger": ("geometric", 2),
-    "chart_pop": ("circles", 5),
-    "dance_pop": ("starburst", 7),
-    "indie_pop": ("floating_circles", 3),
-    "synth_pop": ("waves", 11),
-    # rock / electronic / scores gap-fill
-    "indie_rock": ("triangles", 12),
-    "post_grunge": ("geometric", 9),
-    "rap_rock": ("triangles", 13),
-    "festival_edm": ("starburst", 5),
-    "soundtracks": ("rays", 15),
-    "rave_cave": ("starburst", 6),
-    # ---- 7 decade mixes (era) ----
-    "decade_60s": ("spiral", 3),
-    "decade_70s": ("rays", 5),
-    "decade_80s": ("triangles", 7),
-    "decade_90s": ("geometric", 4),
-    "decade_00s": ("circles", 6),
-    "decade_10s": ("waves", 8),
-    "decade_20s": ("arc_sweep", 2),
-    "stormy": ("aurora", 6),
-    "foggy": ("waves", 6),
-    "snow_day": ("aurora", 1),
-    "heatwave": ("rays", 3),
-    "frosty": ("triangles", 6),
-    "grey_skies": ("waves", 7),
-    "windy": ("chevrons", 2),
-    "clear_night": ("aurora", 8),
-    "festive": ("starburst", 1),
-    "spring_bloom": ("rays", 2),
-    "spring_acoustic": ("waves", 3),
-    "spring_strings": ("aurora", 2),
-    "spring_jangle": ("floating_circles", 2),
-    "summer_heat": ("floating_circles", 4),
-    "summer_breeze": ("rays", 4),
-    "summer_roadtrip": ("chevrons", 6),
-    "summer_tropical": ("starburst", 2),
-    "autumn_leaves": ("waves", 9),
-    "autumn_jazz": ("spiral", 5),
-    "autumn_rain": ("waves", 1),
-    "autumn_embers": ("rays", 13),
-    "winter_frost": ("aurora", 3),
-    "winter_cosy": ("waves", 12),
-    "winter_nights": ("aurora", 7),
-    "winter_jazz": ("spiral", 6),
-    "hopeful": ("rays", 1),
-    "yearning": ("waves", 1),
-    "triumphant": ("rays", 14),
-    "serene": ("aurora", 9),
-    "tender": ("waves", 12),
-    "defiant": ("triangles", 11),
-    "vulnerable": ("waves", 13),
-    "awe_wonder": ("aurora", 10),
-    "grief_release": ("waves", 14),
-    "sunrise": ("rays", 2),
-    "blue_hour": ("aurora", 1),
-    "midnight": ("aurora", 6),
-    "three_am": ("waves", 4),
-    "golden_afternoon": ("rays", 3),
-    "overcast": ("waves", 6),
-    "starlit": ("aurora", 8),
-    "witching_hour": ("spiral", 2),
-    "monday_motivation": ("rays", 4),
-    "midweek_reset": ("waves", 7),
-    "friday_feeling": ("floating_circles", 1),
-    "sunday_scaries": ("waves", 1),
-    "treat_yourself": ("floating_circles", 4),
-    "dinner_party": ("spiral", 5),
-    "housework_hustle": ("floating_circles", 6),
-    "study_session": ("waves", 10),
-    "wind_down": ("aurora", 5),
-    "yoga_stretch": ("aurora", 2),
-    "meditation": ("aurora", 3),
-    "deep_reading": ("waves", 2),
-    "creative_flow": ("spiral", 1),
-    "gaming": ("triangles", 3),
-    "gardening": ("rays", 9),
-    "spa_bath": ("aurora", 4),
-    "power_nap": ("aurora", 7),
-    "throwback_anthems": ("starburst", 1),
-    "old_friends": ("floating_circles", 7),
-    "campfire": ("rays", 13),
-    "cookout": ("rays", 7),
-    "game_night": ("floating_circles", 9),
-    "singalong": ("starburst", 2),
-    "school_days": ("chevrons", 1),
-    "memory_lane": ("waves", 9),
-    "crush": ("floating_circles", 5),
-    "slow_burn": ("waves", 11),
-    "moving_on": ("rays", 11),
-    "loved_up": ("floating_circles", 10),
-    "long_distance": ("waves", 13),
-    "flirty": ("floating_circles", 2),
-    "devotion": ("waves", 12),
-    "wedding_day": ("rays", 1),
-    "funk_disco": ("floating_circles", 1),
-    "neo_soul": ("waves", 2),
-    "motown_soul": ("rays", 2),
-    "after_hours_rnb": ("aurora", 3),
-    "acid_jazz": ("spiral", 1),
-    "boom_bap": ("geometric", 3),
-    "conscious_flow": ("waves", 4),
-    "g_funk": ("rays", 4),
-    "trap_mode": ("triangles", 2),
-    "lofi_beats": ("waves", 5),
-    "house_party": ("floating_circles", 4),
-    "deep_house": ("aurora", 5),
-    "techno": ("spiral", 2),
-    "trance": ("rays", 5),
-    "dnb": ("chevrons", 1),
-    "bass_drop": ("triangles", 3),
-    "uk_garage": ("floating_circles", 6),
-    "synthwave": ("chevrons", 2),
-    "industrial": ("triangles", 4),
-    "vaporwave": ("aurora", 6),
-    "downtempo": ("waves", 6),
-    "hyperpop": ("starburst", 1),
-    "classic_rock": ("rays", 6),
-    "heavy_riffs": ("triangles", 5),
-    "punk_energy": ("chevrons", 3),
-    "garage_grunge": ("geometric", 5),
-    "emo_poppunk": ("chevrons", 4),
-    "britpop_rock": ("floating_circles", 7),
-    "blues_bar": ("waves", 7),
-    "psych_haze": ("aurora", 7),
-    "prog_rock": ("diamond", 1),
-    "stoner_rock": ("spiral", 3),
-    "reggae_dub": ("waves", 8),
-    "afrobeat": ("rays", 7),
-    "latin_heat": ("starburst", 2),
-    "bossa_samba": ("waves", 9),
-    "celtic_folk": ("triangles", 6),
-    "ska": ("chevrons", 5),
-    "bebop": ("diamond", 2),
-    "swing_bigband": ("rays", 8),
-    "smooth_jazz": ("waves", 10),
-    "country_roads": ("rays", 9),
-    "outlaw_country": ("geometric", 6),
-    "bluegrass": ("triangles", 7),
-    "rockabilly_surf": ("chevrons", 6),
-    "cinematic_epic": ("rays", 10),
-    "ambient_drift": ("aurora", 8),
-    "post_rock": ("diamond", 3),
-    "chiptune": ("geometric", 7),
-    "gospel": ("rays", 1),
-    "glasgow_folk": ("waves", 3),
-    "glasgow_dream": ("aurora", 1),
-    "glasgow_indie": ("floating_circles", 2),
-    "glasgow_soul": ("rays", 3),
-    "glasgow_postrock": ("diamond", 4),
-    "glasgow_anthems": ("rays", 11),
-    "glasgow_synth": ("chevrons", 7),
-    "glasgow_postpunk": ("triangles", 1),
-    "glasgow_house": ("floating_circles", 3),
-    "glasgow_underground": ("spiral", 4),
-    "glasgow_bass": ("starburst", 3),
-    "glasgow_late": ("waves", 11),
-    "london_dub": ("waves", 1),
-    "london_soul": ("aurora", 2),
-    "london_jazz": ("spiral", 5),
-    "london_triphop": ("waves", 4),
-    "london_mod": ("chevrons", 8),
-    "london_britpop": ("floating_circles", 5),
-    "london_indie": ("triangles", 8),
-    "london_calling": ("chevrons", 9),
-    "london_garage": ("floating_circles", 8),
-    "london_grime": ("triangles", 9),
-    "london_dubstep": ("triangles", 10),
-    "london_jungle": ("chevrons", 10),
-    "melbourne_folk": ("waves", 2),
-    "melbourne_dream": ("aurora", 4),
-    "melbourne_soul": ("spiral", 6),
-    "melbourne_sunset": ("rays", 12),
-    "melbourne_indie": ("floating_circles", 9),
-    "melbourne_pubrock": ("rays", 13),
-    "melbourne_hiphop": ("geometric", 1),
-    "melbourne_postpunk": ("triangles", 2),
-    "melbourne_psych": ("spiral", 7),
-    "melbourne_garagepunk": ("chevrons", 11),
-    "melbourne_club": ("floating_circles", 10),
-    "melbourne_techno": ("spiral", 8),
-    # Non-mood extras — distinct styles, default variant
-    "on_repeat":           ("floating_circles", 0),  # circular/looping
-    "repeat_rewind":       ("triangles",        0),  # angular rewind feel
-    "rediscovery":         ("aurora",           0),  # dreamy re-emergence
-    "deep_cuts":           ("waves",            0),  # deep layered bands
-    "all_time_favourites": ("rays",             0),  # radiating gold star
-    "time_capsule":        ("circles",          0),  # concentric radar rings
-    "time_machine":        ("spiral",           0),  # time vortex
-    "discover_weekly":     ("radial",           0),  # warm centre glow
-    # ----- ENERGY -----
-    "workout":          ("starburst",       0),  # 14-ray tight centre burst
-    "running":          ("geometric",       1),  # flat 12° speed strips
-    "empowering":       ("rays",            1),  # 11 rays rising from bottom
-    "confidence_boost": ("geometric",       2),  # 3 bold strips at 38°
-    "cathartic":        ("triangles",       1),  # downward-pointing release
-    "angst_mix":        ("rays",            2),  # tight corner rays, 60° spread
-    "celebration":      ("floating_circles",1),  # confetti scattered circles
-    "euphoric":         ("starburst",       1),  # 18 rays, peak-bliss burst
-    # ----- CALM -----
-    "chill":            ("waves",           1),  # 3 wide gentle rolling waves
-    "sleep":            ("waves",           2),  # 2 barely-visible flat bands
-    "daydreaming":      ("aurora",          1),  # 5 slow dreamy ribbons
-    "lazy_sunday":      ("floating_circles",2),  # 4 large widely-spaced circles
-    "sunday_morning":   ("radial",          1),  # warm glow from lower centre
-    "deep_work":        ("circles",         4),  # 12 tight focus rings
-    "evening_unwind":   ("arc_sweep",       1),  # arcs from left (unwinding)
-    "folk_acoustic":    ("geometric",       3),  # simple 3 strips at 20°
-    "melancholy":       ("waves",           3),  # 6 narrow tight sad waves
-    "emotional":        ("aurora",          2),  # 8 intense fast ribbons
-    # ----- UPBEAT -----
-    "happy":            ("floating_circles",0),  # 7 classic joyful circles
-    "sunny":            ("starburst",       2),  # 16-ray sun
-    "beach_vibes":      ("waves",           8),  # 4 rolling ocean waves
-    "fresh_start":      ("chevrons",        0),  # 4 forward V-shapes
-    "spring_mix":       ("floating_circles",3),  # many small buds, upper half
-    "brunch_mix":       ("geometric",       4),  # 4 airy light strips at 25°
-    "weekend_mix":      ("arc_sweep",       2),  # arcs sweeping from top
-    "cooking_mix":      ("spiral",          0),  # 9-arc clockwise spiral
-    "summer_evening":   ("aurora",          3),  # 4 wide slow warm ribbons
-    # ----- ROMANTIC -----
-    "romantic_mix":     ("arc_sweep",       0),  # classic right-sweep arcs
-    "modern_romance":   ("chevrons",        1),  # 6 contemporary V-shapes
-    "slow_dance":       ("spiral",          1),  # 8-arc counter-clockwise
-    "love_songs":       ("waves",           4),  # 5 lyrical flowing waves
-    "first_date":       ("floating_circles",4),  # nervous scattered circles
-    "acoustic_romance": ("geometric",       5),  # 2 minimal gentle strips
-    "indie_romance":    ("triangles",       2),  # 3 asymmetric alt triangles
-    "late_night_romance":("circles",        2),  # off-centre left rings
-    "piano_romance":    ("radial",          3),  # centred spotlight glow
-    "strings_romance":  ("aurora",          4),  # 6 classical flow ribbons
-    "string_quartet":   ("diamond",         1),  # 6 diamonds rotated 18°
-    # ----- ATMOSPHERIC -----
-    "golden_hour":      ("aurora",          5),  # 4 wide slow golden bands
-    "sunset_mix":       ("radial",          2),  # glow from horizon bottom
-    "autumn_mix":       ("triangles",       3),  # falling leaf triangles
-    "winter_mix":       ("circles",         3),  # 7 rings from upper centre
-    "cosy":             ("waves",           7),  # 3 enveloping warm waves
-    "main_character":   ("rays",            3),  # 8 rays, top-centre spotlight
-    "morning":          ("starburst",       3),  # 10-ray gentle sunrise
-    # ----- DRIVING / ACTIVITY -----
-    "driving_mix":      ("triangles",       5),  # forward-pointing arrows
-    "night_drive":      ("rays",            5),  # 7 rays from left (headlights)
-    "driving_singalong":("floating_circles",5),  # carefree weighted-right
-    "road_trip":        ("chevrons",        2),  # 8 highway arrow chevrons
-    "commute_mix":      ("geometric",       6),  # 6 narrow regular strips
-    "walking_mix":      ("waves",           5),  # 5 steady even-spaced waves
-    # ----- DINNER / EVENING -----
-    "dinner":           ("diamond",         0),  # 6 classic diamonds
-    "jazz_dinner":      ("spiral",          2),  # 12-arc tight jazz spiral
-    "romantic_jazz":    ("arc_sweep",       4),  # smooth bottom-curve sweep
-    "candlelight":      ("radial",          4),  # candle glow just below centre
-    "date_night":       ("diamond",         2),  # 8 tighter diamonds
-    "romantic_dinner":  ("aurora",          6),  # 5 warm atmospheric ribbons
-    # ----- FOCUS / MOOD -----
-    "focus":            ("circles",         1),  # 14 tight centred focus rings
-    "dreamy_mix":       ("aurora",          7),  # 7 rapid dreamy ribbons
-    "moody_mix":        ("geometric",       7),  # 4 heavy dark strips at 30°
-    "bittersweet":      ("waves",           6),  # 4 irregular asymmetric waves
-    "heartbreak":       ("triangles",       4),  # shattered small triangles
-    "rainy_day":        ("ripples",         0),  # concentric ripples where drops land
-    # ----- MEMORY / LATE NIGHT -----
-    "nostalgia_mix":    ("circles",         5),  # off-centre memory rings
-    "synthpop_romance": ("geometric",       8),  # steep 52° 80s strips
-    "late_night":       ("radial",          5),  # dark ambient off-centre glow
-    # ----- PARTY / SOCIAL -----
-    "party":            ("starburst",       4),  # 22-ray max party burst
-    "friday_night":     ("rays",            4),  # 10 rays, corner night energy
-    "pre_party":        ("floating_circles",6),  # building anticipation circles
-    "party_throwback":  ("circles",         6),  # off-centre right throwback
-    "after_dark":       ("diamond",         3),  # 3 large bold club diamonds
-    "after_work":       ("triangles",       6),  # sharp vertical slash
-    "cool_down":        ("waves",           9),  # 4 measured cooling waves
+    # --- electronic ---
+    "after_dark": ("laser_fan", 0),
+    "bass_drop": ("concentric_pulse", 0),
+    "dance_pop": ("disco_ball", 0),
+    "decade_00s": ("spiral", 0),
+    "decade_20s": ("equalizer", 1),
+    "decade_80s": ("concentric_pulse", 1),
+    "deep_house": ("circuit", 1),
+    "dnb": ("spiral", 1),
+    "festival_edm": ("starburst", 1),
+    "glasgow_bass": ("waveform", 0),
+    "glasgow_house": ("laser_fan", 1),
+    "glasgow_synth": ("grid_perspective", 0),
+    "glasgow_underground": ("grid_perspective", 1),
+    "house_party": ("equalizer", 2),
+    "london_dubstep": ("waveform", 1),
+    "london_garage": ("laser_fan", 2),
+    "london_jungle": ("waveform", 2),
+    "melbourne_club": ("grid_perspective", 2),
+    "melbourne_techno": ("grid_perspective", 3),
+    "rave_cave": ("grid_perspective", 4),
+    "synth_pop": ("waveform", 3),
+    "synthwave": ("grid_perspective", 5),
+    "techno": ("circuit", 0),
+    "time_machine": ("concentric_pulse", 2),
+    "trance": ("circuit", 2),
+    "uk_garage": ("laser_fan", 3),
+    "vaporwave": ("grid_perspective", 6),
+    # --- hiphop ---
+    "after_hours_rnb": ("lounge", 0),
+    "boom_bap": ("cassette", 0),
+    "conscious_flow": ("halftone", 0),
+    "g_funk": ("brushstrokes", 0),
+    "london_grime": ("cityscape", 0),
+    "melbourne_hiphop": ("cassette", 1),
+    "swagger": ("cassette", 2),
+    "trap_mode": ("waveform", 4),
+    # --- soul_funk ---
+    "decade_60s": ("circles", 0),
+    "funk_disco": ("disco_ball", 1),
+    "glasgow_soul": ("disco_ball", 2),
+    "gospel": ("stained_glass", 0),
+    "london_soul": ("disco_ball", 3),
+    "melbourne_soul": ("disco_ball", 4),
+    "motown_soul": ("disco_ball", 5),
+    "neo_soul": ("vinyl_grooves", 1),
+    "yacht_rock": ("sun_horizon", 0),
+    # --- rock ---
+    "autumn_embers": ("low_poly", 0),
+    "britpop_rock": ("mod_target", 0),
+    "classic_rock": ("amp_stack", 0),
+    "emo_poppunk": ("guitar", 0),
+    "garage_grunge": ("amp_stack", 1),
+    "glasgow_anthems": ("amp_stack", 2),
+    "glasgow_indie": ("guitar", 1),
+    "indie_rock": ("guitar", 2),
+    "london_britpop": ("mod_target", 1),
+    "london_indie": ("guitar", 3),
+    "melbourne_indie": ("guitar", 4),
+    "melbourne_psych": ("prism", 0),
+    "melbourne_pubrock": ("amp_stack", 3),
+    "post_grunge": ("triangles", 0),
+    "power_ballads": ("smoke", 0),
+    "prog_rock": ("prism", 1),
+    "psych_haze": ("geometric", 0),
+    "rockabilly_surf": ("amp_stack", 4),
+    "stoner_rock": ("desert", 0),
+    # --- metal_punk ---
+    "defiant": ("amp_stack", 5),
+    "glasgow_postpunk": ("guitar", 5),
+    "heavy_riffs": ("amp_stack", 6),
+    "industrial": ("shards", 1),
+    "london_calling": ("guitar", 6),
+    "melbourne_garagepunk": ("guitar", 7),
+    "melbourne_postpunk": ("guitar", 8),
+    "punk_energy": ("guitar", 9),
+    "rap_rock": ("shards", 0),
+    # --- jazz ---
+    "acid_jazz": ("jazz_club", 0),
+    "autumn_jazz": ("jazz_club", 1),
+    "bebop": ("jazz_club", 2),
+    "blues_bar": ("smoke", 1),
+    "bossa_samba": ("jazz_club", 3),
+    "dinner": ("candle_glow", 0),
+    "jazz_dinner": ("jazz_club", 4),
+    "london_jazz": ("jazz_club", 5),
+    "romantic_jazz": ("jazz_club", 6),
+    "smooth_jazz": ("jazz_club", 7),
+    "swing_bigband": ("brushstrokes", 1),
+    "winter_jazz": ("jazz_club", 8),
+    # --- classical ---
+    "neoclassical": ("strings", 0),
+    "spring_strings": ("strings", 1),
+    "string_quartet": ("strings", 2),
+    # --- folk ---
+    "acoustic_romance": ("mountains", 0),
+    "autumn_leaves": ("woodgrain", 0),
+    "autumn_mix": ("mountains", 1),
+    "bluegrass": ("woodgrain", 1),
+    "campfire": ("pine_forest", 0),
+    "celtic_folk": ("pine_forest", 1),
+    "cooking_mix": ("gingham", 0),
+    "country_roads": ("mountains", 2),
+    "gardening": ("blossom", 0),
+    "glasgow_folk": ("meadow", 0),
+    "melbourne_folk": ("meadow", 1),
+    "old_friends": ("woodgrain", 2),
+    "outlaw_country": ("desert", 1),
+    "road_trip": ("open_road", 0),
+    "spring_acoustic": ("meadow", 2),
+    "spring_bloom": ("meadow", 3),
+    "spring_mix": ("meadow", 4),
+    "summer_breeze": ("pine_forest", 3),
+    "summer_roadtrip": ("open_road", 1),
+    # --- latin_global ---
+    "afrobeat": ("kente", 0),
+    "beach_vibes": ("beach", 0),
+    "decade_70s": ("vinyl_grooves", 0),
+    "latin_heat": ("palm_sunburst", 1),
+    "london_dub": ("beach", 1),
+    "melbourne_sunset": ("palm_sunburst", 0),
+    "reggae_dub": ("tropical_leaves", 0),
+    "summer_tropical": ("beach", 2),
+    # --- chiptune ---
+    "chiptune": ("pixel_grid", 0),
+    "gaming": ("pixel_grid", 1),
+    # --- cinematic ---
+    "cinematic_epic": ("film_strip", 0),
+    "main_character": ("film_strip", 1),
+    "soundtracks": ("film_strip", 2),
+    # --- pop ---
+    "brunch_mix": ("gingham", 1),
+    "chart_pop": ("floating_circles", 0),
+    "decade_10s": ("equalizer", 0),
+    "decade_90s": ("diamond", 0),
+    "fresh_start": ("halftone", 1),
+    "happy": ("floating_circles", 1),
+    "hyperpop": ("pixel_grid", 2),
+    "indie_pop": ("diamond", 1),
+    "london_mod": ("mod_target", 2),
+    "sad_bangers": ("halftone", 2),
+    "school_days": ("cassette", 3),
+    "ska": ("checkerboard", 0),
+    "spring_jangle": ("blossom", 1),
+    "throwback_anthems": ("cassette", 4),
+    # --- ambient ---
+    "ambient_drift": ("cosmos", 0),
+    "awe_wonder": ("cosmos", 1),
+    "daydreaming": ("clouds", 0),
+    "deep_cuts": ("aurora", 0),
+    "downtempo": ("starfield", 1),
+    "dreamy_mix": ("clouds", 1),
+    "evening_unwind": ("aurora", 1),
+    "glasgow_dream": ("clouds", 2),
+    "glasgow_late": ("smoke", 2),
+    "glasgow_postrock": ("crescendo", 0),
+    "late_night": ("lounge", 1),
+    "lofi_beats": ("cassette", 5),
+    "london_triphop": ("smoke", 3),
+    "melbourne_dream": ("clouds", 3),
+    "midnight": ("moonlight", 0),
+    "night_drive": ("cosmos", 2),
+    "post_rock": ("crescendo", 1),
+    "rediscovery": ("starfield", 2),
+    "starlit": ("starfield", 0),
+    "winter_nights": ("moonlight", 1),
+    # --- atmos ---
+    "autumn_rain": ("rainfall", 0),
+    "blue_hour": ("clouds", 4),
+    "clear_night": ("moonlight", 2),
+    "foggy": ("smoke", 4),
+    "frosty": ("snowfall", 0),
+    "golden_hour": ("sun_horizon", 1),
+    "grey_skies": ("clouds", 5),
+    "heatwave": ("sun_horizon", 2),
+    "morning": ("waves", 0),
+    "overcast": ("clouds", 6),
+    "rainy_day": ("ripples", 0),
+    "snow_day": ("snowfall", 1),
+    "stormy": ("clouds", 7),
+    "summer_evening": ("waves", 1),
+    "sunny": ("starburst", 0),
+    "sunrise": ("sun_horizon", 3),
+    "sunset_mix": ("sun_horizon", 4),
+    "windy": ("clouds", 8),
+    "winter_frost": ("snowfall", 2),
+    "winter_mix": ("rainfall", 1),
+    # --- romance ---
+    "candlelight": ("candle_glow", 1),
+    "crush": ("arc_sweep", 0),
+    "date_night": ("arc_sweep", 1),
+    "devotion": ("arc_sweep", 2),
+    "first_date": ("brushstrokes", 2),
+    "flirty": ("diamond", 2),
+    "indie_romance": ("floating_circles", 2),
+    "late_night_romance": ("bokeh", 0),
+    "long_distance": ("candle_glow", 3),
+    "love_songs": ("bokeh", 1),
+    "loved_up": ("bokeh", 3),
+    "modern_romance": ("bokeh", 2),
+    "piano_romance": ("arc_sweep", 3),
+    "romantic_dinner": ("candle_glow", 2),
+    "romantic_mix": ("brushstrokes", 3),
+    "slow_burn": ("smoke", 5),
+    "slow_dance": ("diamond", 3),
+    "strings_romance": ("strings", 3),
+    "synthpop_romance": ("floating_circles", 3),
+    "wedding_day": ("wedding_rings", 0),
+    # --- party ---
+    "all_time_favourites": ("circles", 1),
+    "cookout": ("gingham", 2),
+    "dinner_party": ("gingham", 3),
+    "euphoric": ("confetti", 2),
+    "festive": ("holiday_lights", 0),
+    "friday_feeling": ("starburst", 2),
+    "friday_night": ("disco_ball", 6),
+    "game_night": ("circles", 2),
+    "party_throwback": ("confetti", 3),
+    "singalong": ("starburst", 3),
+    "summer_heat": ("sun_horizon", 5),
+    "treat_yourself": ("circles", 3),
+    "weekend_mix": ("confetti", 4),
+    # --- energetic ---
+    "celebration": ("confetti", 0),
+    "commute_mix": ("traffic", 0),
+    "confidence_boost": ("lightning", 0),
+    "driving_mix": ("open_road", 2),
+    "driving_singalong": ("traffic", 1),
+    "empowering": ("lightning", 1),
+    "housework_hustle": ("shards", 2),
+    "monday_motivation": ("lightning", 2),
+    "party": ("laser_fan", 4),
+    "running": ("motion", 0),
+    "triumphant": ("lightning", 3),
+    "walking_mix": ("motion", 1),
+    "workout": ("motion", 2),
+    # --- emotional ---
+    "angst_mix": ("low_poly", 1),
+    "bittersweet": ("triangles", 1),
+    "cathartic": ("smoke", 6),
+    "emotional": ("low_poly", 2),
+    "grief_release": ("rainfall", 2),
+    "heartbreak": ("waves", 2),
+    "hopeful": ("triangles", 2),
+    "melancholy": ("low_poly", 3),
+    "memory_lane": ("cassette", 6),
+    "moody_mix": ("rainfall", 3),
+    "moving_on": ("waves", 3),
+    "nostalgia_mix": ("triangles", 3),
+    "restless": ("starfield", 3),
+    "situationship": ("brushstrokes", 4),
+    "sunday_scaries": ("low_poly", 4),
+    "tender": ("rainfall", 4),
+    "three_am": ("moonlight", 3),
+    "vulnerable": ("waves", 4),
+    "witching_hour": ("triangles", 4),
+    "yearning": ("moonlight", 4),
+    # --- calm ---
+    "after_work": ("aurora", 2),
+    "chill": ("aurora", 3),
+    "cool_down": ("woodgrain", 3),
+    "cosy": ("pine_forest", 2),
+    "creative_flow": ("starfield", 4),
+    "deep_reading": ("grid_paper", 0),
+    "deep_work": ("grid_paper", 1),
+    "focus": ("grid_paper", 2),
+    "golden_afternoon": ("sun_horizon", 6),
+    "lazy_sunday": ("aurora", 4),
+    "meditation": ("zen", 0),
+    "midweek_reset": ("woodgrain", 4),
+    "power_nap": ("starfield", 5),
+    "serene": ("aurora", 5),
+    "spa_bath": ("zen", 1),
+    "study_session": ("grid_paper", 3),
+    "sunday_morning": ("clouds", 9),
+    "wind_down": ("zen", 2),
+    "winter_cosy": ("woodgrain", 5),
+    "yoga_stretch": ("zen", 3),
+    # --- place_scot ---
+    "scotland_scene": ("tartan", 0),
+    # --- place_lon ---
+    "london_scene": ("cityscape", 1),
+    # --- place_aus ---
+    "australia_scene": ("sun_horizon", 7),
+    # --- misc ---
+    "discover_weekly": ("radial", 0),
+    "folk_acoustic": ("acoustic_guitar", 0),
+    "on_repeat": ("chevrons", 0),
+    "pre_party": ("confetti", 1),
+    "repeat_rewind": ("geometric", 1),
+    "sleep": ("moonlight", 5),
+    "time_capsule": ("radial", 1),
 }
 
 # Per-profile icon overlay — drawn on top of the background before text.
 # Keys not listed here get no icon (plain background only).
 _PROFILE_ICON = {
-    # --- Meloday+ gap-fill mixes: glyph only where a direct symbol fits (6 of 11);
-    # situationship/restless/dance_pop/indie_pop/synth_pop intentionally have none (gradient + bg only) ---
-    "sad_bangers": "nightlife",
-    "power_ballads": "whatshot",
-    "neoclassical": "piano",
-    "yacht_rock": "beach_access",
-    "swagger": "mic",
-    "chart_pop": "trending_up",
-    # ---- 7 decade mixes (era) ----
-    "decade_60s": "history",
-    "decade_70s": "replay",
-    "decade_80s": "music_note_2",
-    "decade_90s": "headphones",
-    "decade_00s": "graphic_eq",
-    "decade_10s": "music_note",
-    "decade_20s": "star_shine",
-    # ---- 3 geo showcase mixes ----
-    "scotland_scene":  "travel_explore",
-    "australia_scene": "travel_explore",
-    "london_scene":    "travel_explore",
-    "stormy": "thunderstorm",
-    "foggy": "foggy",
-    "snow_day": "snowflake",
-    "frosty": "ac_unit",
-    "grey_skies": "cloud",
-    "windy": "air",
-    "clear_night": "moon_stars",
-    "festive": "celebration",
-    "sunrise": "wb_twilight",
-    "study_session": "menu_book",
-    "meditation": "self_improvement",
-    "deep_reading": "menu_book",
-    "gaming": "stadia_controller",
-    "gardening": "potted_plant",
-    "spa_bath": "hot_tub",
-    "power_nap": "bedtime",
-    "singalong": "mic",
-    "boom_bap": "mic",
-    "conscious_flow": "mic",
-    "g_funk": "mic",
-    "trap_mode": "mic",
-    "lofi_beats": "headphones",
-    "cinematic_epic": "movie",
-    "soundtracks": "movie",
-    "chiptune": "stadia_controller",
-    "london_grime": "mic",
-    "melbourne_hiphop": "mic",
-    # Romance / love — favourite hearts; arrangement (solitary/pair/trio/cluster) via _HEART_MODE
-    "romantic_mix":      "favorite",
-    "modern_romance":    "favorite",
-    "late_night_romance":"favorite",
-    "romantic_dinner":   "wine_bar",
-    "love_songs":        "favorite",
-    "slow_dance":        "favorite",
-    "date_night":        "wine_bar",
-    "first_date":        "favorite",
-    "acoustic_romance":  "favorite",
-    "indie_romance":     "favorite",
-    "synthpop_romance":  "favorite",
-    "heartbreak":        "heart_broken",
-    # Musical / instrumental — note glyph clusters mix music_note + music_note_2
-    "piano_romance":     "piano",
-    "romantic_jazz":     "music_note",
-    "string_quartet":    "music_note",
-    "strings_romance":   "music_note",
-    "folk_acoustic":     "music_note",
-    # Drinks / food
-    "dinner":            "restaurant",
-    "jazz_dinner":       "restaurant",
-    "cosy":              "local_cafe",
-    "brunch_mix":        "brunch_dining",  # rotates with bakery_dining / egg_alt
-    # Night / sleep
-    "sleep":             "moon_stars",
-    "late_night":        "partly_cloudy_night",
-    # Weather / atmosphere
-    "rainy_day":         "rainy",
-    "melancholy":        "water_drop",
-    "dreamy_mix":        "cloud",
-    # Sun / day
-    "sunny":             "wb_sunny",
-    "golden_hour":       "wb_sunny",
-    "sunday_morning":    "wb_sunny",
-    "summer_evening":    "wb_sunny",
-    "sunset_mix":        "wb_sunny",
-    "fresh_start":       "clear_day",
-    "beach_vibes":       "beach_access",
-    # Season
-    "winter_mix":        "snowflake",
-    "autumn_mix":        "forest",
-    "spring_mix":        "local_florist",
-    # Energy / power
-    "workout":           "fitness_center",
-    "running":           "directions_run",
-    "confidence_boost":  "trending_up",
-    # Calm / dreamy / focus
-    "daydreaming":       "cloud",
-    "lazy_sunday":       "cloud",
-    "evening_unwind":    "self_improvement",
-    "cool_down":         "spa",
-    # Party / celebration
-    "party":             "celebration",
-    "pre_party":         "nightlife",
-    "friday_night":      "nightlife",
-    "celebration":       "flare",          # cluster of flares
-    "party_throwback":   "festival",
-    "euphoric":          "festival",
-    "happy":             "mood",
-    "weekend_mix":       "weekend",
-    # Driving / activity
-    "driving_mix":       "directions_car",
-    "commute_mix":       "route",
-    "driving_singalong": "directions_car",
-    "road_trip":         "route",
-    "walking_mix":       "directions_walk",
-    # Spotlight
-    "main_character":    "star_shine",
-    # Non-mood extras (concept glyphs)
-    "on_repeat":         "repeat",
-    "repeat_rewind":     "replay",
-    "release_radar":     "radar",
-    "rediscovery":       "travel_explore",
-    "discover_weekly":   "explore",
-    "time_capsule":      "history",
+    # Per-profile glyph — restrained: only where a clear literal symbol fits AND it doesn't
+    # compete with the art. Romance hearts via _HEART_MODE; date_night/brunch_mix rotate.
+    # autumn_leaves uses the multicolour falling-leaves treatment in _draw_icon_overlay.
+    "sad_bangers": "nightlife", "decade_80s": "music_note_2", "decade_10s": "music_note",
+    "foggy": "foggy", "snow_day": "snowflake",
+    "frosty": "ac_unit", "study_session": "menu_book", "deep_reading": "menu_book",
+    "gaming": "stadia_controller", "power_nap": "bedtime", "chiptune": "stadia_controller",
+    "romantic_mix": "favorite", "modern_romance": "favorite", "late_night_romance": "favorite",
+    "love_songs": "favorite", "slow_dance": "favorite", "date_night": "wine_bar",
+    "first_date": "favorite", "acoustic_romance": "favorite", "indie_romance": "favorite",
+    "synthpop_romance": "favorite", "heartbreak": "heart_broken",
+    "brunch_mix": "brunch_dining", "rainy_day": "rainy",
+    "fresh_start": "clear_day",
+    "winter_mix": "snowflake", "spring_mix": "local_florist", "running": "directions_run",
+    "lazy_sunday": "cloud", "evening_unwind": "self_improvement", "cool_down": "spa",
+    "pre_party": "nightlife", "friday_night": "nightlife", "celebration": "flare",
+    "weekend_mix": "weekend", "commute_mix": "route", "walking_mix": "directions_walk",
+    "on_repeat": "repeat", "repeat_rewind": "replay", "release_radar": "radar",
+    "rediscovery": "travel_explore", "discover_weekly": "explore", "time_capsule": "history",
+    "crush": "favorite", "flirty": "favorite", "devotion": "favorite",
+    "loved_up": "favorite", "long_distance": "favorite", "autumn_leaves": "eco",
+    "heatwave": "thermostat", "cooking_mix": "skillet",
+    "gospel": "church",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -894,6 +807,8 @@ _ICON_DEFAULT_META = {"extent": 205, "base_scale": 1.0, "tilt": 10, "anchor": (0
 _ICON_META = {
     # Music profiles render a composed note cluster (mixes music_note + music_note_2).
     "music_note":          {"kind": "cluster", "extent": 215},
+    "beach_access":        {"tilt_bias": -16, "tilt": 5},   # umbrella leans clockwise
+    "piano":               {"extent": 215},                 # a touch larger so the keys read
     # Concept / informational glyphs — upright, a touch more central.
     "repeat":              {"tilt": 0, "anchor": (0.50, 0.42)},
     "replay":              {"tilt": 0, "anchor": (0.50, 0.42)},
@@ -910,19 +825,24 @@ _ICON_META = {
 # Per-profile overrides (merged over _ICON_META) — a deliberate placement spread across
 # same-glyph siblings (sun / moon profiles) or a bespoke size.
 _ICON_PROFILE_OVERRIDE = {
+    # round 3: keep glyphs clear of busy art (smaller / moved off the focal element)
+    "first_date":     {"anchor": (0.30, 0.30), "base_scale": 0.66},   # hearts small, off the candle
+    "heatwave":       {"anchor": (0.30, 0.28), "base_scale": 0.70},   # smaller, higher
+    "long_distance":  {"anchor": (0.30, 0.27), "base_scale": 0.66},   # heart up-left, off the candle flame
+    "decade_10s":     {"anchor": (0.50, 0.15), "base_scale": 0.55},   # notes up high, clear of the EQ bars
+    "repeat_rewind":  {"anchor": (0.74, 0.42)},                       # glyph to the right
+    "rediscovery":    {"anchor": (0.75, 0.62), "base_scale": 0.50},   # small, lower-right (declutter cosmos)
     "main_character": {"anchor": (0.50, 0.37), "base_scale": 1.12},
     "night_drive":    {"anchor": (0.62, 0.40)},
     "late_night":     {"anchor": (0.62, 0.41)},
     "sleep":          {"anchor": (0.50, 0.38)},
-    "sunny":          {"anchor": (0.58, 0.37)},
     "golden_hour":    {"anchor": (0.40, 0.37)},
     "sunset_mix":     {"anchor": (0.50, 0.36)},
-    "beach_vibes":    {"anchor": (0.60, 0.37)},
     "summer_evening": {"anchor": (0.40, 0.37)},
     # Release Radar — small, lower-right quadrant, semi-transparent, no shadow.
     "release_radar":  {"anchor": (0.74, 0.60), "base_scale": 0.45, "alpha": 120, "shadow": False},
     # Rainy Day — cloud up in the top-right, mirrored (rain falls left), ripples drawn below it.
-    "rainy_day":      {"anchor": (0.72, 0.31), "flip": True},
+    "rainy_day":      {"anchor": (0.70, 0.25), "flip": True, "base_scale": 0.86},  # cloud up top; ripples land low
     # Party — Pre-Party lower-left, Friday Night lower-right (with scattered music notes).
     "pre_party":      {"anchor": (0.30, 0.62)},
     "friday_night":   {"anchor": (0.70, 0.62)},
@@ -1008,6 +928,7 @@ _ICON_COLOR = {
     "forest":                (220, 138,  66),
     "local_florist":         (246, 158, 196),
     "beach_access":          (255, 178, 102),
+    "sailing":               (222, 230, 240),   # white sail / nautical
     # Food / drink — warm creams
     "local_cafe":            (226, 196, 150),   # latte
     "restaurant":            (238, 200, 150),
@@ -1017,12 +938,23 @@ _ICON_COLOR = {
     # Music — warm cream accent
     "music_note":            (244, 230, 206),
     "music_note_2":          (244, 230, 206),
-    "piano":                 (238, 232, 222),
+    "piano":                 (246, 246, 250),   # white keys (two-tone detail draws the black keys)
     # Party / celebration — vivid festive
     "celebration":           (255, 140, 175),
     "festival":              (255, 150, 165),
     "nightlife":             (236, 150, 210),
     "flare":                 (255, 214, 130),   # festive gold spark
+    # --- added in the cover redesign ---
+    "eco":                   (130, 200,  96),   # leaf green
+    "bolt":                  (255, 214,  90),   # electric yellow
+    "palette":               (236, 210, 170),   # warm cream
+    "casino":                (236, 110, 120),   # festive red
+    "church":                (236, 206, 142),   # warm gold
+    "thermostat":            (255, 150,  80),   # heat orange
+    "album":                 (226, 216, 202),   # vinyl cream
+    "redeem":                (242, 152, 182),   # gift pink
+    "trophy":                (255, 210, 110),   # gold
+    "outdoor_grill":         (246, 142,  82),   # grill orange
 }
 
 # Per-profile icon-colour overrides (mood nuance where a shared glyph serves different moods).
@@ -1079,6 +1011,32 @@ _TOP_SONGS_STYLE_POOL = [
     ("starburst",        4),
     ("chevrons",         2),
     ("spiral",           2),
+]
+
+# Top Songs [Year] — 20 curated, mutually-distinct covers ((top, bottom), style, variant), indexed
+# by `year % 20`. WHY curated (not random per year as before): guarantees 20 visibly-different,
+# individually-bold "year in review" covers that never collide; glyph-free (the big year is the hero).
+_TOP_SONGS_COVERS = [
+    (((220,  60,  60), (120, 20, 30)), "starburst",        0),   # crimson burst
+    (((235, 130,  40), (150, 50, 10)), "sun_horizon",      2),   # orange sunset
+    (((240, 190,  50), (170, 110, 10)), "confetti",        0),   # gold confetti
+    (((150, 200,  60), ( 60, 120, 30)), "equalizer",       0),   # lime EQ
+    (((60,  200, 120), ( 20, 100, 60)), "circuit",         0),   # green circuit
+    (((40,  200, 200), ( 15,  90, 110)), "concentric_pulse", 0), # teal pulse
+    (((60,  150, 235), ( 20,  60, 150)), "grid_perspective", 0), # blue grid
+    (((120, 110, 235), ( 50,  40, 150)), "starfield",      0),   # indigo starfield
+    (((180,  90, 220), ( 90,  30, 140)), "laser_fan",      0),   # violet lasers
+    (((230,  80, 200), (130,  20, 120)), "halftone",       0),   # magenta halftone
+    (((240,  90, 150), (150,  30,  90)), "waveform",       0),   # pink waveform
+    (((255, 120,  90), (170,  50,  50)), "triangles",      0),   # coral triangles
+    (((210, 150,  70), (110,  70,  30)), "vinyl_grooves",  0),   # amber vinyl
+    (((90,  190, 160), ( 30, 100,  90)), "mountains",      0),   # mint mountains
+    (((230, 170,  60), ( 60,  80, 140)), "marquee_lights", 0),   # gold marquee
+    (((200,  70, 110), ( 70,  25,  60)), "spiral",         0),   # rose spiral
+    (((70,  170, 210), ( 25,  80, 120)), "chevrons",       0),   # sky chevrons
+    (((180, 200,  80), ( 90, 110,  30)), "low_poly",       0),   # chartreuse low-poly
+    (((240, 120, 180), (120,  40, 120)), "floating_circles", 0), # bubblegum circles
+    (((110, 205, 205), ( 40, 110, 120)), "aurora",         0),   # aqua aurora
 ]
 
 # _MOOD_PROFILE_KEYS is defined after _MOOD_MIX_NAMES below.
@@ -8151,16 +8109,19 @@ def _make_ripples_background(w, h, color_top, color_bottom, v=0, rng=None):
     def _clamp(x): return max(0, min(255, x))
     light = tuple(_clamp(c + 64) for c in color_top[:3])
     dark  = tuple(int(c * 0.6) for c in color_top[:3])
+    # WHY: ripple centres are confined to the LOWER band (water sits *below* the falling rain) —
+    # previously they scattered from y≈0.08 and landed level with / above the rain-cloud glyph,
+    # which read as nonsense. Flatter squish (0.42) reads as drops on a surface, not floating rings.
     for _ in range(5 + (v % 3)):
         rx    = rng.randint(int(w * 0.10), int(w * 0.90))
-        ry    = rng.randint(int(h * 0.08), int(h * 0.70))
+        ry    = rng.randint(int(h * 0.50), int(h * 0.74))
         rings = rng.randint(3, 5)
         gap   = rng.randint(24, 40)
         for k in range(1, rings + 1):
             rr    = k * gap
             alpha = max(16, 110 - k * 20)
             tone  = light if k % 2 else dark
-            draw.ellipse([rx - rr, ry - rr * 0.62, rx + rr, ry + rr * 0.62],
+            draw.ellipse([rx - rr, ry - rr * 0.42, rx + rr, ry + rr * 0.42],
                          outline=(*tone, alpha), width=3)
     return Image.alpha_composite(img, overlay)
 
@@ -8597,6 +8558,2064 @@ def _make_spiral_background(w, h, color_top, color_bottom, v=0, rng=None):
     return img
 
 
+# === NEW genre/mood generators ================================================
+# Genre/mood-evocative backgrounds: the SHAPE signals the music so glyph-less covers still
+# read right. Same contract as the originals — (w, h, color_top, color_bottom, v, rng) -> RGBA;
+# translucent shapes over the gradient; rng jitters each element a few %. The bottom ~22% (title
+# bar) and the top-left badge zone are kept calm.
+
+def _make_equalizer_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Vertical EQ / spectrum bars rising from a baseline — electronic, dance, pop, hip-hop, bass."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=72): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # (n_bars, mirror, gap, max_h, min_h) — n_bars monotonic in i so all variants are distinct.
+    configs = [(12 + i, i % 4 == 3, 0.18 + (i % 4) * 0.06,
+                0.30 if i % 4 == 3 else 0.50 + (i % 3) * 0.05, 0.07 + (i % 3) * 0.03) for i in range(10)]
+    n, mirror, gapf, maxh, minh = configs[min(v, len(configs) - 1)]
+    base_y = h * 0.72; mid_y = h * 0.42
+    seg = w / n; bw = seg * (1 - gapf)
+    # WHY: palette-derived L/M/D bars washed out over the gradient (decade_10s feedback). Use a
+    # vibrant fixed spectrum instead so every bar reads with strong contrast on any background.
+    HUES = [(64, 220, 232), (236, 72, 170), (250, 208, 64), (96, 220, 120),
+            (255, 138, 64), (120, 130, 245), (240, 96, 110)]
+    for i in range(n):
+        ph = abs(0.5 + 0.5 * math.sin(i * 0.9 + v) * math.cos(i * 0.37 + v * 0.5))
+        hh = (minh + (maxh - minh) * ph) * h * (1 + (rng.uniform(-0.05, 0.05) if rng else 0))  # low jitter = clean bars
+        x0 = i * seg + (seg - bw) / 2
+        col = HUES[(i + v) % len(HUES)]      # cycle hues, offset per variant so each cover differs
+        alpha = 215 if i % 2 == 0 else 185   # bright + near-opaque so bars pop
+        if mirror:
+            draw.rectangle([x0, mid_y - hh / 2, x0 + bw, mid_y + hh / 2], fill=(*col, alpha))
+        else:
+            draw.rectangle([x0, base_y - hh, x0 + bw, base_y], fill=(*col, alpha))
+    return img
+
+
+def _make_grid_perspective_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Vanishing-point wireframe floor + horizon band — synthwave, vaporwave, techno, 80s."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=85): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    # (n_verticals, horizon_frac, line_alpha)
+    configs = [(13, 0.46, 70), (17, 0.42, 60), (11, 0.50, 78), (21, 0.40, 54)]
+    n_v, hz_f, alpha = configs[min(v, len(configs) - 1)]
+    vp_x = w * 0.5 + (rng.uniform(-0.05, 0.05) * w if rng else 0)
+    hz_y = h * hz_f
+    lw   = max(2, w // 360)
+    for k in range(6):                                   # soft horizon glow
+        a = int(alpha * (0.5 - k * 0.07))
+        if a > 0:
+            draw.rectangle([0, hz_y - k * 4, w, hz_y + k * 4], fill=(*L, a))
+    for i in range(-n_v, n_v + 1):                       # converging verticals (floor)
+        x_bottom = vp_x + i * (w / n_v) * 1.5
+        draw.line([(vp_x, hz_y), (x_bottom, h)], fill=(*L, alpha), width=lw)
+    y, step = hz_y + 6, (h - hz_y) * 0.06                # perspective horizontals (floor)
+    while y < h:
+        draw.line([(0, y), (w, y)], fill=(*L, int(alpha * 0.8)), width=lw)
+        y += step; step *= 1.32
+    # mirror a ceiling grid UPWARD so the detail fills higher up the cover
+    for i in range(-n_v, n_v + 1):
+        draw.line([(vp_x, hz_y), (vp_x + i * (w / n_v) * 1.5, 0)], fill=(*L, int(alpha * 0.62)), width=lw)
+    y, step = hz_y - 6, hz_y * 0.06
+    while y > 0:
+        draw.line([(0, y), (w, y)], fill=(*L, int(alpha * 0.5)), width=lw)
+        y -= step; step *= 1.32
+    return img
+
+
+def _make_circuit_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """PCB traces with right-angle bends + node pads — chiptune, gaming, industrial, IDM, dnb."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=82): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    rng = rng or random.Random(v)
+    configs = [(7, 12), (10, 14), (5, 10), (13, 16)]     # (n_traces, grid)
+    n_traces, grid = configs[min(v, len(configs) - 1)]
+    cell = w / grid
+    lw = max(2, w // 320)
+    node = lambda gx, gy: (gx * cell + cell / 2, gy * cell + cell / 2)
+    for t in range(n_traces):
+        gx, gy = rng.randint(0, grid - 1), rng.randint(0, grid - 1)
+        pts = [node(gx, gy)]
+        for _ in range(rng.randint(3, 6)):
+            if rng.random() < 0.5:
+                gx = max(0, min(grid - 1, gx + rng.choice([-3, -2, 2, 3])))
+            else:
+                gy = max(0, min(grid - 1, gy + rng.choice([-3, -2, 2, 3])))
+            x2, y2 = node(gx, gy)
+            pts.append((x2, pts[-1][1])); pts.append((x2, y2))    # right-angle bend
+        a = 46 + (t % 2) * 16
+        draw.line(pts, fill=(*L, a), width=lw, joint="curve")
+        for (px, py) in pts[::2]:
+            r = cell * 0.16
+            draw.ellipse([px - r, py - r, px + r, py + r], fill=(*L, min(255, a + 22)))
+    return img
+
+
+def _make_waveform_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Centred oscilloscope waveform lines, edge-tapered — electronic, ambient, downtempo, synth."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=88): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.55): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    configs = [(5, 0.14, 2.0), (7, 0.11, 3.0), (4, 0.18, 1.4), (6, 0.13, 4.5)]  # (n_lines, amp, freq) — denser
+    n_lines, ampf, freq = configs[min(v, len(configs) - 1)]
+    mid = h * 0.42; lw = max(3, w // 260)
+    ph0 = rng.uniform(0, 6.28) if rng else 0
+    for li in range(n_lines):
+        amp = ampf * h * (1 - li * 0.12); ph = ph0 + li * 0.8
+        col = L if li % 2 == 0 else D
+        a = 72 if li % 2 == 0 else 46
+        pts = []
+        for px in range(0, w + 1, 8):
+            t = px / w
+            y = mid + amp * math.sin(math.pi * t) * math.sin(freq * 2 * math.pi * t + ph)
+            pts.append((px, y))
+        draw.line(pts, fill=(*col, a), width=lw, joint="curve")
+    return img
+
+
+def _make_laser_fan_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Thin bright beams fanning up from the lower edge — club lasers; EDM, trance, party, garage."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=96): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    configs = [(9 + i, [0.50, 0.22, 0.78, 0.40, 0.60][i % 5],
+                [0.96, 0.92, 0.94][i % 3]) for i in range(8)]   # (n,ox,oy), n monotonic
+    n, ox, oy = configs[min(v, len(configs) - 1)]
+    cx, cy = w * ox, h * oy
+    spread = math.radians(150)
+    rot = rng.uniform(-0.12, 0.12) if rng else 0
+    outer = max(w, h) * 1.4
+    for i in range(n):
+        a_mid = -math.pi / 2 + (i / (n - 1) - 0.5) * spread + rot
+        bw = math.radians(1.7)
+        a0, a1 = a_mid - bw, a_mid + bw
+        pts = [(cx, cy),
+               (cx + outer * math.cos(a0), cy + outer * math.sin(a0)),
+               (cx + outer * math.cos(a1), cy + outer * math.sin(a1))]
+        draw.polygon(pts, fill=(*L, 60 if i % 2 == 0 else 38))
+    r = w * 0.03
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(*L, 110))
+    return img
+
+
+def _make_concentric_pulse_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Many thin concentric rings — a sound/sonar pulse; deep house, bass, techno, ambient.
+    Distinct from `circles` (few thick outline rings): many thin rings fading outward."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=82): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    configs = [(14 + i, [0.50, 0.32, 0.68, 0.42, 0.58][i % 5],
+                [0.44, 0.40, 0.50, 0.46][i % 4]) for i in range(12)]   # (n,cx,cy), n monotonic
+    n, cxf, cyf = configs[min(v, len(configs) - 1)]
+    cx = w * cxf + (rng.uniform(-0.03, 0.03) * w if rng else 0); cy = h * cyf
+    max_r = max(w, h) * 0.95; lw = max(2, w // 300)
+    for i in range(1, n + 1):
+        r = max_r * i / n
+        a = max(14, int(90 * (1 - i / n)))
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(*L, a), width=lw)
+    return img
+
+
+def _make_low_poly_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Tessellated faceted-gem triangle mesh, per-facet tone — indie, alt-rock, modern electronic.
+    WHY: gives alt/indie its own faceted family so the old recoloured-triangle twins diverge."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _c01(x): return max(0.0, min(1.0, x))
+    def _lighten(c, amt=74): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.46): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    configs = [(5 + (i % 6), 5 + (i % 6) + (i // 6)) for i in range(10)]   # (cols, rows), all distinct
+    cols, rows = configs[min(v, len(configs) - 1)]
+    rng = rng or random.Random(v)
+    cw, ch = w / cols, h / rows
+    pts = [[(c * cw + (0 if c in (0, cols) else rng.uniform(-0.4, 0.4) * cw),
+             r * ch + (0 if r in (0, rows) else rng.uniform(-0.4, 0.4) * ch))
+            for c in range(cols + 1)] for r in range(rows + 1)]
+    def tone(fr):
+        fr = _c01(fr)
+        return tuple(int(D[k] + (L[k] - D[k]) * fr) for k in range(3))
+    for r in range(rows):
+        for c in range(cols):
+            p00, p10 = pts[r][c], pts[r][c + 1]
+            p01, p11 = pts[r + 1][c], pts[r + 1][c + 1]
+            f = (r + c) / (rows + cols)
+            draw.polygon([p00, p10, p11], fill=(*tone(f + rng.uniform(-0.14, 0.14)), 172))
+            draw.polygon([p00, p11, p01], fill=(*tone(f + rng.uniform(-0.14, 0.14)), 172))
+    return img
+
+
+def _make_vinyl_grooves_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Concentric record grooves + off-centre label disc + sheen arc — soul, funk, disco, Motown, R&B, gospel."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=72): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    configs = [(0.62, 0.46, 0.64), (0.50, 0.42, 0.68), (0.38, 0.50, 0.60), (0.66, 0.40, 0.62)]
+    cxf, cyf, rmf = configs[min(v, len(configs) - 1)]
+    cx = w * cxf + (rng.uniform(-0.02, 0.02) * w if rng else 0); cy = h * cyf
+    rmax = min(w, h) * rmf; label_r = rmax * 0.27
+    n_g = 26; lw = max(2, int((rmax - label_r) / n_g * 0.6))
+    for i in range(n_g):
+        r = label_r + (rmax - label_r) * i / n_g
+        tone = D if i % 2 == 0 else L
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(*tone, 70 if i % 2 == 0 else 30), width=lw)
+    draw.ellipse([cx - label_r, cy - label_r, cx + label_r, cy + label_r], fill=(*M, 210))   # label
+    hr = label_r * 0.12
+    draw.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill=(*D, 230))                       # spindle hole
+    draw.arc([cx - rmax * 0.92, cy - rmax * 0.92, cx + rmax * 0.92, cy + rmax * 0.92],
+             200, 250, fill=(*L, 120), width=max(3, int(rmax * 0.04)))                       # sheen
+    return img
+
+
+def _make_halftone_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Pop-art halftone dot screen, dot size grows across an axis — pop, hyperpop, indie-pop, britpop, ska, 90s."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=88): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    configs = [(12 + i * 2, ['y', 'x', 'radial', 'yinv'][i % 4]) for i in range(8)]   # (cols, axis), cols monotonic
+    cols, axis = configs[min(v, len(configs) - 1)]
+    sp = w / cols; rows = int(h / sp) + 1
+    for j in range(rows + 1):
+        for i in range(cols + 1):
+            cx, cy = i * sp, j * sp
+            if axis == 'y':      p = cy / h
+            elif axis == 'yinv': p = 1 - cy / h
+            elif axis == 'x':    p = cx / w
+            else:                p = 1 - math.hypot(cx - w / 2, cy - h / 2) / math.hypot(w / 2, h / 2)
+            rad = sp * (0.10 + 0.42 * max(0.0, min(1.0, p)))
+            if rad >= 1:
+                draw.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=(*L, 72))
+    return img
+
+
+def _make_brushstrokes_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Broad painterly diagonal sweeps with rounded ends — jazz, blues, expressive/emotional moods."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=66): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # WHY procedural: many distinct stroke arrangements (one per v) without a huge literal table.
+    # (cx_f, cy_f, len_f, thick_f, angle, alpha, color) generated from v.
+    tones = [L, M, D]
+    n_strokes = 2 + (v % 4)
+    strokes = []
+    for s in range(n_strokes):
+        strokes.append((0.42 + 0.06 * ((v + s) % 3),
+                        0.26 + (0.50 / max(1, n_strokes)) * s + 0.04 * (v % 3),
+                        1.30 - 0.06 * s, 0.20 - 0.025 * s,
+                        -16 - ((v + s) % 5) * 4, max(30, 60 - s * 8), tones[s % 3]))
+    jit = rng.uniform(-3, 3) if rng else 0
+    for cx_f, cy_f, lenf, thf, ang, a, col in strokes:
+        cx, cy = cx_f * w, cy_f * h
+        length, thick = lenf * w, thf * h
+        draw.polygon(_rotated_rect_points(cx, cy, length, thick, ang + jit), fill=(*col, a))
+        rad = thick / 2; ra = math.radians(ang + jit)
+        ex, ey = math.cos(ra) * length / 2, math.sin(ra) * length / 2
+        for sgn in (-1, 1):
+            ecx, ecy = cx + sgn * ex, cy + sgn * ey
+            draw.ellipse([ecx - rad, ecy - rad, ecx + rad, ecy + rad], fill=(*col, a))
+    return img
+
+
+def _make_smoke_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Wide vertical haze ribbons, gaussian-softened — psych, stoner, trip-hop, lofi, late-night, jazz-dinner.
+    Distinct from `aurora` (horizontal ribbons): tall vertical columns that waver."""
+    img     = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw    = ImageDraw.Draw(overlay, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=60): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    configs = [(2 + i % 5, 0.07 + (i % 4) * 0.02, 1.0 + i * 0.25) for i in range(10)]  # (n,amp,freq), freq monotonic
+    n, ampf, freq = configs[min(v, len(configs) - 1)]
+    ph0 = rng.uniform(0, 6.28) if rng else 0
+    for ri in range(n):
+        cx = (ri + 0.5) / n * w; amp = ampf * w
+        halfw = w * (0.10 + 0.03 * (ri % 2)); ph = ph0 + ri * 1.1
+        left, right = [], []
+        for py in range(0, h + 1, 10):
+            off = amp * math.sin(freq * 2 * math.pi * (py / h) + ph)
+            left.append((cx + off - halfw, py)); right.append((cx + off + halfw, py))
+        draw.polygon(left + right[::-1], fill=(*L, 40 if ri % 2 == 0 else 28))
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=14))
+    return Image.alpha_composite(img, overlay)
+
+
+# _make_marquee_lights_background retired (round 4) — family removed; blues_bar reassigned to smoke.
+
+
+def _make_staff_lines_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Musical staff lines with a few note heads — classical, strings, orchestral, chamber."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=82): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    rng = rng or random.Random(v)
+    configs = [(2, 5), (3, 5), (1, 5), (2, 4)]                # (n_staves, lines_per)
+    n_staves, lpl = configs[min(v, len(configs) - 1)]
+    lw = max(2, w // 400)
+    region_top, region_bot = h * 0.12, h * 0.70
+    stave_gap = (region_bot - region_top) / n_staves
+    line_gap = stave_gap * 0.16
+    for s in range(n_staves):
+        top = region_top + s * stave_gap + stave_gap * 0.2
+        ys = [top + k * line_gap for k in range(lpl)]
+        for y in ys:
+            draw.line([(w * 0.04, y), (w * 0.96, y)], fill=(*L, 64), width=lw)
+        # note heads SNAPPED to the line/space grid (not floating) + a stem, so they read as notation
+        grid = ys + [(ys[k] + ys[k + 1]) / 2 for k in range(len(ys) - 1)]
+        nr = line_gap * 0.58
+        placed = []
+        tries = 0
+        while len(placed) < rng.randint(3, 5) and tries < 60:
+            tries += 1
+            nx = rng.uniform(w * 0.14, w * 0.88); ny = rng.choice(grid)
+            if any(abs(nx - px) < nr * 4 and abs(ny - py) < nr * 2.2 for px, py in placed):
+                continue                                  # keep note-heads from overlapping
+            placed.append((nx, ny))
+            draw.ellipse([nx - nr * 1.25, ny - nr * 0.9, nx + nr * 1.25, ny + nr * 0.9], fill=(*L, 175))
+            draw.line([(nx + nr * 1.15, ny), (nx + nr * 1.15, ny - line_gap * 3.0)], fill=(*L, 150), width=max(2, lw))
+    return img
+
+
+def _make_mountains_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Layered mountain-range silhouettes receding back→front — folk, acoustic, country, celtic, outdoors."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _c01(x): return max(0.0, min(1.0, x))
+    def _lighten(c, amt=70): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    configs = [(3 + i % 3, 2 + i % 4) for i in range(6)]   # (n_layers, base_peaks), distinct
+    n_layers, base_pk = configs[min(v, len(configs) - 1)]
+    def tone(fr):
+        fr = _c01(fr); return tuple(int(L[k] + (D[k] - L[k]) * fr) for k in range(3))
+    for li in range(n_layers):
+        frac = li / (n_layers - 1) if n_layers > 1 else 0
+        base_y = h * (0.40 + 0.34 * frac); peak_h = h * (0.12 + 0.16 * (1 - frac))
+        npk = base_pk + li; seg = w / npk
+        pts = [(0, h)]
+        for k in range(npk + 1):
+            ph = peak_h * (0.5 + 0.5 * abs(math.sin(k * 1.3 + li))) * (1 + rng.uniform(-0.15, 0.15))
+            pts.append((k * seg, base_y - ph))
+        pts.append((w, h))
+        draw.polygon(pts, fill=(*tone(frac), min(230, 210 if li == n_layers - 1 else 150 + li * 10)))
+    return img
+
+
+def _make_starfield_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Scattered stars (+ optional nebula) on a deep gradient — ambient, sleep, midnight, dreamy, space."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=120): return tuple(_clamp(x + amt) for x in c[:3])
+    L = _lighten(color_top)
+    rng = rng or random.Random(v)
+    configs = [(80 + i * 14, i % 3 != 0) for i in range(12)]   # (n_stars, nebula), n monotonic
+    n_stars, nebula = configs[min(v, len(configs) - 1)]
+    if nebula:
+        nb = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        nd = ImageDraw.Draw(nb)
+        ncx, ncy, nr = w * rng.uniform(0.3, 0.7), h * rng.uniform(0.2, 0.4), w * 0.34
+        nd.ellipse([ncx - nr, ncy - nr * 0.6, ncx + nr, ncy + nr * 0.6], fill=(*L, 40))
+        img = Image.alpha_composite(img, nb.filter(ImageFilter.GaussianBlur(radius=60)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    bar_top = h * 0.74
+    for _ in range(n_stars):
+        x, y = rng.uniform(0, w), rng.uniform(0, bar_top)
+        s = rng.random(); r = 1 if s < 0.70 else (2 if s < 0.93 else 3)
+        a = rng.randint(120, 235)
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=(*L, a))
+        if r == 3:
+            draw.line([(x - 5, y), (x + 5, y)], fill=(*L, max(0, a - 60)), width=1)
+            draw.line([(x, y - 5), (x, y + 5)], fill=(*L, max(0, a - 60)), width=1)
+    return img
+
+
+def _make_palm_sunburst_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Retro sun low on the horizon + palm-tree silhouettes — latin, tropical, reggae, afrobeat, beach.
+    WHY redrawn: the old corner 'fronds' rendered as stray lines top-left; now real palm-tree shapes."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=92): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.30): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    configs = [(0.50, 0.70, 0.26, 1), (0.62, 0.68, 0.24, 2),
+               (0.40, 0.72, 0.28, 1), (0.55, 0.66, 0.22, 2)]   # (sun x,y,r ; n_trees)
+    sxf, syf, srf, ntrees = configs[min(v, len(configs) - 1)]
+    scx, scy, sr = w * sxf, h * syf, w * srf
+    draw.ellipse([scx - sr, scy - sr, scx + sr, scy + sr], fill=(*L, 170))   # retro sun
+    for i in range(1, 6):                                                    # slats across the sun
+        yy = scy - sr * 0.5 + i * (sr * 0.28)
+        draw.rectangle([scx - sr, yy, scx + sr, yy + max(3, sr * 0.06)], fill=(*D, 110))
+    for tx, lean in [(w * 0.16, -1), (w * 0.86, 1)][:ntrees]:                # palm-tree silhouettes
+        base_y, top_y = h * 0.80, h * 0.42
+        crown = (tx + lean * w * 0.05, top_y)
+        draw.line([(tx, base_y), ((tx + crown[0]) / 2, (base_y + top_y) / 2), crown],
+                  fill=(*D, 185), width=max(4, int(w * 0.013)), joint="curve")
+        for k in range(6):                                                   # drooping fronds
+            a = math.radians(202 + k * 27)
+            fx2, fy2 = crown[0] + math.cos(a) * w * 0.11, crown[1] - math.sin(a) * h * 0.07
+            draw.line([crown, (fx2, fy2)], fill=(*D, 175), width=max(3, int(w * 0.006)))
+    return img
+
+
+def _make_sun_horizon_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Sun on a striped horizon — warm retro sunset; country, road-trip, summer, golden-hour."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=90): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    M = _mid(color_top, color_bottom)
+    # (sun x, horizon y [LOWER on page], sun r, stripe count) — horizon is lower than before.
+    configs = [([0.50, 0.40, 0.60, 0.45, 0.55][i % 5], 0.64 + (i % 4) * 0.025,
+                0.20 + (i % 3) * 0.03, 8 + i) for i in range(10)]
+    sxf, syf, srf, nb = configs[min(v, len(configs) - 1)]
+    hz = h * syf; scx, sr = w * sxf, w * srf
+    # Warm horizon glow (soft light rising from the horizon) → a multi-colour sunrise/sunset sky even
+    # when the palette top is cool. WHY: the sun was painted with the lightened palette top, so a violet
+    # sunrise sky gave a PURPLE sun; the sun is now always warm and a warm glow enriches the gradient.
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gld = ImageDraw.Draw(glow)
+    gld.ellipse([scx - sr * 3.4, hz - sr * 2.1, scx + sr * 3.4, hz + sr * 1.3], fill=(255, 168, 92, 130))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=64)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    draw.ellipse([scx - sr, hz - sr, scx + sr, hz + sr], fill=(255, 232, 178, 235))            # warm sun
+    draw.ellipse([scx - sr * 0.66, hz - sr * 0.66, scx + sr * 0.66, hz + sr * 0.66], fill=(255, 247, 218, 205))  # bright core
+    # WHY: uniform full-width stripes from top to horizon, same y-grid across sky AND sun, so the
+    # sun's slats line up with the sky stripes (the old per-sun venetian gap looked misaligned).
+    slot = hz / nb
+    for i in range(nb):
+        yb = i * slot
+        col = L if i % 2 == 0 else M
+        draw.rectangle([0, yb, w, yb + slot * 0.55], fill=(*col, 64 if i % 2 == 0 else 46))
+    draw.rectangle([0, hz, w, h], fill=(*D, 120))             # darker ground band
+    return img
+
+
+def _make_woodgrain_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Flowing woodgrain lines + a knot — warm acoustic, cosy, folk, campfire, singer-songwriter."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=58): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    configs = [10 + i for i in range(12)]   # n_lines, monotonic (WHY: dropped the 'knot' ovals —
+    n_lines = configs[min(v, len(configs) - 1)]                       # they read as stray little circles)
+    for i in range(n_lines):
+        base_y = h * (i + 0.5) / n_lines; amp = h * 0.02 * (1 + i % 3); ph = rng.uniform(0, 6.28)
+        pts = [(x, base_y + amp * math.sin(x * 0.012 + ph)) for x in range(0, w + 1, 12)]
+        draw.line(pts, fill=(*(L if i % 2 else D), 40), width=max(2, h // 240))
+    return img
+
+
+def _make_amp_stack_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A backline of guitar AMP STACKS — head (with knobs) + speaker cabinet(s) with cone grilles.
+    WHY redrawn: the old concentric cones read as gas hob-burners from above; this is a literal amp."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=60): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.42): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # (centre_x, n_cabs, cab_width_frac) — a Hughes & Kettner-style stack: a head NARROWER than the 4×12
+    # cab(s) below it, each cab exactly 2×2 = 4 speaker cones. WHY 8 configs: amp_stack is _BG_SYMMETRIC.
+    configs = [(0.50, 2, 0.44), (0.50, 1, 0.48), (0.46, 2, 0.40), (0.54, 1, 0.44),
+               (0.50, 2, 0.48), (0.45, 1, 0.42), (0.55, 2, 0.42), (0.50, 1, 0.50)]
+    cxf, cabs, wf = configs[min(v, len(configs) - 1)]
+    cab_w = w * wf; cx = w * cxf; sx = cx - cab_w / 2
+    cab_dark = _darken(color_bottom, 0.26)            # near-black cabinet vinyl
+    grille   = _darken(color_bottom, 0.40)            # grille cloth (a touch lighter)
+    metal    = _lighten(color_top, 70)                # head control panel / piping
+    hk_blue  = (60, 140, 235)                         # H&K signature power glow
+    top_y, bot_y = h * 0.10, h * 0.74
+    span = bot_y - top_y
+    head_hf, gpf = 0.28, 0.045                                 # head height & gaps as fractions of cab_w
+    # WHY: keep each cab SQUARE (a real 4×12 is ~square) so the 2×2 cones fill the MAJORITY of the face.
+    # Scale cab_w down if a tall (2-cab) stack wouldn't fit the vertical span — never leave a wide/short cab.
+    denom = head_hf + gpf + cabs + (cabs - 1) * gpf
+    cab_w = min(w * wf, span / denom)
+    cab_h = cab_w
+    head_h = cab_w * head_hf; gp = cab_w * gpf
+    stack_h = head_h + gp + cabs * cab_h + (cabs - 1) * gp
+    sx = cx - cab_w / 2
+    top = top_y + (span - stack_h) / 2                         # centre the stack vertically
+    rad = max(5, int(cab_w * 0.035)); lwd = max(2, int(w * 0.004))
+    def rrect(box, fill, outline=None):
+        try:
+            draw.rounded_rectangle(box, radius=rad, fill=fill, outline=outline, width=lwd)
+        except Exception:
+            draw.rectangle(box, fill=fill, outline=outline, width=lwd)
+    draw.ellipse([sx - cab_w * 0.08, top + stack_h - 6, sx + cab_w * 1.08, top + stack_h + 22], fill=(0, 0, 0, 70))  # floor shadow
+    # --- amp head (narrower than the cab) ---
+    hw = cab_w * 0.80; hx = cx - hw / 2
+    rrect([hx, top, hx + hw, top + head_h], (*cab_dark, 235), (*metal, 150))
+    draw.rectangle([hx + hw * 0.10, top + head_h * 0.20, hx + hw * 0.90, top + head_h * 0.52], fill=(*metal, 205))  # control panel
+    py = top + head_h * 0.36
+    for k in range(6):                                                           # knobs on the panel
+        kx = hx + hw * (0.17 + 0.66 * k / 5); kr = head_h * 0.11
+        draw.ellipse([kx - kr, py - kr, kx + kr, py + kr], fill=(*cab_dark, 235), outline=(*metal, 220))
+    draw.rectangle([hx + hw * 0.10, top + head_h * 0.66, hx + hw * 0.32, top + head_h * 0.82], fill=(*hk_blue, 190))  # power glow
+    # --- cabinet(s): each a 2×2 (= 4 cone) 4×12 ---
+    cy0 = top + head_h + gp
+    for cab in range(cabs):
+        cby0 = cy0 + cab * (cab_h + gp); cby1 = cby0 + cab_h
+        rrect([sx, cby0, sx + cab_w, cby1], (*cab_dark, 235), (*metal, 130))
+        inset = cab_w * 0.04
+        gx0, gy0, gx1, gy1 = sx + inset, cby0 + inset, sx + cab_w - inset, cby1 - inset
+        draw.rectangle([gx0, gy0, gx1, gy1], fill=(*grille, 225))                                      # grille cloth
+        for px, py2 in [(sx, cby0), (sx + cab_w, cby0), (sx, cby1), (sx + cab_w, cby1)]:               # small corner caps
+            cs = cab_w * 0.03
+            draw.rectangle([px - cs, py2 - cs, px + cs, py2 + cs], fill=(*metal, 165))
+        cellw, cellh = (gx1 - gx0) / 2, (gy1 - gy0) / 2
+        cr = min(cellw, cellh) * 0.49                                                                  # 12" speakers fill the majority of the cab
+        cone, cone_d, cap = _darken(color_bottom, 0.20), _darken(color_bottom, 0.10), _darken(color_bottom, 0.30)
+        for rr in range(2):
+            for cc in range(2):
+                ccx, ccy = gx0 + cellw * (cc + 0.5), gy0 + cellh * (rr + 0.5)
+                draw.ellipse([ccx - cr, ccy - cr, ccx + cr, ccy + cr], fill=(*cone_d, 245), outline=(*metal, 150), width=max(2, int(cr * 0.08)))  # frame
+                for sd in range(8):                                                                    # mounting screws round the frame
+                    sa = math.radians(sd * 45 + 22)
+                    sxx, syy = ccx + math.cos(sa) * cr * 0.9, ccy + math.sin(sa) * cr * 0.9
+                    draw.ellipse([sxx - cr * 0.05, syy - cr * 0.05, sxx + cr * 0.05, syy + cr * 0.05], fill=(*metal, 175))
+                draw.ellipse([ccx - cr * 0.82, ccy - cr * 0.82, ccx + cr * 0.82, ccy + cr * 0.82], fill=(*cone, 245))                            # cone
+                draw.ellipse([ccx - cr * 0.30, ccy - cr * 0.30, ccx + cr * 0.30, ccy + cr * 0.30], fill=(*cap, 245), outline=(*metal, 120))      # dust cap
+                draw.ellipse([ccx - cr * 0.26, ccy - cr * 0.34, ccx - cr * 0.02, ccy - cr * 0.10], fill=(255, 255, 255, 45))                     # highlight
+    return img
+
+
+def _make_shards_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Sharp angular shards radiating from a point — aggressive; punk, metal, industrial, hardcore."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=70): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.46): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    configs = [(7 + i, [0.50, 0.30, 0.70, 0.42][i % 4],
+                [0.30, 0.25, 0.35, 0.28][i % 4]) for i in range(8)]   # (n,ox,oy), n monotonic
+    n, oxf, oyf = configs[min(v, len(configs) - 1)]
+    ox, oy = w * oxf, h * oyf; outer = max(w, h) * 1.3
+    for i in range(n):
+        a_mid = i * 2 * math.pi / n + rng.uniform(-0.10, 0.10)
+        spread = rng.uniform(0.04, 0.12); ln = outer * rng.uniform(0.6, 1.0)
+        a0, a1 = a_mid - spread, a_mid + spread
+        pts = [(ox, oy), (ox + ln * math.cos(a0), oy + ln * math.sin(a0)),
+               (ox + ln * math.cos(a1), oy + ln * math.sin(a1))]
+        draw.polygon(pts, fill=(*(L if i % 2 else D), 55 if i % 2 else 38))
+    return img
+
+
+def _make_confetti_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Scattered confetti bits (rotated quads + triangles) — party, celebration, festive, cookout."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=84): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.50): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    rng = rng or random.Random(v)
+    n = [28, 40, 52, 64, 76, 88, 34, 58][min(v, 7)]
+    bar_top = h * 0.74; tones = [L, D, M]
+    for _ in range(n):
+        x, y = rng.uniform(0, w), rng.uniform(0, bar_top)
+        s = rng.uniform(w * 0.012, w * 0.030); ang = rng.uniform(0, 360)
+        col = rng.choice(tones); a = rng.randint(60, 150)
+        if rng.random() < 0.5:
+            pts = _rotated_rect_points(x, y, s * 1.8, s * 0.7, ang)
+        else:
+            ra = math.radians(ang)
+            pts = [(x + s * math.cos(ra + k * 2.094), y + s * math.sin(ra + k * 2.094)) for k in range(3)]
+        draw.polygon(pts, fill=(*col, a))
+    return img
+
+
+def _make_tartan_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Real tartan sett — a repeating colour sequence drawn as semi-transparent warp + weft bands so
+    the crossings blend into the classic plaid, with red + cream over-stripes. Scotland scene, celtic."""
+    img     = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw    = ImageDraw.Draw(overlay, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _darken(c, fac): return tuple(int(x * fac) for x in c[:3])
+    def _lighten(c, amt): return tuple(_clamp(x + amt) for x in c[:3])
+    # Irn-Bru tartan (Scottish Register, Kinloch Anderson) — matched to the real sett: ORANGE-dominant
+    # ground, azure-blue bands, white tramline pinstripes with a thin navy line. Hard-pinned (palette-free).
+    orange = (200, 76, 24)
+    blue   = (26, 118, 176)
+    white  = (240, 240, 242)
+    navy   = (20, 28, 56)
+    unit = w * [0.155, 0.13, 0.185, 0.14][min(v, 3)]
+    # sett (width × unit, colour, alpha) — big orange block, W-navy-W tramline, orange, BLUE band with a
+    # W-orange-W centre tramline, orange, tramline → repeats. WHY orange is low-alpha: the bg gradient is
+    # already orange (so orange BANDS are skipped, alpha 0); the blue/white/navy draw as a GRID in BOTH
+    # directions. WHY skip orange + asymmetric warp/weft alpha: drawing opaque orange weft erased the
+    # vertical blue warp → horizontal-stripe bug. Now warp (vertical) is full and weft (horizontal) is
+    # lighter, so BOTH axes read and the blue∩blue crossings build solid blue squares = a real plaid.
+    sett = [(1.00, orange, 0),
+            (0.05, white, 235), (0.035, navy, 220), (0.05, white, 235),
+            (0.42, orange, 0),
+            (0.28, blue, 215), (0.05, white, 235), (0.035, orange, 170), (0.05, white, 235), (0.28, blue, 215),
+            (0.42, orange, 0),
+            (0.05, white, 235), (0.035, navy, 220), (0.05, white, 235)]
+    def stripes(horizontal, amul):
+        pos = 0; limit = h if horizontal else w
+        while pos < limit:
+            for wf, col, a in sett:
+                bw = unit * wf
+                if a > 0:
+                    aa = max(1, int(a * amul))
+                    if horizontal:
+                        draw.rectangle([0, pos, w, pos + bw], fill=(*col, aa))
+                    else:
+                        draw.rectangle([pos, 0, pos + bw, h], fill=(*col, aa))
+                pos += bw
+    stripes(False, 1.0)      # warp (vertical) full strength
+    stripes(True, 0.78)      # weft (horizontal) lighter → both directions read; crossings blend = plaid
+    return Image.alpha_composite(img, overlay)
+
+
+def _make_cityscape_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A dusk skyline — a DISTINCT sky (palette gradient + a warm city-lights glow on the horizon) with
+    near-black building silhouettes and warm lit windows. London/Australia scenes, urban genres.
+    WHY redrawn: mid-tone buildings blended into the sky; dark silhouettes + a glow read as a real city."""
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=110): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top)
+    rng = rng or random.Random(v)
+    n = [12, 16, 9, 14][min(v, 3)]
+    base_y = h * 0.72
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))                                    # warm city-lights haze
+    ImageDraw.Draw(glow).ellipse([-w * 0.1, base_y - h * 0.20, w * 1.1, base_y + h * 0.06], fill=(*L, 95))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=55)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    sil = _darken(color_bottom, 0.20)                                                 # near-black buildings
+    win = (255, 214, 130)                                                             # warm lit windows
+    bw = w / n; wsz = max(3, int(bw * 0.12))
+    for i in range(n):
+        bh = min(h * 0.58, h * (0.14 + 0.46 * abs(math.sin(i * 1.7 + v))))
+        x0, x1 = i * bw, i * bw + bw * 0.94; top = base_y - bh
+        draw.rectangle([x0, top, x1, base_y], fill=(*sil, 245))
+        if rng.random() < 0.4:                                                        # some have a roof spire/tower
+            sx = (x0 + x1) / 2
+            draw.rectangle([sx - wsz * 0.4, top - bh * 0.10, sx + wsz * 0.4, top], fill=(*sil, 245))
+        wy = top + wsz * 1.8
+        while wy < base_y - wsz:
+            wx = x0 + wsz
+            while wx < x1 - wsz:
+                if rng.random() < 0.5:
+                    draw.rectangle([wx, wy, wx + wsz, wy + wsz], fill=(*win, rng.randint(120, 220)))
+                wx += wsz * 2.0
+            wy += wsz * 2.2
+    draw.rectangle([0, base_y, w, h], fill=(*_darken(color_bottom, 0.14), 235))       # dark street
+    return img
+
+
+# === NEW families, round 2 (genre / mood / season) ============================
+
+def _make_mod_target_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """RAF-roundel / mod target — concentric bullseye (Mod, Britpop, Madchester)."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=95): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    configs = [(0.50, 0.42, 0.46), (0.62, 0.40, 0.42), (0.38, 0.46, 0.44), (0.50, 0.38, 0.40)]
+    cxf, cyf, rf = configs[min(v, len(configs) - 1)]
+    cx, cy, R = w * cxf, h * cyf, min(w, h) * rf
+    # Real RAF roundel: EXACTLY three concentric rings — outer blue, white, inner red. Nothing else.
+    # WHY: the previous 4th (white centre dot) made it read as a dartboard, not the RAF/Mod target.
+    blue, white, red = (24, 64, 156), (238, 238, 242), (206, 42, 52)
+    for frac, col in [(1.0, blue), (0.62, white), (0.30, red)]:
+        rr = R * frac
+        draw.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(*col, 240))
+    return img
+
+
+def _make_disco_ball_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Faceted mirror-ball + sparkles — disco, funk, Motown, dance, party."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=95): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    rng = rng or random.Random(v)
+    configs = [(0.50, 0.40, 0.30), (0.62, 0.38, 0.26), (0.40, 0.42, 0.28), (0.50, 0.36, 0.32)]
+    cxf, cyf, rf = configs[min(v, len(configs) - 1)]
+    cx, cy, R = w * cxf, h * cyf, min(w, h) * rf
+    draw.line([(cx, cy - R), (cx, h * 0.02)], fill=(*L, 120), width=max(2, int(R * 0.02)))    # hang wire
+    draw.ellipse([cx - R * 0.06, cy - R - R * 0.10, cx + R * 0.06, cy - R + R * 0.02], fill=(*L, 190))  # mount
+    # WHY rewrite: square glitter tiles with random alpha read as flat noise. Shade each mirror tile as a
+    # point on a sphere lit from the upper-left (silver ramp + a few coloured-light reflections) → a real ball.
+    ball = Image.new("RGBA", (w, h), (0, 0, 0, 0)); bd = ImageDraw.Draw(ball, 'RGBA')
+    bd.ellipse([cx - R, cy - R, cx + R, cy + R], fill=(24, 26, 40, 255))          # dark grout between tiles
+    SIL = [(40, 44, 60), (110, 122, 144), (188, 200, 220), (248, 250, 255)]       # shadow→highlight silver
+    casts = [L, M, (236, 96, 150), (96, 200, 220), (250, 210, 90)]                # coloured-light reflections
+    lx, ly, lz = -0.50, -0.55, 0.67                                               # light from upper-left
+    cell = R * 0.135
+    row, yy = 0, cy - R - cell
+    while yy < cy + R + cell:
+        off = (cell * 0.5) if row % 2 else 0.0                                    # brick-offset rows = real mirror tiles
+        xx = cx - R - cell + off
+        while xx < cx + R + cell:
+            mx, my = xx + cell / 2, yy + cell / 2
+            dx, dy = (mx - cx) / R, (my - cy) / R
+            r2 = dx * dx + dy * dy
+            if r2 < 1.10:                                                         # draw past the rim; the mask clips it
+                z = math.sqrt(max(0.0, 1.0 - min(1.0, r2)))
+                b = 0.15 + 0.85 * max(0.0, dx * lx + dy * ly + z * lz)            # sphere brightness
+                base = SIL[0] if b < 0.32 else SIL[1] if b < 0.58 else SIL[2] if b < 0.84 else SIL[3]
+                if rng.random() < 0.18:
+                    cc = rng.choice(casts); base = tuple((base[k] + cc[k]) // 2 for k in range(3))
+                if rng.random() < 0.07 and b > 0.45:
+                    base = (252, 253, 255)                                        # occasional bright flash
+                bd.rectangle([xx + 0.6, yy + 0.6, xx + cell - 1.0, yy + cell - 1.0], fill=(*base, 255))
+            xx += cell
+        yy += cell; row += 1
+    cmask = Image.new("L", (w, h), 0)                                             # clip tiles to the EXACT rim
+    ImageDraw.Draw(cmask).ellipse([cx - R, cy - R, cx + R, cy + R], fill=255)     # → tiles reach the edge, no gap
+    ball.putalpha(cmask)
+    img = Image.alpha_composite(img, ball)
+    spec = Image.new("RGBA", (w, h), (0, 0, 0, 0)); sd = ImageDraw.Draw(spec)
+    hx, hy = cx - R * 0.34, cy - R * 0.36; hr = R * 0.24
+    sd.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], fill=(255, 255, 255, 150))   # specular hotspot
+    img = Image.alpha_composite(img, spec.filter(ImageFilter.GaussianBlur(radius=max(2, int(R * 0.10)))))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    draw.arc([cx - R, cy - R, cx + R, cy + R], 20, 150, fill=(8, 8, 18, 120), width=max(2, int(R * 0.05)))  # shaded underside
+    for _ in range(5):                                                            # light-ray sparkles around the ball
+        a = rng.uniform(0, 6.28); rr = R * rng.uniform(1.06, 1.5)
+        sx, sy = cx + math.cos(a) * rr, cy + math.sin(a) * rr
+        if 0 < sx < w and 0 < sy < h * 0.7:
+            gl = R * rng.uniform(0.07, 0.13)
+            draw.line([(sx - gl, sy), (sx + gl, sy)], fill=(255, 255, 255, 150), width=2)
+            draw.line([(sx, sy - gl), (sx, sy + gl)], fill=(255, 255, 255, 150), width=2)
+    return img
+
+
+def _make_cassette_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Cassette tape — body, reels, tape window — retro mixtape (hip-hop, throwback, lofi)."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=80): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    # WHY 8 configs: cassette is _BG_SYMMETRIC (no h-flip doubling) and now also carries swagger — needs ≥7.
+    configs = [(0.50, 0.40, 1.0), (0.50, 0.42, 0.86), (0.46, 0.38, 1.05), (0.54, 0.40, 0.92),
+               (0.48, 0.44, 0.95), (0.52, 0.36, 1.0), (0.50, 0.38, 0.90), (0.50, 0.43, 1.02)]
+    cxf, cyf, sc = configs[min(v, len(configs) - 1)]
+    ACCENTS = [(228, 96, 72), (236, 188, 72), (96, 188, 220), (210, 110, 196),
+               (120, 200, 130), (240, 150, 90), (150, 150, 240), (236, 110, 130)]
+    accent = ACCENTS[v % len(ACCENTS)]      # a coloured label so mixtapes differ at a glance
+    cx, cy = w * cxf, h * cyf
+    bw, bh = w * 0.62 * sc, w * 0.40 * sc
+    x0, y0, x1, y1 = cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2
+    lwd = max(2, int(w * 0.004))
+    def rrect(box, fill, outline=None):
+        try:
+            draw.rounded_rectangle(box, radius=max(4, int(bw * 0.04)), fill=fill, outline=outline, width=lwd)
+        except Exception:
+            draw.rectangle(box, fill=fill, outline=outline, width=lwd)
+    rrect([x0, y0, x1, y1], (*M, 175), (*L, 190))                                   # body
+    rrect([x0 + bw * 0.10, y0 + bh * 0.12, x1 - bw * 0.10, y0 + bh * 0.40], (*accent, 180), (*L, 150))  # label
+    wy0, wy1 = cy + bh * 0.02, cy + bh * 0.30
+    draw.rectangle([x0 + bw * 0.16, wy0, x1 - bw * 0.16, wy1], fill=(*D, 175))      # tape window
+    for side in (-1, 1):
+        rx, ry, rr = cx + side * bw * 0.18, (wy0 + wy1) / 2, bh * 0.11
+        draw.ellipse([rx - rr, ry - rr, rx + rr, ry + rr], fill=(*L, 195))          # reel
+        for k in range(6):
+            a = math.radians(k * 60)
+            draw.line([(rx, ry), (rx + math.cos(a) * rr * 0.8, ry + math.sin(a) * rr * 0.8)], fill=(*D, 170), width=2)
+        hr = rr * 0.3
+        draw.ellipse([rx - hr, ry - hr, rx + hr, ry + hr], fill=(*D, 205))
+    return img
+
+
+def _make_pixel_grid_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """8-bit pixel blocks + a space-invader motif — chiptune, gaming, hyperpop."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=80): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.45): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    rng = rng or random.Random(v)
+    cols = [16, 22, 12, 28][min(v, 3)]
+    px = w / cols
+    # 8-bit pixel field — clusters of lit blocks (reads as pixel-art/chiptune without a literal invader).
+    for r in range(int(h * 0.74 / px)):
+        for c in range(cols):
+            p = rng.random()
+            if p < 0.34:
+                tone = L if p < 0.12 else (M if p < 0.24 else D)
+                draw.rectangle([c * px + 1, r * px + 1, c * px + px - 1, r * px + px - 1],
+                               fill=(*tone, rng.randint(55, 150)))
+    return img
+
+
+# _make_flames_background retired (round 4) — family removed; party→laser_fan, punk_energy→guitar, slow_burn→smoke.
+
+
+def _make_columns_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Neoclassical fluted columns + capitals — classical, strings, orchestral."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=72): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.46): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    n = [4, 5, 3, 6][min(v, 3)]
+    top_y, bot_y = h * 0.16, h * 0.72
+    seg = w / n; colw = seg * 0.5; cap = (bot_y - top_y) * 0.06
+    for i in range(n):
+        cx = i * seg + seg / 2; x0, x1 = cx - colw / 2, cx + colw / 2
+        draw.rectangle([x0 - colw * 0.14, top_y, x1 + colw * 0.14, top_y + cap], fill=(*L, 155))          # capital
+        draw.rectangle([x0 - colw * 0.14, bot_y - cap, x1 + colw * 0.14, bot_y], fill=(*L, 155))          # base
+        draw.rectangle([x0, top_y, x1, bot_y], fill=(*L, 95))                                             # shaft
+        for f in range(4):
+            fx = x0 + colw * (0.2 + 0.2 * f)
+            draw.line([(fx, top_y + cap), (fx, bot_y - cap)], fill=(*D, 90), width=max(1, int(colw * 0.05)))  # flute
+    return img
+
+
+def _make_film_strip_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Realistic 35mm film strip(s) — dark film base, two rows of rounded Kodak perforations, and lit
+    image frames between them divided by frame lines. Soundtracks, cinematic, main character."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac): return tuple(int(x * fac) for x in c[:3])
+    rng = rng or random.Random(v)
+    film = (18, 18, 22)                                            # film base (near-black)
+    perf = (238, 238, 232)                                        # clear perforations
+    frame_tone = _lighten(color_top, 45)                          # the projected image area
+    scene = _lighten(color_bottom, 40)
+    nst, frames = [(2, 6), (3, 5), (1, 7), (2, 8)][min(v, 3)]
+    strip_h = h * (0.26 if nst <= 2 else 0.205)
+    centres = {1: [0.50], 2: [0.32, 0.70], 3: [0.22, 0.50, 0.78]}[nst]
+    for cyf in centres:
+        cy = h * cyf; y0, y1 = cy - strip_h / 2, cy + strip_h / 2
+        draw.rectangle([-20, y0, w + 20, y1], fill=(*film, 240))                              # film base
+        np = frames * 2
+        pw, ph, pr = w / np * 0.42, strip_h * 0.15, max(2, int(strip_h * 0.04))
+        for k in range(np):                                                                   # two perforation rows
+            px = (k + 0.5) * w / np
+            for py in (y0 + strip_h * 0.12, y1 - strip_h * 0.12):
+                box = [px - pw / 2, py - ph / 2, px + pw / 2, py + ph / 2]
+                try:
+                    draw.rounded_rectangle(box, radius=pr, fill=(*perf, 225))
+                except Exception:
+                    draw.rectangle(box, fill=(*perf, 225))
+        fy0, fy1 = y0 + strip_h * 0.27, y1 - strip_h * 0.27                                   # image frames between perfs
+        fw = w / frames
+        for k in range(frames):
+            fx0, fx1 = k * fw + fw * 0.05, (k + 1) * fw - fw * 0.05
+            draw.rectangle([fx0, fy0, fx1, fy1], fill=(*frame_tone, 165))                     # projected frame
+            draw.line([(fx0, (fy0 + fy1) / 2), (fx1, (fy0 + fy1) / 2)], fill=(*scene, 90), width=1)  # faint horizon in-frame
+    return img
+
+
+def _make_stained_glass_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Leaded stained-glass panes + arches — gospel & choir."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=85): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    # Rich stained-glass jewel tones (cobalt, ruby, emerald, gold, violet, amber, teal).
+    JEWELS = [(42, 78, 178), (172, 36, 64), (34, 142, 92), (224, 172, 52),
+              (120, 54, 168), (220, 110, 44), (32, 132, 146)]
+    cols, rows = [(4, 5), (5, 6), (3, 4), (6, 7)][min(v, 3)]
+    cw, chh = w / cols, h * 0.74 / rows
+    lead = max(2, int(w * 0.006))
+    for r in range(rows):
+        for c in range(cols):
+            x0, y0 = c * cw, r * chh
+            draw.rectangle([x0, y0, x0 + cw, y0 + chh], fill=(*rng.choice(JEWELS), rng.randint(120, 180)),
+                           outline=(*D, 210), width=lead)               # dark leading between panes
+    for c in range(cols):                                   # arched tops
+        x0 = c * cw
+        draw.arc([x0, -chh, x0 + cw, chh], 180, 360, fill=(*L, 170), width=lead)
+    return img
+
+
+# _make_neon_background retired (round 4) — family removed; swagger→cassette, synthwave/vaporwave→grid_perspective.
+
+
+def _make_candle_glow_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Candle flame(s) + warm halo — candlelight, romantic/jazz dinner, date night."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gd = ImageDraw.Draw(glow)
+    flame = Image.new("RGBA", (w, h), (0, 0, 0, 0)); fd = ImageDraw.Draw(flame)
+    def _clamp(x): return max(0, min(255, x))
+    warm = (255, 220, 150)                                # candlelight is always warm
+    L = tuple(_clamp(x + 90) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    n = [3, 2, 4, 1][min(v, 3)]
+    seg = w / (n + 1)
+    for i in range(1, n + 1):
+        cx = seg * i + rng.uniform(-0.04, 0.04) * w
+        cy = h * rng.uniform(0.40, 0.52)
+        R = w * 0.16
+        gd.ellipse([cx - R, cy - R, cx + R, cy + R], fill=(*warm, 80))            # halo
+        fh = h * 0.10
+        fd.polygon([(cx, cy - fh), (cx - fh * 0.28, cy - fh * 0.2), (cx, cy + fh * 0.15),
+                    (cx + fh * 0.28, cy - fh * 0.2)], fill=(*warm, 230))           # flame
+        fd.ellipse([cx - fh * 0.14, cy - fh * 0.4, cx + fh * 0.14, cy], fill=(255, 250, 225, 230))
+        cw_ = w * 0.018
+        fd.rectangle([cx - cw_, cy + fh * 0.1, cx + cw_, cy + h * 0.22], fill=(*L, 175))  # candle stick
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=40)))
+    return Image.alpha_composite(img, flame)
+
+
+def _make_bokeh_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Soft defocused light orbs — glam, love songs, late-night romance."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    orbs = Image.new("RGBA", (w, h), (0, 0, 0, 0)); od = ImageDraw.Draw(orbs)
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 95) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    for _ in range([10, 14, 7, 18][min(v, 3)]):
+        r = w * rng.uniform(0.04, 0.14)
+        cx, cy = rng.uniform(0, w), rng.uniform(0, h * 0.74)
+        od.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(*L, rng.randint(40, 115)))
+    orbs = orbs.filter(ImageFilter.GaussianBlur(radius=12))
+    od2 = ImageDraw.Draw(orbs)
+    for _ in range([4, 5, 3, 6][min(v, 3)]):                                       # a few crisp orbs
+        r = w * rng.uniform(0.03, 0.07)
+        cx, cy = rng.uniform(0, w), rng.uniform(0, h * 0.7)
+        od2.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(*L, 150), width=max(2, int(r * 0.18)))
+    return Image.alpha_composite(img, orbs)
+
+
+def _make_clouds_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Soft layered cloud puffs — dreamy, daydreaming, overcast, grey skies."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0)); ld = ImageDraw.Draw(layer)
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 70) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    for i in range([3, 4, 2, 5, 3, 4][min(v, 5)]):
+        cy = h * (0.18 + 0.15 * i) + rng.uniform(-0.03, 0.03) * h
+        cx = w * rng.uniform(0.3, 0.7); cw_ = w * rng.uniform(0.28, 0.42); a = rng.randint(50, 90)
+        for k in range(5):
+            ex = cx - cw_ / 2 + cw_ * k / 4; er = cw_ * (0.18 + 0.10 * abs(math.sin(k)))
+            ld.ellipse([ex - er, cy - er * 0.8, ex + er, cy + er * 0.8], fill=(*L, a))
+        ld.ellipse([cx - cw_ * 0.5, cy - cw_ * 0.04, cx + cw_ * 0.5, cy + cw_ * 0.20], fill=(*L, a))
+    return Image.alpha_composite(img, layer.filter(ImageFilter.GaussianBlur(radius=7)))
+
+
+def _make_zen_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Raked-sand ripples + stacked stones — spa, wind down, meditation, yoga."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=70): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.46): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    cxf, cyf = [(0.50, 0.50), (0.38, 0.46), (0.62, 0.52), (0.50, 0.44)][min(v, 3)]
+    cx, cy = w * cxf, h * cyf
+    for i in range(11, 0, -1):                                  # raked sand rings around the stones
+        rr = min(w, h) * 0.52 * i / 11
+        draw.ellipse([cx - rr, cy - rr * 0.5, cx + rr, cy + rr * 0.5],
+                     outline=(*L, max(18, 64 - i * 3)), width=max(2, w // 360))
+    sy = cy
+    for sw_ in (0.11, 0.085, 0.06):                            # stacked stones
+        sr = w * sw_
+        draw.ellipse([cx - sr, sy - sr * 0.55, cx + sr, sy + sr * 0.55], fill=(*D, 185))
+        sy -= sr * 0.95
+    return img
+
+
+def _make_grid_paper_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Graph / dotted notebook grid — study, focus, deep work, deep reading."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 80) for x in color_top[:3])
+    cols = [16, 22, 12, 26][min(v, 3)]; sp = w / cols
+    style = 'dots' if v % 2 else 'lines'; lw = max(1, w // 500); reg = h * 0.74
+    if style == 'lines':
+        x = 0
+        while x <= w:
+            draw.line([(x, 0), (x, reg)], fill=(*L, 38), width=lw); x += sp
+        y = 0
+        while y <= reg:
+            draw.line([(0, y), (w, y)], fill=(*L, 38), width=lw); y += sp
+    else:
+        y = sp / 2
+        while y < reg:
+            x = sp / 2
+            while x < w:
+                draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(*L, 90)); x += sp
+            y += sp
+    return img
+
+
+def _make_moonlight_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Moon + craters + soft stars — sleep, midnight, clear night, 3am."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 130) for x in color_top[:3])
+    D = tuple(int(x * 0.7) for x in L)
+    rng = rng or random.Random(v)
+    mxf, myf, mrf = [(0.68, 0.30, 0.16), (0.50, 0.28, 0.18), (0.32, 0.32, 0.14), (0.72, 0.26, 0.20)][min(v, 3)]
+    mx, my, mr = w * mxf, h * myf, w * mrf
+    bar = h * 0.74
+    for _ in range(70):                                        # stars
+        x, y = rng.uniform(0, w), rng.uniform(0, bar)
+        r = 1 if rng.random() < 0.8 else 2
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=(*L, rng.randint(110, 220)))
+    draw.ellipse([mx - mr, my - mr, mx + mr, my + mr], fill=(*L, 205))             # moon
+    for _ in range(4):                                         # craters
+        a = rng.uniform(0, 6.28); rr = mr * rng.uniform(0.1, 0.7)
+        cxx, cyy = mx + math.cos(a) * mr * 0.5, my + math.sin(a) * mr * 0.5
+        draw.ellipse([cxx - rr * 0.3, cyy - rr * 0.3, cxx + rr * 0.3, cyy + rr * 0.3], fill=(*D, 120))
+    return img
+
+
+def _make_cosmos_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Ringed planet + orbit + stars — ambient drift, awe & wonder, cosmic."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=110): return tuple(_clamp(x + amt) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); M = _mid(color_top, color_bottom)
+    rng = rng or random.Random(v)
+    for _ in range(70):                                        # stars
+        x, y = rng.uniform(0, w), rng.uniform(0, h * 0.74)
+        r = 1 if rng.random() < 0.85 else 2
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=(*L, rng.randint(90, 200)))
+    pxf, pyf, prf = [(0.62, 0.36, 0.16), (0.40, 0.34, 0.18), (0.50, 0.30, 0.14), (0.66, 0.40, 0.20)][min(v, 3)]
+    px, py, pr = w * pxf, h * pyf, w * prf
+    rw = pr * 1.9
+    ring_box = [px - rw, py - rw * 0.30, px + rw, py + rw * 0.30]
+    lwd = max(4, w // 200)
+    # WHY split arcs: the ring must pass BEHIND the planet at the back and IN FRONT at the front.
+    draw.arc(ring_box, 180, 360, fill=(*L, 140), width=lwd)                        # back half (behind)
+    draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=(*M, 215))             # planet
+    draw.ellipse([px - pr * 0.7, py - pr * 0.7, px + pr * 0.25, py + pr * 0.25], fill=(*L, 80))  # highlight
+    draw.arc(ring_box, 0, 180, fill=(*L, 185), width=lwd)                          # front half (in front)
+    return img
+
+
+def _make_lightning_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Jagged electric bolts (glow) — empowering, confidence, motivation, beast mode."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gd = ImageDraw.Draw(glow)
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 120) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    n = [3, 4, 2, 5][min(v, 3)]; lw = max(3, int(w * 0.01))
+    for i in range(n):
+        x = w * (i + 0.5) / n + rng.uniform(-0.05, 0.05) * w
+        pts = [(x, 0)]; y = 0
+        while y < h * 0.7:
+            y += h * rng.uniform(0.08, 0.16); x += rng.uniform(-0.08, 0.08) * w
+            pts.append((x, y))
+        gd.line(pts, fill=(*L, 220), width=lw, joint="curve")
+        if len(pts) > 2:                                       # a branch
+            bx, by = pts[len(pts) // 2]
+            gd.line([(bx, by), (bx + rng.uniform(-0.12, 0.12) * w, by + h * 0.16)], fill=(*L, 180), width=max(2, lw - 2))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=8)))
+    return Image.alpha_composite(img, glow)
+
+
+def _make_blossom_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Falling cherry-blossom petals + a few blooms — spring mixes."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    rng = rng or random.Random(v)
+    pinks = [(255, 200, 215), (250, 180, 205), (240, 212, 226), (255, 224, 235)]
+    bar = h * 0.74
+    for _ in range([30, 45, 22, 60][min(v, 3)]):                  # drifting petals
+        x, y = rng.uniform(0, w), rng.uniform(0, bar)
+        s = w * rng.uniform(0.012, 0.026)
+        draw.ellipse([x - s, y - s * 0.6, x + s, y + s * 0.6], fill=(*rng.choice(pinks), rng.randint(120, 200)))
+    for _ in range([4, 6, 3, 8][min(v, 3)]):                      # 5-petal blossoms
+        fx, fy = rng.uniform(w * 0.1, w * 0.9), rng.uniform(0, bar * 0.85)
+        fr = w * rng.uniform(0.02, 0.038); col = rng.choice(pinks)
+        for k in range(5):
+            a = math.radians(k * 72)
+            px, py = fx + math.cos(a) * fr, fy + math.sin(a) * fr
+            draw.ellipse([px - fr * 0.6, py - fr * 0.6, px + fr * 0.6, py + fr * 0.6], fill=(*col, 200))
+        draw.ellipse([fx - fr * 0.3, fy - fr * 0.3, fx + fr * 0.3, fy + fr * 0.3], fill=(255, 235, 170, 220))
+    return img
+
+
+def _make_snowfall_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Drifting snow + low drifts — snow day, frosty, winter frost/nights."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 120) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    bar = h * 0.80
+    draw.ellipse([-w * 0.2, h * 0.66, w * 0.62, h * 0.98], fill=(*L, 55))         # drifts
+    draw.ellipse([w * 0.42, h * 0.70, w * 1.2, h * 1.02], fill=(*L, 50))
+    for _ in range([60, 90, 40, 120][min(v, 3)]):                # flakes
+        x, y = rng.uniform(0, w), rng.uniform(0, bar)
+        r = rng.choice([1, 2, 2, 3])
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=(*L, rng.randint(120, 230)))
+    return img
+
+
+def _make_rainfall_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Diagonal rain streaks — rain weather + sad moods (heartbreak, grief, melancholy)."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 70) for x in color_top[:3])
+    rng = rng or random.Random(v)
+    ang = math.radians(74); dx, dy = math.cos(ang), math.sin(ang)
+    ln = h * 0.06; lw = max(1, w // 420)
+    for _ in range([120, 170, 80, 220][min(v, 3)]):
+        x, y = rng.uniform(0, w), rng.uniform(-h * 0.05, h * 0.76)
+        draw.line([(x, y), (x + dx * ln, y + dy * ln)], fill=(*L, rng.randint(60, 145)), width=lw)
+    return img
+
+
+def _make_pine_forest_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Rows of evergreen pines receding — folk, celtic, campfire, cosy, winter."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _c01(x): return max(0.0, min(1.0, x))
+    def _lighten(c, amt=66): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rows = [3, 4, 2, 5][min(v, 3)]
+    def tone(fr): fr = _c01(fr); return tuple(int(L[k] + (D[k] - L[k]) * fr) for k in range(3))
+    for layer in range(rows):
+        frac = layer / (rows - 1) if rows > 1 else 0
+        base_y = h * (0.46 + 0.26 * frac); size = w * (0.05 + 0.03 * frac)
+        n = 5 + layer * 2; th = size * 3.2
+        col = tone(frac)
+        for i in range(n + 1):
+            tx = i * (w / n)
+            top = base_y - th
+            draw.polygon([(tx - size, base_y), (tx + size, base_y), (tx, top)], fill=(*col, 205))
+            draw.polygon([(tx - size * 0.8, base_y - th * 0.42), (tx + size * 0.8, base_y - th * 0.42), (tx, top - th * 0.18)], fill=(*col, 205))
+    return img
+
+
+def _make_tropical_leaves_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Big tropical leaf silhouettes from the corners — tropical, reggae, afrobeat, beach."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=55): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.40): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    anchors = [[(0.04, 0.06, 35)], [(0.96, 0.06, 145), (0.05, 0.95, -55)],
+               [(0.05, 0.95, -50)], [(0.96, 0.95, 215), (0.04, 0.08, 40)]][min(v, 3)]
+    for axf, ayf, base_deg in anchors:
+        ax, ay = w * axf, h * ayf
+        for k in range(3):
+            ang = math.radians(base_deg + (k - 1) * 26)
+            ln, wd = w * 0.52, w * 0.10
+            tip = (ax + math.cos(ang) * ln, ay + math.sin(ang) * ln)
+            perp = ang + math.pi / 2
+            m1 = (ax + math.cos(ang) * ln * 0.5 + math.cos(perp) * wd, ay + math.sin(ang) * ln * 0.5 + math.sin(perp) * wd)
+            m2 = (ax + math.cos(ang) * ln * 0.5 - math.cos(perp) * wd, ay + math.sin(ang) * ln * 0.5 - math.sin(perp) * wd)
+            draw.polygon([(ax, ay), m1, tip, m2], fill=(*D, 150))
+            draw.line([(ax, ay), tip], fill=(*L, 110), width=max(2, int(w * 0.004)))   # midrib
+            for t in (0.35, 0.55, 0.75):
+                vx, vy = ax + math.cos(ang) * ln * t, ay + math.sin(ang) * ln * t
+                draw.line([(vx, vy), (vx + math.cos(perp) * wd * 0.7, vy + math.sin(perp) * wd * 0.7)], fill=(*L, 90), width=max(1, int(w * 0.002)))
+                draw.line([(vx, vy), (vx - math.cos(perp) * wd * 0.7, vy - math.sin(perp) * wd * 0.7)], fill=(*L, 90), width=max(1, int(w * 0.002)))
+    return img
+
+
+def _make_gingham_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Even picnic gingham check (overlaps darken) — cookout, brunch, cooking, dinner party."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 60) for x in color_top[:3])
+    cell = w * [0.10, 0.08, 0.13, 0.07][min(v, 3)]; a = 66
+    x = 0
+    while x < w:
+        draw.rectangle([x, 0, x + cell, h], fill=(*L, a)); x += cell * 2
+    y = 0
+    while y < h:
+        draw.rectangle([0, y, w, y + cell], fill=(*L, a)); y += cell * 2
+    return Image.alpha_composite(img, overlay)
+
+
+def _make_open_road_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A road receding to a vanishing point on a DISTINCT horizon — sky + sun glow above, ground below,
+    asphalt road with a dashed centre line. Road trip, summer roadtrip, driving (Windows Down).
+    WHY redrawn: the old road just faded into the gradient with no sky/horizon."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=95): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.42): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    hz  = h * [0.42, 0.40, 0.44, 0.41][min(v, 3)]                 # horizon line
+    vpx = w * [0.50, 0.42, 0.58, 0.50][min(v, 3)]                 # vanishing point ON the horizon
+    draw.rectangle([0, 0, w, hz], fill=(*L, 70))                  # distinct sky band above the horizon
+    draw.ellipse([vpx - w * 0.17, hz - w * 0.17, vpx + w * 0.17, hz + w * 0.17], fill=(*L, 70))  # low sun glow
+    draw.rectangle([0, hz, w, h], fill=(*D, 150))                 # ground below the horizon
+    by = h * 0.99; bw = w * 0.62                                  # asphalt road → vanishing point
+    draw.polygon([(w * 0.5 - bw / 2, by), (w * 0.5 + bw / 2, by), (vpx + w * 0.018, hz), (vpx - w * 0.018, hz)], fill=(44, 44, 50, 240))
+    draw.line([(w * 0.5 - bw / 2, by), (vpx - w * 0.018, hz)], fill=(*L, 150), width=max(2, int(w * 0.004)))  # edge lines
+    draw.line([(w * 0.5 + bw / 2, by), (vpx + w * 0.018, hz)], fill=(*L, 150), width=max(2, int(w * 0.004)))
+    n = 7
+    lerp = lambda t: (w * 0.5 + (vpx - w * 0.5) * t, by + (hz - by) * t)
+    for i in range(n):                                            # dashed yellow centre line
+        x0, y0 = lerp(i / n); x1, y1 = lerp((i + 0.5) / n)
+        draw.line([(x0, y0), (x1, y1)], fill=(245, 220, 90, 235), width=max(2, int((1 - i / n) * w * 0.02)))
+    return img
+
+
+def _make_holiday_lights_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Strings of festive fairy-lights / baubles — festive."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gd = ImageDraw.Draw(glow)
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 50) for x in color_top[:3])
+    bulbs = [(235, 70, 70), (80, 200, 95), (245, 205, 90), (130, 170, 255)]
+    nstr = [3, 4, 2, 5][min(v, 3)]
+    wire_y = lambda x, y0: y0 + math.sin(x * 0.012) * h * 0.045
+    strings = [h * (0.12 + s * 0.15) for s in range(nstr)]
+    for y0 in strings:
+        for k in range(11):
+            bx = w * (k + 0.5) / 11; by = wire_y(bx, y0) + h * 0.018; br = w * 0.013
+            gd.ellipse([bx - br * 2.4, by - br * 2.4, bx + br * 2.4, by + br * 2.4], fill=(*bulbs[k % 4], 110))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=9)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    for y0 in strings:
+        draw.line([(x, wire_y(x, y0)) for x in range(0, w + 1, 10)], fill=(*L, 130), width=max(2, w // 400))
+        for k in range(11):
+            bx = w * (k + 0.5) / 11; by = wire_y(bx, y0) + h * 0.018; br = w * 0.013
+            draw.line([(bx, wire_y(bx, y0)), (bx, by)], fill=(*L, 120), width=max(1, w // 650))
+            draw.ellipse([bx - br, by - br, bx + br, by + br], fill=(*bulbs[k % 4], 235))
+    return img
+
+
+# === NEW families, round 3 (genre-true, album-cover quality) ===================
+
+def _make_jazz_club_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A lively jazz combo under crossed spotlights — a warm-wood double bass + a brass trumpet + a
+    scatter of real music-note glyphs. WHY redrawn: flat silhouettes + hand-drawn notes read as crude."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    rng = rng or random.Random(v)
+    warm = (255, 206, 128)
+    sp = Image.new("RGBA", (w, h), (0, 0, 0, 0)); sd = ImageDraw.Draw(sp)
+    sd.polygon([(w * 0.16, -h * 0.05), (w * 0.60, h * 0.95), (w * 0.28, h * 0.95)], fill=(*warm, 30))  # crossed
+    sd.polygon([(w * 0.84, -h * 0.05), (w * 0.72, h * 0.95), (w * 0.42, h * 0.95)], fill=(*warm, 26))  # spotlights
+    img = Image.alpha_composite(img, sp.filter(ImageFilter.GaussianBlur(radius=36)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    # WHY 10 entries + _BG_SYMMETRIC (no h-flip): the h-mirror was flipping the music-note glyphs backwards.
+    flip = [0, -1, 1, 0, -1, 1, 0.5, -0.5, 1.5, -1.5][min(v, 9)]                              # per-variant nudge
+    floor = h * 0.74; lwd = max(2, int(w * 0.005))
+    draw.line([(0, floor), (w, floor)], fill=(40, 30, 24, 90), width=max(2, int(h * 0.006)))  # stage edge
+    # --- double bass (left), warm wood standing on an endpin ---
+    bx = w * (0.28 + 0.02 * flip); wood, wood_d, strc = (150, 88, 42), (94, 52, 24), (232, 224, 200)
+    uy, ly = h * 0.46, h * 0.60; upr, lwr = w * 0.10, w * 0.135
+    draw.line([(bx, ly + lwr * 0.92), (bx, floor + h * 0.02)], fill=(*wood_d, 235), width=max(3, int(w * 0.006)))  # endpin
+    draw.ellipse([bx - lwr, ly - lwr * 0.86, bx + lwr, ly + lwr * 0.96], fill=(*wood, 235))   # lower bout
+    draw.ellipse([bx - upr, uy - upr * 0.80, bx + upr, uy + upr * 0.90], fill=(*wood, 235))   # upper bout
+    draw.polygon([(bx - upr * 0.82, uy), (bx + upr * 0.82, uy),
+                  (bx + lwr * 0.82, ly), (bx - lwr * 0.82, ly)], fill=(*wood, 235))           # waist
+    shoulder = uy - upr * 0.78; nw = w * 0.026
+    draw.rectangle([bx - nw * 0.5, h * 0.155, bx + nw * 0.5, shoulder], fill=(*wood_d, 235))  # neck
+    sr = w * 0.018
+    draw.arc([bx - sr, h * 0.13, bx + sr, h * 0.172], 0, 330, fill=(*wood, 235), width=max(3, int(w * 0.01)))  # scroll
+    bjy = ly + lwr * 0.20
+    for s in (-1, 1):                                                                         # f-holes
+        draw.line([(bx + s * upr * 0.46, bjy - h * 0.05), (bx + s * upr * 0.46, bjy + h * 0.04)], fill=(*wood_d, 200), width=lwd)
+    for s in (-1.5, -0.5, 0.5, 1.5):                                                          # 4 strings
+        draw.line([(bx + s * nw * 0.2, ly + lwr * 0.7), (bx + s * nw * 0.2, h * 0.16)], fill=(*strc, 175), width=2)
+    # --- trumpet (right), brass ---
+    tx, ty = w * (0.65 + 0.02 * flip), h * 0.42; tw = max(8, int(w * 0.022))
+    brass, brass_h, brass_d = (212, 172, 60), (244, 216, 124), (150, 116, 30)
+    draw.line([(tx - w * 0.14, ty), (tx + w * 0.06, ty)], fill=(*brass, 255), width=tw)       # leadpipe
+    draw.line([(tx - w * 0.14, ty - tw * 0.28), (tx + w * 0.06, ty - tw * 0.28)], fill=(*brass_h, 255), width=max(2, tw // 3))  # highlight
+    draw.polygon([(tx + w * 0.06, ty - h * 0.02), (tx + w * 0.06, ty + h * 0.02),
+                  (tx + w * 0.20, ty + h * 0.085), (tx + w * 0.20, ty - h * 0.085)], fill=(*brass, 255))  # bell flare
+    draw.ellipse([tx + w * 0.185, ty - h * 0.085, tx + w * 0.215, ty + h * 0.085], fill=(*brass_h, 255))  # bell rim
+    draw.ellipse([tx - w * 0.165, ty - tw * 0.7, tx - w * 0.13, ty + tw * 0.7], fill=(*brass_d, 255))     # mouthpiece
+    for k in range(3):                                                                        # 3 valves + caps
+        vx = tx - w * 0.04 + k * w * 0.035
+        draw.rectangle([vx - tw * 0.32, ty - h * 0.06, vx + tw * 0.32, ty], fill=(*brass_d, 255))
+        draw.ellipse([vx - tw * 0.42, ty - h * 0.078, vx + tw * 0.42, ty - h * 0.05], fill=(*brass_h, 255))
+    # --- scattered music-note GLYPHS (non-overlapping), warm gold ---
+    notes = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gold = (250, 210, 120)
+    names = ["music_note", "music_note_2"]; placed = []; target = rng.randint(3, 5); tries = 0
+    while len(placed) < target and tries < 60:
+        tries += 1
+        nx, ny = rng.uniform(w * 0.42, w * 0.84), rng.uniform(h * 0.10, h * 0.32)
+        nsz = w * rng.uniform(0.05, 0.075); r = nsz * 0.55
+        if any(math.hypot(nx - px, ny - py) < r + pr for px, py, pr in placed):
+            continue
+        placed.append((nx, ny, r))
+        _draw_glyph(notes, names[len(placed) % 2], nx, ny, nsz, (*gold, 235), tilt=rng.uniform(-16, 16))
+    return Image.alpha_composite(img, notes)
+
+
+def _make_strings_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A cello in warm wood — classical, string quartet, neoclassical, strings & romance.
+    WHY redrawn: the old neck floated off the bouts and strings fanned out. Here a heel joins the neck to
+    the body and the neck, fingerboard, bridge and 4 parallel strings all share the centreline = connected."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    wood, wood_d, fb, strc = (150, 86, 40), (96, 52, 22), (44, 30, 22), (232, 224, 200)
+    configs = [(0.50, 1.00), (0.42, 0.94), (0.58, 1.06), (0.50, 0.86)]    # (centre_x, scale) — all distinct
+    cxf, scl = configs[min(v, len(configs) - 1)]
+    cx = w * cxf
+    uy, ly = h * 0.46, h * 0.62
+    upr, lwr = w * 0.105 * scl, w * 0.140 * scl
+    lwd = max(2, int(w * 0.006))
+    draw.ellipse([cx - lwr, ly - lwr * 0.86, cx + lwr, ly + lwr * 0.96], fill=(*wood, 235))   # lower bout
+    draw.ellipse([cx - upr, uy - upr * 0.80, cx + upr, uy + upr * 0.90], fill=(*wood, 235))   # upper bout
+    draw.polygon([(cx - upr * 0.82, uy), (cx + upr * 0.82, uy),
+                  (cx + lwr * 0.82, ly), (cx - lwr * 0.82, ly)], fill=(*wood, 235))           # waist
+    draw.arc([cx - lwr, ly - lwr * 0.86, cx + lwr, ly + lwr * 0.96], 300, 80, fill=(*wood_d, 130), width=lwd)  # edge sheen
+    shoulder = uy - upr * 0.78; nw = w * 0.034 * scl; neck_top = h * 0.16
+    draw.polygon([(cx - upr * 0.34, shoulder), (cx + upr * 0.34, shoulder),
+                  (cx + nw * 0.6, shoulder - h * 0.04), (cx - nw * 0.6, shoulder - h * 0.04)], fill=(*wood, 235))  # heel
+    draw.rectangle([cx - nw * 0.6, neck_top, cx + nw * 0.6, shoulder - h * 0.03], fill=(*wood_d, 235))   # neck
+    draw.rectangle([cx - nw * 0.42, neck_top, cx + nw * 0.42, shoulder - h * 0.03], fill=(*fb, 235))     # fingerboard
+    draw.rectangle([cx - nw * 0.5, neck_top - h * 0.03, cx + nw * 0.5, neck_top], fill=(*wood, 235))     # pegbox
+    sr = w * 0.02
+    draw.arc([cx - sr, neck_top - h * 0.058, cx + sr, neck_top - h * 0.012], 0, 330, fill=(*wood, 235), width=max(3, int(w * 0.01)))  # scroll
+    by = ly + lwr * 0.18
+    draw.line([(cx - upr * 0.4, by), (cx + upr * 0.4, by)], fill=(*wood_d, 220), width=lwd)   # bridge
+    for s in (-1, 1):                                                                         # f-holes
+        fx = cx + s * upr * 0.5
+        draw.line([(fx, by - h * 0.06), (fx, by + h * 0.04)], fill=(*wood_d, 200), width=lwd)
+    tail_y = ly + lwr * 0.72
+    for s in (-1.5, -0.5, 0.5, 1.5):                                                          # 4 aligned strings
+        ox = s * nw * 0.22
+        draw.line([(cx + ox, tail_y), (cx + ox, neck_top)], fill=(*strc, 175), width=max(1, int(w * 0.0035)))
+    return img
+
+
+# Gibson Les Paul — a 480-point outline of the WHOLE guitar (body + neck + headstock) traced off a real
+# LP photo: the transparent-PNG alpha was boundary-traced (5000 px), PCA-rotated so the neck lies
+# horizontal, flipped so the single cutaway sits at the BOTTOM (treble side), and normalised to body
+# half-width 0.70 with the body centred on the origin. nx<=1.149 = body, 1.149..2.83 = neck, >=2.83 = headstock.
+# WHY a traced outline: hand-built body polygons read as a lumpy blob; the real contour is unmistakably an LP.
+_GUITAR_CP = [
+    (-0.2041, -0.7091), (-0.179, -0.7069), (-0.1539, -0.7047), (-0.1288, -0.7025), (-0.1037, -0.7003), (-0.0786, -0.6981),
+    (-0.0546, -0.6931), (-0.0313, -0.6865), (-0.008, -0.6802), (0.0146, -0.6724), (0.0374, -0.6645), (0.0595, -0.6555),
+    (0.0814, -0.646), (0.1029, -0.6352), (0.1238, -0.6238), (0.1445, -0.6121), (0.1645, -0.5981), (0.1852, -0.5861),
+    (0.2051, -0.5721), (0.2236, -0.5564), (0.2434, -0.5425), (0.2608, -0.525), (0.2794, -0.5093), (0.2971, -0.4921),
+    (0.3153, -0.4762), (0.3326, -0.4588), (0.3511, -0.4431), (0.3709, -0.4291), (0.3912, -0.4163), (0.4125, -0.4059),
+    (0.4364, -0.4007), (0.4604, -0.3957), (0.4847, -0.3965), (0.5084, -0.4003), (0.5317, -0.4062), (0.5546, -0.4148),
+    (0.5765, -0.4249), (0.5979, -0.4364), (0.6199, -0.4463), (0.6414, -0.4578), (0.6641, -0.4664), (0.686, -0.4757),
+    (0.7084, -0.4843), (0.7318, -0.4905), (0.7551, -0.496), (0.7786, -0.4999), (0.8031, -0.5007), (0.8274, -0.5015),
+    (0.8512, -0.4965), (0.8752, -0.4915), (0.8978, -0.4837), (0.9194, -0.4736), (0.9403, -0.4623), (0.9602, -0.4489),
+    (0.9795, -0.4341), (0.9981, -0.4183), (1.0143, -0.399), (1.0305, -0.3797), (1.0452, -0.3597), (1.059, -0.3393),
+    (1.0763, -0.3498), (1.0868, -0.3585), (1.1015, -0.3396), (1.1057, -0.3158), (1.0867, -0.3175), (1.0753, -0.3035),
+    (1.0822, -0.2806), (1.0889, -0.2574), (1.0953, -0.2345), (1.0995, -0.211), (1.101, -0.1867), (1.1041, -0.1628),
+    (1.1037, -0.1381), (1.1206, -0.1266), (1.145, -0.1275), (1.1701, -0.1253), (1.1944, -0.1261), (1.2188, -0.1269),
+    (1.2439, -0.1247), (1.2683, -0.1255), (1.2934, -0.1233), (1.3177, -0.1241), (1.3421, -0.1249), (1.3672, -0.1227),
+    (1.3915, -0.1235), (1.4166, -0.1213), (1.4409, -0.1221), (1.4657, -0.1213), (1.4903, -0.1208), (1.5149, -0.1207),
+    (1.5385, -0.1195), (1.5629, -0.1203), (1.588, -0.1181), (1.6124, -0.1189), (1.6375, -0.1167), (1.6619, -0.1175),
+    (1.6864, -0.1174), (1.7113, -0.1161), (1.7364, -0.1139), (1.7607, -0.1147), (1.7852, -0.1155), (1.8103, -0.1133),
+    (1.8346, -0.1141), (1.8597, -0.1119), (1.884, -0.1128), (1.9086, -0.1124), (1.9334, -0.1114), (1.9578, -0.1122),
+    (1.9829, -0.11), (2.0072, -0.1108), (2.0323, -0.1086), (2.0567, -0.1094), (2.0811, -0.1102), (2.1062, -0.108),
+    (2.1306, -0.1088), (2.1557, -0.1066), (2.1801, -0.1074), (2.2052, -0.1052), (2.2295, -0.106), (2.2546, -0.1041),
+    (2.2791, -0.1046), (2.3035, -0.1054), (2.3286, -0.1033), (2.3529, -0.1041), (2.3775, -0.1037), (2.4023, -0.1027),
+    (2.427, -0.1022), (2.4519, -0.1013), (2.4763, -0.1021), (2.5014, -0.0999), (2.5258, -0.1007), (2.5509, -0.0985),
+    (2.5752, -0.0993), (2.5998, -0.0987), (2.6246, -0.0979), (2.6497, -0.0957), (2.6741, -0.0965), (2.6992, -0.0943),
+    (2.7228, -0.0981), (2.7457, -0.1049), (2.7674, -0.1152), (2.7875, -0.1294), (2.8042, -0.146), (2.8284, -0.1476),
+    (2.8436, -0.1586), (2.8317, -0.1796), (2.8273, -0.203), (2.8254, -0.226), (2.8492, -0.2297), (2.8732, -0.2316),
+    (2.8971, -0.2264), (2.8932, -0.2019), (2.887, -0.1787), (2.8736, -0.1591), (2.8871, -0.1454), (2.9115, -0.1461),
+    (2.9366, -0.144), (2.9611, -0.1448), (2.9662, -0.1636), (2.955, -0.1839), (2.951, -0.2075), (2.9543, -0.2261),
+    (2.978, -0.2299), (3.0026, -0.2292), (3.0228, -0.221), (3.0178, -0.1972), (3.0126, -0.1734), (2.9993, -0.1535),
+    (3.0196, -0.1456), (3.044, -0.1464), (3.068, -0.1488), (3.092, -0.1511), (3.0894, -0.1712), (3.0796, -0.1931),
+    (3.0752, -0.2167), (3.0843, -0.2327), (3.1078, -0.2376), (3.1329, -0.2355), (3.1492, -0.2236), (3.1442, -0.1996),
+    (3.1386, -0.176), (3.1258, -0.1577), (3.1481, -0.1549), (3.1725, -0.1559), (3.1963, -0.1595), (3.2205, -0.161),
+    (3.2443, -0.1641), (3.2686, -0.1649), (3.2707, -0.1435), (3.2693, -0.1202), (3.273, -0.0965), (3.2791, -0.0735),
+    (3.2867, -0.0506), (3.2905, -0.0268), (3.2883, -0.0017), (3.2921, 0.0219), (3.2863, 0.0455), (3.2769, 0.0674),
+    (3.2714, 0.0912), (3.2675, 0.115), (3.2702, 0.1387), (3.2694, 0.1599), (3.2444, 0.1588), (3.2193, 0.1566),
+    (3.1955, 0.1515), (3.1704, 0.1493), (3.1453, 0.1472), (3.1269, 0.1565), (3.1411, 0.176), (3.1475, 0.1991),
+    (3.1513, 0.2228), (3.1296, 0.2308), (3.1051, 0.2317), (3.0813, 0.2267), (3.0795, 0.2042), (3.0846, 0.1803),
+    (3.0962, 0.1594), (3.0847, 0.1448), (3.0596, 0.1426), (3.0345, 0.1404), (3.0101, 0.1412), (3.0039, 0.1575),
+    (3.0174, 0.1767), (3.0229, 0.1999), (3.0202, 0.2206), (2.9966, 0.2251), (2.9735, 0.2231), (2.9506, 0.2165),
+    (2.9543, 0.193), (2.9593, 0.169), (2.9722, 0.1494), (2.953, 0.1392), (2.9287, 0.14), (2.9042, 0.1408),
+    (2.8798, 0.1416), (2.8821, 0.1606), (2.8907, 0.1827), (2.8974, 0.2055), (2.8883, 0.2233), (2.8645, 0.2271),
+    (2.8407, 0.2239), (2.8264, 0.2122), (2.8286, 0.1871), (2.8362, 0.1644), (2.8402, 0.144), (2.8151, 0.1418),
+    (2.7936, 0.1323), (2.7762, 0.1149), (2.7566, 0.1008), (2.735, 0.0907), (2.711, 0.0857), (2.6859, 0.0835),
+    (2.6615, 0.0843), (2.6372, 0.0851), (2.6128, 0.0859), (2.5884, 0.0867), (2.564, 0.0875), (2.5396, 0.0884),
+    (2.5145, 0.0862), (2.4902, 0.087), (2.4662, 0.089), (2.4416, 0.0886), (2.4172, 0.0894), (2.3928, 0.0902),
+    (2.3685, 0.091), (2.344, 0.0918), (2.3193, 0.0909), (2.2946, 0.0906), (2.2703, 0.0912), (2.2458, 0.092),
+    (2.2215, 0.0928), (2.197, 0.0936), (2.1726, 0.0944), (2.148, 0.0941), (2.1238, 0.0955), (2.099, 0.0949),
+    (2.0745, 0.0947), (2.05, 0.0955), (2.0256, 0.0963), (2.0013, 0.0971), (1.977, 0.0979), (1.9519, 0.0957),
+    (1.9274, 0.0965), (1.903, 0.0973), (1.8786, 0.0981), (1.8543, 0.0989), (1.8312, 0.0969), (1.8067, 0.0977),
+    (1.7824, 0.0985), (1.7598, 0.0994), (1.7354, 0.1002), (1.7103, 0.0981), (1.6859, 0.0988), (1.6614, 0.0996),
+    (1.6369, 0.1004), (1.6126, 0.1012), (1.5881, 0.102), (1.5637, 0.1028), (1.5392, 0.1036), (1.5144, 0.1025),
+    (1.4898, 0.1024), (1.4654, 0.1031), (1.441, 0.1039), (1.4165, 0.1047), (1.3921, 0.1049), (1.3671, 0.1033),
+    (1.3428, 0.1041), (1.3185, 0.1049), (1.294, 0.1057), (1.2696, 0.1065), (1.2445, 0.1043), (1.2201, 0.1051),
+    (1.1956, 0.1059), (1.1712, 0.1067), (1.1467, 0.1075), (1.1217, 0.1058), (1.0973, 0.1061), (1.0728, 0.1069),
+    (1.0483, 0.1077), (1.0238, 0.1085), (0.9995, 0.1094), (0.9754, 0.1121), (0.9512, 0.1141), (0.9279, 0.1195),
+    (0.905, 0.1273), (0.8835, 0.138), (0.8626, 0.1501), (0.845, 0.1675), (0.8294, 0.1861), (0.8189, 0.2078),
+    (0.8114, 0.2307), (0.8064, 0.2546), (0.8072, 0.2789), (0.8122, 0.3025), (0.8205, 0.3252), (0.8326, 0.3461),
+    (0.848, 0.3644), (0.8666, 0.3801), (0.8855, 0.3957), (0.9018, 0.4124), (0.908, 0.4353), (0.8985, 0.4574),
+    (0.8774, 0.4696), (0.8544, 0.4752), (0.8306, 0.479), (0.8063, 0.4798), (0.7819, 0.4806), (0.7568, 0.4784),
+    (0.7329, 0.4734), (0.7089, 0.4684), (0.6861, 0.461), (0.6635, 0.4524), (0.6418, 0.4419), (0.6201, 0.4315),
+    (0.5986, 0.4202), (0.5774, 0.4086), (0.5566, 0.3969), (0.5341, 0.3885), (0.5102, 0.3835), (0.4863, 0.3785),
+    (0.4612, 0.3763), (0.4374, 0.3796), (0.4139, 0.384), (0.392, 0.3939), (0.3709, 0.406), (0.3507, 0.4204),
+    (0.3314, 0.4366), (0.3159, 0.4551), (0.2973, 0.4717), (0.2792, 0.4886), (0.2599, 0.5048), (0.2415, 0.5202),
+    (0.2232, 0.5356), (0.2031, 0.5497), (0.183, 0.5639), (0.1628, 0.5781), (0.1416, 0.5905), (0.1214, 0.6046),
+    (0.0995, 0.6151), (0.0776, 0.6254), (0.0557, 0.6357), (0.0329, 0.6445), (0.0108, 0.6538), (-0.0124, 0.661),
+    (-0.0356, 0.6676), (-0.0588, 0.6742), (-0.0826, 0.678), (-0.1061, 0.6826), (-0.1299, 0.6856), (-0.1543, 0.6864),
+    (-0.1787, 0.6872), (-0.2024, 0.6902), (-0.2273, 0.6889), (-0.2524, 0.6867), (-0.2775, 0.6845), (-0.3016, 0.6801),
+    (-0.3264, 0.6773), (-0.3497, 0.6707), (-0.3729, 0.6644), (-0.3956, 0.6565), (-0.4183, 0.6487), (-0.4405, 0.6398),
+    (-0.4623, 0.6302), (-0.485, 0.6221), (-0.5039, 0.6065), (-0.527, 0.604), (-0.549, 0.5941), (-0.5627, 0.5736),
+    (-0.5753, 0.5557), (-0.5904, 0.5383), (-0.6075, 0.5206), (-0.6239, 0.5016), (-0.6401, 0.4823), (-0.6556, 0.4627),
+    (-0.6686, 0.4419), (-0.6829, 0.4216), (-0.6952, 0.4006), (-0.7069, 0.3794), (-0.7176, 0.3578), (-0.7279, 0.3359),
+    (-0.736, 0.3132), (-0.7433, 0.2901), (-0.7508, 0.2672), (-0.7564, 0.244), (-0.761, 0.2202), (-0.7662, 0.197),
+    (-0.7699, 0.1733), (-0.7722, 0.1493), (-0.776, 0.1255), (-0.7763, 0.101), (-0.7758, 0.0762), (-0.7784, 0.0523),
+    (-0.7792, 0.0279), (-0.7822, 0.0043), (-0.8011, 0.0099), (-0.8161, 0.0093), (-0.8225, -0.0136), (-0.8145, -0.0364),
+    (-0.7987, -0.0315), (-0.78, -0.03), (-0.7778, -0.0551), (-0.7756, -0.0802), (-0.7734, -0.1053), (-0.7715, -0.1285),
+    (-0.7692, -0.1536), (-0.767, -0.1787), (-0.762, -0.2026), (-0.7572, -0.2266), (-0.7519, -0.2503), (-0.7469, -0.2742),
+    (-0.7391, -0.2969), (-0.7312, -0.3194), (-0.7244, -0.3426), (-0.7155, -0.3649), (-0.7067, -0.387), (-0.6967, -0.4086),
+    (-0.6863, -0.43), (-0.6735, -0.4503), (-0.6613, -0.471), (-0.6477, -0.4907), (-0.6325, -0.5097), (-0.6162, -0.5278),
+    (-0.5988, -0.5451), (-0.5813, -0.5626), (-0.562, -0.5788), (-0.5427, -0.595), (-0.5226, -0.6091), (-0.5016, -0.6213),
+    (-0.4807, -0.6339), (-0.4596, -0.6458), (-0.4378, -0.6564), (-0.4153, -0.6658), (-0.3931, -0.6746), (-0.3701, -0.6823),
+    (-0.3469, -0.6893), (-0.3236, -0.6951), (-0.2999, -0.6988), (-0.2762, -0.7025), (-0.2521, -0.7047), (-0.2284, -0.7083),
+]
+
+
+def _make_guitar_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A Gibson Les Paul — indie, rock, grunge, punk, blues, pub rock. The whole-guitar silhouette is a
+    480-point trace of a real LP (see _GUITAR_CP); on top sit a bound rosewood board with trapezoid inlays,
+    2 humbuckers (width ~= the string spread), tune-o-matic + stopbar, 4 amber knobs + toggle, and a black
+    3+3 headstock (its own traced region). Drawn flat (neck to the right) then rotated to lean up-right."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    # 10 real finishes — the guitar is NEVER h-mirrored (a flipped Les Paul reads left-handed/wrong), so
+    # extra variants are added here as genuine colours instead of flip-twins (guitar is in _BG_SYMMETRIC).
+    variants = [(16, (38, 22, 14), (190, 118, 46)),    # tobacco / heritage cherry sunburst
+                (14, (18, 18, 22), (178, 180, 188)),   # silverburst
+                (18, (168, 126, 40), (230, 192, 96)),  # goldtop (near-solid gold)
+                (15, (58, 12, 20), (192, 42, 50)),     # cherry / wine-red burst
+                (12, (15, 15, 18), (46, 46, 52)),      # ebony (near-solid black)
+                (17, (120, 70, 22), (232, 180, 76)),   # honey / lemon burst
+                (16, (16, 30, 72), (76, 138, 216)),    # blue burst
+                (15, (10, 40, 24), (52, 142, 80)),     # emerald-green burst
+                (17, (32, 16, 50), (126, 76, 182)),    # purple burst
+                (13, (34, 92, 118), (128, 186, 208))]  # (lean deg, edge, centre) — pelham/teal blue
+    ang, edge, centre = variants[min(v, len(variants) - 1)]
+    binding, fboard, fret, inlay = (230, 224, 198), (74, 48, 34), (198, 198, 202), (236, 234, 212)
+    pg_cream, pu_sur, pu_body, gold = (234, 228, 200), (232, 226, 200), (40, 36, 34), (214, 180, 90)
+    amber, chrome, hs_blk = (214, 150, 60), (208, 212, 218), (24, 22, 26)
+    # supersample: draw the whole layer at 2x and LANCZOS-downsample at the very end. WHY: PIL polygons are
+    # aliased, so a 2 px binding looks fuzzy at 1x; supersampling antialiases every edge cleanly WITHOUT
+    # smoothing/altering the traced body shape (point-smoothing pulled in the tail + upper bout — never do that).
+    ss = 2; W, H = w * ss, h * ss
+    gl = Image.new("RGBA", (W, H), (0, 0, 0, 0)); g = ImageDraw.Draw(gl, 'RGBA')
+    def rr(box, fill, outline=None):
+        try:
+            g.rounded_rectangle(box, radius=int(W * 0.01), fill=fill, outline=outline)
+        except Exception:
+            g.rectangle(box, fill=fill, outline=outline)
+    S = W * 0.205; bx, by = W * 0.30, H * 0.545
+    scy = by                                                              # neck centreline (trace neck centred on it)
+    def P(nx, ny): return (bx + nx * S, by + ny * S)
+    cp = _GUITAR_CP                                                       # the EXACT approved trace — never smoothed
+    NECK_X, HS_X = 1.149, 2.83                                            # body->neck pocket, neck->headstock (from the trace)
+    # --- whole-guitar silhouette: cream binding (full outline) ---
+    g.polygon([P(nx, ny) for nx, ny in cp], fill=(*binding, 255))
+    # --- body: a real sunburst — radial gradient (bright flamed centre -> dark burst edge) clipped to
+    # the body, so the cream binding shows as a thin rim. Base-fill the body first so the irregular
+    # corners (cutaway horn, bouts) stay edge-dark where the ellipses don't reach. ---
+    body = [(nx, ny) for nx, ny in cp if nx <= NECK_X]
+    burst = Image.new("RGBA", (W, H), (0, 0, 0, 0)); bd = ImageDraw.Draw(burst)
+    bd.polygon([(bx + nx * S, by + ny * S) for nx, ny in body], fill=(*edge, 255))
+    cxb, cyb = bx + 0.14 * S, by
+    for i in range(26, -1, -1):
+        t = i / 26.0                                                      # 1 = edge .. 0 = centre
+        cc = tuple(int(centre[k] + (edge[k] - centre[k]) * t) for k in range(3))
+        rx, ry = (0.10 + 0.92 * t) * S, (0.08 + 0.66 * t) * S
+        bd.ellipse([cxb - rx, cyb - ry, cxb + rx, cyb + ry], fill=(*cc, 255))
+    # uniform, barely-there binding: erode the body mask by a CONSTANT pixel width (a thick boundary line
+    # eats the same amount all the way round) rather than scaling toward the centre (which is non-uniform)
+    bind_px = max(2, int(round(W * 0.0015)))                             # ~1.5 px (final) — barely, barely there
+    mask = Image.new("L", (W, H), 0); mdr = ImageDraw.Draw(mask)
+    bodypx = [(bx + nx * S, by + ny * S) for nx, ny in body]
+    mdr.polygon(bodypx, fill=255)
+    mdr.line(bodypx + [bodypx[0]], fill=0, width=bind_px * 2, joint="curve")
+    gl.paste(burst, (0, 0), mask)
+    # --- HARDWARE — every part's position & size measured directly off lespaul_ref2.png (warped into
+    # this exact frame): bridge pickup (0.22,-0.01) 0.165x0.296, neck pickup (0.66,-0.01), tune-o-matic
+    # (0.054), stopbar (-0.092), the cream pickguard contour, the 4-knob parallelogram and the toggle. ---
+    cy0 = scy - 0.012 * S                                                 # bridge/pickups/tailpiece centreline
+    # cream pickguard (traced contour: flat top along the strings, point past the neck pickup, wide tail)
+    pg = [(0.10, 0.122), (0.857, 0.118), (0.74, 0.24), (0.647, 0.267), (0.557, 0.30), (0.467, 0.337),
+          (0.377, 0.375), (0.287, 0.412), (0.197, 0.45), (0.137, 0.455), (0.105, 0.40)]
+    g.polygon([P(nx, ny) for nx, ny in pg], fill=(*pg_cream, 245))
+    # stopbar tailpiece + tune-o-matic bridge — slim chrome bars (NOT solid blocks): a stopbar with
+    # string anchors + end studs, and a saddle bar (kept shorter than the pickups) + 6 saddles + 2 posts
+    chrome_d = (150, 154, 162)
+    rr([bx - 0.114 * S, cy0 - 0.140 * S, bx - 0.066 * S, cy0 + 0.140 * S], (*chrome, 255))            # stopbar bar
+    for s in range(6):                                                                                # string anchor holes
+        yy = cy0 - 0.100 * S + s * (0.20 * S / 5)
+        g.ellipse([bx - 0.099 * S, yy - 0.008 * S, bx - 0.081 * S, yy + 0.008 * S], fill=(*chrome_d, 255))
+    for sy in (cy0 - 0.150 * S, cy0 + 0.150 * S):                                                     # 2 anchor studs
+        g.ellipse([bx - 0.102 * S, sy - 0.016 * S, bx - 0.078 * S, sy + 0.016 * S], fill=(*chrome, 255), outline=(*chrome_d, 255))
+    rr([bx + 0.028 * S, cy0 - 0.120 * S, bx + 0.080 * S, cy0 + 0.120 * S], (*chrome, 255))            # tune-o-matic saddle bar
+    for s in range(6):                                                                                # 6 saddles
+        yy = cy0 - 0.095 * S + s * (0.19 * S / 5)
+        g.rectangle([bx + 0.036 * S, yy - 0.010 * S, bx + 0.072 * S, yy + 0.010 * S], fill=(*chrome_d, 255))
+    for sy in (cy0 - 0.158 * S, cy0 + 0.158 * S):                                                     # 2 thumbwheel posts
+        g.ellipse([bx + 0.040 * S, sy - 0.018 * S, bx + 0.068 * S, sy + 0.018 * S], fill=(*chrome, 255), outline=(*chrome_d, 255))
+    # 2 humbuckers — exact footprint 0.165w x 0.296h: cream mounting ring, twin dark bobbins, gold poles
+    for cxn in (0.220, 0.664):
+        cxh = bx + cxn * S
+        rr([cxh - 0.082 * S, cy0 - 0.148 * S, cxh + 0.082 * S, cy0 + 0.148 * S], (*pu_sur, 255))   # mounting ring
+        g.rectangle([cxh - 0.062 * S, cy0 - 0.126 * S, cxh + 0.062 * S, cy0 + 0.126 * S], fill=(*pu_body, 255))  # bobbins
+        for rowx in (-0.030, 0.030):                                      # twin coils; poles span ~ the strings
+            for p in range(6):
+                yy = cy0 - 0.100 * S + p * (0.20 * S / 5)
+                g.ellipse([cxh + rowx * S - 0.010 * S, yy - 0.010 * S, cxh + rowx * S + 0.010 * S, yy + 0.010 * S], fill=(*gold, 255))
+    # 4 amber top-hat knobs — the measured parallelogram on the lower bout
+    for kx_n, ky_n in [(-0.41, 0.30), (-0.17, 0.31), (-0.30, 0.48), (-0.07, 0.49)]:
+        kx, ky = P(kx_n, ky_n); kr = 0.055 * S
+        g.ellipse([kx - kr, ky - kr, kx + kr, ky + kr], fill=(*amber, 255), outline=(*hs_blk, 170))
+        g.ellipse([kx - kr * 0.55, ky - kr * 0.55, kx + kr * 0.55, ky + kr * 0.55], outline=(150, 104, 38, 220))
+    # 3-way toggle (upper bout by the cutaway shoulder): cream poker-chip + chrome nut + black tip
+    tgx, tgy = P(0.83, -0.29); tr = 0.052 * S
+    g.ellipse([tgx - tr, tgy - tr, tgx + tr, tgy + tr], fill=(*pg_cream, 255))            # poker-chip washer
+    g.ellipse([tgx - tr * 0.5, tgy - tr * 0.5, tgx + tr * 0.5, tgy + tr * 0.5], fill=(*chrome, 255))
+    g.ellipse([tgx - tr * 0.22, tgy - tr * 0.22, tgx + tr * 0.22, tgy + tr * 0.22], fill=(*hs_blk, 255))
+    # --- bound rosewood fretboard — runs from the NUT right down to the neck pickup (overhangs the body,
+    # per the photo). Les Paul 24.75" scale: fret n at NUT_X - SCALE*(1-2^(-n/12)); trapezoid inlays at
+    # 3,5,7,9,12,15,17,19,21 (centred in the space). Tapers narrow at the nut -> wide at the body. ---
+    NUT_X, FB_END = 2.67, 0.76; SCALE = NUT_X - 0.054                      # nut -> bridge saddle
+    def fb_hw(nx): return (0.088 + 0.020 * (NUT_X - nx) / (NUT_X - FB_END)) * S   # board half-width
+    def fnx(n): return NUT_X - SCALE * (1 - 2 ** (-n / 12.0))              # fret position (n=0 nut)
+    def board_quad(pad):
+        return [(P(FB_END, 0)[0], scy - fb_hw(FB_END) - pad), (P(NUT_X, 0)[0], scy - fb_hw(NUT_X) - pad),
+                (P(NUT_X, 0)[0], scy + fb_hw(NUT_X) + pad), (P(FB_END, 0)[0], scy + fb_hw(FB_END) + pad)]
+    g.polygon(board_quad(0.012 * S), fill=(*binding, 255))                 # cream binding
+    g.polygon(board_quad(0.0), fill=(*fboard, 255))                        # rosewood
+    for n in range(1, 23):                                                 # 22 frets (closer toward the body)
+        fx = P(fnx(n), 0)[0]; hw = fb_hw(fnx(n))
+        g.line([(fx, scy - hw), (fx, scy + hw)], fill=(*fret, 255), width=max(1, int(W * 0.0022)))
+    for n in (3, 5, 7, 9, 12, 15, 17, 19, 21):                             # trapezoid inlays
+        mx = (fnx(n - 1) + fnx(n)) / 2; cxi = P(mx, 0)[0]; hw = fb_hw(mx)
+        iw = (P(fnx(n - 1), 0)[0] - P(fnx(n), 0)[0]) * 0.30; ih = hw * 0.60
+        g.polygon([(cxi - iw, scy - ih * 0.82), (cxi + iw, scy - ih), (cxi + iw, scy + ih), (cxi - iw, scy + ih * 0.82)], fill=(*inlay, 255))
+    nx_n = P(NUT_X, 0)[0]; nhw = fb_hw(NUT_X) + 0.012 * S                   # bone nut
+    g.rectangle([nx_n - 0.012 * S, scy - nhw, nx_n + 0.014 * S, scy + nhw], fill=(238, 232, 214, 255))
+    # --- headstock: trace region (from just past the nut) filled black; truss-rod, tuners, logo on top ---
+    hs = [P(nx, ny) for nx, ny in cp if nx >= NUT_X + 0.02]
+    if len(hs) >= 3:
+        g.polygon(hs, fill=(*hs_blk, 255))
+    g.polygon([P(2.71, -0.050), P(2.795, -0.060), P(2.83, 0), P(2.795, 0.060), P(2.71, 0.050)],
+              fill=(40, 38, 42, 255), outline=(120, 118, 122, 200))        # bell truss-rod cover
+    for txn in (2.865, 2.991, 3.118):                                      # 3 + 3 tuners
+        for sgn in (-1, 1):
+            px, py = P(txn, sgn * 0.085)                                   # face post (string hole)
+            g.ellipse([px - 0.026 * S, py - 0.026 * S, px + 0.026 * S, py + 0.026 * S], fill=(*chrome, 255), outline=(*chrome_d, 255))
+            g.ellipse([px - 0.009 * S, py - 0.009 * S, px + 0.009 * S, py + 0.009 * S], fill=(118, 120, 126, 255))
+            ey, ty = sgn * 0.145, sgn * 0.235                              # keystone button at the edge, outward
+            g.polygon([P(txn - 0.030, ey), P(txn + 0.030, ey), P(txn + 0.020, ty), P(txn - 0.020, ty)],
+                      fill=(*chrome, 255), outline=(*chrome_d, 220))
+    # --- strings: stopbar -> nut, then fanning to the 6 tuner posts ---
+    posts = ([P(txn, -0.085) for txn in (2.865, 2.991, 3.118)] +        # top row: outer string -> nearest peg
+             [P(txn, 0.085) for txn in (3.118, 2.991, 2.865)])           # bottom row REVERSED -> mirrors the top
+    for s in range(6):
+        sy = cy0 - 0.095 * S + s * (0.19 * S / 5)
+        ny_nut = scy - fb_hw(NUT_X) * 0.78 + s * (fb_hw(NUT_X) * 1.56 / 5)
+        g.line([(bx - 0.092 * S, sy), (nx_n, ny_nut)], fill=(232, 232, 236, 175), width=max(1, int(W * 0.0013)))
+        g.line([(nx_n, ny_nut), posts[s]], fill=(214, 214, 220, 150), width=max(1, int(W * 0.0013)))
+    gl = gl.rotate(ang, center=(bx, by), resample=Image.BICUBIC).resize((w, h), Image.LANCZOS)  # downsample -> AA
+    return Image.alpha_composite(img, gl)
+
+
+def _make_acoustic_guitar_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """An acoustic (dreadnought) guitar — folk & acoustic. Warm spruce top, soundhole + rosette.
+    Drawn flat (neck to the right) on a layer then rotated up-right; the acoustic counterpart to guitar."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    variants = [(20, 1.00), (15, 0.94), (24, 1.06)]       # (lean°, scale)
+    ang, scl = variants[min(v, len(variants) - 1)]
+    spruce, bind = (224, 192, 138), (150, 112, 60)
+    rose, hole = (196, 150, 70), (40, 28, 18)
+    neck_c, fboard, fret, dot = (140, 96, 54), (58, 40, 28), (180, 180, 184), (230, 230, 234)
+    strc = (236, 230, 210)
+    gl = Image.new("RGBA", (w, h), (0, 0, 0, 0)); g = ImageDraw.Draw(gl, 'RGBA')
+    bx, by = w * 0.38, h * 0.58; BL = w * 0.30 * scl; BH = w * 0.32 * scl
+    lb = (bx - BL * 0.18, by, BL * 0.64, BH * 1.00)        # lower bout
+    ub = (bx + BL * 0.16, by, BL * 0.54, BH * 0.80)        # upper bout
+    for ex, ey, ew, eh in (lb, ub):
+        g.ellipse([ex - ew / 2, ey - eh / 2, ex + ew / 2, ey + eh / 2], fill=(*bind, 255))         # binding
+        g.ellipse([ex - ew / 2 + 3, ey - eh / 2 + 3, ex + ew / 2 - 3, ey + eh / 2 - 3], fill=(*spruce, 255))
+    g.polygon([(bx - BL * 0.18, by - BH * 0.42), (bx + BL * 0.16, by - BH * 0.34),
+               (bx + BL * 0.16, by + BH * 0.34), (bx - BL * 0.18, by + BH * 0.42)], fill=(*spruce, 255))  # waist
+    hx, hy = bx + BL * 0.10, by; hr = BH * 0.17           # soundhole + rosette
+    g.ellipse([hx - hr - 4, hy - hr - 4, hx + hr + 4, hy + hr + 4], outline=(*rose, 255), width=max(2, int(w * 0.006)))
+    g.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], fill=(*hole, 255))
+    g.rectangle([bx - BL * 0.10, by - BH * 0.10, bx - BL * 0.02, by + BH * 0.10], fill=(*neck_c, 255))   # bridge
+    nx0 = bx + BL * 0.40; NL = w * 0.32; NW = w * 0.044
+    g.rectangle([nx0, by - NW / 2, nx0 + NL, by + NW / 2], fill=(*neck_c, 255))
+    g.rectangle([nx0, by - NW * 0.42, nx0 + NL, by + NW * 0.42], fill=(*fboard, 255))
+    for k in range(1, 8):
+        fxx = nx0 + NL * k / 8
+        g.line([(fxx, by - NW * 0.42), (fxx, by + NW * 0.42)], fill=(*fret, 255), width=max(1, int(w * 0.002)))
+    for k in (3, 5):
+        cxk = nx0 + NL * k / 8
+        g.ellipse([cxk - w * 0.005, by - w * 0.005, cxk + w * 0.005, by + w * 0.005], fill=(*dot, 255))
+    hx0 = nx0 + NL                                          # acoustic headstock + 3+3 tuners
+    try:
+        g.rounded_rectangle([hx0, by - NW * 0.7, hx0 + w * 0.075, by + NW * 0.7], radius=int(w * 0.01), fill=(*neck_c, 255))
+    except Exception:
+        g.rectangle([hx0, by - NW * 0.7, hx0 + w * 0.075, by + NW * 0.7], fill=(*neck_c, 255))
+    for k in range(3):
+        tx = hx0 + w * 0.016 + k * w * 0.022
+        g.ellipse([tx - w * 0.005, by - NW * 0.85, tx + w * 0.005, by - NW * 0.6], fill=(220, 220, 224, 255))
+        g.ellipse([tx - w * 0.005, by + NW * 0.6, tx + w * 0.005, by + NW * 0.85], fill=(220, 220, 224, 255))
+    for s in range(6):                                      # strings: bridge → headstock
+        sy = by - NW * 0.32 + s * (NW * 0.64 / 5)
+        g.line([(bx - BL * 0.06, sy), (hx0 + w * 0.02, sy)], fill=(*strc, 180), width=1)
+    gl = gl.rotate(ang, center=(bx, by), resample=Image.BICUBIC)
+    return Image.alpha_composite(img, gl)
+
+
+def _make_checkerboard_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """2-tone black/white check — ska, 2-tone, mod-adjacent."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0)); draw = ImageDraw.Draw(overlay, 'RGBA')
+    cols = [8, 6, 10, 7][min(v, 3)]
+    cell = w / cols
+    black, white = (24, 24, 28), (240, 240, 244)
+    rows = int(h * 0.74 / cell) + 1
+    for r in range(rows):
+        for c in range(cols):
+            col = white if (r + c) % 2 == 0 else black
+            draw.rectangle([c * cell, r * cell, c * cell + cell, r * cell + cell], fill=(*col, 150))
+    return Image.alpha_composite(img, overlay)
+
+
+def _make_desert_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Rolling sand dunes + low sun — stoner/desert rock, outlaw country."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _c01(x): return max(0.0, min(1.0, x))
+    def _lighten(c, amt=85): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.42): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    sx = w * [0.5, 0.36, 0.64, 0.46][min(v, 3)]; sr = w * 0.16; sy = h * 0.40
+    draw.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=(*L, 180))                          # sun
+    layers = 4
+    def tone(fr): fr = _c01(fr); return tuple(int(L[k] + (D[k] - L[k]) * fr) for k in range(3))
+    for li in range(layers):                                                                    # smooth dunes
+        frac = li / (layers - 1); base = h * (0.46 + 0.12 * li)
+        pts = [(0, h)]
+        for x in range(0, w + 1, 24):
+            pts.append((x, base + math.sin(x * 0.004 + li * 1.7) * h * 0.05))
+        pts.append((w, h))
+        draw.polygon(pts, fill=(*tone(frac), 210))
+    return img
+
+
+def _make_motion_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Dynamic speed streaks — running, walking, workout, high-energy activity."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=95): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.5): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    n = [22, 30, 16, 36][min(v, 3)]
+    ang = math.radians([12, 8, 16, 10][min(v, 3)])
+    dx, dy = math.cos(ang), math.sin(ang)
+    for _ in range(n):
+        y = rng.uniform(0, h * 0.74); x0 = rng.uniform(-w * 0.1, w * 0.6)
+        ln = w * rng.uniform(0.18, 0.5); lw = max(2, int(h * rng.uniform(0.004, 0.016)))
+        col = L if rng.random() < 0.5 else D
+        draw.line([(x0, y), (x0 + dx * ln, y + dy * ln)], fill=(*col, rng.randint(70, 150)), width=lw)
+    return img
+
+
+def _make_traffic_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Car light-trails on a night road (long exposure) — commute / beat the traffic."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    rng = rng or random.Random(v)
+    red, white = (235, 70, 60), (250, 240, 210)
+    n = [6, 8, 5, 9][min(v, 3)]
+    for i in range(n):
+        y = h * (0.16 + 0.62 * i / max(1, n - 1)) + rng.uniform(-0.02, 0.02) * h
+        col = red if i % 2 else white
+        amp = h * 0.02
+        pts = [(x, y + math.sin(x * 0.006 + i) * amp) for x in range(0, w + 1, 12)]
+        draw.line(pts, fill=(*col, rng.randint(90, 150)), width=max(3, int(h * 0.012)))
+    return img
+
+
+def _make_beach_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Sea horizon + sun + rolling waves — beach, summer, tropical."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=90): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.5): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    hz = h * [0.50, 0.46, 0.54, 0.48][min(v, 3)]
+    sx = w * [0.5, 0.36, 0.64, 0.5][min(v, 3)]; sr = w * 0.15
+    draw.ellipse([sx - sr, hz - sr, sx + sr, hz + sr], fill=(*L, 200))                          # sun
+    draw.rectangle([0, hz, w, h], fill=(*D, 90))                                                # sea
+    for i in range(5):                                                                          # wave lines
+        wy = hz + (h - hz) * (0.12 + 0.18 * i)
+        pts = [(x, wy + math.sin(x * 0.02 + i) * h * 0.012) for x in range(0, w + 1, 12)]
+        draw.line(pts, fill=(*L, 110 - i * 12), width=max(2, int(h * 0.006)))
+    return img
+
+
+def _make_wedding_rings_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Two interlocking gold rings + petals/sparkles — wedding day."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    rng = rng or random.Random(v)
+    gold = (236, 206, 120)
+    cx, cy = w * 0.50, h * 0.40
+    r = w * [0.12, 0.10, 0.13, 0.11][min(v, 3)]; off = r * 0.72
+    lw = max(6, int(w * 0.022))
+    draw.ellipse([cx - off - r, cy - r, cx - off + r, cy + r], outline=(*gold, 235), width=lw)
+    draw.ellipse([cx + off - r, cy - r, cx + off + r, cy + r], outline=(*gold, 235), width=lw)
+    draw.arc([cx + off - r, cy - r, cx + off + r, cy + r], 150, 250, fill=(*gold, 120), width=lw)  # interlock hint
+    pinks = [(255, 200, 215), (250, 182, 205), (255, 226, 234)]
+    bar = h * 0.74
+    for _ in range([16, 22, 12, 28][min(v, 3)]):
+        x, y = rng.uniform(0, w), rng.uniform(0, bar); s = w * rng.uniform(0.010, 0.022)
+        draw.ellipse([x - s, y - s * 0.6, x + s, y + s * 0.6], fill=(*rng.choice(pinks), rng.randint(110, 180)))
+    return img
+
+
+def _make_lounge_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Cocktail glass + warm glow + bokeh — after-hours r&b, late-night lounge (NOT a skyline)."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False).convert("RGBA")
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0)); gd = ImageDraw.Draw(glow)
+    warm = tuple(max(0, min(255, c + 95)) for c in color_top[:3])
+    rng = rng or random.Random(v)
+    for _ in range([9, 12, 7, 14][min(v, 3)]):                     # bokeh
+        r = w * rng.uniform(0.04, 0.11); bx, by = rng.uniform(0, w), rng.uniform(0, h * 0.72)
+        gd.ellipse([bx - r, by - r, bx + r, by + r], fill=(*warm, rng.randint(45, 95)))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(radius=16)))
+    draw = ImageDraw.Draw(img, 'RGBA')
+    D = tuple(int(x * 0.30) for x in color_bottom[:3])
+    cx, cy = w * [0.50, 0.42, 0.58, 0.50][min(v, 3)], h * 0.40
+    gw = w * 0.14; lw = max(4, int(w * 0.012))
+    draw.line([(cx - gw, cy - gw * 0.85), (cx + gw, cy - gw * 0.85)], fill=(*D, 220), width=lw)   # rim
+    draw.polygon([(cx - gw, cy - gw * 0.85), (cx + gw, cy - gw * 0.85), (cx, cy + gw * 0.15)], outline=(*D, 230), fill=(*warm, 70))  # bowl
+    draw.line([(cx, cy + gw * 0.15), (cx, cy + gw * 1.05)], fill=(*D, 220), width=lw)             # stem
+    draw.line([(cx - gw * 0.5, cy + gw * 1.05), (cx + gw * 0.5, cy + gw * 1.05)], fill=(*D, 220), width=lw)  # base
+    draw.line([(cx + gw * 0.3, cy - gw * 0.5), (cx + gw * 0.55, cy - gw * 0.9)], fill=(*D, 200), width=max(2, lw // 2))  # pick
+    draw.ellipse([cx + gw * 0.48, cy - gw * 1.0, cx + gw * 0.62, cy - gw * 0.86], fill=(120, 160, 70, 220))  # olive
+    return img
+
+
+def _make_prism_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Prism splitting a white beam into a spectrum fan — prog & art rock, art-pop."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    L = tuple(_clamp(x + 95) for x in color_top[:3])
+    cx, cy = w * [0.44, 0.38, 0.50, 0.42][min(v, 3)], h * 0.40
+    tri = w * 0.13
+    spectrum = [(232, 44, 44), (240, 140, 44), (242, 220, 64), (60, 200, 96), (60, 140, 232), (146, 72, 210)]
+    ox, oy = cx + tri * 0.55, cy + tri * 0.25
+    for i, col in enumerate(spectrum):                            # rainbow fan out
+        a = math.radians(-22 + i * 9)
+        draw.line([(ox, oy), (ox + math.cos(a) * w * 0.55, oy + math.sin(a) * w * 0.55)],
+                  fill=(*col, 150), width=max(3, int(h * 0.012)))
+    draw.line([(0, cy - tri * 0.1), (cx - tri * 0.5, cy - tri * 0.1)], fill=(*L, 180), width=max(3, int(h * 0.01)))  # white beam in
+    draw.polygon([(cx, cy - tri), (cx - tri * 0.9, cy + tri * 0.7), (cx + tri * 0.9, cy + tri * 0.7)],
+                 fill=(*L, 70), outline=(*L, 200))               # prism
+    return img
+
+
+def _make_crescendo_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A building sound-swell rising left→right — post-rock, cinematic build."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _lighten(c, amt=70): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.5): return tuple(int(x * fac) for x in c[:3])
+    def _mid(c1, c2): return tuple((a + b) // 2 for a, b in zip(c1[:3], c2[:3]))
+    L = _lighten(color_top); D = _darken(color_bottom); M = _mid(color_top, color_bottom)
+    base_y = h * 0.74
+    freq = [1.6, 2.2, 1.2, 2.6][min(v, 3)]
+    for layer, (col, a) in enumerate([(D, 150), (M, 150), (L, 150)]):
+        pts = [(0, base_y)]
+        for x in range(0, w + 1, 10):
+            t = x / w
+            amp = h * (0.04 + 0.46 * t) * (1 - layer * 0.18)     # amplitude grows toward the right = crescendo
+            pts.append((x, base_y - amp * (0.55 + 0.45 * math.sin(x * 0.012 * freq + layer))))
+        pts += [(w, base_y)]
+        draw.polygon(pts, fill=(*col, a))
+    return img
+
+
+def _make_meadow_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Rolling green hills + wildflowers — spring acoustic, spring, pastoral folk."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    def _clamp(x): return max(0, min(255, x))
+    def _c01(x): return max(0.0, min(1.0, x))
+    def _lighten(c, amt=80): return tuple(_clamp(x + amt) for x in c[:3])
+    def _darken(c, fac=0.5): return tuple(int(x * fac) for x in c[:3])
+    L = _lighten(color_top); D = _darken(color_bottom)
+    rng = rng or random.Random(v)
+    def tone(fr): fr = _c01(fr); return tuple(int(L[k] + (D[k] - L[k]) * fr) for k in range(3))
+    hills = 3
+    tops = []
+    for li in range(hills):
+        frac = li / (hills - 1); base = h * (0.50 + 0.12 * li)
+        pts = [(0, h)]
+        for x in range(0, w + 1, 24):
+            pts.append((x, base + math.sin(x * 0.004 + li * 2.1) * h * 0.05))
+        pts += [(w, h)]
+        draw.polygon(pts, fill=(*tone(frac), 215)); tops.append((base, frac))
+    flowers = [(255, 210, 90), (250, 130, 170), (250, 250, 250), (200, 120, 230)]
+    for _ in range([18, 26, 12, 32][min(v, 3)]):                  # wildflowers on the front hills
+        x = rng.uniform(0, w); y = rng.uniform(h * 0.58, h * 0.72); fr = w * rng.uniform(0.008, 0.016)
+        col = rng.choice(flowers)
+        for k in range(5):
+            a = math.radians(k * 72)
+            draw.ellipse([x + math.cos(a) * fr - fr * 0.5, y + math.sin(a) * fr - fr * 0.5,
+                          x + math.cos(a) * fr + fr * 0.5, y + math.sin(a) * fr + fr * 0.5], fill=(*col, 200))
+    return img
+
+
+# _make_papel_picado_background retired (round 4) — family removed; latin_heat→palm_sunburst, summer_heat→sun_horizon.
+
+
+def _make_kente_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Bold woven kente strips with geometric motifs — afrobeat, African."""
+    img = _make_gradient_image(w, h, color_top, color_bottom, diagonal=False)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0)); draw = ImageDraw.Draw(overlay, 'RGBA')
+    kente = [(34, 34, 40), (224, 172, 44), (208, 56, 52), (40, 150, 92)]
+    n = [7, 9, 6, 10][min(v, 3)]
+    strip = h / n
+    for r in range(n):
+        y0 = r * strip; base = kente[r % 4]
+        draw.rectangle([0, y0, w, y0 + strip], fill=(*base, 130))
+        motif = kente[(r + 2) % 4]; blocks = 8
+        for c in range(blocks):
+            bx = w * (c + 0.5) / blocks
+            if (r + c) % 2 == 0:                                  # alternating squares
+                draw.rectangle([bx - strip * 0.28, y0 + strip * 0.22, bx + strip * 0.28, y0 + strip * 0.78], fill=(*motif, 150))
+            else:                                                 # diamonds
+                draw.polygon([(bx, y0 + strip * 0.18), (bx + strip * 0.3, y0 + strip * 0.5),
+                              (bx, y0 + strip * 0.82), (bx - strip * 0.3, y0 + strip * 0.5)], fill=(*motif, 150))
+    return Image.alpha_composite(img, overlay)
+
+
+# ── Background generator registry ─────────────────────────────────────────────
+# Maps a _COVER_BG_STYLES style name -> its generator fn. Adding a new pattern is one
+# line here plus the _make_<name>_background above — no edits to the cover dispatcher.
+# WHY a registry (not an if/elif chain): the redesign adds ~25 genre/mood-evocative
+# families, and validator/contact-sheet import this as the single source of "known styles".
+# NEW generators are defined just above this dict (search "# === NEW genre/mood generators").
+_BG_GENERATORS = {
+    "geometric":        _make_geometric_background,
+    "circles":          _make_concentric_circles_background,
+    "radial":           _make_radial_glow_background,
+    "ripples":          _make_ripples_background,
+    "waves":            _make_waves_background,
+    "floating_circles": _make_floating_circles_background,
+    "rays":             _make_rays_background,
+    "arc_sweep":        _make_arc_sweep_background,
+    "aurora":           _make_aurora_background,
+    "triangles":        _make_triangles_background,
+    "diamond":          _make_diamond_background,
+    "starburst":        _make_starburst_background,
+    "chevrons":         _make_chevrons_background,
+    "spiral":           _make_spiral_background,
+    # --- new: electronic / dance / rock-indie cluster ---
+    "equalizer":        _make_equalizer_background,
+    "grid_perspective": _make_grid_perspective_background,
+    "circuit":          _make_circuit_background,
+    "waveform":         _make_waveform_background,
+    "laser_fan":        _make_laser_fan_background,
+    "concentric_pulse": _make_concentric_pulse_background,
+    "low_poly":         _make_low_poly_background,
+    # --- new: soul/funk · pop · jazz/classical · folk · ambient ---
+    "vinyl_grooves":    _make_vinyl_grooves_background,
+    "halftone":         _make_halftone_background,
+    "brushstrokes":     _make_brushstrokes_background,
+    "smoke":            _make_smoke_background,
+    "staff_lines":      _make_staff_lines_background,
+    "mountains":        _make_mountains_background,
+    "starfield":        _make_starfield_background,
+    # --- new: tropical/sunset · wood · rock-amp · aggressive · party · place ---
+    "palm_sunburst":    _make_palm_sunburst_background,
+    "sun_horizon":      _make_sun_horizon_background,
+    "woodgrain":        _make_woodgrain_background,
+    "amp_stack":        _make_amp_stack_background,
+    "shards":           _make_shards_background,
+    "confetti":         _make_confetti_background,
+    "tartan":           _make_tartan_background,
+    "cityscape":        _make_cityscape_background,
+    # --- round 2: genre families ---
+    "mod_target":       _make_mod_target_background,
+    "disco_ball":       _make_disco_ball_background,
+    "cassette":         _make_cassette_background,
+    "pixel_grid":       _make_pixel_grid_background,
+    "columns":          _make_columns_background,
+    "film_strip":       _make_film_strip_background,
+    "stained_glass":    _make_stained_glass_background,
+    # --- round 2: mood / romance / calm / night ---
+    "candle_glow":      _make_candle_glow_background,
+    "bokeh":            _make_bokeh_background,
+    "clouds":           _make_clouds_background,
+    "zen":              _make_zen_background,
+    "grid_paper":       _make_grid_paper_background,
+    "moonlight":        _make_moonlight_background,
+    "cosmos":           _make_cosmos_background,
+    "lightning":        _make_lightning_background,
+    # --- round 2: season / weather / place / activity ---
+    "blossom":          _make_blossom_background,
+    "snowfall":         _make_snowfall_background,
+    "rainfall":         _make_rainfall_background,
+    "pine_forest":      _make_pine_forest_background,
+    "tropical_leaves":  _make_tropical_leaves_background,
+    "gingham":          _make_gingham_background,
+    "open_road":        _make_open_road_background,
+    "holiday_lights":   _make_holiday_lights_background,
+    # --- round 3: genre-true families ---
+    "jazz_club":        _make_jazz_club_background,
+    "strings":          _make_strings_background,
+    "guitar":           _make_guitar_background,
+    "acoustic_guitar":  _make_acoustic_guitar_background,
+    "checkerboard":     _make_checkerboard_background,
+    "desert":           _make_desert_background,
+    "motion":           _make_motion_background,
+    "traffic":          _make_traffic_background,
+    "beach":            _make_beach_background,
+    "wedding_rings":    _make_wedding_rings_background,
+    "lounge":           _make_lounge_background,
+    "prism":            _make_prism_background,
+    "crescendo":        _make_crescendo_background,
+    "meadow":           _make_meadow_background,
+    "kente":            _make_kente_background,
+}
+
+
+def _bg_variant_count(fn):
+    """How many variants a generator defines = length of its first `configs`/`variants` list literal.
+    WHY: a _COVER_BG_STYLES entry with v >= this count silently clamps to the last variant
+    (the root of the old indie_rock/rap_rock identical-twin bug); cover_validator uses this to flag it."""
+    import ast, inspect, re
+    try:
+        src = inspect.getsource(fn)
+    except Exception:
+        return None
+    try:
+        for node in ast.walk(ast.parse(src)):
+            if not (isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id in ("configs", "variants")):
+                continue
+            val = node.value
+            if isinstance(val, ast.List):                         # literal table
+                return len(val.elts)
+            if isinstance(val, ast.ListComp) and len(val.generators) == 1:   # [.. for i in range(N)]
+                it = val.generators[0].iter
+                if (isinstance(it, ast.Call) and isinstance(getattr(it, "func", None), ast.Name)
+                        and it.func.id == "range" and it.args
+                        and all(isinstance(a, ast.Constant) for a in it.args)):
+                    args = [a.value for a in it.args]
+                    return args[0] if len(args) == 1 else args[1] - args[0]
+    except Exception:
+        pass
+    # inline pattern `[...][min(v, K)]` (many round-2 generators) → K + 1 variants
+    ks = [int(m) for m in re.findall(r"min\(v,\s*(\d+)\)", src)]
+    return max(ks) + 1 if ks else None
+
+# Generators whose variant table is an inline literal / procedural (no named configs list) — set by hand.
+_BG_VARIANT_COUNTS_OVERRIDE = {"ripples": 6, "confetti": 8, "tartan": 4, "cityscape": 4, "brushstrokes": 10}
+_BG_BASE_COUNTS = {name: (_BG_VARIANT_COUNTS_OVERRIDE.get(name) or _bg_variant_count(fn) or 1)
+                   for name, fn in _BG_GENERATORS.items()}
+
+# Families whose horizontal mirror looks identical (centred/symmetric) — these get NO flip-doubling.
+# WHY: an h-flip of an off-centre/asymmetric pattern is a genuinely different cover (and the per-key
+# rng means even the same base variant renders differently per playlist), so asymmetric families
+# offer 2× distinct variants for free — enough headroom for ~269 unique covers without huge tables.
+_BG_SYMMETRIC = {"starburst", "amp_stack", "staff_lines", "vinyl_grooves", "tartan",
+                 # round-2 deterministic/centred families whose h-mirror would be a redundant twin:
+                 "mod_target", "columns", "film_strip", "zen", "grid_paper", "pine_forest",
+                 "tropical_leaves", "gingham", "cassette", "open_road", "holiday_lights",
+                 # round 3 centred/symmetric families:
+                 "strings", "checkerboard", "wedding_rings", "lounge", "kente", "jazz_club",
+                 # guitar: a flipped Les Paul reads as a different (left-handed) instrument — NEVER mirror it.
+                 # Its extra variants are real colour finishes (10), not flip-twins. WHY: user requirement.
+                 "guitar"}
+_BG_VARIANT_COUNTS = {n: _BG_BASE_COUNTS[n] * (1 if n in _BG_SYMMETRIC else 2) for n in _BG_GENERATORS}
+
+
+def _render_bg(style, color_top, color_bottom, v, rng):
+    """Render background `style` at variant `v`. Variants beyond a generator's base table are the
+    base pattern horizontally mirrored (asymmetric families only) — a free 2× distinct-variant space."""
+    gen  = _BG_GENERATORS.get(style, _make_geometric_background)
+    base = _BG_BASE_COUNTS.get(style, 1)
+    img  = gen(1000, 1000, color_top, color_bottom, v % base, rng=rng)
+    if (v // base) % 2 and style not in _BG_SYMMETRIC:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    return img
+
+
 # ── Cover icon overlays ──────────────────────────────────────────────────────
 
 def _icon_light(c, f=0.45, alpha=200):
@@ -8628,7 +10647,7 @@ _MS_CODEPOINTS = {
     "movie": 0xE684,
     "stadia_controller": 0xF135,
     "favorite": 0xE87E, "heart_broken": 0xEAC2, "candle": 0xF588, "music_note": 0xE405,
-    "music_note_2": 0xFFFD8, "piano": 0xE521, "graphic_eq": 0xE1B8, "bedtime": 0xF159,
+    "music_note_2": 0xFFFD8, "piano": 0xE521, "graphic_eq": 0xE1B8, "bedtime": 0xF159, "sailing": 0xE502,
     "dark_mode": 0xE51C, "wb_sunny": 0xE430, "clear_day": 0xF157, "beach_access": 0xEB3E,
     "rainy": 0xF176, "water_drop": 0xE798, "local_cafe": 0xEB44, "restaurant": 0xE56C,
     "wine_bar": 0xF1E8, "skillet": 0xF543, "fitness_center": 0xEB43, "directions_run": 0xE566,
@@ -8641,6 +10660,10 @@ _MS_CODEPOINTS = {
     "travel_explore": 0xE2DB, "explore": 0xE87A, "history": 0xE8B3,
     "moon_stars": 0xF34F, "partly_cloudy_night": 0xEA46, "local_bar": 0xE540,
     "brunch_dining": 0xEA73, "bakery_dining": 0xEA53, "egg_alt": 0xEAC8, "flare": 0xE3E4,
+    # --- added in the cover redesign (codepoints extracted from the font via ms_glyphs.py) ---
+    "eco": 0xEA35, "skillet": 0xF543, "bolt": 0xEA0B, "palette": 0xE3B7, "casino": 0xEB40,
+    "church": 0xEAAE, "thermostat": 0xF076, "album": 0xE019, "redeem": 0xE8B1, "trophy": 0xE71A,
+    "outdoor_grill": 0xEA47,
 }
 
 # Two-tone glyphs: drawn as a filled duotone (see _draw_glyph) — a solid FILL=1 body in the glyph
@@ -8700,49 +10723,78 @@ def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
                                  int(round(cy - tile.height / 2))))
 
 
+# When set to a list (by cover_validator), the cluster/scatter helpers append every placed glyph's
+# (x, y, radius) so the validator can assert no two glyphs on a cover overlap. None in normal use.
+_CLUSTER_FOOTPRINTS = None
+_GLYPH_RADIUS_FRAC = 0.46                     # Material Symbol visual radius ≈ this × em size
+
+
+def _rec_footprint(x, y, r):
+    if _CLUSTER_FOOTPRINTS is not None:
+        _CLUSTER_FOOTPRINTS.append((x, y, r))
+
+
 def _draw_glyph_cluster(layer, names, cx, cy, anchor_size, rng, fill, n=3, stroke=None,
-                        ring_mult=0.50, sat_lo=0.55, sat_hi=0.70):
-    """Composed constellation: one anchor glyph plus (n-1) satellites on a balanced ring
-    around it (radius = anchor_size*ring_mult, satellites sat_lo–sat_hi of the anchor), gentle
-    varied tilts. Overlapping shapes get an outline (`stroke` = (width_fraction, fill)) so they
-    stay legible. `names` is cycled across glyphs (["music_note","music_note_2"]) or repeated
-    (["favorite"], ["flare"]). Widen ring_mult / shrink satellites to keep sparks from overlapping."""
+                        ring_mult=0.50, sat_lo=0.50, sat_hi=0.62):
+    """Composed constellation: one anchor glyph + (n-1) satellites on a ring, sized and spaced
+    so NO two glyphs overlap. WHY computed (not fixed) ring: the old ring (0.50×anchor) was
+    smaller than anchor_radius+satellite_radius, so satellites always overlapped the anchor and
+    relied on outlines to stay legible. Now the ring is the max of (a) clear-the-anchor, (b)
+    clear-neighbouring-satellites, (c) an explicit `ring_mult` lower bound. `names` is cycled
+    across glyphs (["music_note","music_note_2"]) or repeated (["favorite"], ["flare"])."""
     sw, sf = stroke or (0, None)
 
     def g(name, gx, gy, gsize, gtilt):
         _draw_glyph(layer, name, gx, gy, gsize, fill, tilt=gtilt,
                     stroke_width=int(round(gsize * sw)) if sw else 0, stroke_fill=sf)
+        _rec_footprint(gx, gy, gsize * _GLYPH_RADIUS_FRAC)
+
+    if n <= 1:
+        g(names[0], cx, cy, anchor_size, rng.uniform(-8, 8))
+        return
+
+    GR = 0.46                                       # Material Symbol visual radius ≈ 0.46 × em size
+    margin    = anchor_size * 0.05
+    sat_sizes = [anchor_size * rng.uniform(sat_lo, sat_hi) for _ in range(n - 1)]
+    rs_max    = max(sat_sizes) * GR
+    ring      = anchor_size * GR + rs_max + margin             # (a) clear the anchor
+    if n - 1 >= 2:                                             # (b) clear neighbouring satellites
+        ring = max(ring, (rs_max + margin * 0.5) / math.sin(math.pi / (n - 1)))
+    ring = max(ring, anchor_size * ring_mult)                  # (c) honour an explicit wider spread
 
     g(names[0], cx, cy, anchor_size, rng.uniform(-8, 8))
-    if n <= 1:
-        return
-    ring   = anchor_size * ring_mult
     base_a = rng.uniform(0, 2 * math.pi)
     for i in range(1, n):
-        ang   = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.18, 0.18)
-        ssize = anchor_size * rng.uniform(sat_lo, sat_hi)
+        ang = base_a + 2 * math.pi * (i - 1) / (n - 1) + rng.uniform(-0.10, 0.10)
         g(names[i % len(names)], cx + ring * math.cos(ang), cy + ring * math.sin(ang),
-          ssize, rng.uniform(-15, 15))
+          sat_sizes[i - 1], rng.uniform(-15, 15))
 
 
 def _draw_falling_cluster(layer, cloud_name, flake_name, cx, cy, size, rng, fill, stroke=None):
-    """A cloud with 7–8 flakes falling below it — used for Winter. Flakes are drawn FIRST so the
-    cloud is composited ON TOP of them; flakes fall further and spread wider. `size` is the
-    cloud's em size; the cloud sits high and flakes fall down through the centre."""
+    """A cloud with several flakes falling below it (Winter). Flakes are drawn FIRST so the cloud
+    composites ON TOP, and each flake is placed with a min-separation (reject-and-retry) so no two
+    flakes overlap each other or sit under the cloud. `size` is the cloud's em size."""
     sw, sf = stroke or (0, None)
 
     def g(name, gx, gy, gsize, gtilt):
         _draw_glyph(layer, name, gx, gy, gsize, fill, tilt=gtilt,
                     stroke_width=int(round(gsize * sw)) if sw else 0, stroke_fill=sf)
+        _rec_footprint(gx, gy, gsize * _GLYPH_RADIUS_FRAC)
 
+    GR = 0.46
     cloud_y = cy - size * 0.70
-    n = rng.randint(7, 8)
-    for i in range(n):                                   # flakes first → cloud drawn over them
-        fx    = cx + rng.uniform(-0.85, 0.85) * size
-        fy    = cloud_y + size * (0.55 + 1.45 * (i + rng.uniform(0, 1)) / n)
-        fsize = size * rng.uniform(0.22, 0.38)
-        g(flake_name, fx, fy, fsize, rng.uniform(-22, 22))
-    g(cloud_name, cx, cloud_y, size, rng.uniform(-6, 6))  # cloud composited on top
+    placed  = [(cx, cloud_y, size * GR * 0.92)]          # reserve the cloud footprint
+    target, tries = rng.randint(6, 7), 0
+    while len(placed) - 1 < target and tries < 200:
+        tries += 1
+        fsize = size * rng.uniform(0.24, 0.38)
+        fr    = fsize * GR
+        fx    = cx + rng.uniform(-1.0, 1.0) * size
+        fy    = cloud_y + size * rng.uniform(0.60, 2.10)            # below the cloud
+        if all((fx - px) ** 2 + (fy - py) ** 2 > (fr + pr) ** 2 for px, py, pr in placed):
+            g(flake_name, fx, fy, fsize, rng.uniform(-22, 22))      # flakes first
+            placed.append((fx, fy, fr))
+    g(cloud_name, cx, cloud_y, size, rng.uniform(-6, 6))           # cloud composited on top
 
 
 def _icon_dark(c, f=0.42):
@@ -8815,13 +10867,16 @@ def _place_icon(base, overlay, cx, cy, scale=1.0, angle=0.0, shadow=True, bg_lum
 
 
 def _draw_ripples_below(layer, cx, cy, size, rgb, alpha):
-    """A few faint concentric ripple ellipses just below a rain-cloud icon (Rainy Day)."""
+    """A few small ripples CLEARLY below a rain-cloud icon (Rainy Day) — not overlapping the cloud.
+    WHY max(): anchor the ripples in the lower band (≥60% down) regardless of the cloud's size, so a
+    big cloud can't push the rain into them — the previous fixed cy-offset still collided."""
     draw = ImageDraw.Draw(layer)
-    ry   = cy + size * 0.42
+    H    = layer.size[1]
+    ry   = max(cy + size * 0.88, H * 0.60)              # well below the cloud, in the lower band
     a0   = max(40, int(alpha * 0.55))
     lw   = max(2, int(size * 0.012))
-    for k, rr in enumerate((size * 0.30, size * 0.46, size * 0.62)):
-        draw.ellipse([cx - rr, ry - rr * 0.34, cx + rr, ry + rr * 0.34],
+    for k, rr in enumerate((size * 0.12, size * 0.20, size * 0.28)):
+        draw.ellipse([cx - rr, ry - rr * 0.32, cx + rr, ry + rr * 0.32],
                      outline=(*rgb, max(28, a0 - k * 16)), width=lw)
 
 
@@ -8831,6 +10886,8 @@ def _draw_scattered_notes(layer, W, H, avoid, rng, fill, stroke, note_size, targ
     dress the Friday Night cover around its hero glyph."""
     sw, sf = stroke or (0, None)
     placed  = list(avoid)
+    for _fp in avoid:                            # record the hero footprint(s) for overlap validation
+        _rec_footprint(*_fp)
     names   = ["music_note", "music_note_2"]
     margin  = 60
     bar_top = int(H * 0.78)
@@ -8846,7 +10903,29 @@ def _draw_scattered_notes(layer, W, H, avoid, rng, fill, stroke, note_size, targ
             _draw_glyph(layer, names[k % 2], x, y, note_size, fill, tilt=rng.uniform(-18, 18),
                         stroke_width=int(round(note_size * sw)) if sw else 0, stroke_fill=sf)
             placed.append((x, y, r))
+            _rec_footprint(x, y, r)
             k += 1
+
+
+# Real fallen leaves are a MIX of autumnal colours, never one uniform tone.
+_AUTUMN_FILLS = [(214, 120, 40), (190, 78, 32), (228, 168, 58), (162, 74, 40), (205, 108, 48), (178, 138, 52)]
+
+
+def _draw_falling_leaves(layer, W, H, leaf_name, rng, fills, size):
+    """Scatter leaf glyphs across the upper canvas in MIXED autumnal colours, non-overlapping —
+    some high (still falling), some settling low. Each leaf a different colour from `fills`."""
+    placed, margin, bar_top = [], 50, int(H * 0.74)
+    target, tries = 12, 0
+    while len(placed) < target and tries < 400:
+        tries += 1
+        s = size * rng.uniform(0.5, 1.1); r = s * 0.42
+        x = rng.uniform(margin, W - margin); y = rng.uniform(margin + 60, bar_top - 20)
+        if x - r < 250 and y - r < 150:                  # keep clear of the top-left badge
+            continue
+        if all((x - px) ** 2 + (y - py) ** 2 > (r + pr) ** 2 for px, py, pr in placed):
+            _draw_glyph(layer, leaf_name, x, y, s, (*rng.choice(fills), 235), tilt=rng.uniform(-55, 55))
+            _rec_footprint(x, y, r)
+            placed.append((x, y, r))
 
 
 def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
@@ -8882,13 +10961,15 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
         cluster_mode, cluster_names, cluster_n = "ring", ["flare"], rng.randint(4, 5)
     elif key == "winter_mix":
         cluster_mode = "falling"
+    elif key == "autumn_leaves":
+        cluster_mode = "leaves"
     kind = "cluster" if cluster_mode else "single"
 
     scale = meta["base_scale"] * rng.uniform(0.92, 1.12)
 
     # Off-centre placement, clamped clear of the bottom title bar (22%) and the badge.
     R       = meta["extent"] * scale
-    R_clamp = R * (1.20 if kind == "cluster" else 1.0)   # clusters spread wider than R
+    R_clamp = R * (1.35 if kind == "cluster" else 1.0)   # clusters spread wider (non-overlap rings)
     margin  = 40
     bar_top = int(H * 0.78)
     ax, ay  = meta["anchor"]
@@ -8923,7 +11004,9 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
         stroke_rgb = tuple(int(c * 0.28) for c in rgb) if fl >= 110 \
             else tuple(min(255, int(c + (255 - c) * 0.75)) for c in rgb)
         stroke = (0.045, (*stroke_rgb, alpha))
-        if cluster_mode == "falling":
+        if cluster_mode == "leaves":                 # autumn: scattered multicolour falling leaves
+            _draw_falling_leaves(overlay, W, H, icon_name, rng, _AUTUMN_FILLS, size * 0.5)
+        elif cluster_mode == "falling":
             _draw_falling_cluster(overlay, "cloud", "snowflake", cx, cy, size * 0.46, rng, fill, stroke=stroke)
         elif icon_name == "flare":                   # spread the sparks so none overlap
             _draw_glyph_cluster(overlay, cluster_names, cx, cy, anchor_size=size * 0.44,
@@ -8933,7 +11016,7 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
             _draw_glyph_cluster(overlay, cluster_names, cx, cy, anchor_size=size * 0.60,
                                 rng=rng, fill=fill, n=cluster_n, stroke=stroke)
     else:
-        angle = rng.uniform(-meta["tilt"], meta["tilt"])
+        angle = meta.get("tilt_bias", 0) + rng.uniform(-meta["tilt"], meta["tilt"])
         _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False), fill2=fill2)
         if key == "rainy_day":                       # little ripples landing below the cloud
             _draw_ripples_below(overlay, cx, cy, size, rgb, alpha)
@@ -9144,17 +11227,11 @@ def _generate_extras_cover(key, title, subtitle=None):
     if key.startswith("top_songs_") and len(key) == 14:
         try:
             year     = int(key[-4:])
-            # Seed ALL choices (palette, style, variant, colour jitter) from the year
-            # number so the look is permanently stable — historical playlists should
-            # not shift weekly the way mood mixes do.
-            year_rng                 = random.Random(year)
-            palette_idx              = year_rng.randint(0, len(_TOP_SONGS_YEAR_PALETTES) - 1)
-            color_top, color_bottom  = _TOP_SONGS_YEAR_PALETTES[palette_idx]
-            _ts_style, _ts_max_v     = year_rng.choice(_TOP_SONGS_STYLE_POOL)
-            bg_style                 = _ts_style
-            bg_v                     = year_rng.randint(0, _ts_max_v)
-            _rng                     = year_rng  # geometry jitter uses the same seed stream
-            _jitter_range            = 30        # more dramatic shift between years
+            # Pick from the 20 curated, mutually-distinct covers by `year % 20` so each year is a
+            # bold, stable, never-colliding "year in review" look (no weekly shift like mood mixes).
+            (color_top, color_bottom), bg_style, bg_v = _TOP_SONGS_COVERS[year % len(_TOP_SONGS_COVERS)]
+            _rng                     = random.Random(year)   # stable per-year geometry/jitter
+            _jitter_range            = 10                     # subtle — keep the curated palette intact
         except (ValueError, IndexError):
             color_top, color_bottom = _EXTRAS_COVER_COLORS.get("top_songs", ((200, 160, 30), (140, 90, 10)))
             bg_style, bg_v = "geometric", 0
@@ -9180,34 +11257,7 @@ def _generate_extras_cover(key, title, subtitle=None):
     color_bottom = _jitter(color_bottom)
 
     text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
-    if bg_style == "circles":
-        img = _make_concentric_circles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "radial":
-        img = _make_radial_glow_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "ripples":
-        img = _make_ripples_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "waves":
-        img = _make_waves_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "floating_circles":
-        img = _make_floating_circles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "rays":
-        img = _make_rays_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "arc_sweep":
-        img = _make_arc_sweep_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "aurora":
-        img = _make_aurora_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "triangles":
-        img = _make_triangles_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "diamond":
-        img = _make_diamond_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "starburst":
-        img = _make_starburst_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "chevrons":
-        img = _make_chevrons_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    elif bg_style == "spiral":
-        img = _make_spiral_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
-    else:
-        img = _make_geometric_background(1000, 1000, color_top, color_bottom, bg_v, rng=_rng)
+    img    = _render_bg(bg_style, color_top, color_bottom, bg_v, _rng)
     img    = _add_bottom_vignette(img)
     img    = _draw_icon_overlay(img, key, color_top, color_bottom, _rng)
     result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
