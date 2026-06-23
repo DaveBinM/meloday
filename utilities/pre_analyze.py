@@ -1064,14 +1064,19 @@ def _release_age_days(release_date, year, now):
 def _refresh_due(synced_at, release_date, year, has_data, source, now):
     """Should this track's <source> data be (re)fetched? Never-synced -> yes. Otherwise the
     cadence adapts: missing data on a young release retries soon (MB/LRCLIB may not have had it
-    yet); Last.fm refreshes fast for new releases (listeners/tags evolve) and slows as it ages;
-    geo/lyrics settle to yearly once found (origin + lyrics are static)."""
+    yet); empty GEO retries monthly regardless of age; Last.fm refreshes fast for new releases
+    (listeners/tags evolve) and slows as it ages; geo/lyrics settle to yearly once found."""
     if synced_at is None:
         return True
     age = (now - synced_at) / 86400.0
     rel = _release_age_days(release_date, year, now)
     if not has_data:
-        threshold = 21 if rel < 365 else 180
+        # WHY geo is flat 30d (not 21/180 by release age): artist origin is editor-CONTRIBUTED and accrues
+        # independent of release age, so an old release still missing geo is just as likely to get filled as
+        # a new one — the "old + empty = probably never" assumption is wrong for geo (it left a just-added MB
+        # origin unseen for up to 180d). The empty pool is tiny (~300 artists ~= 5 min at <=1 req/s), so a
+        # monthly recheck of every empty is cheap. Lyrics/Last.fm empties keep the release-age cadence.
+        threshold = 30 if source == "geo" else (21 if rel < 365 else 180)
     elif source == "lastfm":
         threshold = 14 if rel < 90 else (45 if rel < 730 else 120)
     else:   # geo / lyrics
