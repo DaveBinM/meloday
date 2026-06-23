@@ -12761,6 +12761,9 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     slot         = (current_hour * rot_per_day) // 24
     cur_gslot    = cur_ord * rot_per_day + slot          # monotonic global slot index
     _rotation    = _load_surface_rotation()              # {key: {"s": last-on-slate gslot, "b": last-built ord}}
+    _new_slot    = _rotation.get("__slot__") != cur_gslot   # rotate anytime/city ONLY when the slot advances
+    _cur_general = {name_to_key[n] for n in (existing or {})   # general mixes currently on the shelf (reuse within a slot)
+                    if n in name_to_key and name_to_key[n] in _GENERAL_PROFILES}
 
     # ---- Three tiers: CONTEXT (scheduled & in-window, UNCAPPED) + ANYTIME (rotating, time-ranked,
     # overdue-covered) + GEO (>=1 per city). Surfaces every right-now playlist with no cap, rotates the
@@ -12809,21 +12812,30 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     anytime_pool = _fillable([k for k in _GENERAL_PROFILES
                               if not _is_scheduled(k) and not _geo_group(k)
                               and _profile_season_ok(k, lat)])
-    a_scored = sorted((_mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k), k)
-                      for k in anytime_pool)
-    a_pool   = _stratified(a_scored) if _has_centroid else [k for _, k in a_scored]
-    active_anytime = _select_diverse_profiles([(i, k) for i, k in enumerate(a_pool)],
-                                              n_active, max_per_category=max(2, math.ceil(n_active / n_cats)))
+    _cur_anytime = [k for k in _cur_general
+                    if not _is_scheduled(k) and not _geo_group(k) and k in anytime_pool]
+    if _new_slot or not _cur_anytime:                    # rotate to a fresh set when the slot advances
+        a_scored = sorted((_mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k), k)
+                          for k in anytime_pool)
+        a_pool   = _stratified(a_scored) if _has_centroid else [k for _, k in a_scored]
+        active_anytime = _select_diverse_profiles([(i, k) for i, k in enumerate(a_pool)],
+                                                  n_active, max_per_category=max(2, math.ceil(n_active / n_cats)))
+    else:
+        active_anytime = _cur_anytime                    # stable within the slot — hourly re-runs are no-ops here
 
     # GEO — guarantee >=1 city mix per city; pick the most time-fitting + most-overdue so every city mix
     # cycles in over time and night mixes lead at night. (Pinned scenes are handled separately below.)
-    active_city = []
-    for _pre in ("glasgow_", "london_", "melbourne_"):
-        _cands = _fillable([k for k in _GENERAL_PROFILES
-                            if k.startswith(_pre) and k not in _PINNED_PROFILES and _profile_season_ok(k, lat)])
-        if _cands:
-            active_city.append(min(_cands, key=lambda k:
-                _mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k)))
+    _cur_city = [k for k in _cur_general if _geo_group(k)]
+    if _new_slot or not _cur_city:                       # rotate the per-city pick when the slot advances
+        active_city = []
+        for _pre in ("glasgow_", "london_", "melbourne_"):
+            _cands = _fillable([k for k in _GENERAL_PROFILES
+                                if k.startswith(_pre) and k not in _PINNED_PROFILES and _profile_season_ok(k, lat)])
+            if _cands:
+                active_city.append(min(_cands, key=lambda k:
+                    _mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k)))
+    else:
+        active_city = _cur_city                          # stable within the slot
 
     active_general = (active_context
                       + [k for k in active_anytime if k not in active_context]
@@ -12863,8 +12875,10 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     _stale = lambda k: (_rotation.get(k) or {}).get("b") != cur_ord     # content last built on a prior day
     to_build = [k for k in active_profiles
                 if k in active_pinned or k not in currently or _stale(k)]
-    for k in active_profiles:                                            # stamp "on the slate now" → overdue
-        _rotation.setdefault(k, {})["s"] = cur_gslot
+    if _new_slot:                                                        # advance the rotation once per slot
+        for k in active_profiles:
+            _rotation.setdefault(k, {})["s"] = cur_gslot                 # "on the slate this slot" → overdue
+        _rotation["__slot__"] = cur_gslot
     xlog(f"[INFO] mood_mixes: add={sorted(set(to_build))} remove={to_remove} "
          f"weather{active_weather} season{active_seasonal} pinned{active_pinned}")
     # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g. the
