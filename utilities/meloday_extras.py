@@ -12610,7 +12610,7 @@ def _surface_rotation_path():
     return os.path.join(_BASE_DIR, "assets", "mood_surface_rotation.json")
 
 def _load_surface_rotation():
-    """{profile_key: {"s": last-on-slate gslot, "b": last-built ordinal}}. {} if missing/corrupt."""
+    """{profile_key: {"s": last-on-slate gslot}} (+ "__slot__": last-rotated gslot). {} if missing/corrupt."""
     try:
         with open(_surface_rotation_path()) as f:
             return json.load(f).get("rotation", {})
@@ -12760,7 +12760,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     rot_per_day  = max(1, int(_extras.get("mood_mix_rotations_per_day", 6)))
     slot         = (current_hour * rot_per_day) // 24
     cur_gslot    = cur_ord * rot_per_day + slot          # monotonic global slot index
-    _rotation    = _load_surface_rotation()              # {key: {"s": last-on-slate gslot, "b": last-built ord}}
+    _rotation    = _load_surface_rotation()              # {key: {"s": last-on-slate gslot}} + "__slot__": last-rotated gslot
     _new_slot    = _rotation.get("__slot__") != cur_gslot   # rotate anytime/city ONLY when the slot advances
     _cur_general = {name_to_key[n] for n in (existing or {})   # general mixes currently on the shelf (reuse within a slot)
                     if n in name_to_key and name_to_key[n] in _GENERAL_PROFILES}
@@ -12863,18 +12863,18 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
 
-    # Churn control (slot-stable diffing): only BUILD new entries + a once-a-day content refresh of
-    # survivors; only REMOVE profiles that genuinely rotated out. Survivors within the day are left
-    # untouched so the hourly cron doesn't thrash Plex. Managed = the rotating/conditional tiers; pinned
-    # scenes and the cron mixes (_TIME_PROFILES) are never auto-removed here.
+    # Churn control (slot-stable diffing): BUILD only genuinely new entries (+ the daily-refreshed pinned
+    # scenes); REMOVE only profiles that rotated out. A surviving playlist is NEVER rebuilt while it stays
+    # on the slate — WHY: its content must stay consistent until it actually rotates out and back in;
+    # rebuilding in place silently reshuffled a playlist the user was still looking at. Managed = the
+    # rotating/conditional tiers; pinned scenes and the cron mixes (_TIME_PROFILES) aren't auto-removed.
     managed         = _GENERAL_PROFILES | _WEATHER_PROFILES | _SEASONAL_PROFILES
     desired_managed = set(active_general) | set(active_weather) | set(active_seasonal)
     currently = {name_to_key[name] for name in existing
                  if name in name_to_key and name_to_key[name] in managed}
     to_remove = sorted(currently - desired_managed)
-    _stale = lambda k: (_rotation.get(k) or {}).get("b") != cur_ord     # content last built on a prior day
-    to_build = [k for k in active_profiles
-                if k in active_pinned or k not in currently or _stale(k)]
+    to_build = [k for k in active_profiles                              # survivors keep their tracks untouched;
+                if k in active_pinned or k not in currently]           # only brand-new entries + pinned (re)build
     if _new_slot:                                                        # advance the rotation once per slot
         for k in active_profiles:
             _rotation.setdefault(k, {})["s"] = cur_gslot                 # "on the slate this slot" → overdue
@@ -12896,7 +12896,6 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         if not is_showcase:
             seen_rks.update(str(t.ratingKey) for t in tracks)   # no repeats across dedup-eligible mixes
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
-        _rotation.setdefault(profile_key, {})["b"] = cur_ord    # content built today (skip rebuild on later runs)
     _save_surface_rotation(_rotation)
     return mixes, to_remove
 
