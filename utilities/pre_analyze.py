@@ -1523,15 +1523,16 @@ def _resolve_area_chain(mbid):
     _mb_area_chain[mbid] = chain
     return chain
 
-def _artist_origin(name, mbid=None):
-    """Resolve an artist's full place hierarchy from MusicBrainz — the union of the begin-area and
-    area parent chains (whichever exist), plus the country code. {} if not found. Uses the artist MBID
-    (from the file tags) for an EXACT lookup when available — no name-collision risk — else a name search."""
-    if mbid:
-        a = _mb_get(f"artist/{mbid}?fmt=json") or {}
-    else:
-        q = urllib.parse.quote('artist:"%s"' % name.replace('"', ""))
-        a = (_mb_get(f"artist/?query={q}&fmt=json&limit=1").get("artists") or [{}])[0]
+def _artist_origin(mbid):
+    """Resolve an artist's full place hierarchy from MusicBrainz via the EXACT artist MBID (from the file
+    tags) — the union of the begin-area and area parent chains (whichever exist), plus the country code.
+    {} when there is no MBID or MB has nothing. We NEVER name-search MusicBrainz.
+    WHY MBID-only: a name search (artist:"<name>") collides — two different artists share a name and the
+    query silently returns the wrong one, setting a wrong origin (cf. the Victoria-BC / Melbourne-FL city-mix
+    mismatches). No MBID -> no geo (those files simply aren't Picard-tagged)."""
+    if not mbid:
+        return {}
+    a = _mb_get(f"artist/{mbid}?fmt=json") or {}
     if not a:
         return {}
     begin, area = a.get("begin-area") or {}, a.get("area") or {}
@@ -1569,36 +1570,45 @@ def sync_artist_origin(limit=None):
     # migrate: stamp already-resolved origins so they refresh yearly, not all at once
     conn.execute("UPDATE essentia_cache SET geo_synced_at=? "
                  "WHERE artist_origin IS NOT NULL AND geo_synced_at IS NULL", (now,))
+    # MBID-only policy: drop any origin that could only have come from a name match (no file MBID).
+    # WHY: name searches collide and silently set the wrong origin; geo now resolves exclusively via the
+    # exact artist MBID, so a name-derived origin must go (and can't re-resolve without an MBID). Idempotent
+    # — a no-op once the cache is clean. (artist_mbid NULL + origin set <=> name-derived, since an
+    # MBID-resolved track always carried an MBID.)
+    purged = conn.execute("UPDATE essentia_cache SET artist_origin=NULL, geo_synced_at=NULL "
+                          "WHERE artist_mbid IS NULL AND artist_origin IS NOT NULL").rowcount
+    if purged:
+        log_msg(f"[INFO] MBID-only geo: purged {purged:,} name-derived origin(s) (no file MBID).")
     conn.commit()
     rows = conn.execute(
         "SELECT rating_key, artist, release_date, year, geo_synced_at, artist_origin, artist_mbid "
         "FROM essentia_cache WHERE artist IS NOT NULL").fetchall()
-    todo = [(rk, art, mbid) for rk, art, rd, yr, syn, data, mbid in rows
-            if _refresh_due(syn, rd, yr, data is not None, "geo", now)]
+    # MBID-only: a track with no file MBID is never queued (we never name-match for geo). Count the skips.
+    due = [(rk, art, mbid) for rk, art, rd, yr, syn, data, mbid in rows
+           if _refresh_due(syn, rd, yr, data is not None, "geo", now)]
+    todo = [t for t in due if t[2]]
+    n_skipped = len(due) - len(todo)
     if limit:
         todo = todo[:int(limit)]
     verbose = bool(limit) and int(limit) <= 25
-    log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} due of {len(rows)} cached.")
+    log_msg(f"[INFO] MusicBrainz origin sync: {len(todo)} due of {len(rows)} cached"
+            + (f" ({n_skipped:,} skipped — no file MBID)." if n_skipped else "."))
     conn.close()   # setup done; the writer thread uses its own connection
     global _MB_RL
     _MB_RL = _RateLimiter(0.95)       # MusicBrainz: strict <=1 req/s — small margin to avoid 503s
     workers = _workers_arg(3)
     import concurrent.futures, queue as _queue
     from collections import defaultdict
-    # Group tracks by artist IDENTITY — prefer the file's MusicBrainz artist MBID (exact, no name
-    # collisions), falling back to the name for the ~1% with no tag.
-    artist_tracks = defaultdict(list)   # key (mbid or name) -> [rk, ...]
-    artist_info   = {}                  # key -> (name, mbid)
+    # Group tracks by the file's exact MusicBrainz artist MBID (name-only tracks were filtered out above —
+    # we never name-match for geo). One MB lookup per MBID, fanned out to all of that artist's tracks.
+    artist_tracks = defaultdict(list)   # mbid -> [rk, ...]
+    artist_info   = {}                  # mbid -> (name, mbid)   (name kept only for the verbose log line)
     for rk, art, mbid in todo:
-        key = mbid or (art or "")
-        if not key:
-            continue
-        artist_tracks[key].append(rk)
-        artist_info.setdefault(key, (art, mbid))
+        artist_tracks[mbid].append(rk)
+        artist_info.setdefault(mbid, (art, mbid))
     artists = list(artist_tracks)
-    n_mbid = sum(1 for k in artists if artist_info[k][1])
-    log_msg(f"[INFO] resolving {len(artists)} unique artists with {workers} workers (capped at 1 req/s) "
-            f"— {n_mbid} via exact MBID, {len(artists) - n_mbid} by name.")
+    log_msg(f"[INFO] resolving {len(artists)} unique artists via exact MBID with {workers} workers "
+            f"(capped at 1 req/s).")
     q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time(); _last = [0.0]
 
     def _writer():
@@ -1633,7 +1643,7 @@ def sync_artist_origin(limit=None):
     wt = _threading.Thread(target=_writer, daemon=True); wt.start()
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            list(ex.map(lambda k: q.put((k, _artist_origin(*artist_info[k]))), artists))
+            list(ex.map(lambda k: q.put((k, _artist_origin(k))), artists))   # k is the artist MBID
     finally:
         q.put(STOP); wt.join()
     log_msg(f"\n[INFO] MusicBrainz origin sync complete: {cnt['a']} artists, {cnt['t']} tracks.")
@@ -1657,9 +1667,17 @@ def resync_geo(names):
         log_msg(f"[INFO] Cleared geo for {n} tracks (all MBID-tagged artists).")
     else:
         ph = ",".join("?" * len(names))
+        lows = [x.strip().lower() for x in names]
         n = conn.execute(f"UPDATE essentia_cache SET artist_origin=NULL, geo_synced_at=NULL "
-                         f"WHERE lower(artist) IN ({ph})", [x.strip().lower() for x in names]).rowcount
+                         f"WHERE lower(artist) IN ({ph})", lows).rowcount
         log_msg(f"[INFO] Cleared geo for {n} tracks across {len(names)} artist(s): {', '.join(names)}.")
+        # WHY: geo is MBID-only — a cleared track with no file MBID won't re-resolve, so flag it rather than
+        # leave the user wondering why the artist stays empty after a resync.
+        n_nombid = conn.execute(f"SELECT COUNT(*) FROM essentia_cache "
+                                f"WHERE lower(artist) IN ({ph}) AND artist_mbid IS NULL", lows).fetchone()[0]
+        if n_nombid:
+            log_msg(f"[WARN] {n_nombid} of those tracks have no file MBID — geo is MBID-only, so they stay "
+                    f"empty until their files are Picard-tagged with an artist MBID.")
     conn.commit(); conn.close()
     if n == 0:
         log_msg("[WARN] No matching tracks — check the name(s) exactly match the `artist` column, e.g. "
