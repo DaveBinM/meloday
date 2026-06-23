@@ -107,8 +107,8 @@ extras:
   lastfm_api_key:               # Optional: enables Last.fm popularity ranking in Release Radar
   lastfm_api_secret:            # Optional: required alongside lastfm_api_key
   top_songs_start_year: 2020    # Earliest year to generate a Top Songs playlist for (set to the year you started using Plex)
-  mood_mix_count: 12            # Number of general mood/activity mixes shown at once (from ~210 profiles; ~one per category for a balanced slate). Contextual time/weather/season mixes add on top. Rotates on listening + time + weather + day.
-  mood_mix_rotations_per_day: 6 # How many times a day the general mood mixes rotate to a fresh set (run the generator at least this often; default 6 = every ~4h)
+  mood_mix_count: 16            # Size of the rotating "anytime" mood/genre tier (the time-agnostic vibes). ADDED ON TOP of the uncapped context tier (every time/activity/weather/season-appropriate mix surfaces with no cap) + >=1 geo mix per city + 3 pinned scenes. Higher = more browse options on the shelf.
+  mood_mix_rotations_per_day: 6 # How many times a day the anytime tier rotates to a fresh set. Run the extras generator AT LEAST this often — recommend HOURLY (0 * * * *): the slate tracks your schedule (workout, commute, dinner, going out) and only edits playlists that actually change, so frequent runs are cheap.
   mood_mix_exclude_played_days: 3 # Keep songs played in the last N days out of the mixes for variety (0 = disabled). Also dedupes tracks across the mixes shown at once.
   weather_location:             # Optional: city name, coordinates, or airport code (e.g. "Sydney") — enables weather-triggered mood mixes
   exclude_compilations_from_era: true          # Drop compilations (Various Artists, Greatest Hits, Best Of) from the decade/era mixes, using the MusicBrainz release type read from your files' tags

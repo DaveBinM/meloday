@@ -4745,6 +4745,19 @@ _TIME_SOFT_BOOSTS = {
     "empowering":         ( 6, 11, 0.06),   # WHY: morning-motivation context (empowering-1)
     "awe_wonder":         (20,  1, 0.06),   # WHY: awe/cosmic listening skews night (awe_wonder-1)
     "moving_on":          (18, 24, 0.06),   # WHY: parity with romance siblings (moving_on-1)
+    # Romance MOODS (the unscheduled ones) lean evening so a rotating few surface each night in the
+    # anytime tier — "a date can be any night", but we don't force the whole romance shelf nightly.
+    "love_songs":         (18, 24, 0.08),
+    "slow_dance":         (18, 24, 0.08),
+    "romantic_mix":       (18, 24, 0.08),
+    "modern_romance":     (18, 24, 0.08),
+    "first_date":         (18, 24, 0.08),
+    "indie_romance":      (18, 24, 0.06),
+    "acoustic_romance":   (18, 24, 0.06),
+    "synthpop_romance":   (19,  2, 0.06),
+    "romantic_jazz":      (18, 24, 0.08),
+    "piano_romance":      (19, 24, 0.06),
+    "strings_romance":    (18, 24, 0.06),
 }
 
 # Day-of-week boosts — applied on top of soft time boosts for profiles with a natural weekday.
@@ -4776,70 +4789,102 @@ _WEEKDAY_BOOSTS = {
     "sad_bangers":       ({4, 5},  0.06),   # WHY: night-out lean (audit sad_bangers-1)
 }
 
-# Hard day-of-week gates — profiles excluded from the pool entirely on the wrong day.
-# Different from _WEEKDAY_BOOSTS (score reduction only) — these are hard exclusions.
-# 0=Monday … 6=Sunday.
-_WEEKDAY_RESTRICTED = {
-    "friday_night":   {4},               # Friday only
-    "pre_party":      {4, 5},            # Fri/Sat only
-    "weekend_mix":    {5, 6},            # Sat/Sun only
-    "brunch_mix":     {5, 6},            # Sat/Sun only
-    "sunday_morning": {6},               # Sunday only
-    "lazy_sunday":    {6},               # Sunday only
-    "after_work":     {0, 1, 2, 3, 4},  # Mon–Fri only
-    "commute_mix":    {0, 1, 2, 3, 4},  # Mon–Fri only
-    # --- new day-bound mixes ---
-    "monday_motivation": {0},            # Monday only
-    "friday_feeling":    {4},            # Friday only
-    "sunday_scaries":    {6},            # Sunday only
-    "midweek_reset":     {1, 2, 3},      # Tue–Thu — midweek only
-}
+# (The old hard day-of-week + hour gate dicts — _WEEKDAY_RESTRICTED / _HOUR_RESTRICTED — were replaced by
+#  the richer per-profile _PROFILE_SCHEDULE below, which expresses day-dependent, multi-window timing.)
 
-# Hard time-of-day gates — profiles excluded from the pool entirely outside their
-# window. (start_hour, end_hour) in 0–23; if start > end the window wraps past midnight.
-# Profiles not listed here are always eligible.
-_HOUR_RESTRICTED = {
-    "after_work":       (15, 20),   # 3pm-8pm only
-    "brunch_mix":       ( 8, 13),   # 8am-1pm only
-    "commute_mix":      ( 6,  9),   # morning commute
-    "focus":            ( 5, 17),   # 5am–5pm only
-    "deep_work":        ( 5, 17),   # 5am–5pm only
-    "fresh_start":      ( 4, 10),   # 4am–10am — morning motivation only
-    "workout":          ( 5, 22),   # 5am–10pm — no gym music in the small hours
-    "running":          ( 5, 22),   # 5am–10pm
-    "evening_unwind":   (17,  2),   # 5pm–2am — evening only
-    "candlelight":      (17,  3),   # 5pm–3am — dinner and late romance
-    "night_drive":      (19,  4),   # 7pm–4am — night driving only
-    "after_dark":       (20,  6),   # 8pm–6am — after dark by definition
-    "late_night_romance":(19,  4),  # 7pm–4am — evening/night only
-    # --- new mood/vibe mixes with a hard daypart (only eligible in-window) ---
-    "sunrise":           ( 4, 10),  # dawn only
-    "blue_hour":         (16, 21),  # dusk
-    "midnight":          (22,  4),  # late night
-    "three_am":          (23,  5),  # small hours only
-    "witching_hour":     (21,  5),  # night only
-    "wind_down":         (18,  2),  # evening wind-down
-    "dinner_party":      (17, 23),  # evening
-    "monday_motivation": ( 5, 12),  # Monday morning (+ _WEEKDAY_RESTRICTED {0})
-    "friday_feeling":    (11, 19),  # Friday afternoon/evening (+ {4})
-    "sunday_scaries":    (15, 23),  # Sunday afternoon/evening (+ {6})
-    # --- daypart-named mixes that previously had only a soft time nudge (now hard-gated) ---
-    "after_hours_rnb":   (21,  4),  # late-night R&B
-    "glasgow_late":      (21,  4),  # late-night Glasgow
-    "date_night":        (18,  1),  # evening/night
-    "game_night":        (18,  1),  # evening/night
-    "romantic_dinner":   (17, 23),  # dinner
-    "jazz_dinner":       (17, 23),  # dinner
-    "golden_afternoon":  (12, 18),  # afternoon
-    "golden_hour":       (16, 21),  # dusk
-    "winter_nights":     (18,  3),  # nights
-    "friday_night":      (18,  3),  # night (+ _WEEKDAY_RESTRICTED {4})
-    "sunday_morning":    ( 5, 12),  # morning (+ {6})
-    "clear_night":       (20,  5),  # weather-managed, but night by definition
-    "summer_evening":    (17, 22),  # season-managed, but an evening mix
-    "sunset_mix":        (16, 21),  # WHY: dusk mix — every other dusk/night atmospheric mix is hard-gated (audit sunset_mix-1)
-    "starlit":           (20,  5),  # WHY: night mix — consistency with its peers (audit starlit-1)
+# ---------------------------------------------------------------------------
+# Per-profile SCHEDULE — the "right playlist at the right time" gate (replaces the old single-window hour
+# + weekday gate dicts). Each value is a LIST of windows (dayset, start_hour, end_hour); dayset is a
+# frozenset of weekdays (0=Mon … 6=Sun) or None = any day; (start,end) wraps midnight via _in_time_window.
+# Windows OR together, so one profile can be day-dependent AND multi-window (e.g. workout: MWF evening +
+# Tue/Thu early morning). A SCHEDULED profile surfaces ONLY in its windows (the uncapped "context" tier);
+# a profile NOT here is an "anytime" rotating mix. City mixes (geo tier), weather/seasonal profiles, and
+# the 4 cron mixes (_TIME_PROFILES) are deliberately NOT scheduled here.
+# ---------------------------------------------------------------------------
+_SCHED_MWF      = frozenset({0, 2, 4})        # office/gym days
+_SCHED_TT       = frozenset({1, 3})           # WFH / early-workout / lunch-run days
+_SCHED_WEEKDAYS = frozenset({0, 1, 2, 3, 4})
+_SCHED_WEEKEND  = frozenset({5, 6})
+_SCHED_FRI_WKND = frozenset({4, 5, 6})        # "going out" nights
+_WORKOUT_WINDOWS = [(_SCHED_MWF, 16, 19), (_SCHED_TT, 5, 8)]   # MWF gym / Tue-Thu early
+
+_PROFILE_SCHEDULE = {
+    # wake / early morning
+    "fresh_start":       [(_SCHED_WEEKDAYS, 5, 9), (_SCHED_WEEKEND, 8, 10)],
+    "sunrise":           [(None, 5, 9)],
+    "sunday_morning":    [(frozenset({6}), 7, 13)],
+    # commute — MWF office days only, morning + evening home leg (Tue/Thu WFH)
+    "commute_mix":       [(_SCHED_MWF, 6, 8), (_SCHED_MWF, 15, 17)],
+    # work — all weekdays (office MWF + WFH Tue/Thu)
+    "focus":             [(_SCHED_WEEKDAYS, 7, 15)],
+    "deep_work":         [(_SCHED_WEEKDAYS, 7, 15)],
+    "study_session":     [(_SCHED_WEEKDAYS, 7, 15)],
+    # lunch (reused mixes) + weekend cookout
+    "cookout":           [(None, 12, 14), (_SCHED_WEEKEND, 12, 18)],
+    "golden_afternoon":  [(None, 12, 18)],
+    # midday run (Tue/Thu) + weekend morning
+    "running":           [(_SCHED_TT, 12, 14), (_SCHED_WEEKEND, 8, 12)],
+    # walk Henry — weekday late afternoon / weekend morning
+    "walking_mix":       [(_SCHED_WEEKDAYS, 16, 18), (_SCHED_WEEKEND, 8, 10)],
+    # workout — MWF evening / Tue-Thu early AM
+    "workout":           list(_WORKOUT_WINDOWS),
+    "cool_down":         [(_SCHED_MWF, 18, 19), (_SCHED_TT, 7, 9)],
+    # cook dinner / dinner guests / a date — ANY night
+    "cooking_mix":       [(None, 17, 19)],
+    "dinner_party":      [(None, 18, 22)],
+    "romantic_dinner":   [(None, 18, 22)],
+    "jazz_dinner":       [(None, 18, 22)],
+    # evening (any night)
+    "evening_unwind":    [(None, 18, 23)],
+    "wind_down":         [(None, 19, 23)],
+    "date_night":        [(None, 18, 24)],
+    "candlelight":       [(None, 18, 24)],
+    "blue_hour":         [(None, 16, 21)],
+    "golden_hour":       [(None, 16, 21)],
+    "sunset_mix":        [(None, 16, 21)],
+    "game_night":        [(_SCHED_FRI_WKND, 18, 24)],
+    # night / late
+    "late_night_romance":[(None, 21, 3)],
+    "after_dark":        [(None, 20, 4)],
+    "night_drive":       [(None, 19, 4)],
+    "after_hours_rnb":   [(None, 21, 4)],
+    "midnight":          [(None, 22, 4)],
+    "three_am":          [(None, 0, 4)],
+    "witching_hour":     [(None, 22, 4)],
+    "starlit":           [(None, 21, 4)],
+    "winter_nights":     [(None, 18, 3)],
+    # going out (Fri + weekend nights)
+    "friday_night":      [(frozenset({4}), 18, 3)],
+    "pre_party":         [(frozenset({4, 5}), 17, 23)],
+    "party":             [(_SCHED_FRI_WKND, 20, 4)],
+    "party_throwback":   [(frozenset({4, 5}), 20, 3)],
+    "celebration":       [(_SCHED_FRI_WKND, 18, 24)],
+    # weekday occasion / day-named
+    "after_work":        [(_SCHED_WEEKDAYS, 15, 20)],
+    "monday_motivation": [(frozenset({0}), 5, 12)],
+    "friday_feeling":    [(frozenset({4}), 11, 19)],
+    "sunday_scaries":    [(frozenset({6}), 15, 23)],
+    "midweek_reset":     [(frozenset({1, 2, 3}), 7, 20)],
+    # weekend flexible (reused)
+    "brunch_mix":        [(_SCHED_WEEKEND, 8, 14)],
+    "weekend_mix":       [(_SCHED_WEEKEND, 8, 23)],
+    "lazy_sunday":       [(_SCHED_WEEKEND, 10, 18)],
+    "road_trip":         [(_SCHED_WEEKEND, 9, 18)],
+    "campfire":          [(_SCHED_WEEKEND, 16, 21)],
+    "folk_acoustic":     [(_SCHED_WEEKEND, 9, 18)],
+    # wellness routines
+    "yoga_stretch":      [(None, 6, 10)],
+    "meditation":        [(None, 6, 10)],
+    "spa_bath":          [(None, 19, 23)],
+    "power_nap":         [(None, 13, 16)],
 }
+# Dance / EDM family — present when going out (Fri + weekend nights) AND during workouts (high-energy).
+_DANCE_SCHEDULE_KEYS = {"rave_cave", "festival_edm", "techno", "trance", "dnb", "house_party",
+                        "uk_garage", "bass_drop", "deep_house", "hyperpop", "industrial",
+                        "dance_pop", "funk_disco"}
+for _dk in _DANCE_SCHEDULE_KEYS:
+    _PROFILE_SCHEDULE.setdefault(_dk, []).append((_SCHED_FRI_WKND, 20, 4))
+    _PROFILE_SCHEDULE[_dk].extend(_WORKOUT_WINDOWS)
 
 # Weather-conditional profiles — require weather data; add/remove when conditions match.
 _WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes", "stormy", "foggy", "snow_day", "heatwave", "frosty", "grey_skies", "windy", "clear_night"}
@@ -4848,9 +4893,6 @@ _WEATHER_PROFILES = {"rainy_day", "sunny", "cosy", "beach_vibes", "stormy", "fog
 
 # Season-conditional profiles — triggered by current calendar season; no weather API needed.
 _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening", "festive"}
-
-# Work-hours focus guarantee — at least one of these is always active Mon-Fri 7am-3pm.
-_WORK_FOCUS_PROFILES = {"focus", "deep_work"}
 
 # Always-present geo showcase mixes — pinned into every general run (never rotated, never removed); like
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
@@ -6734,6 +6776,39 @@ def _in_time_window(hour, window):
     return hour >= start or hour < end
 
 
+def _get_active_weekday():
+    """Current weekday (0=Mon … 6=Sun) in the user's active timezone (travel-aware), mirroring
+    _get_active_hour — so day-of-week stays consistent with the active hour on a trip."""
+    from zoneinfo import ZoneInfo
+    travel = config.get("travel", [])
+    for trip in travel:
+        try:
+            tz = ZoneInfo(trip["timezone"])
+            dest_today = datetime.now(tz=tz).date()
+            start = date.fromisoformat(trip["start"])
+            end   = date.fromisoformat(trip["end"])
+            if start <= dest_today <= end:
+                return datetime.now(tz=tz).weekday()
+        except Exception:
+            pass
+    return datetime.now().weekday()
+
+
+def _is_scheduled(profile_key):
+    """True if the profile has a _PROFILE_SCHEDULE (it's a time/activity 'context' mix, not 'anytime')."""
+    return profile_key in _PROFILE_SCHEDULE
+
+
+def _in_schedule(profile_key, hour, weekday):
+    """True if `profile_key` has a schedule window matching (hour, weekday). Windows OR together; a
+    dayset of None means any day; (start,end) wraps midnight. Unscheduled profiles return False
+    (they belong to the rotating 'anytime' tier, not the context tier)."""
+    for dayset, start, end in _PROFILE_SCHEDULE.get(profile_key, ()):
+        if (dayset is None or weekday in dayset) and _in_time_window(hour, (start, end)):
+            return True
+    return False
+
+
 def _get_weather(location):
     """
     Fetch current weather from wttr.in.
@@ -6907,7 +6982,7 @@ def _mood_rotation_score(profile_key, acoustic_dist, current_hour, weather):
     weekday_entry = _WEEKDAY_BOOSTS.get(profile_key)
     if weekday_entry:
         days, amount = weekday_entry
-        if datetime.now().weekday() in days:
+        if _get_active_weekday() in days:           # travel-aware, consistent with the schedule gate
             score -= amount
 
     # Weather boost
@@ -12505,51 +12580,6 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2, max_
     return selected[:n_active]
 
 
-# ---------------------------------------------------------------------------
-# Slate freshness — vary the rotating mood-mix selection day-to-day / slot-to-slot
-# ---------------------------------------------------------------------------
-_FRESHNESS_PENALTY = 0.30        # rotation-score penalty for a recently-surfaced profile; same order as
-                                 # the hard time-of-day boost, so a strong contextual fit can still win
-
-
-def _mood_history_path():
-    return os.path.join(_BASE_DIR, "assets", "mood_mix_history.json")
-
-
-def _load_mood_history():
-    """Recently-surfaced general slates: [{ord, slot, ts, profiles}, ...] oldest-first. [] if missing."""
-    try:
-        with open(_mood_history_path()) as f:
-            return json.load(f).get("slots", [])
-    except (OSError, ValueError):
-        return []
-
-
-def _save_mood_history(slots):
-    """Persist the last 8 slates atomically (best-effort — never fatal to a build)."""
-    try:
-        os.makedirs(os.path.dirname(_mood_history_path()), exist_ok=True)
-        tmp = _mood_history_path() + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump({"version": 1, "slots": slots[-8:]}, f)
-        os.replace(tmp, _mood_history_path())
-    except OSError as e:
-        xlog(f"[WARN] mood_mixes: could not persist rotation history: {e}")
-
-
-def _recency_penalty(profile_key, prior_days, cur_ord):
-    """Decaying rotation-score penalty for a profile surfaced on a recent DAY: full _FRESHNESS_PENALTY if it
-    was in yesterday's slate (anti-consecutive), halving each day further back, 0 outside the retained
-    window. `max` (not sum) keeps it bounded at _FRESHNESS_PENALTY."""
-    pen = 0.0
-    for s in prior_days:
-        if profile_key in (s.get("profiles") or ()):
-            ago = cur_ord - s.get("ord", 0)
-            if ago > 0:
-                pen = max(pen, _FRESHNESS_PENALTY / (2 ** (ago - 1)))
-    return pen
-
-
 def _external_used_rks(existing_playlists, building_names):
     """Rating keys already used by EXISTING dedup-eligible Meloday+ mixes built by OTHER cron runs,
     so the no-repeat invariant holds across runs (a track in the Morning mix won't be reused by a
@@ -12569,6 +12599,43 @@ def _external_used_rks(existing_playlists, building_names):
     return used
 
 
+# ---------------------------------------------------------------------------
+# Surface rotation — per-profile {last-on-slate gslot, last-built ordinal}. Lets the slate (a) guarantee
+# coverage via an uncapped overdue bonus (the longest-unseen mix always cycles in → nothing is never
+# surfaced) and (b) rebuild a surviving playlist only once a day (sub-daily runs build only NEW entries).
+# ---------------------------------------------------------------------------
+_ANYTIME_OVERDUE_RATE = 0.10   # per-slot bonus for an unseen profile (uncapped → everyone returns)
+
+def _surface_rotation_path():
+    return os.path.join(_BASE_DIR, "assets", "mood_surface_rotation.json")
+
+def _load_surface_rotation():
+    """{profile_key: {"s": last-on-slate gslot, "b": last-built ordinal}}. {} if missing/corrupt."""
+    try:
+        with open(_surface_rotation_path()) as f:
+            return json.load(f).get("rotation", {})
+    except (OSError, ValueError):
+        return {}
+
+def _save_surface_rotation(rotation):
+    """Atomic best-effort write (never fatal to a build), mirroring _save_geo_rotation."""
+    try:
+        os.makedirs(os.path.dirname(_surface_rotation_path()), exist_ok=True)
+        tmp = _surface_rotation_path() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"version": 1, "rotation": rotation}, f)
+        os.replace(tmp, _surface_rotation_path())
+    except OSError as e:
+        xlog(f"[WARN] mood_mixes: could not persist surface rotation: {e}")
+
+def _surface_overdue(last_gslot, cur_gslot):
+    """Uncapped overdue bonus: rises with slots since the profile was last on the slate; never-seen gets
+    top priority. Mirrors _geo_overdue_bonus — guarantees every rotating mix cycles in over time."""
+    if last_gslot is None:
+        return _ANYTIME_OVERDUE_RATE * 10_000
+    return _ANYTIME_OVERDUE_RATE * max(0, cur_gslot - last_gslot)
+
+
 def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                      n_active=5, mix_size=50, reselect=False, time_context=False,
                      weather_context=False, existing_playlists=None):
@@ -12583,13 +12650,13 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         Only adds/removes weather playlists to match the current conditions. Cheap to run
         often so weather mixes track the weather through the day. Does NOT touch the rest.
 
-    reselect=False (default, daily 6am):
-        Refreshes content for existing general mixes. Checks weather and season;
-        adds/removes weather and seasonal mixes.
-
-    reselect=True (weekly Monday):
-        Full acoustic reselection of general mixes with category-diversity constraint.
-        Also updates weather and seasonal mixes.
+    default (general — run HOURLY so the slate tracks the schedule):
+        Builds the three-tier slate: CONTEXT (every scheduled, in-window profile — uncapped) +
+        ANYTIME (a rotating, time-ranked, overdue-covered set of size mood_mix_count) + GEO (>=1 city
+        mix per city) + weather + seasonal + the 3 pinned scenes. Slot-stable diffing only builds new
+        entries (+ a once-a-day content refresh) and removes rotated-out ones, so hourly runs are cheap.
+        (The `reselect` flag is retained for CLI compatibility but is now a no-op — the overdue rotation
+        continuously refreshes the anytime tier, so there is no separate weekly "reselection".)
 
     Returns (mixes, profiles_to_delete) where mixes is a list of
     (playlist_name, profile_key, tracks) tuples.
@@ -12687,21 +12754,17 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     lat = weather.get("lat", 0.0) if weather else 0.0
 
     # Determine which general profiles are active
-    today_wd     = datetime.now().weekday()
+    today_wd     = _get_active_weekday()
     current_hour = _get_active_hour()
     cur_ord      = datetime.now().date().toordinal()
-    prior_slots  = _load_mood_history()   # recent slates, for the freshness / anti-repeat penalty
+    rot_per_day  = max(1, int(_extras.get("mood_mix_rotations_per_day", 6)))
+    slot         = (current_hour * rot_per_day) // 24
+    cur_gslot    = cur_ord * rot_per_day + slot          # monotonic global slot index
+    _rotation    = _load_surface_rotation()              # {key: {"s": last-on-slate gslot, "b": last-built ord}}
 
-    def _hour_allowed(k):
-        window = _HOUR_RESTRICTED.get(k)
-        return _in_time_window(current_hour, window) if window else True
-
-    # ---- General mixes: a daily "anytime" core + time/day-gated mixes layered on top ----
-    # The genre/vibe/mood/decade mixes (no hard hour/day gate) are chosen ONCE A DAY and held stable all
-    # day, fresh each morning; the _HOUR_RESTRICTED / _WEEKDAY_RESTRICTED profiles rotate in/out by their
-    # window ON TOP (like the weather/season tiers). Splitting them keeps the anytime half steady while
-    # time-relevant mixes still come and go — and avoids freezing the slate to one build-hour's vibe.
-    _gated = lambda k: k in _HOUR_RESTRICTED or k in _WEEKDAY_RESTRICTED
+    # ---- Three tiers: CONTEXT (scheduled & in-window, UNCAPPED) + ANYTIME (rotating, time-ranked,
+    # overdue-covered) + GEO (>=1 per city). Surfaces every right-now playlist with no cap, rotates the
+    # rest across the day, and guarantees every mix surfaces over time (uncapped overdue bonus). ----
     now             = datetime.now(tz=timezone.utc)
     recent_entries  = [e for e in history_entries
                        if e.viewedAt and e.viewedAt >= now - timedelta(days=30)]
@@ -12730,47 +12793,42 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                 pool.append(k)
         return pool
 
-    # Anytime core — ungated, hour/weather-neutral, chosen ONCE A DAY (day-seeded) and held stable.
-    _today = next((s for s in prior_slots if s.get("ord") == cur_ord), None)
-    if _today is not None:
-        active_core = [k for k in (_today.get("profiles") or [])
-                       if k in _GENERAL_PROFILES and not _gated(k)]
-    else:
-        anytime = _fillable([k for k in _GENERAL_PROFILES
-                             if not _gated(k) and _profile_season_ok(k, lat)])
-        scored  = sorted((_adist(k) + _recency_penalty(k, prior_slots, cur_ord), k) for k in anytime)
-        pool    = _stratified(scored) if _has_centroid else list(anytime)
-        random.Random(hash(cur_ord)).shuffle(pool)           # day-seeded: identical all day, fresh next day
-        active_core = _select_diverse_profiles([(i, k) for i, k in enumerate(pool)],
-                                               n_active, max_per_category=max(1, math.ceil(n_active / n_cats)))
-        xlog(f"[INFO] mood_mixes: daily anytime core → {active_core}")
-        # One row per day; the day-based _recency_penalty varies the core day to day.
-        _save_mood_history([s for s in prior_slots if s.get("ord") != cur_ord]
-                           + [{"ord": cur_ord, "ts": int(time.time()), "profiles": list(active_core)}])
+    def _overdue(k):
+        return _surface_overdue((_rotation.get(k) or {}).get("s"), cur_gslot)
 
-    # Time/day-gated — in-window profiles selected per run, layered ON TOP (rotate in/out by their window).
-    win_pool = _fillable([k for k in _GENERAL_PROFILES if _gated(k)
-                          and today_wd in _WEEKDAY_RESTRICTED.get(k, {today_wd})
-                          and _hour_allowed(k) and _profile_season_ok(k, lat)])
-    if win_pool:
-        win_ranked = [k for _, k in sorted(
-            (_mood_rotation_score(k, _adist(k), current_hour, weather)
-             + _recency_penalty(k, prior_slots, cur_ord), k) for k in win_pool)]
-        active_windowed = _select_diverse_profiles([(i, k) for i, k in enumerate(win_ranked)],
-                                                   max(2, n_active // 3), max_per_category=2)
-    else:
-        active_windowed = []
+    # CONTEXT — every scheduled profile whose window matches now, UNCAPPED (no _select_diverse_profiles).
+    # Excludes city mixes (geo tier). The "right playlist at the right time"; rotates as windows change.
+    active_context = _fillable([k for k in _GENERAL_PROFILES
+                               if _is_scheduled(k) and not _geo_group(k)
+                               and _in_schedule(k, current_hour, today_wd)
+                               and _profile_season_ok(k, lat)])
 
-    # Work-hours focus guarantee — Mon-Fri 7am-3pm ensure a focus/work mix is on the shelf (focus/deep_work
-    # are _HOUR_RESTRICTED 5-17, so they belong to the windowed tier).
-    if (0 <= today_wd <= 4 and 7 <= current_hour < 15
-            and not any(k in _WORK_FOCUS_PROFILES for k in active_windowed)):
-        focus_pool = sorted(_WORK_FOCUS_PROFILES & set(win_pool), key=_adist)
-        if focus_pool:
-            active_windowed.append(focus_pool[0])
+    # ANYTIME — unscheduled, non-city vibe/genre/mood mixes: a rotating, time-ranked set ADDED ON TOP.
+    # Ranked by acoustic fit + soft time/day boost minus an uncapped overdue bonus, so time-fitting moods
+    # surface now (romance in the evening, ambient late) AND the longest-unseen always cycles in (coverage).
+    anytime_pool = _fillable([k for k in _GENERAL_PROFILES
+                              if not _is_scheduled(k) and not _geo_group(k)
+                              and _profile_season_ok(k, lat)])
+    a_scored = sorted((_mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k), k)
+                      for k in anytime_pool)
+    a_pool   = _stratified(a_scored) if _has_centroid else [k for _, k in a_scored]
+    active_anytime = _select_diverse_profiles([(i, k) for i, k in enumerate(a_pool)],
+                                              n_active, max_per_category=max(2, math.ceil(n_active / n_cats)))
 
-    active_general = list(active_core) + [k for k in active_windowed if k not in active_core]
-    xlog(f"[INFO] mood_mixes: general = core{active_core} + windowed{active_windowed}")
+    # GEO — guarantee >=1 city mix per city; pick the most time-fitting + most-overdue so every city mix
+    # cycles in over time and night mixes lead at night. (Pinned scenes are handled separately below.)
+    active_city = []
+    for _pre in ("glasgow_", "london_", "melbourne_"):
+        _cands = _fillable([k for k in _GENERAL_PROFILES
+                            if k.startswith(_pre) and k not in _PINNED_PROFILES and _profile_season_ok(k, lat)])
+        if _cands:
+            active_city.append(min(_cands, key=lambda k:
+                _mood_rotation_score(k, _adist(k), current_hour, weather) - _overdue(k)))
+
+    active_general = (active_context
+                      + [k for k in active_anytime if k not in active_context]
+                      + [k for k in active_city if k not in active_context and k not in active_anytime])
+    xlog(f"[INFO] mood_mixes: context{active_context} + anytime{active_anytime} + city{active_city}")
     # Validation hook: force specific mixes onto the slate regardless of rotation, e.g.
     #   MELODAY_FORCE_MIXES=rave_cave   (comma/space-separated profile keys). No-op when unset.
     _forced = [k for k in os.environ.get("MELODAY_FORCE_MIXES", "").replace(",", " ").split()
@@ -12779,40 +12837,36 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         active_general += _forced
         xlog(f"[INFO] mood_mixes: FORCED onto slate via MELODAY_FORCE_MIXES → {_forced}")
 
-    # Weather-conditional profiles
-    active_weather   = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
-    inactive_weather = [k for k in _WEATHER_PROFILES if k not in active_weather]
+    # Weather + season tiers (condition / calendar gated)
+    active_weather  = [k for k in _WEATHER_PROFILES if _weather_boost(k, weather) < 0]
+    active_seasonal = [k for k in _SEASONAL_PROFILES if _season_active(k, lat)]
 
-    # Season-conditional profiles (work without weather API)
-    active_seasonal   = [k for k in _SEASONAL_PROFILES if _season_active(k, lat)]
-    inactive_seasonal = [k for k in _SEASONAL_PROFILES if k not in active_seasonal]
-
-    to_remove = (
-        [k for k in inactive_weather  if _MOOD_MIX_NAMES[k] in existing] +
-        [k for k in inactive_seasonal if _MOOD_MIX_NAMES[k] in existing]
-    )
-    # general mixes that rotated out of this slot's selection are also removed (computed up-front so
-    # `building` below knows everything this run will delete — their tracks must not block new mixes)
-    to_remove += [k for name, k in name_to_key.items()
-                  if k in _GENERAL_PROFILES and k not in active_general and name in existing]
-
-    # Pinned geo showcase mixes are present every run but their content refreshes ONCE A DAY. Their
-    # _build_mix_tracks geo branch advances the artist-coverage rotation (stamping each chosen artist's
-    # `last` = today) every time it runs, so rebuilding on the sub-daily cron churns their content. Skip
-    # any scene whose rotation already advanced today; a skipped scene is neither rebuilt nor in
-    # to_remove, so the caller leaves its existing playlist untouched until tomorrow's first run.
+    # Pinned geo scenes — present every run; content refreshes ONCE A DAY (skip any whose artist-rotation
+    # already advanced today, so the sub-daily cron doesn't churn them). Never auto-removed.
     _geo_rot = _load_geo_rotation()
     def _scene_done_today(scene):
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
-    active_profiles = active_general + active_weather + active_seasonal + active_pinned
-    xlog(f"[INFO] mood_mixes: active = general{active_general} + weather{active_weather} "
-         f"+ seasonal{active_seasonal} + pinned{active_pinned}")
 
-    # The anytime core is built once a day; on later sub-daily runs skip rebuilding it (leave the
-    # playlists untouched) — only the windowed / weather / season / scene tiers refresh through the day.
-    to_build = [k for k in active_profiles if not (_today is not None and k in active_core)]
+    active_profiles = active_general + active_weather + active_seasonal + active_pinned
+
+    # Churn control (slot-stable diffing): only BUILD new entries + a once-a-day content refresh of
+    # survivors; only REMOVE profiles that genuinely rotated out. Survivors within the day are left
+    # untouched so the hourly cron doesn't thrash Plex. Managed = the rotating/conditional tiers; pinned
+    # scenes and the cron mixes (_TIME_PROFILES) are never auto-removed here.
+    managed         = _GENERAL_PROFILES | _WEATHER_PROFILES | _SEASONAL_PROFILES
+    desired_managed = set(active_general) | set(active_weather) | set(active_seasonal)
+    currently = {name_to_key[name] for name in existing
+                 if name in name_to_key and name_to_key[name] in managed}
+    to_remove = sorted(currently - desired_managed)
+    _stale = lambda k: (_rotation.get(k) or {}).get("b") != cur_ord     # content last built on a prior day
+    to_build = [k for k in active_profiles
+                if k in active_pinned or k not in currently or _stale(k)]
+    for k in active_profiles:                                            # stamp "on the slate now" → overdue
+        _rotation.setdefault(k, {})["s"] = cur_gslot
+    xlog(f"[INFO] mood_mixes: add={sorted(set(to_build))} remove={to_remove} "
+         f"weather{active_weather} season{active_seasonal} pinned{active_pinned}")
     # Cross-run dedup: exclude tracks already used by dedup-eligible mixes built by OTHER runs (e.g. the
     # time-of-day mixes) AND the held-over anytime core, but NOT the mixes we rebuild/remove now.
     building = ({_MOOD_MIX_NAMES[k] for k in to_build}
@@ -12828,7 +12882,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         if not is_showcase:
             seen_rks.update(str(t.ratingKey) for t in tracks)   # no repeats across dedup-eligible mixes
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
-
+        _rotation.setdefault(profile_key, {})["b"] = cur_ord    # content built today (skip rebuild on later runs)
+    _save_surface_rotation(_rotation)
     return mixes, to_remove
 
 
@@ -12995,7 +13050,7 @@ def _load_geo_rotation():
 
 
 def _save_geo_rotation(scenes):
-    """Atomic best-effort write (never fatal to a build), mirroring _save_mood_history."""
+    """Atomic best-effort write (never fatal to a build), mirroring _save_geo_rotation."""
     try:
         os.makedirs(os.path.dirname(_geo_rotation_path()), exist_ok=True)
         tmp = _geo_rotation_path() + ".tmp"
