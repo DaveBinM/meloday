@@ -89,7 +89,11 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG_FILE = os.path.join(_BASE_DIR, "logs", "meloday_extras.log")
 os.makedirs(os.path.dirname(_LOG_FILE), exist_ok=True)
 
-_file_handler = logging.FileHandler(_LOG_FILE, mode="w", encoding="utf-8")
+from logging.handlers import RotatingFileHandler
+# WHY: this was mode="w", which wiped the log on every run — so an intermittent failure (e.g. an early-morning
+# crash that froze the slate at the overnight state) left no trace to diagnose. Append + size-bounded rotation
+# keeps several days of run history while capping disk.
+_file_handler = RotatingFileHandler(_LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8")
 _file_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
 _logger = logging.getLogger("MelodayExtras")
 _logger.setLevel(logging.INFO)
@@ -6499,7 +6503,7 @@ _PROFILE_MIN_LISTENERS = {
 
 # Artist top-tracks gate (Throwback Anthems): keep only an artist's OWN Last.fm top-N tracks that ALSO clear
 # the global-listener floor — both must hold (an artist's signature song AND a genuinely famous one).
-# WHY: throwback_anthems is acoustic-vibe-ranked (category "social") with no popularity floor, so obscure
+# WHY: throwback_anthems is acoustic-vibe-ranked (category "nostalgic_throwback") with no popularity floor, so obscure
 # tracks that merely fit the vibe were displacing artists' actual hits. The per-artist rank map is built by
 # `pre_analyze.py --sync-top-tracks` (assets/lastfm_artist_top_tracks.json: {artist: {norm_title: rank}});
 # the floor reads the lastfm_listeners column.
@@ -6792,6 +6796,25 @@ def _get_active_weekday():
         except Exception:
             pass
     return datetime.now().weekday()
+
+
+def _get_active_date():
+    """Current date in the user's active timezone (travel-aware), mirroring _get_active_hour/_get_active_weekday.
+    WHY: the slot index cur_gslot mixes this day ordinal with the (travel-aware) hour — they must share a
+    timezone, or the day boundary desyncs from the hour during travel and rotation mis-fires/stalls."""
+    from zoneinfo import ZoneInfo
+    travel = config.get("travel", [])
+    for trip in travel:
+        try:
+            tz = ZoneInfo(trip["timezone"])
+            dest_today = datetime.now(tz=tz).date()
+            start = date.fromisoformat(trip["start"])
+            end   = date.fromisoformat(trip["end"])
+            if start <= dest_today <= end:
+                return dest_today
+        except Exception:
+            pass
+    return datetime.now().date()
 
 
 def _is_scheduled(profile_key):
@@ -12756,7 +12779,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     # Determine which general profiles are active
     today_wd     = _get_active_weekday()
     current_hour = _get_active_hour()
-    cur_ord      = datetime.now().date().toordinal()
+    cur_ord      = _get_active_date().toordinal()         # travel-aware, consistent with hour/weekday above
     rot_per_day  = max(1, int(_extras.get("mood_mix_rotations_per_day", 6)))
     slot         = (current_hour * rot_per_day) // 24
     cur_gslot    = cur_ord * rot_per_day + slot          # monotonic global slot index
@@ -12889,10 +12912,19 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     mixes = []
     for profile_key in to_build:
         is_showcase = _PROFILE_CATEGORY.get(profile_key) in ("era", "geo_scene")  # decade + geo: EXEMPT from cross-mix dedup
-        tracks = _build_mix_tracks(
-            profile_key, essentia_cache, history_entries,
-            excluded_album_keys, mix_size, plex,
-            hard_exclude_rks=(recent_rks if is_showcase else seen_rks))
+        # WHY: isolate each mix's build. Before, one mix raising aborted the whole build_mood_mixes; the caller's
+        # broad except then applied NO adds/removes, freezing the slate at the previous (e.g. overnight) state.
+        # Now a single failure logs + skips, and to_remove (computed above) still applies, so the slate still rotates.
+        try:
+            tracks = _build_mix_tracks(
+                profile_key, essentia_cache, history_entries,
+                excluded_album_keys, mix_size, plex,
+                hard_exclude_rks=(recent_rks if is_showcase else seen_rks))
+        except Exception:
+            xlog(f"[ERROR] mood_mixes: build '{profile_key}' failed, skipping:\n{traceback.format_exc()}")
+            continue
+        if not tracks:
+            continue                                            # nothing fit — don't upsert an empty playlist
         if not is_showcase:
             seen_rks.update(str(t.ratingKey) for t in tracks)   # no repeats across dedup-eligible mixes
         mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
