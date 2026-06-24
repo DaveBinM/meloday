@@ -342,9 +342,12 @@ def _essentia_backfill_worker(rk, file_path, data):
     # exercised on a box with no audio/models.
     _fault = os.environ.get("MELODAY_BF_FAULT_RATE")
     if _fault:
-        import random as _rnd
+        import random as _rnd, time as _t
         if rk == os.environ.get("MELODAY_BF_POISON") or _rnd.random() < float(_fault):
-            os._exit(1)
+            os._exit(1)                          # die immediately → pool breaks while siblings are busy
+        _slp = os.environ.get("MELODAY_BF_FAULT_SLEEP")
+        if _slp:
+            _t.sleep(float(_slp))                # simulate the long C-inference so siblings linger
         return rk, data, None
     import meloday
     if not file_path or not os.path.exists(file_path):
@@ -363,18 +366,41 @@ def _essentia_backfill_worker(rk, file_path, data):
     return rk, data, None
 
 def _bf_worker_count(per_worker_gb, override=None):
-    """CPU-bound worker count: leave >=1 core free, capped by available RAM at per_worker_gb each."""
+    """CPU-bound worker count for a CONSIDERATE background job: capped by RAM (with a generous buffer
+    for Plex/Lidarr + the daily cron's own analysis workers) AND by ~half the cores. WHY: grabbing
+    every core/GB starved the box and OOM-cascaded; leaving real headroom keeps the first break rare."""
     if override:
         return max(1, int(override))
     try:
         import psutil
         physical = psutil.cpu_count(logical=False) or os.cpu_count() or 2
         avail = psutil.virtual_memory().available
-        headroom = max(1024 ** 3, int(avail * 0.15))
+        headroom = max(4 * 1024 ** 3, int(avail * 0.30))   # reserve >=4 GB / 30% for everything else
         ram_cap = max(1, int((avail - headroom) // int(per_worker_gb * 1024 ** 3)))
-        return max(1, min(physical - 1, ram_cap))   # -1: always leave a core for the OS / cron / SSH
+        core_cap = max(_BF_WORKER_FLOOR, physical // 2)     # leave ~half the cores for Plex/cron/OS
+        return max(1, min(physical - 1, ram_cap, core_cap))
     except Exception:
-        return max(1, (os.cpu_count() or 2) - 1)
+        return max(1, (os.cpu_count() or 2) // 2)
+
+def _bf_wait_for_memory(need_gb, buffer_gb=2.0, timeout=90):
+    """Block until available RAM covers need_gb + buffer (or timeout). WHY: after a pool breaks we must
+    not respawn a fresh pool into a still-starved box — that just OOMs again and leaks another worker
+    generation. Returns when memory is ready or we've waited long enough (then the caller proceeds with
+    its already-throttled-down worker count)."""
+    try:
+        import psutil
+    except Exception:
+        return
+    need = (need_gb + buffer_gb) * 1024 ** 3
+    deadline = time.time() + timeout
+    warned = False
+    while time.time() < deadline:
+        if psutil.virtual_memory().available >= need:
+            return
+        if not warned:
+            log_msg(f"\n[INFO] waiting for ~{need_gb + buffer_gb:.0f} GB free before respawning…")
+            warned = True
+        time.sleep(2)
 
 # Single-thread the numeric libs (TF / BLAS / OpenMP) inside spawned analysis workers.
 # WHY: each worker is one of N processes; if TF/BLAS each grab all logical cores, N workers ×
@@ -543,6 +569,13 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
                 if pending:
                     try: flush_fn(pending); pending.clear()
                     except Exception: pass
+                # SIGKILL this generation's workers BEFORE shutdown. shutdown(wait=False) only stops
+                # feeding them — a worker stuck in a ~22s EffNet C-call keeps running, and with a fresh
+                # pool spawned next iteration the generations pile into a process/memory runaway. Killing
+                # here guarantees exactly one generation alive at a time (same as _bf_kill_workers).
+                for _p in (getattr(executor, "_processes", None) or {}).values():
+                    try: _p.kill()
+                    except Exception: pass
                 executor.shutdown(wait=False, cancel_futures=True)
                 _bf_active_ex[0] = None
             if not broke:
@@ -556,7 +589,8 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
             n_cur = max(_BF_WORKER_FLOOR, int(n_cur * 0.75))
             log_msg(f"\n[WARN] {label}: worker pool broke (likely OOM) — {ok} ok so far; rebuilding "
                     f"with {n_cur} worker(s), {left} left (restart {restarts}/{_BF_RESTART_CAP}).")
-            time.sleep(_backoff)                 # let OOM-reclaimed memory settle before respawning
+            time.sleep(_backoff)                          # brief settle so the killed workers are reaped
+            _bf_wait_for_memory(n_cur * per_worker_gb)    # don't respawn into a starved box → OOM loop
     finally:
         if pending:
             try: flush_fn(pending)
