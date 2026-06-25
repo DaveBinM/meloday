@@ -2121,8 +2121,8 @@ _MOOD_PROFILES = {
 # Theme:    Geo HITS mix — Scotland's biggest, anyone-would-know songs.
 # Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
 # Era/Geo:  Any era · origin-gated: scotland.
-# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
-# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Music:    Origin gate + top-200 by global Last.fm listeners + each artist's own top-5 anthem-rescue (genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 + anthem-rescue · PINNED · cat:geo_scene
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "scottish_hits":   {"bpm": 116, "energy": -9, "danceability": 0.54, "brightness": 0.40, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.60, "valence": 0.55, "vocal_presence": 0.76},
@@ -2130,8 +2130,8 @@ _MOOD_PROFILES = {
 # Theme:    Geo HITS mix — Australia's biggest, anyone-would-know songs.
 # Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
 # Era/Geo:  Any era · origin-gated: australia.
-# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
-# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Music:    Origin gate + top-200 by global Last.fm listeners + each artist's own top-5 anthem-rescue (genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 + anthem-rescue · PINNED · cat:geo_scene
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "australian_hits": {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
@@ -2139,8 +2139,8 @@ _MOOD_PROFILES = {
 # Theme:    Geo HITS mix — London's biggest, anyone-would-know songs.
 # Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
 # Era/Geo:  Any era · origin-gated: london.
-# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
-# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Music:    Origin gate + top-200 by global Last.fm listeners + each artist's own top-5 anthem-rescue (genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 + anthem-rescue · PINNED · cat:geo_scene
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "london_hits":     {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
@@ -13050,11 +13050,15 @@ _GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits
                                # re-derives as the library grows. Tight by design: genuine hits, repeats are OK.
 _GEO_HITS_MIN_LISTENERS = 50_000   # absolute backstop only — guards a hypothetical tiny/new origin from
                                    # surfacing obscure tracks (inert for these three, whose top-N all clear ~267k)
-_GEO_HITS_HYBRID = {           # geo HITS profiles that use a floor + anthem-rescue rule instead of the top-N cap.
-    # WHY: the UK canon is too deep for a top-N cap, and a pure floor drops genuine classics Last.fm under-counts
-    # on split/quoted pages (Bowie "Heroes" = 248k, his #2). Qualify if listeners >= floor OR the track is the
-    # artist's own Last.fm top_n with listeners >= rescue. No top-N cap (the whole above-rule canon). See _is_geo_hits.
-    "uk_hits": {"floor": 400_000, "top_n": 5, "rescue": 150_000},
+_GEO_HITS_HYBRID = {           # per-profile selection for the geo HITS mixes: a base pool + an anthem-rescue.
+    # base = top-`cap` by listeners (place hits) or >=`floor` (UK — too deep for a cap). rescue = the artist's OWN
+    # Last.fm top_n (>= rescue listeners) ADDED on top, so genuine signatures Last.fm UNDER-COUNTS on split/quoted
+    # pages aren't dropped (Bowie "Heroes" 248k = his #2; Fleetwood Mac "The Chain" 628k sits below London's ~648k
+    # top-200 cut). Rescue only adds — the "biggest hits" base is unchanged. top_n/rescue shared + tunable.
+    "scottish_hits":   {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
+    "australian_hits": {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
+    "london_hits":     {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
+    "uk_hits":         {"floor": 400_000,      "top_n": 5, "rescue": 150_000},
 }
 
 # Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
@@ -13699,21 +13703,28 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 best[sk] = (sc, rk)
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        _hyb = _GEO_HITS_HYBRID.get(profile_key)
-        if _hyb:
-            # UK-scale hybrid (no top-N cap — the UK canon is too deep): a song qualifies on a global floor OR
-            # as the artist's OWN Last.fm top-N with a lower rescue floor, so genuinely-known classics that
-            # Last.fm under-counts on a split/quoted page (e.g. Bowie "Heroes" at 248k = his #2) aren't dropped.
-            def _hit_ok(rk):
-                e = essentia_cache.get(rk, {}); lis = e.get("lastfm_listeners") or 0
-                if lis >= _hyb["floor"]:
-                    return True
-                r = _artist_top_rank(e)
-                return r is not None and r <= _hyb["top_n"] and lis >= _hyb["rescue"]
-            pool = [rk for rk in uniq if _hit_ok(rk)]
+        _hyb = _GEO_HITS_HYBRID.get(profile_key) or {}
+        # base = the "biggest hits" core: >= floor (deep origins like the UK) or the top-`cap` by listeners.
+        if _hyb.get("floor") is not None:
+            pool = [rk for rk in uniq if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _hyb["floor"]]
         else:
             pool = [rk for rk in uniq
-                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_GEO_HITS_POOL]
+                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_hyb.get("cap", _GEO_HITS_POOL)]
+        # Anthem-rescue: ADD each artist's OWN Last.fm top-N signatures (>= rescue) that fell below the base cut,
+        # so genuine hits Last.fm under-counts on split/quoted pages aren't dropped (Bowie "Heroes"; Fleetwood
+        # Mac "The Chain" 628k below London's top-200 cut). Only ADDS — the "biggest hits" base stays intact.
+        _topn, _resc = _hyb.get("top_n"), _hyb.get("rescue")
+        if _topn and _resc:
+            _seen = set(pool)
+            for rk in uniq:
+                if rk in _seen:
+                    continue
+                e = essentia_cache.get(rk, {})
+                if (e.get("lastfm_listeners") or 0) < _resc:
+                    continue
+                r = _artist_top_rank(e)
+                if r is not None and r <= _topn:
+                    pool.append(rk); _seen.add(rk)
         random.Random(f"geohits-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         # Daily-built sentinel so the once-a-day _scene_done_today gate stops the hourly cron rebuilding this
         # pinned mix (mirrors the scenes, which write per-artist 'last' to the same geo-rotation file).
