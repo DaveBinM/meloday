@@ -13044,6 +13044,9 @@ _SONG_MIN_YEAR_CACHE = {}
 _ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm listener floor to count as
                                # part of the decade's recognisable canon — so older/smaller decades
                                # self-size below it while the modern ones have far more above it
+_ERA_RESCUE_TOP_N = 5          # decade ANTHEM-RESCUE: also keep each artist's own Last.fm top-N signature
+_ERA_RESCUE_MIN   = 150_000    # songs (>= this many listeners) that fell below the top-150 cut, so genuine
+                               # classics the tight cap drops (The Twist, Get Ready, Jailbreak) aren't lost
 _GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits): keep the top-N songs by
                                # global Last.fm listeners per origin. N IS the auto per-location floor — the
                                # Nth-song listener count varies by place (London's bar ~2.5x Scotland's) and
@@ -13093,7 +13096,13 @@ def _is_compilation(entry):
     if rt:
         return bool({str(t).lower() for t in rt} & _ERA_EXCLUDED_RELEASE_TYPES)
     return _comp_folder_fallback(entry.get("file_path"))
-_era_is_comp = _is_compilation   # decade-mix code keeps its original name
+def _era_is_comp(entry):
+    """Compilation check for the DECADE mixes specifically — `_is_compilation` PLUS any track filed under a
+    Various-Artists folder. WHY: VA soundtracks (release_types ['album','soundtrack']) slip _is_compilation,
+    and a song owned ONLY on a VA comp/soundtrack has no reliable decade and shouldn't anchor one (e.g.
+    'God Only Knows'/'Heroes', owned only on VA releases). Era-scoped — canonical selection keeps plain
+    _is_compilation."""
+    return _is_compilation(entry) or "/various artists" in (entry.get("file_path") or "").lower()
 
 
 def _entry_song_key(entry):
@@ -13111,10 +13120,10 @@ def _song_min_year_map(essentia_cache):
         m = {}
         for e in essentia_cache.values():
             y = e.get("year")
-            if not y:
-                continue
-            k = _entry_song_key(e)
-            if k[1] and y < m.get(k, 9999):
+            if not y or _era_is_comp(e):        # WHY skip comps/VA: their album-year is the comp/reissue year,
+                continue                        # not the original, and it was mis-dating songs (a 1990 comp set
+            k = _entry_song_key(e)              # "God Only Knows" to the 90s). Studio-copy songs are unaffected —
+            if k[1] and y < m.get(k, 9999):     # their min already comes from the studio copy.
                 m[k] = y
         _SONG_MIN_YEAR_CACHE[cid] = m
     return m
@@ -13832,6 +13841,19 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             return len({(essentia_cache.get(rk, {}).get("artist") or "").lower() for rk in rks if rk})
         use_floor = len(floored) >= mix_size and _n_artists(floored[:mix_size * 3]) >= mix_size
         pool = (floored if use_floor else uniq)[:mix_size * 3]
+        # Anthem-rescue: ADD each artist's own Last.fm top-N (>= _ERA_RESCUE_MIN) that fell below the cut, so
+        # genuine decade classics the tight top-150 drops aren't lost. Only adds from `uniq` (already in-decade
+        # + comp/VA-filtered), so every rescued track passes the SAME decade gate as the base — never out-of-decade.
+        _seen = set(pool)
+        for rk in uniq:
+            if rk in _seen:
+                continue
+            e = essentia_cache.get(rk, {})
+            if (e.get("lastfm_listeners") or 0) < _ERA_RESCUE_MIN:
+                continue
+            r = _artist_top_rank(e)
+            if r is not None and r <= _ERA_RESCUE_TOP_N:
+                pool.append(rk); _seen.add(rk)
         random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         history_rks, library_rks = [], pool
 
