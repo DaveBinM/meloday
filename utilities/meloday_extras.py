@@ -10575,18 +10575,18 @@ def _make_union_jack_background(w, h, color_top, color_bottom, v=0, rng=None):
     # (cross half-width frac, saltire width frac, red/white ratio) — subtle proportion shifts per variant
     configs = [(0.115, 0.16, 0.46), (0.10, 0.14, 0.50), (0.13, 0.18, 0.42), (0.105, 0.15, 0.48)]
     cw, sw, ratio = configs[min(v, len(configs) - 1)]
-    img  = Image.new("RGB", (w, h), blue)
-    draw = ImageDraw.Draw(img)
+    img  = _make_gradient_image(w, h, blue, (8, 30, 90), diagonal=False)   # blue ground — RGBA, like every other generator
+    draw = ImageDraw.Draw(img, 'RGBA')
     wsw = max(2, int(w * sw)); rsw = max(2, int(wsw * ratio))           # white then narrower red saltire (diagonals)
     for col, width in ((white, wsw), (red, rsw)):
-        draw.line([(0, 0), (w, h)], fill=col, width=width)
-        draw.line([(0, h), (w, 0)], fill=col, width=width)
+        draw.line([(0, 0), (w, h)], fill=(*col, 255), width=width)
+        draw.line([(0, h), (w, 0)], fill=(*col, 255), width=width)
     wcw = max(2, int(w * cw)); rcw = max(2, int(wcw * 0.58))            # white then narrower red St George cross, on top
     cx, cy = w // 2, h // 2
-    draw.rectangle([cx - wcw, 0, cx + wcw, h], fill=white)
-    draw.rectangle([0, cy - wcw, w, cy + wcw], fill=white)
-    draw.rectangle([cx - rcw, 0, cx + rcw, h], fill=red)
-    draw.rectangle([0, cy - rcw, w, cy + rcw], fill=red)
+    draw.rectangle([cx - wcw, 0, cx + wcw, h], fill=(*white, 255))
+    draw.rectangle([0, cy - wcw, w, cy + wcw], fill=(*white, 255))
+    draw.rectangle([cx - rcw, 0, cx + rcw, h], fill=(*red, 255))
+    draw.rectangle([0, cy - rcw, w, cy + rcw], fill=(*red, 255))
     return img
 
 _BG_GENERATORS = {
