@@ -211,6 +211,8 @@ _EXTRAS_COVER_COLORS = {
     "scottish_hits":   ((200, 76, 24), (150, 52, 16)),     # Irn-Bru orange (tartan ground)
     "australian_hits": ((225, 125, 60), (140, 55, 50)),    # sunset orange/red
     "london_hits":     ((125, 85, 130), (48, 38, 68)),     # urban purple
+    "uk_scene":        ((20, 56, 140), (10, 28, 80)),      # Union Jack blue
+    "uk_hits":         ((20, 56, 140), (10, 28, 80)),      # Union Jack blue
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -767,6 +769,9 @@ _COVER_BG_STYLES = {
     "scottish_hits": ("tartan", 1),
     "london_hits": ("cityscape", 2),
     "australian_hits": ("sun_horizon", 8),
+    # --- UK (whole) scene + hits: the Union Jack family ---
+    "uk_scene": ("union_jack", 0),
+    "uk_hits": ("union_jack", 1),
     # --- misc ---
     "discover_weekly": ("radial", 0),
     "folk_acoustic": ("acoustic_guitar", 0),
@@ -804,6 +809,7 @@ _PROFILE_ICON = {
     "heatwave": "thermostat", "cooking_mix": "skillet",
     "gospel": "church",
     "scottish_hits": "star", "australian_hits": "star", "london_hits": "star",
+    "uk_hits": "star",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -2138,6 +2144,24 @@ _MOOD_PROFILES = {
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "london_hits":     {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
+# ── uk_scene → "Sounds of the UK" ─────────────────────────────────────────────────────────
+# Theme:    Geo mix — the UK scene (England/Scotland/Wales/NI), all genres.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  Any era · origin-gated: united kingdom.
+# Music:    Origin gate + equal-weight artist rotation; each artist's top-10 by global Last.fm popularity.
+# Criteria: no genre/sound gate · origin-gated · equal-weight rotation (no floor) · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "uk_scene":        {"bpm": 118, "energy": -8, "danceability": 0.60, "brightness": 0.42, "beat_confidence": 0.78, "onset_rate": 5.4, "dynamic_complexity": 0.44, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.75},
+# ── uk_hits → "UK Hits" ───────────────────────────────────────────────────────────────────
+# Theme:    Geo HITS mix — the UK's biggest, anyone-would-know songs.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  Any era · origin-gated: united kingdom.
+# Music:    Origin gate + HYBRID: listeners≥400k OR the artist's own Last.fm top-5 (≥150k) — rescues under-counted classics; no top-N cap.
+# Criteria: no genre/sound gate · origin-gated · floor+anthem hybrid · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "uk_hits":         {"bpm": 118, "energy": -8, "danceability": 0.60, "brightness": 0.42, "beat_confidence": 0.78, "onset_rate": 5.4, "dynamic_complexity": 0.44, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.75},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4462,6 +4486,8 @@ _MOOD_MIX_NAMES = {
     "scottish_hits":   "Scottish Hits • Meloday+",
     "australian_hits": "Australian Hits • Meloday+",
     "london_hits":     "London Hits • Meloday+",
+    "uk_scene":        "Sounds of the UK • Meloday+",
+    "uk_hits":         "UK Hits • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -4946,7 +4972,8 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 # Always-present geo showcase mixes — pinned into every general run (never rotated, never removed); like
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
-                     "scottish_hits", "australian_hits", "london_hits"}
+                     "scottish_hits", "australian_hits", "london_hits",
+                     "uk_scene", "uk_hits"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5103,6 +5130,7 @@ _PROFILE_CATEGORY = {
     # geo_scene (3 pinned showcase scenes + 3 pinned geo HITS mixes — all share showcase behaviour)
     "scotland_scene": "geo_scene", "australia_scene": "geo_scene", "london_scene": "geo_scene",
     "scottish_hits": "geo_scene", "australian_hits": "geo_scene", "london_hits": "geo_scene",
+    "uk_scene": "geo_scene", "uk_hits": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -6426,10 +6454,12 @@ _PROFILE_GEO_GATE = {
     "scottish_hits":   {"places": {"scotland"},  "scene": {"scotland"}},
     "australian_hits": {"places": {"australia"}, "scene": {"australia"}},
     "london_hits":     {"places": {"london"},    "scene": {"london"}},
+    "uk_scene":        {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
+    "uk_hits":         {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
 }
 # Geo HITS mixes — same origin gate as the scenes above, but selected like the decade mixes (top-N by global
 # Last.fm listeners) instead of the scenes' equal-weight artist rotation. Routed via _is_geo_hits in _build_mix_tracks.
-_GEO_HITS_PROFILES = {"scottish_hits", "australian_hits", "london_hits"}
+_GEO_HITS_PROFILES = {"scottish_hits", "australian_hits", "london_hits", "uk_hits"}
 
 # City STYLE mixes (glasgow_/london_/melbourne_*): a TIERED, COUNTRY-BOUNDED geo gate (replaces the old soft
 # origin boost). Selection fills from the strictest tier first and tops up outward — city, then region, then
@@ -10538,7 +10568,29 @@ def _make_kente_background(w, h, color_top, color_bottom, v=0, rng=None):
 # WHY a registry (not an if/elif chain): the redesign adds ~25 genre/mood-evocative
 # families, and validator/contact-sheet import this as the single source of "known styles".
 # NEW generators are defined just above this dict (search "# === NEW genre/mood generators").
+def _make_union_jack_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """Stylised Union Jack — blue ground, white + red diagonal saltires, white + red St George cross on top.
+    Hard-coded flag colours (ignores the gradient). Left-right symmetric -> listed in _BG_SYMMETRIC (no h-flip twin)."""
+    blue, white, red = (12, 48, 135), (244, 244, 248), (200, 16, 47)
+    # (cross half-width frac, saltire width frac, red/white ratio) — subtle proportion shifts per variant
+    configs = [(0.115, 0.16, 0.46), (0.10, 0.14, 0.50), (0.13, 0.18, 0.42), (0.105, 0.15, 0.48)]
+    cw, sw, ratio = configs[min(v, len(configs) - 1)]
+    img  = Image.new("RGB", (w, h), blue)
+    draw = ImageDraw.Draw(img)
+    wsw = max(2, int(w * sw)); rsw = max(2, int(wsw * ratio))           # white then narrower red saltire (diagonals)
+    for col, width in ((white, wsw), (red, rsw)):
+        draw.line([(0, 0), (w, h)], fill=col, width=width)
+        draw.line([(0, h), (w, 0)], fill=col, width=width)
+    wcw = max(2, int(w * cw)); rcw = max(2, int(wcw * 0.58))            # white then narrower red St George cross, on top
+    cx, cy = w // 2, h // 2
+    draw.rectangle([cx - wcw, 0, cx + wcw, h], fill=white)
+    draw.rectangle([0, cy - wcw, w, cy + wcw], fill=white)
+    draw.rectangle([cx - rcw, 0, cx + rcw, h], fill=red)
+    draw.rectangle([0, cy - rcw, w, cy + rcw], fill=red)
+    return img
+
 _BG_GENERATORS = {
+    "union_jack":       _make_union_jack_background,
     "geometric":        _make_geometric_background,
     "circles":          _make_concentric_circles_background,
     "radial":           _make_radial_glow_background,
@@ -10662,7 +10714,7 @@ _BG_BASE_COUNTS = {name: (_BG_VARIANT_COUNTS_OVERRIDE.get(name) or _bg_variant_c
 # WHY: an h-flip of an off-centre/asymmetric pattern is a genuinely different cover (and the per-key
 # rng means even the same base variant renders differently per playlist), so asymmetric families
 # offer 2× distinct variants for free — enough headroom for ~269 unique covers without huge tables.
-_BG_SYMMETRIC = {"starburst", "amp_stack", "staff_lines", "vinyl_grooves", "tartan",
+_BG_SYMMETRIC = {"union_jack", "starburst", "amp_stack", "staff_lines", "vinyl_grooves", "tartan",
                  # round-2 deterministic/centred families whose h-mirror would be a redundant twin:
                  "mod_target", "columns", "film_strip", "zen", "grid_paper", "pine_forest",
                  "tropical_leaves", "gingham", "cassette", "open_road", "holiday_lights",
@@ -12936,7 +12988,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     def _scene_done_today(scene):
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
-                                 "scottish_hits", "australian_hits", "london_hits")
+                                 "scottish_hits", "australian_hits", "london_hits",
+                                 "uk_scene", "uk_hits")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -12997,6 +13050,12 @@ _GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits
                                # re-derives as the library grows. Tight by design: genuine hits, repeats are OK.
 _GEO_HITS_MIN_LISTENERS = 50_000   # absolute backstop only — guards a hypothetical tiny/new origin from
                                    # surfacing obscure tracks (inert for these three, whose top-N all clear ~267k)
+_GEO_HITS_HYBRID = {           # geo HITS profiles that use a floor + anthem-rescue rule instead of the top-N cap.
+    # WHY: the UK canon is too deep for a top-N cap, and a pure floor drops genuine classics Last.fm under-counts
+    # on split/quoted pages (Bowie "Heroes" = 248k, his #2). Qualify if listeners >= floor OR the track is the
+    # artist's own Last.fm top_n with listeners >= rescue. No top-N cap (the whole above-rule canon). See _is_geo_hits.
+    "uk_hits": {"floor": 400_000, "top_n": 5, "rescue": 150_000},
+}
 
 # Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
 # Authoritative source = the MusicBrainz `release_types` read from each file's tags (cached); for the ~1%
@@ -13640,8 +13699,21 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 best[sk] = (sc, rk)
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        pool = [rk for rk in uniq
-                if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_GEO_HITS_POOL]
+        _hyb = _GEO_HITS_HYBRID.get(profile_key)
+        if _hyb:
+            # UK-scale hybrid (no top-N cap — the UK canon is too deep): a song qualifies on a global floor OR
+            # as the artist's OWN Last.fm top-N with a lower rescue floor, so genuinely-known classics that
+            # Last.fm under-counts on a split/quoted page (e.g. Bowie "Heroes" at 248k = his #2) aren't dropped.
+            def _hit_ok(rk):
+                e = essentia_cache.get(rk, {}); lis = e.get("lastfm_listeners") or 0
+                if lis >= _hyb["floor"]:
+                    return True
+                r = _artist_top_rank(e)
+                return r is not None and r <= _hyb["top_n"] and lis >= _hyb["rescue"]
+            pool = [rk for rk in uniq if _hit_ok(rk)]
+        else:
+            pool = [rk for rk in uniq
+                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_GEO_HITS_POOL]
         random.Random(f"geohits-{date.today().toordinal()}-{profile_key}").shuffle(pool)
         # Daily-built sentinel so the once-a-day _scene_done_today gate stops the hourly cron rebuilding this
         # pinned mix (mirrors the scenes, which write per-artist 'last' to the same geo-rotation file).
