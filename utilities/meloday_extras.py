@@ -207,6 +207,10 @@ _EXTRAS_COVER_COLORS = {
     "scotland_scene":  ((200, 76, 24), (150, 52, 16)),     # Irn-Bru orange (tartan ground)
     "australia_scene": ((225, 125, 60), (140, 55, 50)),    # sunset orange/red
     "london_scene":    ((125, 85, 130), (48, 38, 68)),     # urban purple
+    # ---- 3 geo HITS mixes (reuse the matching scene's gradient; star glyph distinguishes) ----
+    "scottish_hits":   ((200, 76, 24), (150, 52, 16)),     # Irn-Bru orange (tartan ground)
+    "australian_hits": ((225, 125, 60), (140, 55, 50)),    # sunset orange/red
+    "london_hits":     ((125, 85, 130), (48, 38, 68)),     # urban purple
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -759,6 +763,10 @@ _COVER_BG_STYLES = {
     "london_scene": ("cityscape", 1),
     # --- place_aus ---
     "australia_scene": ("sun_horizon", 7),
+    # --- 3 geo HITS mixes: same family as the matching scene, distinct variant (star glyph distinguishes) ---
+    "scottish_hits": ("tartan", 1),
+    "london_hits": ("cityscape", 2),
+    "australian_hits": ("sun_horizon", 8),
     # --- misc ---
     "discover_weekly": ("radial", 0),
     "folk_acoustic": ("acoustic_guitar", 0),
@@ -795,6 +803,7 @@ _PROFILE_ICON = {
     "loved_up": "favorite", "long_distance": "favorite", "autumn_leaves": "eco",
     "heatwave": "thermostat", "cooking_mix": "skillet",
     "gospel": "church",
+    "scottish_hits": "star", "australian_hits": "star", "london_hits": "star",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -958,6 +967,7 @@ _ICON_COLOR = {
     "album":                 (226, 216, 202),   # vinyl cream
     "redeem":                (242, 152, 182),   # gift pink
     "trophy":                (255, 210, 110),   # gold
+    "star":                  (255, 210, 110),   # gold — geo HITS mixes
     "outdoor_grill":         (246, 142,  82),   # grill orange
 }
 
@@ -2097,6 +2107,37 @@ _MOOD_PROFILES = {
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "london_scene":    {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
+    # ---- 3 geo HITS mixes: SAME hard origin gate as the scenes above, but selected like the decade mixes —
+    #      the top-200 songs by GLOBAL Last.fm listeners from that origin (an auto per-location floor: London's
+    #      bar sits far higher than Scotland's). Genuine, widely-known hits; repetition across days is fine.
+    #      Centroid is metadata only (required entry / cover art). PINNED. DJ-ordered (SMOOTH). ----
+# ── scottish_hits → "Scottish Hits" ───────────────────────────────────────────────────────
+# Theme:    Geo HITS mix — Scotland's biggest, anyone-would-know songs.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  Any era · origin-gated: scotland.
+# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "scottish_hits":   {"bpm": 116, "energy": -9, "danceability": 0.54, "brightness": 0.40, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.60, "valence": 0.55, "vocal_presence": 0.76},
+# ── australian_hits → "Australian Hits" ───────────────────────────────────────────────────
+# Theme:    Geo HITS mix — Australia's biggest, anyone-would-know songs.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  Any era · origin-gated: australia.
+# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "australian_hits": {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
+# ── london_hits → "London Hits" ───────────────────────────────────────────────────────────
+# Theme:    Geo HITS mix — London's biggest, anyone-would-know songs.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  Any era · origin-gated: london.
+# Music:    Origin gate + top-200 by global Last.fm listeners (auto per-location floor; genuine hits).
+# Criteria: no genre/sound gate · origin-gated · top-200 by listeners · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "london_hits":     {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4417,6 +4458,10 @@ _MOOD_MIX_NAMES = {
     "scotland_scene":  "Sounds of Scotland • Meloday+",
     "australia_scene": "Sounds of Australia • Meloday+",
     "london_scene":    "Sounds of London • Meloday+",
+    # ---- 3 geo HITS mixes ----
+    "scottish_hits":   "Scottish Hits • Meloday+",
+    "australian_hits": "Australian Hits • Meloday+",
+    "london_hits":     "London Hits • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -4900,7 +4945,8 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 
 # Always-present geo showcase mixes — pinned into every general run (never rotated, never removed); like
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
-_PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene"}
+_PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
+                     "scottish_hits", "australian_hits", "london_hits"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5054,8 +5100,9 @@ _PROFILE_CATEGORY = {
     # era
     "decade_60s": "era", "decade_70s": "era", "decade_80s": "era", "decade_90s": "era", "decade_00s": "era",
     "decade_10s": "era", "decade_20s": "era",
-    # geo_scene
+    # geo_scene (3 pinned showcase scenes + 3 pinned geo HITS mixes — all share showcase behaviour)
     "scotland_scene": "geo_scene", "australia_scene": "geo_scene", "london_scene": "geo_scene",
+    "scottish_hits": "geo_scene", "australian_hits": "geo_scene", "london_hits": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -6376,7 +6423,13 @@ _PROFILE_GEO_GATE = {
     "scotland_scene":  {"places": {"scotland"},  "scene": {"scotland"}},
     "australia_scene": {"places": {"australia"}, "scene": {"australia"}},
     "london_scene":    {"places": {"london"},    "scene": {"london"}},
+    "scottish_hits":   {"places": {"scotland"},  "scene": {"scotland"}},
+    "australian_hits": {"places": {"australia"}, "scene": {"australia"}},
+    "london_hits":     {"places": {"london"},    "scene": {"london"}},
 }
+# Geo HITS mixes — same origin gate as the scenes above, but selected like the decade mixes (top-N by global
+# Last.fm listeners) instead of the scenes' equal-weight artist rotation. Routed via _is_geo_hits in _build_mix_tracks.
+_GEO_HITS_PROFILES = {"scottish_hits", "australian_hits", "london_hits"}
 
 # City STYLE mixes (glasgow_/london_/melbourne_*): a TIERED, COUNTRY-BOUNDED geo gate (replaces the old soft
 # origin boost). Selection fills from the strictest tier first and tops up outward — city, then region, then
@@ -10679,6 +10732,7 @@ _MS_CODEPOINTS = {
     # --- added in the cover redesign (codepoints extracted from the font via ms_glyphs.py) ---
     "eco": 0xEA35, "skillet": 0xF543, "bolt": 0xEA0B, "palette": 0xE3B7, "casino": 0xEB40,
     "church": 0xEAAE, "thermostat": 0xF076, "album": 0xE019, "redeem": 0xE8B1, "trophy": 0xE71A,
+    "star": 0xE838,
     "outdoor_grill": 0xEA47,
 }
 
@@ -12881,7 +12935,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     _geo_rot = _load_geo_rotation()
     def _scene_done_today(scene):
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
-    active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene")
+    active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
+                                 "scottish_hits", "australian_hits", "london_hits")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -12936,6 +12991,12 @@ _SONG_MIN_YEAR_CACHE = {}
 _ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm listener floor to count as
                                # part of the decade's recognisable canon — so older/smaller decades
                                # self-size below it while the modern ones have far more above it
+_GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits): keep the top-N songs by
+                               # global Last.fm listeners per origin. N IS the auto per-location floor — the
+                               # Nth-song listener count varies by place (London's bar ~2.5x Scotland's) and
+                               # re-derives as the library grows. Tight by design: genuine hits, repeats are OK.
+_GEO_HITS_MIN_LISTENERS = 50_000   # absolute backstop only — guards a hypothetical tiny/new origin from
+                                   # surfacing obscure tracks (inert for these three, whose top-N all clear ~267k)
 
 # Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
 # Authoritative source = the MusicBrainz `release_types` read from each file's tags (cached); for the ~1%
@@ -13409,6 +13470,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     play_counts  = _history_play_counts(history_entries)
     _is_era      = _PROFILE_CATEGORY.get(profile_key) == "era"
     _is_geo      = _PROFILE_CATEGORY.get(profile_key) == "geo_scene"
+    _is_geo_hits = profile_key in _GEO_HITS_PROFILES   # geo HITS variant (category geo_scene, but top-N by listeners)
     _is_showcase = _is_era or _is_geo          # decade + geo mixes: popularity-ranked, gated, deduped
 
     def _combined_score(rk):
@@ -13559,7 +13621,36 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     # Showcase mixes (decade + geo): keep the top ~3x most popular tracks of the decade/scene, then
     # pick the slate RANDOMLY (seeded per day — stable within a day, fresh across days) — variety
     # without losing the "recognisable hits" feel. The fill ladder still enforces <=1 artist + excludes.
-    if _is_geo:
+    if _is_geo_hits:
+        # Geo HITS (Scottish/Australian/London Hits): the hard origin gate already ran above; now select like
+        # a decade mix — drop comps, collapse each song to its canonical copy, then keep the top-N by GLOBAL
+        # Last.fm listeners. The Nth track's listener count IS the auto per-location floor (London's far higher
+        # than Scotland's), so every track is a genuinely massive, "anyone-would-know" hit. Repetition is fine.
+        if _EXCLUDE_COMPS_FROM_ERA:
+            _kh = [rk for rk in history_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
+            _kl = [rk for rk in library_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
+            if _kh or _kl:
+                history_rks, library_rks = _kh, _kl
+        best = {}   # song_key -> (canon_penalty, year, rk) — one canonical copy per song
+        for rk in dict.fromkeys(history_rks + library_rks):
+            e  = essentia_cache.get(rk, {})
+            sk = _entry_song_key(e)
+            sc = (_canonical_penalty(e), e.get("year") or 9999, rk)
+            if sk not in best or sc < best[sk][0]:
+                best[sk] = (sc, rk)
+        uniq = sorted((v[1] for v in best.values()),
+                      key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        pool = [rk for rk in uniq
+                if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_GEO_HITS_POOL]
+        random.Random(f"geohits-{date.today().toordinal()}-{profile_key}").shuffle(pool)
+        # Daily-built sentinel so the once-a-day _scene_done_today gate stops the hourly cron rebuilding this
+        # pinned mix (mirrors the scenes, which write per-artist 'last' to the same geo-rotation file).
+        _gr = _load_geo_rotation()
+        _gr[profile_key] = {"__built__": {"last": date.today().toordinal()}}
+        _save_geo_rotation(_gr)
+        history_rks, library_rks = [], pool
+
+    elif _is_geo:
         # Equal-weight artist-coverage rotation (scotland/australia/london scenes): every gate-matched,
         # non-score/classical artist is weighted EQUALLY and cycles in over ~ceil(artists/mix_size) days
         # (longest-unseen first) — even, fair coverage of the whole local scene, no own-depth / global-fame
