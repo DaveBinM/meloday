@@ -216,6 +216,7 @@ _EXTRAS_COVER_COLORS = {
     "scotland_now":    ((30, 110, 170), (16, 56, 96)),     # Saltire blue (contemporary Scottish radio)
     "london_now":      ((196, 52, 58), (70, 18, 26)),      # London red (contemporary London radio)
     "uk_now":          ((20, 56, 140), (10, 28, 80)),      # Union Jack blue (union_jack bg hard-codes flag colours)
+    "australia_now":   ((46, 140, 82), (212, 160, 40)),    # green & gold — green sky, golden sun (contemporary Australian radio)
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -774,6 +775,7 @@ _COVER_BG_STYLES = {
     "london_hits": ("cityscape", 2),
     "london_now": ("cityscape", 3),
     "australian_hits": ("sun_horizon", 8),
+    "australia_now": ("sun_horizon", 9),
     # --- UK (whole) scene + hits + now: the Union Jack family ---
     "uk_scene": ("union_jack", 0),
     "uk_hits": ("union_jack", 1),
@@ -816,7 +818,7 @@ _PROFILE_ICON = {
     "gospel": "church",
     "scottish_hits": "star", "australian_hits": "star", "london_hits": "star",
     "uk_hits": "star",
-    "scotland_now": "radio", "london_now": "radio", "uk_now": "radio",
+    "scotland_now": "radio", "london_now": "radio", "uk_now": "radio", "australia_now": "radio",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -2197,6 +2199,15 @@ _MOOD_PROFILES = {
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "uk_now":          {"bpm": 118, "energy": -8, "danceability": 0.60, "brightness": 0.42, "beat_confidence": 0.78, "onset_rate": 5.4, "dynamic_complexity": 0.44, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.75},
+# ── australia_now → "Australia Now" ───────────────────────────────────────────────────────
+# Theme:    Australia-wide radio — current Australian releases + a few classic throwbacks.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years (leaning newest) + ~10% throwback · origin-gated: australia.
+# Music:    Origin gate + most-popular contemporary singles (last 5y, newer-leaning) + ~10% throwback classics · 1-per-artist.
+# Criteria: no genre/sound gate · origin-gated · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "australia_now":   {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4526,6 +4537,7 @@ _MOOD_MIX_NAMES = {
     "scotland_now":    "Scotland Now • Meloday+",
     "london_now":      "London Now • Meloday+",
     "uk_now":          "UK Now • Meloday+",
+    "australia_now":   "Australia Now • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -5011,7 +5023,7 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
                      "scottish_hits", "australian_hits", "london_hits",
-                     "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now"}
+                     "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5169,7 +5181,7 @@ _PROFILE_CATEGORY = {
     "scotland_scene": "geo_scene", "australia_scene": "geo_scene", "london_scene": "geo_scene",
     "scottish_hits": "geo_scene", "australian_hits": "geo_scene", "london_hits": "geo_scene",
     "uk_scene": "geo_scene", "uk_hits": "geo_scene", "scotland_now": "geo_scene",
-    "london_now": "geo_scene", "uk_now": "geo_scene",
+    "london_now": "geo_scene", "uk_now": "geo_scene", "australia_now": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -6498,6 +6510,7 @@ _PROFILE_GEO_GATE = {
     "scotland_now":    {"places": {"scotland"},  "scene": {"scotland"}},
     "london_now":      {"places": {"london"},    "scene": {"london"}},
     "uk_now":          {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
+    "australia_now":   {"places": {"australia"}, "scene": {"australia"}},
 }
 # Geo HITS mixes — same origin gate as the scenes above, but selected like the decade mixes (top-N by global
 # Last.fm listeners) instead of the scenes' equal-weight artist rotation. Routed via _is_geo_hits in _build_mix_tracks.
@@ -13032,7 +13045,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
                                  "scottish_hits", "australian_hits", "london_hits",
-                                 "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now")
+                                 "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -13117,6 +13130,7 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     "scotland_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
     "london_now":   {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
     "uk_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 80, "throwback_pool": 40, "recency_base": 1.6},
+    "australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
 }
 _GEO_RADIO_PROFILES = set(_GEO_RADIO)
 # A title that marks a re-record / remaster / re-version / reissue — i.e. NOT new material, however recent its
