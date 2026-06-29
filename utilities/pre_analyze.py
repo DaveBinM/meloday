@@ -169,8 +169,15 @@ def upsert_essentia_cache_entries(entries):
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL")
         _ensure_db_schema(conn)
+        # INSERT ... ON CONFLICT DO UPDATE (NOT "INSERT OR REPLACE"). WHY: REPLACE deletes+reinserts the
+        # whole row, so any column absent from the in-memory entry is written as NULL. pre_analyze's
+        # cache does NOT load emb_effnet/emb_musicnn (RAM), so a bulk_analyze re-write would NULL them —
+        # the bug that wiped ~67k embeddings. The externally-synced columns below are therefore
+        # COALESCE'd (keep the stored value when the incoming entry doesn't carry it); this also stops
+        # a start-of-run snapshot from clobbering a concurrent Last.fm/MusicBrainz/lyrics sync. Columns
+        # bulk_analyze owns (acoustic / TF heads / Plex metadata) take the incoming value as before.
         conn.executemany("""
-            INSERT OR REPLACE INTO essentia_cache
+            INSERT INTO essentia_cache
             (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
              track_updated_at, album_updated_at, artist_updated_at, danceability, brightness,
              beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
@@ -184,6 +191,35 @@ def upsert_essentia_cache_entries(entries):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(rating_key) DO UPDATE SET
+              bpm=excluded.bpm, key=excluded.key, energy=excluded.energy, year=excluded.year,
+              artist=excluded.artist, genres=excluded.genres, styles=excluded.styles, moods=excluded.moods,
+              file_path=excluded.file_path, track_updated_at=excluded.track_updated_at,
+              album_updated_at=excluded.album_updated_at, artist_updated_at=excluded.artist_updated_at,
+              danceability=excluded.danceability, brightness=excluded.brightness,
+              beat_confidence=excluded.beat_confidence, integrated_loudness=excluded.integrated_loudness,
+              onset_rate=excluded.onset_rate, dynamic_complexity=excluded.dynamic_complexity,
+              arousal=excluded.arousal, valence=excluded.valence, vocal_presence=excluded.vocal_presence,
+              mood_happy=excluded.mood_happy, mood_sad=excluded.mood_sad, mood_aggressive=excluded.mood_aggressive,
+              mood_relaxed=excluded.mood_relaxed, mood_party=excluded.mood_party, mood_acoustic=excluded.mood_acoustic,
+              mood_electronic=excluded.mood_electronic, danceability_hl=excluded.danceability_hl,
+              moodtheme=excluded.moodtheme, genre_discogs=excluded.genre_discogs,
+              title=excluded.title, release_date=excluded.release_date,
+              emb_effnet=COALESCE(excluded.emb_effnet, essentia_cache.emb_effnet),
+              emb_musicnn=COALESCE(excluded.emb_musicnn, essentia_cache.emb_musicnn),
+              lastfm_artist_tags=COALESCE(excluded.lastfm_artist_tags, essentia_cache.lastfm_artist_tags),
+              lastfm_track_tags=COALESCE(excluded.lastfm_track_tags, essentia_cache.lastfm_track_tags),
+              artist_origin=COALESCE(excluded.artist_origin, essentia_cache.artist_origin),
+              lastfm_listeners=COALESCE(excluded.lastfm_listeners, essentia_cache.lastfm_listeners),
+              lyric_valence=COALESCE(excluded.lyric_valence, essentia_cache.lyric_valence),
+              lyric_themes=COALESCE(excluded.lyric_themes, essentia_cache.lyric_themes),
+              lyric_lang=COALESCE(excluded.lyric_lang, essentia_cache.lyric_lang),
+              lastfm_synced_at=COALESCE(excluded.lastfm_synced_at, essentia_cache.lastfm_synced_at),
+              geo_synced_at=COALESCE(excluded.geo_synced_at, essentia_cache.geo_synced_at),
+              lyrics_synced_at=COALESCE(excluded.lyrics_synced_at, essentia_cache.lyrics_synced_at),
+              lyric_themes_raw=COALESCE(excluded.lyric_themes_raw, essentia_cache.lyric_themes_raw),
+              artist_mbid=COALESCE(excluded.artist_mbid, essentia_cache.artist_mbid),
+              release_types=COALESCE(excluded.release_types, essentia_cache.release_types)
         """, [
             (rk, d.get("bpm"), d.get("key"), d.get("energy"), d.get("year"),
              d.get("artist"), json.dumps(d.get("genres") or []),
@@ -222,7 +258,10 @@ def update_analysis_columns(entries):
     """Write ONLY the analysis-derived columns (acoustic + TF + mood + embeddings) via targeted
     UPDATE, never the metadata or sync columns. Used by the TF post-pass so it can run alongside
     the Last.fm / MusicBrainz syncs without clobbering their writes (INSERT OR REPLACE would carry
-    this process's start-of-run snapshot of those columns and overwrite concurrent sync updates)."""
+    this process's start-of-run snapshot of those columns and overwrite concurrent sync updates).
+    emb_effnet/emb_musicnn are COALESCE'd: written only when the entry actually carries them (a
+    force_emb TF backfill), otherwise the stored embedding is preserved — WHY: the in-memory cache
+    doesn't load embeddings, so a plain assignment would NULL them (the bug that wiped ~67k rows)."""
     if not entries:
         return
     try:
@@ -236,7 +275,7 @@ def update_analysis_columns(entries):
               arousal=?, valence=?, vocal_presence=?,
               mood_happy=?, mood_sad=?, mood_aggressive=?, mood_relaxed=?, mood_party=?,
               mood_acoustic=?, mood_electronic=?, danceability_hl=?, moodtheme=?, genre_discogs=?,
-              emb_effnet=?, emb_musicnn=?
+              emb_effnet=COALESCE(?, emb_effnet), emb_musicnn=COALESCE(?, emb_musicnn)
             WHERE rating_key=?
         """, [
             (d.get("bpm"), d.get("key"), d.get("energy"), d.get("danceability"), d.get("brightness"),
@@ -366,21 +405,23 @@ def _essentia_backfill_worker(rk, file_path, data):
     return rk, data, None
 
 def _bf_worker_count(per_worker_gb, override=None):
-    """CPU-bound worker count for a CONSIDERATE background job: capped by RAM (with a generous buffer
-    for Plex/Lidarr + the daily cron's own analysis workers) AND by ~half the cores. WHY: grabbing
-    every core/GB starved the box and OOM-cascaded; leaving real headroom keeps the first break rare."""
+    """CPU-bound worker count: use MOST cores (throughput ~ cores used), capped by RAM with only a
+    modest buffer for Plex/Lidarr/cron. WHY the small buffer: the rebuild loop's SIGKILL-on-break +
+    memory-gate now catch any over-commit, so a fat reserve is no longer needed — the earlier
+    conservative cap (~half the cores) left ~2/3 of the box idle and made the backfill ~10x too slow.
+    Override with --workers N to force a specific count."""
     if override:
         return max(1, int(override))
     try:
         import psutil
         physical = psutil.cpu_count(logical=False) or os.cpu_count() or 2
         avail = psutil.virtual_memory().available
-        headroom = max(4 * 1024 ** 3, int(avail * 0.30))   # reserve >=4 GB / 30% for everything else
+        headroom = max(2 * 1024 ** 3, int(avail * 0.12))   # small reserve; memory-gate is the real backstop
         ram_cap = max(1, int((avail - headroom) // int(per_worker_gb * 1024 ** 3)))
-        core_cap = max(_BF_WORKER_FLOOR, physical // 2)     # leave ~half the cores for Plex/cron/OS
+        core_cap = max(_BF_WORKER_FLOOR, physical - 2)      # leave ~2 cores for OS / Plex / SSH
         return max(1, min(physical - 1, ram_cap, core_cap))
     except Exception:
-        return max(1, (os.cpu_count() or 2) // 2)
+        return max(1, (os.cpu_count() or 2) - 2)
 
 def _bf_wait_for_memory(need_gb, buffer_gb=2.0, timeout=90):
     """Block until available RAM covers need_gb + buffer (or timeout). WHY: after a pool breaks we must
