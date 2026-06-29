@@ -214,6 +214,8 @@ _EXTRAS_COVER_COLORS = {
     "uk_scene":        ((20, 56, 140), (10, 28, 80)),      # Union Jack blue
     "uk_hits":         ((20, 56, 140), (10, 28, 80)),      # Union Jack blue
     "scotland_now":    ((30, 110, 170), (16, 56, 96)),     # Saltire blue (contemporary Scottish radio)
+    "london_now":      ((196, 52, 58), (70, 18, 26)),      # London red (contemporary London radio)
+    "uk_now":          ((20, 56, 140), (10, 28, 80)),      # Union Jack blue (union_jack bg hard-codes flag colours)
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -770,10 +772,12 @@ _COVER_BG_STYLES = {
     "scottish_hits": ("tartan", 1),
     "scotland_now": ("tartan", 2),
     "london_hits": ("cityscape", 2),
+    "london_now": ("cityscape", 3),
     "australian_hits": ("sun_horizon", 8),
-    # --- UK (whole) scene + hits: the Union Jack family ---
+    # --- UK (whole) scene + hits + now: the Union Jack family ---
     "uk_scene": ("union_jack", 0),
     "uk_hits": ("union_jack", 1),
+    "uk_now": ("union_jack", 2),
     # --- misc ---
     "discover_weekly": ("radial", 0),
     "folk_acoustic": ("acoustic_guitar", 0),
@@ -812,7 +816,7 @@ _PROFILE_ICON = {
     "gospel": "church",
     "scottish_hits": "star", "australian_hits": "star", "london_hits": "star",
     "uk_hits": "star",
-    "scotland_now": "radio",
+    "scotland_now": "radio", "london_now": "radio", "uk_now": "radio",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -2175,6 +2179,24 @@ _MOOD_PROFILES = {
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "scotland_now":    {"bpm": 116, "energy": -9, "danceability": 0.54, "brightness": 0.40, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.60, "valence": 0.55, "vocal_presence": 0.76},
+# ── london_now → "London Now" ─────────────────────────────────────────────────────────────
+# Theme:    London-only radio — current London releases + a few classic throwbacks.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years (leaning newest) + ~10% throwback · origin-gated: london.
+# Music:    Origin gate + most-popular contemporary singles (last 5y, newer-leaning) + ~10% throwback classics · 1-per-artist.
+# Criteria: no genre/sound gate · origin-gated · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "london_now":      {"bpm": 118, "energy": -8, "danceability": 0.63, "brightness": 0.44, "beat_confidence": 0.79, "onset_rate": 5.4, "dynamic_complexity": 0.41, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.73},
+# ── uk_now → "UK Now" ─────────────────────────────────────────────────────────────────────
+# Theme:    UK-wide radio — current British releases + a few classic throwbacks.
+# Sound:    No sound/genre gate — any genre from the origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years (leaning newest) + ~10% throwback · origin-gated: united kingdom.
+# Music:    Origin gate + most-popular contemporary singles (last 5y, newer-leaning) + ~10% throwback classics · 1-per-artist.
+# Criteria: no genre/sound gate · origin-gated · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
+# Enhance:  —
+    "uk_now":          {"bpm": 118, "energy": -8, "danceability": 0.60, "brightness": 0.42, "beat_confidence": 0.78, "onset_rate": 5.4, "dynamic_complexity": 0.44, "arousal": 0.62, "valence": 0.58, "vocal_presence": 0.75},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4502,6 +4524,8 @@ _MOOD_MIX_NAMES = {
     "uk_scene":        "Sounds of the UK • Meloday+",
     "uk_hits":         "UK Hits • Meloday+",
     "scotland_now":    "Scotland Now • Meloday+",
+    "london_now":      "London Now • Meloday+",
+    "uk_now":          "UK Now • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -4987,7 +5011,7 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
                      "scottish_hits", "australian_hits", "london_hits",
-                     "uk_scene", "uk_hits", "scotland_now"}
+                     "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5145,6 +5169,7 @@ _PROFILE_CATEGORY = {
     "scotland_scene": "geo_scene", "australia_scene": "geo_scene", "london_scene": "geo_scene",
     "scottish_hits": "geo_scene", "australian_hits": "geo_scene", "london_hits": "geo_scene",
     "uk_scene": "geo_scene", "uk_hits": "geo_scene", "scotland_now": "geo_scene",
+    "london_now": "geo_scene", "uk_now": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -6471,6 +6496,8 @@ _PROFILE_GEO_GATE = {
     "uk_scene":        {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "uk_hits":         {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "scotland_now":    {"places": {"scotland"},  "scene": {"scotland"}},
+    "london_now":      {"places": {"london"},    "scene": {"london"}},
+    "uk_now":          {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
 }
 # Geo HITS mixes — same origin gate as the scenes above, but selected like the decade mixes (top-N by global
 # Last.fm listeners) instead of the scenes' equal-weight artist rotation. Routed via _is_geo_hits in _build_mix_tracks.
@@ -13005,7 +13032,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
                                  "scottish_hits", "australian_hits", "london_hits",
-                                 "uk_scene", "uk_hits", "scotland_now")
+                                 "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -13057,6 +13084,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
 
 
 _SONG_MIN_YEAR_CACHE = {}
+_SONG_ANYYEAR_CACHE = {}
 _ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm listener floor to count as
                                # part of the decade's recognisable canon — so older/smaller decades
                                # self-size below it while the modern ones have far more above it
@@ -13081,11 +13109,24 @@ _GEO_HITS_HYBRID = {           # per-profile selection for the geo HITS mixes: a
 }
 _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popular CONTEMPORARY songs (released in
     # the last `recent_years`) + ~throwback_frac throwback classics, 1-per-artist — like a place-only radio
-    # station. recent/throwback_pool cap the top-by-listeners distinct-artist candidates the daily shuffle draws
-    # from. Routed via _is_geo_radio in _build_mix_tracks.
-    "scotland_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30},
+    # station. recent/throwback_pool cap the distinct-artist candidate windows the daily pick draws from.
+    # `recency_base` (>1) leans the CONTEMPORARY bucket toward newer releases like a real "currents" rotation —
+    # score = listeners * recency_base ** (year - cut) — and the recent pick becomes a weighted sample so the
+    # freshest/biggest currents heavy-rotate (throwback stays listener-ranked; classics are timeless). 1.0 = off.
+    # Routed via _is_geo_radio in _build_mix_tracks.
+    "scotland_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
+    "london_now":   {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
+    "uk_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 80, "throwback_pool": 40, "recency_base": 1.6},
 }
 _GEO_RADIO_PROFILES = set(_GEO_RADIO)
+# A title that marks a re-record / remaster / re-version / reissue — i.e. NOT new material, however recent its
+# release year. Used by the geo-radio split to keep these out of "contemporary" (a radio station treats them as
+# the OLD songs they are). KEEPS "radio edit" / "single version" / "album version" — those ARE the radio cut.
+_REISSUE_RE = re.compile(
+    r"\bre-?record(?:ed|ing)?\b|\bnew\s+(?:version|recording|mix|cut|edit)\b|\bre-?master(?:ed)?\b"
+    r"|\banniversary\b|\b(?:19|20)\d{2}\s+(?:version|mix|edit|re-?master(?:ed)?|recording|cut)\b"
+    r"|\b(?:version|mix|edit|re-?master(?:ed)?|recording|cut)\s+(?:19|20)\d{2}\b"
+    r"|['’]\d{2}\s+(?:version|mix|edit|re-?master(?:ed)?|recording|cut)\b", re.I)
 
 # Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
 # Authoritative source = the MusicBrainz `release_types` read from each file's tags (cached); for the ~1%
@@ -13149,6 +13190,24 @@ def _song_min_year_map(essentia_cache):
             if k[1] and y < m.get(k, 9999):     # their min already comes from the studio copy.
                 m[k] = y
         _SONG_MIN_YEAR_CACHE[cid] = m
+    return m
+def _song_year_anycopy_map(essentia_cache):
+    """Earliest cached year per song over ALL copies — INCLUDING compilations (unlike _song_min_year_map,
+    which excludes them). For the geo-radio contemporary test the comp signal is wanted: if a song ever
+    appeared on a pre-cutoff comp/Greatest-Hits it is NOT brand-new (you don't comp a last-5-years song),
+    so a clean-titled reissue (its only non-comp copy being a recent re-release) is still dated as old."""
+    cid = id(essentia_cache)
+    m = _SONG_ANYYEAR_CACHE.get(cid)
+    if m is None:
+        m = {}
+        for e in essentia_cache.values():
+            y = e.get("year")
+            if not y:
+                continue
+            k = _entry_song_key(e)
+            if k[1] and y < m.get(k, 9999):
+                m[k] = y
+        _SONG_ANYYEAR_CACHE[cid] = m
     return m
 
 
@@ -13718,14 +13777,19 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     # pick the slate RANDOMLY (seeded per day — stable within a day, fresh across days) — variety
     # without losing the "recognisable hits" feel. The fill ladder still enforces <=1 artist + excludes.
     if _is_geo_radio:
-        # Geo RADIO (Scotland Now): a place-only radio station — most-popular CONTEMPORARY songs (released in the
-        # last `recent_years`) + a small throwback-classics slice, 1-per-artist. Origin gate already ran above.
+        # Geo RADIO: a place-only radio station — most-popular CONTEMPORARY songs (released in the last
+        # `recent_years`, leaning newer like a "currents" rotation) + a small throwback-classics slice,
+        # 1-per-artist. Origin gate already ran above.
         cfg  = _GEO_RADIO[profile_key]
         cut  = _NOW_YEAR - cfg["recent_years"]
-        _smy = _song_min_year_map(essentia_cache)
-        def _ryr(rk):
+        base = cfg.get("recency_base", 1.0)
+        _ayr = _song_year_anycopy_map(essentia_cache)   # comp-INCLUSIVE earliest year (proves "not brand-new")
+        def _lis(rk): return essentia_cache.get(rk, {}).get("lastfm_listeners") or 0
+        def _ay(rk):
             e = essentia_cache.get(rk, {})
-            return _smy.get(_entry_song_key(e)) or e.get("year") or 0
+            return _ayr.get(_entry_song_key(e)) or e.get("year") or 0
+        # contemporary ranking leans newer: listeners * recency_base ** (years-into-window). base=1.0 -> pure pop.
+        def _rscore(rk): return (_lis(rk) or 1) * (base ** max(0, _ay(rk) - cut))
         # drop comps/VA, collapse each song to its canonical copy, rank by listeners (like the era/hits branches)
         best = {}
         for rk in dict.fromkeys(history_rks + library_rks):
@@ -13735,46 +13799,54 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             sk = _entry_song_key(e); sc = (_canonical_penalty(e), e.get("year") or 9999, rk)
             if sk not in best or sc < best[sk][0]:
                 best[sk] = (sc, rk)
-        uniq = sorted((v[1] for v in best.values()),
-                      key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        uniq = sorted((v[1] for v in best.values()), key=lambda rk: -_lis(rk))
         # exclude score/classical artists (a radio station plays songs, not film cues)
         _by_a = defaultdict(list)
         for rk in uniq:
             _by_a[(essentia_cache.get(rk, {}).get("artist") or "").lower()].append(rk)
         _skip = {a for a, rks in _by_a.items() if _is_score_classical_artist([essentia_cache[r] for r in rks])}
-        # each artist's most-popular CONTEMPORARY single (year>=cut, NOT a remix/live/extended variant — keep the
-        # radio cut, and stop a recent reissue of an old song leaking in) and most-popular THROWBACK song. uniq is
-        # listener-desc, so the first seen per artist is their top.
+        # Split each artist into a CONTEMPORARY single + a THROWBACK song. A song is OLD (-> throwback) if its
+        # comp-inclusive year predates the cut OR its title marks a re-record/reissue (_REISSUE_RE) — a radio
+        # station plays those as the old songs they are, never as "current"; is_alt_recording keeps remix/live/
+        # extended out of contemporary too (the radio cut). uniq is listener-desc, so first-seen per artist is top.
         recent_by_a, throw_by_a = {}, {}
         for rk in uniq:
-            a = (essentia_cache.get(rk, {}).get("artist") or "").lower()
+            e = essentia_cache.get(rk, {}); a = (e.get("artist") or "").lower()
             if not a or a in _skip:
                 continue
-            y = _ryr(rk)
-            if y >= cut:
-                if a not in recent_by_a and not meloday.is_alt_recording(essentia_cache.get(rk, {}).get("title") or ""):
+            t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t))
+            if ay >= cut and not is_re and not meloday.is_alt_recording(t):
+                if a not in recent_by_a:
                     recent_by_a[a] = rk
-            elif y > 0 and a not in throw_by_a:
-                throw_by_a[a] = rk
-        _byl = lambda d: sorted(d.values(), key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        recent_sorted, throw_sorted = _byl(recent_by_a), _byl(throw_by_a)
+            elif (0 < ay < cut) or is_re:
+                if a not in throw_by_a:
+                    throw_by_a[a] = rk
+        recent_sorted = sorted(recent_by_a.values(), key=lambda rk: -_rscore(rk))   # newer-leaning
+        throw_sorted  = sorted(throw_by_a.values(),  key=lambda rk: -_lis(rk))       # classics: pure popularity
         cur_ord  = date.today().toordinal()
         n_throw  = max(1, round(mix_size * cfg["throwback_frac"]))
         n_recent = mix_size - n_throw
         _used = set()
-        def _pick(cands, want, tag):
-            cands = list(cands); random.Random(f"radio-{cur_ord}-{profile_key}-{tag}").shuffle(cands)
+        def _artist(rk): return (essentia_cache.get(rk, {}).get("artist") or "").lower()
+        def _pick(cands, want, tag):      # uniform daily shuffle (throwback: classics, all equal weight)
+            cands = [rk for rk in cands if _artist(rk) not in _used]
+            random.Random(f"radio-{cur_ord}-{profile_key}-{tag}").shuffle(cands)
             out = []
             for rk in cands:
-                a = (essentia_cache.get(rk, {}).get("artist") or "").lower()
-                if a in _used:
-                    continue
-                out.append(rk); _used.add(a)
+                out.append(rk); _used.add(_artist(rk))
                 if len(out) >= want:
                     break
             return out
+        def _wsample(cands, want, tag):   # weighted daily sample (contemporary: heavy-rotate freshest/biggest)
+            cands = [rk for rk in cands if _artist(rk) not in _used]   # A-Res: key = u**(1/weight), take top-k
+            rng = random.Random(f"radio-{cur_ord}-{profile_key}-{tag}")
+            keyed = sorted(((rng.random() ** (1.0 / max(_rscore(rk), 1e-9)), rk) for rk in cands), reverse=True)
+            out = []
+            for _, rk in keyed[:want]:
+                out.append(rk); _used.add(_artist(rk))
+            return out
         # throwbacks first (so the giants take the classic slots), then contemporary skipping those artists
-        pool = _pick(throw_sorted[:cfg["throwback_pool"]], n_throw, "t") + _pick(recent_sorted[:cfg["recent_pool"]], n_recent, "r")
+        pool = _pick(throw_sorted[:cfg["throwback_pool"]], n_throw, "t") + _wsample(recent_sorted[:cfg["recent_pool"]], n_recent, "r")
         random.Random(f"radio-order-{cur_ord}-{profile_key}").shuffle(pool)
         # daily-built sentinel so _scene_done_today gates the once-a-day rebuild (pinned), like the scenes.
         _gr = _load_geo_rotation(); _gr[profile_key] = {"__built__": {"last": cur_ord}}; _save_geo_rotation(_gr)
