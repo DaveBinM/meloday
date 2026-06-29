@@ -11207,6 +11207,15 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
                        shadow=meta.get("shadow", True), bg_lum=bg_lum)
 
 
+def _brighten_accent(rgb, min_v=0.93, max_s=0.78):
+    """Lift an accent colour to a luminance floor so the accent title word reads on the cover's darkened
+    bottom — WHY: the geo-radio "Now" accent is the gradient's top colour, and a mid-blue (Scotland/UK) on a
+    blue background was low-contrast. Keeps the identity hue; just brighter and a touch less saturated."""
+    h, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
+    r, g, b = colorsys.hsv_to_rgb(h, min(s, max_s), max(v, min_v))
+    return (round(r * 255), round(g * 255), round(b * 255))
+
+
 def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="default"):
     """
     Composite title + optional subtitle + Meloday+ badge onto img (RGBA).
@@ -11434,11 +11443,16 @@ def _generate_extras_cover(key, title, subtitle=None):
     color_top    = _jitter(color_top)
     color_bottom = _jitter(color_bottom)
 
-    text_style = "bar" if key in _MOOD_PROFILE_KEYS else "default"
+    # Geo-radio covers ("X Now") use the word-per-line "default" title (accent-coloured last word, no bottom
+    # bar) — WHY: chosen look for the radio family; the mood "bar" style is kept for all other mood mixes.
+    text_style = "default" if key in _GEO_RADIO_PROFILES else ("bar" if key in _MOOD_PROFILE_KEYS else "default")
+    # Geo-radio uses an accent-coloured last word ("Now"); brighten it so a mid-blue identity colour still
+    # reads on the darkened bottom (Scotland/UK were blue-on-blue). Other covers keep the raw accent.
+    accent = _brighten_accent(color_top) if key in _GEO_RADIO_PROFILES else color_top
     img    = _render_bg(bg_style, color_top, color_bottom, bg_v, _rng)
     img    = _add_bottom_vignette(img)
     img    = _draw_icon_overlay(img, key, color_top, color_bottom, _rng)
-    result = _apply_cover_text(img, title, subtitle, accent_color=color_top, text_style=text_style)
+    result = _apply_cover_text(img, title, subtitle, accent_color=accent, text_style=text_style)
     out_path = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
     try:
         result.convert("RGB").save(out_path)
