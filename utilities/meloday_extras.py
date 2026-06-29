@@ -2032,64 +2032,64 @@ _MOOD_PROFILES = {
     # ---- 7 decade mixes (era) ----
 # ── decade_60s → "60s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Upbeat 120bpm, low energy, danceable; warm-toned, vocal-forward.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  1960–1969 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 1960-1969 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_60s": {"bpm": 120, "energy": -12, "danceability": 0.5, "brightness": 0.30, "beat_confidence": 0.62, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.58, "valence": 0.72, "vocal_presence": 0.82},
 # ── decade_70s → "70s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Mid 116bpm, mid energy, danceable; warm-toned, vocal-forward.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  1970–1979 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 1970-1979 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_70s": {"bpm": 116, "energy": -11, "danceability": 0.56, "brightness": 0.33, "beat_confidence": 0.68, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.68, "vocal_presence": 0.78},
 # ── decade_80s → "80s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Upbeat 122bpm, mid energy, danceable; bright.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  1980–1989 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 1980-1989 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_80s": {"bpm": 122, "energy": -9, "danceability": 0.6, "brightness": 0.42, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.7, "vocal_presence": 0.74},
 # ── decade_90s → "90s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Mid 110bpm, mid energy, danceable; bright.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  1990–1999 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 1990-1999 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_90s": {"bpm": 110, "energy": -9, "danceability": 0.56, "brightness": 0.4, "beat_confidence": 0.72, "onset_rate": 5, "dynamic_complexity": 0.5, "arousal": 0.6, "valence": 0.6, "vocal_presence": 0.74},
 # ── decade_00s → "00s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Mid 116bpm, mid energy, danceable; bright.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  2000–2009 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 2000-2009 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_00s": {"bpm": 116, "energy": -8, "danceability": 0.6, "brightness": 0.43, "beat_confidence": 0.76, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.62, "vocal_presence": 0.76},
 # ── decade_10s → "10s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Mid 114bpm, high energy, very danceable; bright.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  2010–2019 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 2010-2019 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_10s": {"bpm": 114, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.62, "valence": 0.6, "vocal_presence": 0.74},
 # ── decade_20s → "20s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
-# Sound:    Mid 112bpm, high energy, very danceable; bright.
+# Sound:    N/A — the decade's hits, any style or sound (centroid below is metadata only, unused).
 # Era/Geo:  2020–2029 · any origin.
-# Music:    Mood/centroid-led (no genre gate).
-# Criteria: no genre gate · 300k era floor · pop +1 · moodclass · cat:era
+# Music:    The decade's biggest hits by global Last.fm listeners — any genre or sound.
+# Criteria: no genre gate · top hits by Last.fm listeners · 2020-2029 year-window · comp/VA-gated · anthem-rescue (artist top-5 ≥150k) · cat:era
 # Flow:     Day-seeded shuffle (showcase — no DJ re-order).
 # Enhance:  —
     "decade_20s": {"bpm": 112, "energy": -7, "danceability": 0.62, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.42, "arousal": 0.6, "valence": 0.58, "vocal_presence": 0.74},
@@ -12799,9 +12799,13 @@ def _select_diverse_profiles(scored_profiles, n_active, max_per_category=2, max_
     deferred  = []
 
     def _too_similar(key):
+        # Decade mixes aren't sound-based (hits of the period) — never sim-gate them by centroid, in either
+        # direction. The max_per_category cap still limits how many decades share a slate.
+        if _PROFILE_CATEGORY.get(key) == "era":
+            return False
         return any(
             _acoustic_distance_to_centroid(_MOOD_PROFILES[key], _MOOD_PROFILES[s]) < _SIM_GUARD_DISTANCE
-            for s in selected if s in _MOOD_PROFILES
+            for s in selected if s in _MOOD_PROFILES and _PROFILE_CATEGORY.get(s) != "era"
         )
 
     def _take(key):
@@ -13046,6 +13050,10 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return keep
 
     def _adist(k):
+        # Decade mixes are hits-of-the-period regardless of sound — never rank them by acoustic fit to recent
+        # listening; a neutral constant lets them surface via the overdue rotation (fair, sound-independent).
+        if _PROFILE_CATEGORY.get(k) == "era":
+            return 0.5
         return _acoustic_distance_to_centroid(_MOOD_PROFILES[k], recent_centroid) if _has_centroid else 0.0
 
     def _stratified(scored):
