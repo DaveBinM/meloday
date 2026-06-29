@@ -19,6 +19,7 @@ import sys
 import re
 import math
 import random
+import heapq
 import time
 import logging
 import argparse
@@ -6855,6 +6856,43 @@ _PROFILE_LYRIC_VALENCE = {
 }
 
 
+# Profiles annotated "lyric_lang=en gate" in their _MOOD_PROFILES comment — English-leaning mixes where a
+# foreign-language vocal breaks the vibe. From those 116 Enhance: notes MINUS 4 language-native genres
+# (latin_heat / bossa_samba / afrobeat / reggae_dub) whose en-annotation is a generic-template artifact: an
+# en-lean there would wrongly demote the Spanish / Portuguese / African-language tracks that DEFINE the genre.
+# → 112 keys. (celtic_folk is KEPT — Celtic is majority-English; flip it out here if you want Gaelic untouched.)
+_LYRIC_EN_PROFILES = {
+    "situationship", "sad_bangers", "power_ballads", "restless", "yacht_rock", "swagger", "stormy", "grey_skies",
+    "festive", "spring_bloom", "summer_heat", "summer_breeze", "summer_roadtrip", "summer_tropical",
+    "autumn_leaves", "autumn_rain", "autumn_embers", "winter_cosy", "winter_nights", "hopeful", "yearning",
+    "triumphant", "tender", "defiant", "vulnerable", "grief_release", "monday_motivation", "midweek_reset",
+    "friday_feeling", "treat_yourself", "throwback_anthems", "old_friends", "campfire", "cookout", "school_days",
+    "memory_lane", "crush", "slow_burn", "moving_on", "loved_up", "long_distance", "flirty", "devotion",
+    "wedding_day", "funk_disco", "neo_soul", "motown_soul", "after_hours_rnb", "boom_bap", "conscious_flow",
+    "g_funk", "trap_mode", "house_party", "uk_garage", "punk_energy", "garage_grunge", "emo_poppunk", "blues_bar",
+    "celtic_folk", "country_roads", "outlaw_country",
+    "bluegrass", "gospel", "glasgow_soul", "glasgow_house", "london_soul", "london_garage", "london_grime",
+    "melbourne_soul", "melbourne_hiphop", "party", "melancholy", "morning", "rainy_day", "sunny", "nostalgia_mix",
+    "moody_mix", "bittersweet", "cathartic", "confidence_boost", "empowering", "euphoric", "angst_mix",
+    "romantic_mix", "fresh_start", "main_character", "after_dark", "friday_night", "weekend_mix", "date_night",
+    "driving_mix", "night_drive", "driving_singalong", "road_trip", "commute_mix", "party_throwback", "beach_vibes",
+    "summer_evening", "modern_romance", "late_night_romance", "romantic_dinner", "love_songs", "slow_dance",
+    "candlelight", "first_date", "romantic_jazz", "acoustic_romance", "indie_romance", "synthpop_romance",
+    "heartbreak", "pre_party", "celebration"
+}
+_LYRIC_LANG_PENALTY = 0.25                       # soft down-rank for a foreign-language vocal in an en mix
+_LYRIC_LANG_KEEP    = {"en", "none", "instrumental"}   # English, instrumentals, and unknown/empty are kept
+
+def _lyric_lang_penalty(entry, profile_key):
+    """SOFT down-rank (never exclude) for a KNOWN foreign-language vocal track in an English-leaning mix
+    (the _LYRIC_EN_PROFILES set). English / instrumental / unknown are untouched. lower score = better,
+    so a positive penalty demotes. WHY soft: a strong-fitting foreign track can still surface; we only
+    nudge the vibe English (user choice)."""
+    if profile_key not in _LYRIC_EN_PROFILES:
+        return 0.0
+    lang = (entry.get("lyric_lang") or "").lower()
+    return _LYRIC_LANG_PENALTY if (lang and lang not in _LYRIC_LANG_KEEP) else 0.0
+
 def _lyric_boost(entry, profile_key):
     """Pull tracks whose lyrics match the mix's wanted moods/themes; PUSH OUT tracks whose lyrics
     actively EXCLUDE them (the veto — e.g. a danceable breakup song kept out of a party mix). The new
@@ -7356,13 +7394,17 @@ def build_excluded_album_keys(music):
 # can't. EVERY consumer treats a None vector as "fall back to the acoustic path", so partial coverage and a
 # missing numpy degrade gracefully. WHY: emb_effnet/emb_musicnn were collected but unused (audit Tier-4).
 _EMB_FIELD  = "emb_effnet"
-_EMB_WEIGHT = 0.30          # pull toward a profile's seed embedding-centroid in _combined_score
+_EMB_WEIGHT = 0.25          # "sounds-like" cohesion pull in _combined_score (self-cohesion centroid, or a
+                            # profile's seed centroid). Tuned: lifts top-50 pairwise sim ~0.83->0.93 (mood) /
+                            # 0.71->0.77 (genre); the lift flattens past 0.25, so 0.25 avoids over-dominating
+                            # the acoustic/tag terms while keeping most of the cohesion gain.
 
-def _track_emb(entry):
-    """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / empty)."""
+def _track_emb(entry, which="effnet"):
+    """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / empty).
+    `which`: 'effnet' (1280-d Discogs — genre / sub-style) or 'musicnn' (200-d MSD — vibe / sounds-like)."""
     if not _NUMPY_AVAILABLE:
         return None
-    blob = entry.get(_EMB_FIELD)
+    blob = entry.get("emb_musicnn" if which == "musicnn" else _EMB_FIELD)
     if not blob:
         return None
     try:
@@ -7380,11 +7422,11 @@ def _emb_cosine(a, b):
         return 0.0
     return float(np.dot(a, b))
 
-def _emb_centroid(rks, essentia_cache):
-    """Mean of the normalised embeddings over a set of ratingKeys, renormalised. None if <5 present."""
+def _emb_centroid(rks, essentia_cache, which="effnet"):
+    """Mean of the normalised `which` embeddings over a set of ratingKeys, renormalised. None if <5 present."""
     if not _NUMPY_AVAILABLE:
         return None
-    vs = [v for v in (_track_emb(essentia_cache.get(str(rk), {})) for rk in rks) if v is not None]
+    vs = [v for v in (_track_emb(essentia_cache.get(str(rk), {}), which) for rk in rks) if v is not None]
     if len(vs) < 5:
         return None
     m = np.mean(vs, axis=0)
@@ -11535,6 +11577,22 @@ def _generate_daily_mix_cover(plex, tracks, mix_key, title, subtitle=None):
 
 # --- 1. On Repeat ---
 
+# skipCount deprioritisation for the personal play-history builders (On Repeat / Repeat Rewind / Top Songs /
+# All-Time Favourites / Rediscovery). Plex exposes a per-track skipCount; tracks you keep skipping shouldn't
+# dominate "your favourites". PROD-live only — dev has no live Plex, so getattr(...) → 0 → a graceful no-op
+# (mirrors the existing getattr(s, "lastViewedAt", None) pattern). _skip_factor multiplies a builder's positive
+# rank score (≤1, scale-free so it composes with plays/viewCount of any magnitude); _SKIP_HEAVY flags tracks to
+# demote where the sort key is a time, not a score (Rediscovery).
+_SKIP_K     = 0.15   # each skip shrinks the rank score; capped
+_SKIP_CAP   = 12
+_SKIP_HEAVY = 5      # >= this many skips → "you actively dislike this" (Rediscovery demotes to the back)
+
+def _skip_factor(track):
+    """Multiplicative rank deprioritisation by Plex skipCount: 1.0 (no skips / dev / missing attr) down toward
+    a floor as skips rise. Scale-free, so it composes with any builder's positive ranking score."""
+    s = min(int(getattr(track, "skipCount", 0) or 0), _SKIP_CAP)
+    return 1.0 / (1.0 + s * _SKIP_K)
+
 # ── build_on_repeat → "On Repeat" ─────────────────────────────────────────────────────────
 # Theme:    What you're hammering right now — genuine current obsession.
 # Sound:    N/A (personalisation, not acoustic).
@@ -11581,6 +11639,7 @@ def build_on_repeat(plex, history_entries, excluded_album_keys, target=30):
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(400, target * 10)]])
+    ranked.sort(key=lambda x: x[1] * _skip_factor(track_map.get(x[0])), reverse=True)  # demote tracks you skip
 
     artist_count = Counter()
     seen_songs   = set()
@@ -11654,6 +11713,7 @@ def build_repeat_rewind(plex, history_entries, excluded_album_keys, target=30):
         key=lambda x: x[1], reverse=True,
     )
     track_map = resolve_tracks_by_keys(plex, [rk for rk, _ in ranked[:max(200, target * 5)]])
+    ranked.sort(key=lambda x: x[1] * _skip_factor(track_map.get(x[0])), reverse=True)  # demote tracks you skip
 
     artist_count = Counter()
     seen_songs   = set()
@@ -12251,7 +12311,9 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
             continue
         eligible.append((lp, t))
 
-    eligible.sort(key=lambda x: x[0])  # longest-neglected first
+    # longest-neglected first, but push tracks you actively skip (>= _SKIP_HEAVY) to the back so they don't
+    # resurface (skipCount is prod-live; 0 on dev → all in the first bucket → unchanged ordering).
+    eligible.sort(key=lambda x: ((getattr(x[1], "skipCount", 0) or 0) >= _SKIP_HEAVY, x[0]))
 
     artist_count = Counter()
     seen_songs   = set()
@@ -12608,6 +12670,7 @@ def build_top_songs(plex, history_entries, excluded_album_keys,
         ranked = sorted(counts.items(), key=lambda x: x[1], reverse=True)
         candidate_keys = [rk for rk, _ in ranked[:max(400, target * 4)]]
         track_map = resolve_tracks_by_keys(plex, candidate_keys)
+        ranked.sort(key=lambda x: x[1] * _skip_factor(track_map.get(x[0])), reverse=True)  # demote tracks you skip
 
         artist_count = Counter()
         seen_songs   = set()
@@ -12667,6 +12730,9 @@ def build_all_time_favourites(music, excluded_album_keys, target=100):
     # NB: NO canonical dedup here — this list is view-count-sorted (your plays) and the loop stops at
     # the first 0-play track. Swapping in a studio copy you've never played would have 0 plays and cut
     # the playlist short. The inline dedup below keeps your most-played copy of each song (correct).
+    # Re-order by viewCount × skip-factor so heavily-skipped favourites sink (0-play tracks keep factor 1.0 and
+    # stay last, so the "stop at vc==0" below still holds); prod-live, a no-op on dev (skipCount → 0).
+    candidates = sorted(candidates, key=lambda t: (getattr(t, "viewCount", None) or 0) * _skip_factor(t), reverse=True)
     artist_count = Counter()
     seen_songs   = set()
     result = []
@@ -13574,13 +13640,26 @@ def _seed_emb_centroid(profile_key, essentia_cache):
     _SEED_EMB_CENTROID_CACHE[profile_key] = cen
     return cen
 
-def _embedding_boost(entry, profile_key, essentia_cache):
-    """Pull a track toward a profile's seed embedding-centroid ("sounds like the seeds"). No-op for profiles
-    without _EMB_SEEDS, or when the track / centroid has no embedding (graceful under partial coverage)."""
-    cen = _seed_emb_centroid(profile_key, essentia_cache)
+_MIX_EMB_CORE_N = 40   # build the cohesion centroid from the N candidates nearest the acoustic centroid
+
+def _mix_emb_centroid(cand_keys, essentia_cache, target, which):
+    """Two-pass "sounds-like" cohesion centroid: take the _MIX_EMB_CORE_N candidates closest to the mix's
+    ACOUSTIC centroid (its core sound), return the mean normalised `which` embedding of those. None (no-op)
+    if numpy is absent or <5 of the core carry the vector — graceful under partial coverage. emb_musicnn
+    (vibe, cross-genre) for fuzzy mood mixes; emb_effnet (sub-style) for genre-gated mixes."""
+    if not _NUMPY_AVAILABLE:
+        return None
+    core = heapq.nsmallest(_MIX_EMB_CORE_N, cand_keys,
+                           key=lambda rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target))
+    return _emb_centroid(core, essentia_cache, which)
+
+def _embedding_boost(entry, cen, which):
+    """Pull a track toward the mix's embedding-cohesion centroid ("sounds like the mix's core"). `cen`/`which`
+    are computed once per build in _build_mix_tracks (a profile's seed-artist centroid for _EMB_SEEDS profiles,
+    else self-cohesion). Graceful 0.0 when there's no centroid or the track lacks the embedding."""
     if cen is None:
         return 0.0
-    v = _track_emb(entry)
+    v = _track_emb(entry, which)
     if v is None:
         return 0.0
     return -_EMB_WEIGHT * _emb_cosine(v, cen)   # negative = pull (closer in sound -> better/lower score)
@@ -13671,8 +13750,9 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             + _listening_hour_boost(rk)
             + _loudness_consistency_boost(entry, profile_key)
             + _danceability_penalty(entry, profile_key)
-            + _embedding_boost(entry, profile_key, essentia_cache)
+            + _embedding_boost(entry, _emb_cen, _emb_which)
             + _lyric_boost(entry, profile_key)
+            + _lyric_lang_penalty(entry, profile_key)
         )
         # Style-GATED mixes already confirmed genre membership via tags in the gate. Re-applying the
         # external metadata-tag boosts here double-counts the same (noisy) Discogs/Plex/Last.fm tags
@@ -13699,6 +13779,17 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
     else:
         _cand_keys = list(essentia_cache)
+
+    # Embedding "sounds-like" cohesion: compute the mix's core embedding centroid ONCE, then
+    # _combined_score pulls candidates toward it. emb_effnet (sub-style) for genre-gated mixes, emb_musicnn
+    # (vibe, cross-genre) for fuzzy mood mixes; a profile's _EMB_SEEDS seed-artist centroid (effnet) overrides.
+    # Skipped for showcase mixes (they rank by popularity, not _combined_score). Graceful: None -> no-op.
+    _emb_which = "effnet" if profile_key in _STYLE_DEFINED_PROFILES else "musicnn"
+    _emb_cen   = _seed_emb_centroid(profile_key, essentia_cache)
+    if _emb_cen is not None:
+        _emb_which = "effnet"                                   # seed centroids are effnet
+    elif not _is_showcase:
+        _emb_cen = _mix_emb_centroid(_cand_keys, essentia_cache, target, _emb_which)
 
     history_rks = sorted(
         [rk for rk in _cand_keys if rk in play_counts],
