@@ -1446,9 +1446,9 @@ def sync_lastfm_tags(limit=None):
                  "WHERE lastfm_listeners IS NOT NULL AND lastfm_synced_at IS NULL", (now,))
     conn.commit()
     rows = conn.execute(
-        "SELECT rating_key, artist, title, release_date, year, lastfm_synced_at, lastfm_listeners "
+        "SELECT rating_key, artist, title, release_date, year, lastfm_synced_at, lastfm_listeners, artist_mbid "
         "FROM essentia_cache WHERE title IS NOT NULL").fetchall()
-    todo = [(rk, art, tit) for rk, art, tit, rd, yr, syn, data in rows
+    todo = [(rk, art, tit, mbid) for rk, art, tit, rd, yr, syn, data, mbid in rows
             if _refresh_due(syn, rd, yr, data is not None, "lastfm", now)]
     if limit:
         todo = todo[:int(limit)]
@@ -1460,15 +1460,22 @@ def sync_lastfm_tags(limit=None):
     workers = _workers_arg(6)
     log_msg(f"[INFO] fetching with {workers} concurrent workers (capped at 5 req/s).")
 
+    import meloday as _md
+    _mbid_map = _md._MBID_ARTIST_MAP or {}
+
     def _fetch(item):
-        rk, artist, title = item
+        rk, artist, title, mbid = item
         artist, title = artist or "", title or ""
-        at = _lf_artist_tags(artist, key) if artist else {}
-        info = (_lf_get({"method": "track.getInfo", "artist": artist,
+        # Last.fm lookups need the PROPER artist name (with &/+) from the MBID->MusicBrainz-name map — the cache
+        # `artist` is norm_text'd (& and + stripped, e.g. "King Gizzard the Lizard Wizard"), which lands on a
+        # near-empty mis-attributed Last.fm page. Fall back to the stored artist when there's no/unmapped MBID.
+        proper = _mbid_map.get(mbid) or artist
+        at = _lf_artist_tags(proper, key) if proper else {}
+        info = (_lf_get({"method": "track.getInfo", "artist": proper,
                          "track": lastfm_query_title(title)}, key).get("track")
-                or {}) if (artist and title) else {}
+                or {}) if (proper and title) else {}
         tt = _lf_parse(info); listeners = int(info.get("listeners") or 0)
-        disp = f"{artist[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}"
+        disp = f"{proper[:18]:18} - {title[:20]:20} | listeners={listeners:>8} track:{list(tt)[:3]}"
         return (json.dumps(at), json.dumps(tt), listeners, time.time(), rk), disp
 
     n = _run_concurrent(todo, _fetch,
@@ -1504,6 +1511,47 @@ def resync_lastfm_titles():
         sync_lastfm_tags()
 
 
+def resync_lastfm_artist_names():
+    r"""One-time after the artist-name fix: re-fetch Last.fm listeners/tags for tracks whose PROPER artist name
+    carries ANY punctuation that norm_text strips — `&` `+` `.` `'` `’` `/` `-`/`‐` `,` `!` etc. The cache
+    `artist` is norm_text'd (`re.sub(r"[^\w\s]","")`), so the old sync sent e.g. "king gizzard the lizard
+    wizard" / "aha" / "mia" / "fred again" and hit a near-empty or WRONG Last.fm page (King Gizzard 110 vs
+    915,406; a‐ha 78,862 vs 3,462,969; M.I.A. 416k vs 3.4M; Fred again.. 2,381 vs 1,356,683). Skips the MB
+    special-purpose placeholders ("[unknown]", "[no artist]", "[traditional]", …) — they aren't real artists,
+    so a Last.fm match would be falsely-HIGH. Marks the affected rows stale, drops their stale top-tracks
+    entries, then re-runs sync_lastfm_tags() + sync_artist_top_tracks() — both now MBID-proper-name aware."""
+    import meloday as _md, json as _json
+    mbid_map = _md._MBID_ARTIST_MAP or {}
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL"); _ensure_db_schema(conn)
+    rows = conn.execute("SELECT rating_key, artist, artist_mbid FROM essentia_cache "
+                        "WHERE title IS NOT NULL").fetchall()
+    affected, affected_artists = [], set()
+    for rk, art, mbid in rows:
+        proper = mbid_map.get(mbid)
+        if proper and re.search(r"[^\w\s]", proper) and not proper.strip().startswith("["):
+            affected.append(rk); affected_artists.add(art)
+    log_msg(f"[INFO] resync-lastfm-artists: {len(affected):,} tracks across {len(affected_artists)} "
+            f"punctuated-name artists need a Last.fm re-fetch with the proper name (~{len(affected)/5/60:.0f} min).")
+    if not affected:
+        conn.close(); return
+    stale = time.time() - 3650 * 86400        # old timestamp dodges sync_lastfm_tags' first-run re-stamp guard
+    for i in range(0, len(affected), 500):
+        conn.executemany("UPDATE essentia_cache SET lastfm_synced_at=? WHERE rating_key=?",
+                         [(stale, rk) for rk in affected[i:i + 500]])
+    conn.commit(); conn.close()
+    # drop the stale (normalised-name) top-tracks entries so sync_artist_top_tracks re-fetches them properly
+    try:
+        have = _json.load(open(_md.LASTFM_TOP_TRACKS_PATH, encoding="utf-8"))
+        for a in affected_artists:
+            have.pop(a, None)
+        _json.dump(have, open(_md.LASTFM_TOP_TRACKS_PATH, "w"), ensure_ascii=False)
+    except Exception:
+        pass
+    sync_lastfm_tags()
+    sync_artist_top_tracks()
+
+
 def sync_artist_top_tracks(limit=None):
     """Build/refresh assets/lastfm_artist_top_tracks.json: per cache `artist`, the Last.fm top-~50 track
     titles -> 1-based RANK (stored as {norm_title: rank}). Incremental (only artists not yet mapped),
@@ -1517,6 +1565,15 @@ def sync_artist_top_tracks(limit=None):
     import json as _json
     import meloday as _md
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    # {normalised cache artist -> PROPER MusicBrainz name (with &/+)} so the API call uses the real name while
+    # the JSON stays keyed by the normalised `artist` (what _artist_top_rank looks up). Without this, &/+ bands
+    # (King Gizzard & the Lizard Wizard) fetch a near-empty mis-attributed page.
+    _mbid_map = _md._MBID_ARTIST_MAP or {}
+    proper_of = {}
+    for a, mbid in conn.execute("SELECT DISTINCT artist, artist_mbid FROM essentia_cache "
+                                "WHERE artist IS NOT NULL AND artist != ''"):
+        if a not in proper_of and mbid and _mbid_map.get(mbid):
+            proper_of[a] = _mbid_map[mbid]
     artists = sorted({a for (a,) in conn.execute(
         "SELECT DISTINCT artist FROM essentia_cache WHERE artist IS NOT NULL AND artist != ''")})
     conn.close()
@@ -1536,7 +1593,7 @@ def sync_artist_top_tracks(limit=None):
     _LF_RL = _RateLimiter(5.0)
 
     def fetch(artist):
-        data = _lf_get({"method": "artist.gettoptracks", "artist": artist, "limit": 50}, key)
+        data = _lf_get({"method": "artist.gettoptracks", "artist": proper_of.get(artist, artist), "limit": 50}, key)
         tracks = ((data.get("toptracks") or {}).get("track")) or []
         if isinstance(tracks, dict):
             tracks = [tracks]
@@ -2910,6 +2967,8 @@ if __name__ == "__main__":
         sync_lastfm_tags(limit=_lim)
     elif "--resync-lastfm-titles" in sys.argv:
         resync_lastfm_titles()
+    elif "--resync-lastfm-artists" in sys.argv:
+        resync_lastfm_artist_names()
     elif "--sync-top-tracks" in sys.argv:
         sync_artist_top_tracks(limit=_arg_limit())
     elif "--sync-artist-names" in sys.argv:
