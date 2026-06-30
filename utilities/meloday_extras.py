@@ -13220,6 +13220,12 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     "australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
 }
 _GEO_RADIO_PROFILES = set(_GEO_RADIO)
+# Geo-radio variety: a track the station featured in the last _RADIO_SURFACE_WINDOW days is SOFT-deprioritised
+# (weight × down to _RADIO_SURFACE_FLOOR, never hard-banned) so each artist's REPRESENTATIVE track rotates
+# across their catalogue day-to-day. The artist ROSTER stays popularity-stable (the giants recur — power
+# rotation), only the track per artist cycles. Per-mix log lives in the geo-rotation file: "surfaced": {rk: ord}.
+_RADIO_SURFACE_WINDOW = 14
+_RADIO_SURFACE_FLOOR  = 0.3
 # A title that marks a re-record / remaster / re-version / reissue — i.e. NOT new material, however recent its
 # release year. Used by the geo-radio split to keep these out of "contemporary" (a radio station treats them as
 # the OLD songs they are). KEEPS "radio edit" / "single version" / "album version" — those ARE the radio cut.
@@ -13931,51 +13937,91 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         for rk in uniq:
             _by_a[(essentia_cache.get(rk, {}).get("artist") or "").lower()].append(rk)
         _skip = {a for a, rks in _by_a.items() if _is_score_classical_artist([essentia_cache[r] for r in rks])}
-        # Split each artist into a CONTEMPORARY single + a THROWBACK song. A song is OLD (-> throwback) if its
-        # comp-inclusive year predates the cut OR its title marks a re-record/reissue (_REISSUE_RE) — a radio
-        # station plays those as the old songs they are, never as "current"; is_alt_recording keeps remix/live/
-        # extended out of contemporary too (the radio cut). uniq is listener-desc, so first-seen per artist is top.
-        recent_by_a, throw_by_a = {}, {}
+        # Split each artist into a LIST of CONTEMPORARY tracks (re-rolled daily across releases for variety) + a
+        # THROWBACK classic. OLD (-> throwback) if comp-inclusive year predates the cut OR the title marks a
+        # re-record/reissue (_REISSUE_RE) — a radio station plays those as the old songs they are, never "current";
+        # is_alt_recording keeps remix/live/extended out of contemporary too. uniq is listener-desc, so throw_by_a's
+        # first-seen per artist is their top classic.
+        recent_by_a, throw_by_a = defaultdict(list), {}
         for rk in uniq:
             e = essentia_cache.get(rk, {}); a = (e.get("artist") or "").lower()
             if not a or a in _skip:
                 continue
             t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t))
             if ay >= cut and not is_re and not meloday.is_alt_recording(t):
-                if a not in recent_by_a:
-                    recent_by_a[a] = rk
+                recent_by_a[a].append(rk)
             elif (0 < ay < cut) or is_re:
                 if a not in throw_by_a:
                     throw_by_a[a] = rk
-        recent_sorted = sorted(recent_by_a.values(), key=lambda rk: -_rscore(rk))   # newer-leaning
-        throw_sorted  = sorted(throw_by_a.values(),  key=lambda rk: -_lis(rk))       # classics: pure popularity
+        throw_sorted = sorted(throw_by_a.values(), key=lambda rk: -_lis(rk))           # classics: pure popularity
         cur_ord  = date.today().toordinal()
+        # Soft surfacing rotation: a track the station featured in the last _RADIO_SURFACE_WINDOW days is
+        # down-weighted (never banned), so the catalogue turns over while the big hits still recur and the pool
+        # never thins. State persists in the geo-rotation file under "surfaced": {rk: ordinal} (pruned on load).
+        _gr   = _load_geo_rotation()
+        _surf = {rk: o for rk, o in (_gr.get(profile_key, {}).get("surfaced") or {}).items()
+                 if isinstance(o, int) and 0 <= cur_ord - o < _RADIO_SURFACE_WINDOW}
+        def _fresh(rk):   # 1.0 = not shown in the window; ramps down to _RADIO_SURFACE_FLOOR for a just-shown track
+            o = _surf.get(rk)
+            return 1.0 if o is None else max(_RADIO_SURFACE_FLOOR, min(1.0, (cur_ord - o) / _RADIO_SURFACE_WINDOW))
+        def _album(rk):
+            p = (essentia_cache.get(rk, {}).get("file_path") or "").split("/")
+            return p[-2] if len(p) >= 2 else rk
+        def _wchoice(items, weights, rng):
+            if not items: return None
+            tot = sum(weights)
+            if tot <= 0: return rng.choice(items)
+            r = rng.random() * tot
+            for it, w in zip(items, weights):
+                r -= w
+                if r <= 0: return it
+            return items[-1]
+        def _rep_track(a):   # the artist's representative TODAY: pick a RELEASE (coverage + freshness), then a
+            rng = random.Random(f"radio-rep-{cur_ord}-{profile_key}-{a}")   # track within it (top-listener, fresh)
+            by_alb = defaultdict(list)
+            for rk in recent_by_a[a]:
+                by_alb[_album(rk)].append(rk)
+            albums = list(by_alb)
+            alb = _wchoice(albums, [max(_fresh(rk) for rk in by_alb[al]) for al in albums], rng)
+            trks = by_alb[alb]
+            return _wchoice(trks, [(_lis(rk) or 1) * _fresh(rk) for rk in trks], rng)
+        # Rank ARTISTS into the pool by their ceiling score (the same big artists qualify, recency-leaning); the
+        # representative TRACK is then re-rolled per day, so prolific artists rotate across all their releases.
+        def _ceiling(a): return max(_rscore(rk) for rk in recent_by_a[a])
+        recent_artists = sorted(recent_by_a, key=lambda a: -_ceiling(a))
         n_throw  = max(1, round(mix_size * cfg["throwback_frac"]))
         n_recent = mix_size - n_throw
         _used = set()
         def _artist(rk): return (essentia_cache.get(rk, {}).get("artist") or "").lower()
-        def _pick(cands, want, tag):      # uniform daily shuffle (throwback: classics, all equal weight)
+        def _pick_throw(cands, want):     # classics: fresh-weighted daily sample (rotate the classics too)
             cands = [rk for rk in cands if _artist(rk) not in _used]
-            random.Random(f"radio-{cur_ord}-{profile_key}-{tag}").shuffle(cands)
-            out = []
-            for rk in cands:
-                out.append(rk); _used.add(_artist(rk))
-                if len(out) >= want:
-                    break
-            return out
-        def _wsample(cands, want, tag):   # weighted daily sample (contemporary: heavy-rotate freshest/biggest)
-            cands = [rk for rk in cands if _artist(rk) not in _used]   # A-Res: key = u**(1/weight), take top-k
-            rng = random.Random(f"radio-{cur_ord}-{profile_key}-{tag}")
-            keyed = sorted(((rng.random() ** (1.0 / max(_rscore(rk), 1e-9)), rk) for rk in cands), reverse=True)
+            rng = random.Random(f"radio-{cur_ord}-{profile_key}-t")
+            keyed = sorted(((rng.random() ** (1.0 / max((_lis(rk) or 1) * _fresh(rk), 1e-9)), rk) for rk in cands), reverse=True)
             out = []
             for _, rk in keyed[:want]:
                 out.append(rk); _used.add(_artist(rk))
             return out
-        # throwbacks first (so the giants take the classic slots), then contemporary skipping those artists
-        pool = _pick(throw_sorted[:cfg["throwback_pool"]], n_throw, "t") + _wsample(recent_sorted[:cfg["recent_pool"]], n_recent, "r")
+        def _sample_recent(artists, want):   # A-Res over ARTISTS: weight = ceiling ONLY (roster stays popularity-
+            rng = random.Random(f"radio-{cur_ord}-{profile_key}-r")   # stable so the giants recur); the surfacing
+            keyed = []                                                # rotation lives inside _rep_track (the track)
+            for a in artists:
+                if a in _used: continue
+                rep = _rep_track(a)
+                if rep is None: continue
+                keyed.append((rng.random() ** (1.0 / max(_ceiling(a), 1e-9)), a, rep))
+            keyed.sort(reverse=True)
+            out = []
+            for _, a, rep in keyed[:want]:
+                out.append(rep); _used.add(a)
+            return out
+        # throwbacks first (the giants take the classic slots), then contemporary skipping those artists
+        pool = _pick_throw(throw_sorted[:cfg["throwback_pool"]], n_throw) + _sample_recent(recent_artists[:cfg["recent_pool"]], n_recent)
         random.Random(f"radio-order-{cur_ord}-{profile_key}").shuffle(pool)
-        # daily-built sentinel so _scene_done_today gates the once-a-day rebuild (pinned), like the scenes.
-        _gr = _load_geo_rotation(); _gr[profile_key] = {"__built__": {"last": cur_ord}}; _save_geo_rotation(_gr)
+        # Persist: the once-a-day __built__ sentinel (gates _scene_done_today) + the surfacing log (pruned + today's
+        # pool stamped at cur_ord), so tomorrow's build down-weights what we just played.
+        _surf.update({rk: cur_ord for rk in pool})
+        _gr[profile_key] = {"__built__": {"last": cur_ord}, "surfaced": _surf}
+        _save_geo_rotation(_gr)
         history_rks, library_rks = [], pool
 
     elif _is_geo_hits:
