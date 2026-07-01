@@ -998,13 +998,13 @@ def _read_mb_file_tags(file_path):
         import mutagen
         from mutagen.mp4 import MP4FreeForm
     except Exception:
-        return {"artist_mbid": None, "release_types": []}
+        return {"artist_mbid": None, "release_types": [], "_tags_read": False}
     try:
         m = mutagen.File(file_path)
     except Exception:
         m = None
     if m is None or getattr(m, "tags", None) is None:
-        return {"artist_mbid": None, "release_types": []}
+        return {"artist_mbid": None, "release_types": [], "_tags_read": False}
     tags   = m.tags
     keymap = {k.lower(): k for k in tags.keys()}
 
@@ -1041,7 +1041,7 @@ def _read_mb_file_tags(file_path):
     rgid  = _get("musicbrainz_releasegroupid", "----:com.apple.iTunes:MusicBrainz Release Group Id",
                  "TXXX:MusicBrainz Release Group Id")
     out = {"artist_mbid": (ambid[0] if ambid else None), "release_types": rtypes,
-           "release_group_mbid": (rgid[0] if rgid else None)}
+           "release_group_mbid": (rgid[0] if rgid else None), "_tags_read": True}
     ots = _parse_original_ts(odate)
     if ots is not None:
         out["release_date"] = ots        # added ONLY when a tag parsed → data.update() never clobbers with None

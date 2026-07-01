@@ -1315,14 +1315,22 @@ def _ensure_mb_file_tags(limit=None, resync=False):
         rk, fp = item
         t = _read_mb_file_tags(fp)
         rts = t.get("release_types") or []
-        # release_date via COALESCE below → a tagless file (None) never NULLs an existing date.
-        return ((t.get("artist_mbid"), json.dumps(rts), t.get("release_date"), rk),
+        # On a read FAILURE (missing/unreadable file — e.g. a transient NAS hiccup during --resync, which
+        # re-reads already-populated rows) pass NULL for the tag columns so the COALESCE below PRESERVES the
+        # existing artist_mbid/release_types rather than wiping them. A successful read (even with no tags)
+        # sets release_types to "[]" — the "already read" marker. release_date is always COALESCE'd too.
+        if t.get("_tags_read"):
+            am, rts_json = t.get("artist_mbid"), json.dumps(rts)
+        else:
+            am = rts_json = None
+        return ((am, rts_json, t.get("release_date"), rk),
                 f"{(','.join(rts) or '-'):24.24} {os.path.basename(fp or '')[:42]}")
 
     n = _run_concurrent(
         todo, _fetch,
-        "UPDATE essentia_cache SET artist_mbid=?, release_types=?, "
-        "release_date=COALESCE(?, release_date) WHERE rating_key=?",
+        "UPDATE essentia_cache SET artist_mbid=COALESCE(?, artist_mbid), "
+        "release_types=COALESCE(?, release_types), release_date=COALESCE(?, release_date) "
+        "WHERE rating_key=?",
         _workers_arg(16), "MB tags")
     log_msg(f"\n[INFO] MusicBrainz file tags complete: {n} tracks.")
 
