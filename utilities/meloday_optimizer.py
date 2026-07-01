@@ -157,14 +157,17 @@ def run_optimizer():
         try:
             conn = sqlite3.connect(cache_path, timeout=10)
             for row in conn.execute(
-                "SELECT rating_key, bpm, energy, year, styles, genres, moods, danceability, brightness "
-                "FROM essentia_cache"
+                "SELECT rating_key, bpm, energy, year, styles, genres, moods, danceability, brightness, "
+                "release_date FROM essentia_cache"
             ):
                 # WHY: parse each row in its own try so one corrupt JSON column skips just that
                 # row — previously a single bad row aborted the whole load (and silently
                 # truncated the dataset the recommendations are computed from).
                 try:
-                    rk, bpm, energy, year, styles_json, genres_json, moods_json, danceability, brightness = row
+                    rk, bpm, energy, year, styles_json, genres_json, moods_json, danceability, brightness, release_date = row
+                    if release_date:                     # era tuning uses the ORIGINAL-release year (file-tag / MB)
+                        try: year = datetime.fromtimestamp(release_date).year
+                        except Exception: pass
                     cache_data[rk] = {
                         "bpm":          bpm,
                         "energy":       energy,

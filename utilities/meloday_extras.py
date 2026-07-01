@@ -35,6 +35,8 @@ import meloday  # required so load_essentia_cache() populates meloday._essentia_
 from meloday import (
     load_config,
     load_essentia_cache,
+    _entry_original_year,     # original-release year (release_date → Plex year fallback)
+    _entry_original_date,     # original-release full date (release_date) or None
     norm_text,
     primary_artist,
     lastfm_query_title,
@@ -6110,7 +6112,7 @@ _PROFILE_YEAR_WINDOW = {
 def _year_in_window(entry, window):
     """True if the track's release year falls in the (min, max) window (None = open end).
     Tracks with no year are excluded while a window is active — we can't confirm they're old."""
-    y = entry.get("year")
+    y = _entry_original_year(entry)
     if not y:
         return False
     lo, hi = window
@@ -6150,7 +6152,7 @@ def _profile_yield(profile_key, essentia_cache, cap=_MIN_PROFILE_YIELD):
         if style_gated and not _has_required_style(e, profile_key):
             continue
         if yw:
-            oy = smy.get(_entry_song_key(e)) or e.get("year")
+            oy = smy.get(_entry_song_key(e)) or _entry_original_year(e)
             if oy is None or (lo is not None and oy < lo) or (hi is not None and oy > hi):
                 continue
         if geo and not _origin_match(e, geo):
@@ -7458,7 +7460,7 @@ def compute_listening_centroid(history_entries, essentia_cache, top_n=100):
         for field in ("bpm", "energy", "danceability", "brightness", "year",
                       "beat_confidence", "onset_rate", "dynamic_complexity",
                       "integrated_loudness", "arousal", "valence", "vocal_presence"):
-            val = entry.get(field)
+            val = _entry_original_year(entry) if field == "year" else entry.get(field)   # original-release year
             if val is not None:
                 wsum[field]   += val * count
                 wcount[field] += count
@@ -7777,8 +7779,9 @@ def _acoustic_distance_to_centroid(entry, centroid):
         _add((entry["danceability"] - centroid["danceability"]) ** 2, 1.0)
     if entry.get("brightness") is not None and centroid.get("brightness") is not None:
         _add((entry["brightness"] - centroid["brightness"]) ** 2, 1.0)
-    if entry.get("year") and centroid.get("year"):
-        _add(min(abs(entry["year"] - centroid["year"]) / 100.0, 1.0) ** 2, 1.0)
+    _oyr = _entry_original_year(entry)
+    if _oyr and centroid.get("year"):
+        _add(min(abs(_oyr - centroid["year"]) / 100.0, 1.0) ** 2, 1.0)
     if entry.get("beat_confidence") is not None and centroid.get("beat_confidence") is not None:
         _add(min(abs(entry["beat_confidence"] - centroid["beat_confidence"]) / _BC_DIFF_SCALE, 1.0) ** 2, 1.0)
     if entry.get("onset_rate") is not None and centroid.get("onset_rate") is not None:
@@ -7854,8 +7857,9 @@ def _album_acoustic_centroid(rks, essentia_cache):
     for rk in rks:
         e = essentia_cache.get(str(rk), {})
         for f in ("bpm", "energy", "danceability", "brightness", "year"):
-            if e.get(f) is not None:
-                accum[f].append(e[f])
+            val = _entry_original_year(e) if f == "year" else e.get(f)   # original-release year
+            if val is not None:
+                accum[f].append(val)
     return {f: (sum(v) / len(v)) if v else None for f, v in accum.items()}
 
 
@@ -11875,6 +11879,15 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
             if not tracks:
                 continue
             rks          = [str(t.ratingKey) for t in tracks]
+            # Prefer the album's ORIGINAL release date (full, from the cached tracks' release_date) over
+            # Plex's availability date, so reissues/remasters (recent Plex date, OLD original) drop out.
+            # Day precision is kept for the >=cutoff test + the isocalendar-week sort. Soft-fallback: the
+            # Plex `rel` from the pre-filter (which, being >= the original, never hid a recent-original album).
+            _odates = [d for d in (_entry_original_date(essentia_cache.get(rk, {})) for rk in rks) if d]
+            if _odates:
+                rel = Counter(_odates).most_common(1)[0][0]
+                if rel < cutoff_date:                    # its true original isn't in the window → not "new"
+                    continue
             alb_centroid = _album_acoustic_centroid(rks, essentia_cache)
             ac_aff       = 1.0 - _acoustic_distance_to_centroid(alb_centroid, centroid)
             # taste: how well the album's tags (incl. the artist's established Last.fm tags, present
@@ -13290,7 +13303,7 @@ def _song_min_year_map(essentia_cache):
     if m is None:
         m = {}
         for e in essentia_cache.values():
-            y = e.get("year")
+            y = _entry_original_year(e)
             if not y or _era_is_comp(e):        # WHY skip comps/VA: their album-year is the comp/reissue year,
                 continue                        # not the original, and it was mis-dating songs (a 1990 comp set
             k = _entry_song_key(e)              # "God Only Knows" to the 90s). Studio-copy songs are unaffected —
@@ -13308,7 +13321,7 @@ def _song_year_anycopy_map(essentia_cache):
     if m is None:
         m = {}
         for e in essentia_cache.values():
-            y = e.get("year")
+            y = _entry_original_year(e)
             if not y:
                 continue
             k = _entry_song_key(e)
@@ -13822,7 +13835,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _smy = _song_min_year_map(essentia_cache)
         def _orig_in(rk):
             e  = essentia_cache.get(rk, {})
-            oy = _smy.get(_entry_song_key(e)) or e.get("year")
+            oy = _smy.get(_entry_song_key(e)) or _entry_original_year(e)
             return oy is not None and (lo is None or oy >= lo) and (hi is None or oy <= hi)
         _h = [rk for rk in history_rks if _orig_in(rk)]
         _l = [rk for rk in library_rks if _orig_in(rk)]
@@ -13919,7 +13932,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         def _lis(rk): return essentia_cache.get(rk, {}).get("lastfm_listeners") or 0
         def _ay(rk):
             e = essentia_cache.get(rk, {})
-            return _ayr.get(_entry_song_key(e)) or e.get("year") or 0
+            return _ayr.get(_entry_song_key(e)) or _entry_original_year(e) or 0
         # contemporary ranking leans newer: listeners * recency_base ** (years-into-window). base=1.0 -> pure pop.
         def _rscore(rk): return (_lis(rk) or 1) * (base ** max(0, _ay(rk) - cut))
         # drop comps/VA, collapse each song to its canonical copy, rank by listeners (like the era/hits branches)

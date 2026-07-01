@@ -23,6 +23,7 @@ from meloday import (
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
     _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags, lastfm_query_title, is_alt_recording,
+    _parse_original_ts,
 )
 
 # --- LOGGING SETUP ---
@@ -204,7 +205,8 @@ def upsert_essentia_cache_entries(entries):
               mood_relaxed=excluded.mood_relaxed, mood_party=excluded.mood_party, mood_acoustic=excluded.mood_acoustic,
               mood_electronic=excluded.mood_electronic, danceability_hl=excluded.danceability_hl,
               moodtheme=excluded.moodtheme, genre_discogs=excluded.genre_discogs,
-              title=excluded.title, release_date=excluded.release_date,
+              title=excluded.title,
+              release_date=COALESCE(excluded.release_date, essentia_cache.release_date),
               emb_effnet=COALESCE(excluded.emb_effnet, essentia_cache.emb_effnet),
               emb_musicnn=COALESCE(excluded.emb_musicnn, essentia_cache.emb_musicnn),
               lastfm_artist_tags=COALESCE(excluded.lastfm_artist_tags, essentia_cache.lastfm_artist_tags),
@@ -1177,7 +1179,8 @@ def _ensure_meta_fields(conn):
         rd = oaa.timestamp() if oaa else None
         pend.append((t.title or "", rd, rk))
         if len(pend) >= 500:
-            conn.executemany("UPDATE essentia_cache SET title=?, release_date=? WHERE rating_key=?", pend)
+            conn.executemany("UPDATE essentia_cache SET title=?, "
+                              "release_date=COALESCE(release_date, ?) WHERE rating_key=?", pend)
             conn.commit()
             pend = []
     if pend:
@@ -1281,16 +1284,23 @@ def sync_artist_names(limit=None):
     log_msg(f"[INFO] artist-name map complete: {len(have)} MBIDs named.")
 
 
-def _ensure_mb_file_tags(limit=None):
-    """Populate artist_mbid + release_types from each file's embedded MusicBrainz tags (Picard) for cached
-    tracks that lack them. A tag-only header read — no audio decode, no Plex, no API — so it parallelises
-    well over the NAS (measured ~2-4 min for the full ~131k library at 16 workers). NULL-driven: runs only
-    while such tracks exist (first run; new tracks get tagged inline during analysis), then a no-op."""
+def _ensure_mb_file_tags(limit=None, resync=False):
+    """Populate artist_mbid + release_types + release_date (original-release date, full where the tag has it)
+    from each file's embedded MusicBrainz/Picard tags for cached tracks that lack them. A tag-only header
+    read — no audio decode, no Plex, no API — so it parallelises well over the NAS (~2-4 min for the full
+    ~131k library at 16 workers). NULL-driven on release_types (new tracks get tagged inline during
+    analysis), then a no-op. resync=True re-reads ALL files — needed once to backfill release_date into
+    tracks tagged before that field existed (their release_types is already set, so the NULL-driven pass
+    would skip them)."""
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     _ensure_db_schema(conn)
-    todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
-                        "WHERE release_types IS NULL AND file_path IS NOT NULL").fetchall()
+    if resync:
+        todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
+                            "WHERE file_path IS NOT NULL").fetchall()
+    else:
+        todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
+                            "WHERE release_types IS NULL AND file_path IS NOT NULL").fetchall()
     done = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE release_types IS NOT NULL").fetchone()[0]
     conn.close()
     if limit:
@@ -1305,12 +1315,14 @@ def _ensure_mb_file_tags(limit=None):
         rk, fp = item
         t = _read_mb_file_tags(fp)
         rts = t.get("release_types") or []
-        return ((t.get("artist_mbid"), json.dumps(rts), rk),
+        # release_date via COALESCE below → a tagless file (None) never NULLs an existing date.
+        return ((t.get("artist_mbid"), json.dumps(rts), t.get("release_date"), rk),
                 f"{(','.join(rts) or '-'):24.24} {os.path.basename(fp or '')[:42]}")
 
     n = _run_concurrent(
         todo, _fetch,
-        "UPDATE essentia_cache SET artist_mbid=?, release_types=? WHERE rating_key=?",
+        "UPDATE essentia_cache SET artist_mbid=?, release_types=?, "
+        "release_date=COALESCE(?, release_date) WHERE rating_key=?",
         _workers_arg(16), "MB tags")
     log_msg(f"\n[INFO] MusicBrainz file tags complete: {n} tracks.")
 
@@ -1779,6 +1791,72 @@ def sync_artist_origin(limit=None):
     finally:
         q.put(STOP); wt.join()
     log_msg(f"\n[INFO] MusicBrainz origin sync complete: {cnt['a']} artists, {cnt['t']} tracks.")
+
+
+def sync_original_release_dates(limit=None):
+    """Fill `release_date` for tracks still missing it (mostly M4A, whose files lack an originaldate tag)
+    from the track's MusicBrainz RELEASE-GROUP first-release-date. The release-group MBID is read locally
+    from the file's Picard tag; unique release-groups are queried once each via the rate-limited MB API
+    (<=1 req/s). NULL-driven + resumable; first-release-date is immutable, so no re-sync cadence. Tracks
+    with no release-group MBID (untagged) stay NULL. Dispatch: --sync-original-dates (also in --full)."""
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_db_schema(conn)
+    todo = conn.execute("SELECT rating_key, file_path FROM essentia_cache "
+                        "WHERE release_date IS NULL AND file_path IS NOT NULL").fetchall()
+    conn.close()
+    if limit:
+        todo = todo[:int(limit)]
+    if not todo:
+        log_msg("[INFO] MusicBrainz original dates: nothing to do — every track has a release_date.")
+        return
+
+    # 1) Read each file's release-group MBID locally (parallel tag read) and group tracks by release-group.
+    log_msg(f"[INFO] MusicBrainz original dates: reading release-group MBIDs for {len(todo):,} tracks...")
+    rg_tracks = {}      # release_group_mbid -> [rating_key, ...]
+    no_rg = 0
+    def _rgid(item):
+        rk, fp = item
+        return (rk, _read_mb_file_tags(fp).get("release_group_mbid"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+        for rk, rg in ex.map(_rgid, todo):
+            if rg:
+                rg_tracks.setdefault(rg, []).append(rk)
+            else:
+                no_rg += 1
+    if not rg_tracks:
+        log_msg(f"[INFO] MusicBrainz original dates: no release-group MBIDs on the {len(todo):,} undated tracks.")
+        return
+    log_msg(f"[INFO] MusicBrainz original dates: {len(rg_tracks):,} unique release-groups "
+            f"({no_rg:,} tracks untagged) — querying MusicBrainz at <=1 req/s...")
+
+    # 2) Query each unique release-group's first-release-date; write it to every track in that group.
+    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    ok = miss = 0
+    pending = []
+    def _flush():
+        if pending:
+            conn.executemany("UPDATE essentia_cache SET release_date=COALESCE(?, release_date) "
+                             "WHERE rating_key=?", pending)
+            conn.commit(); pending.clear()
+    try:
+        for i, (rg, rks) in enumerate(rg_tracks.items(), 1):
+            d = _mb_get(f"release-group/{rg}?fmt=json")
+            ts = _parse_original_ts([d.get("first-release-date")]) if d else None
+            if ts is not None:
+                pending.extend((ts, rk) for rk in rks)
+                ok += len(rks)
+            else:
+                miss += 1
+            if len(pending) >= 200:
+                _flush()
+            log_msg(f"MB original dates: [{i}/{len(rg_tracks)}] {ok} tracks dated · {miss} groups w/o date ",
+                    end='\r')
+    finally:
+        _flush(); conn.close()
+    log_msg(f"\n[INFO] MusicBrainz original dates complete: {ok:,} tracks dated across {len(rg_tracks):,} "
+            f"release-groups ({miss:,} had no date, {no_rg:,} untagged).")
 
 
 def resync_geo(names):
@@ -2891,6 +2969,7 @@ def run_full_pipeline(limit=None, dry_run=False, skip_geo=False, skip_metadata=F
     ]
     if not skip_geo:
         steps.append(("geo / artist origin", lambda: sync_artist_origin(limit=limit)))
+        steps.append(("original release dates (MB)", lambda: sync_original_release_dates(limit=limit)))
     if not skip_metadata:
         steps.append(("Last.fm tags + listeners", lambda: sync_lastfm_tags(limit=limit)))
         steps.append(("Last.fm artist top tracks", lambda: sync_artist_top_tracks(limit=limit)))
@@ -2957,6 +3036,10 @@ if __name__ == "__main__":
         resync_geo(_names)
     elif "--backfill-mb-tags" in sys.argv:
         _ensure_mb_file_tags(limit=_arg_limit())
+    elif "--resync-mb-tags" in sys.argv:
+        _ensure_mb_file_tags(limit=_arg_limit(), resync=True)   # one-time full re-read (backfills release_date)
+    elif "--sync-original-dates" in sys.argv:
+        sync_original_release_dates(limit=_arg_limit())
     elif "--sync-metadata" in sys.argv:
         _lim = None
         if "--limit" in sys.argv:

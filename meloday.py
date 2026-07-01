@@ -949,6 +949,45 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
             log_text(f"[WARN] TF inference failed: {tf_err}")
 
 
+_ORIG_DATE_RE = re.compile(r"\s*(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?")
+def _parse_original_ts(values):
+    """First parseable original-release date among `values` (tag strings like '1975', '1975-08',
+    '1975-08-01', a MB 'first-release-date', or a padded '1965-00-00') → unix timestamp with FULL
+    day precision when present, else Jan 1 of the year. Rejects implausible years; None if nothing
+    parses. Pre-1970 dates yield NEGATIVE timestamps (fine on Linux/macOS)."""
+    for v in (values or []):
+        m = _ORIG_DATE_RE.match(str(v))
+        if not m:
+            continue
+        y = int(m.group(1))
+        if y < 1000 or y > 2100:
+            continue
+        mo = int(m.group(2) or 1) or 1
+        d  = int(m.group(3) or 1) or 1
+        if not (1 <= mo <= 12):
+            mo = 1
+        for dd in (d if 1 <= d <= 31 else 1, 1):   # bad day (Feb 30 etc.) → fall back to the 1st
+            try:
+                return datetime(y, mo, dd).timestamp()
+            except Exception:
+                continue
+    return None
+
+def _entry_original_date(entry):
+    """The track's original-release date (FULL precision) from the cache `release_date`, else None."""
+    rd = entry.get("release_date")
+    if rd:
+        try:
+            return datetime.fromtimestamp(rd).date()
+        except Exception:
+            pass
+    return None
+
+def _entry_original_year(entry):
+    """Original-release YEAR: prefer the file-tag/MB `release_date`, soft-fallback to Plex `year`."""
+    d = _entry_original_date(entry)
+    return d.year if d else entry.get("year")
+
 def _read_mb_file_tags(file_path):
     """Read the MusicBrainz tags Picard embeds in the audio file: the release-group type list (for
     compilation detection) and the artist MBID (for an exact geo lookup). Authoritative + local — no API.
@@ -993,7 +1032,20 @@ def _read_mb_file_tags(file_path):
                   "TXXX:MusicBrainz Album Type", "TXXX:RELEASETYPE", "musicbrainz_albumtype")
     ambid  = _get("musicbrainz_artistid", "----:com.apple.iTunes:MusicBrainz Artist Id",
                   "TXXX:MusicBrainz Artist Id")
-    return {"artist_mbid": (ambid[0] if ambid else None), "release_types": rtypes}
+    # ORIGINAL-release date (Picard) — full date where present, most-specific tag first. NOT plain
+    # date/©day/TDRC (those are the edition/reissue date). release-group MBID is returned for the
+    # MusicBrainz first-release-date fallback (sync_original_release_dates) — it is transient, not a
+    # cache column, so the upsert ignores it.
+    odate = _get("originaldate", "tdor", "TXXX:originaldate", "----:com.apple.iTunes:originaldate",
+                 "originalyear", "tory", "TXXX:originalyear", "----:com.apple.iTunes:originalyear")
+    rgid  = _get("musicbrainz_releasegroupid", "----:com.apple.iTunes:MusicBrainz Release Group Id",
+                 "TXXX:MusicBrainz Release Group Id")
+    out = {"artist_mbid": (ambid[0] if ambid else None), "release_types": rtypes,
+           "release_group_mbid": (rgid[0] if rgid else None)}
+    ots = _parse_original_ts(odate)
+    if ots is not None:
+        out["release_date"] = ots        # added ONLY when a tag parsed → data.update() never clobbers with None
+    return out
 
 
 def analyze_track_essentia(track, plex_track_ts=None, plex_album_ts=None, plex_artist_ts=None):
@@ -2311,9 +2363,10 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
         elif ma["genres"] & mb["genres"]:  # Genre is the coarsest fallback
             score -= 0.2
             
-        # Era/Decade similarity prevents "time-travel" jumps
-        if ma["year"] and mb["year"]:
-            if abs(ma["year"] - mb["year"]) <= 5:
+        # Era/Decade similarity prevents "time-travel" jumps (original-release year, soft-fallback Plex year)
+        _may, _mby = _entry_original_year(ma), _entry_original_year(mb)
+        if _may and _mby:
+            if abs(_may - _mby) <= 5:
                 score -= 0.1
         
         dist = score
@@ -2338,8 +2391,9 @@ def get_adj_dist(ka, kb, similarity_cache, meta_cache, limit=SONIC_SIMILAR_LIMIT
             dist += ((energy_dist ** 2) * ENERGY_WEIGHT)
             
             # Era/Decade Jump Penalty - Squaring ensures decade jumps are much costlier than 2-3 year shifts
-            if ea["year"] and eb["year"]:
-                year_diff = abs(ea["year"] - eb["year"])
+            _eay, _eby = _entry_original_year(ea), _entry_original_year(eb)   # original-release yr, fallback Plex
+            if _eay and _eby:
+                year_diff = abs(_eay - _eby)
                 year_dist = min(year_diff / 50.0, 1.0) # Penalty scales up to 50 years
                 dist += ((year_dist ** 2) * ERA_WEIGHT)
 
@@ -2453,7 +2507,8 @@ def sort_by_sonic_similarity_refined(tracks, first_track, last_track, limit=SONI
             "genres": set(ec.get("genres") or _resolve_tags(track, "genres")),
             "moods":  set(ec.get("moods")  or _resolve_tags(track, "moods")),
             "styles": set(ec.get("styles") or _resolve_tags(track, "styles")),
-            "year": ec.get("year") or getattr(track, "year", None)
+            "year": ec.get("year") or getattr(track, "year", None),
+            "release_date": ec.get("release_date"),   # for _entry_original_year (original-release era)
         }
 
     # Fetch sonicallySimilar in parallel for tracks not already in the global cache
@@ -2553,7 +2608,8 @@ def get_track_meta(track):
         "genres": set(ec.get("genres") or _resolve_tags(track, "genres")),
         "moods":  set(ec.get("moods")  or _resolve_tags(track, "moods")),
         "styles": set(ec.get("styles") or _resolve_tags(track, "styles")),
-        "year": ec.get("year") or getattr(track, "year", None)
+        "year": ec.get("year") or getattr(track, "year", None),
+        "release_date": ec.get("release_date"),   # for _entry_original_year (original-release era)
     }
 
 # Bridge Pass [Smarter Bridge Track Selection]
@@ -2713,6 +2769,7 @@ def fill_sonic_gaps(path, limit=SONIC_SIMILARITY_SEARCH_LIMIT, similarity_cache=
                         "moods":  set(b_moods),
                         "styles": set(b_styles),
                         "year":   ec_b.get("year") or getattr(bridge, "year", None),
+                        "release_date": ec_b.get("release_date"),   # original-release era (_entry_original_year)
                     }
                     # Evaluate distance to both sides of the gap to find the best "middle ground"
                     d1 = get_adj_dist(t1.ratingKey, bridge.ratingKey, {}, {**m_cache, bridge.ratingKey: bm}, limit)
