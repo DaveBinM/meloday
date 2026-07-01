@@ -1308,8 +1308,8 @@ def _ensure_mb_file_tags(limit=None, resync=False):
     if not todo:
         log_msg(f"[INFO] MusicBrainz file tags: nothing to do — {done:,} tracks already tagged.")
         return
-    log_msg(f"[INFO] Reading MusicBrainz file tags (artist MBID + release type) for {len(todo)} tracks "
-            f"— local & parallel, no API...")
+    log_msg(f"[INFO] Reading MusicBrainz file tags (artist MBID + release type + original date) for "
+            f"{len(todo)} tracks — local & parallel, no API...")
 
     def _fetch(item):
         rk, fp = item
