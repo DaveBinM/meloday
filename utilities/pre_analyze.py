@@ -1820,18 +1820,31 @@ def sync_original_release_dates(limit=None):
         return
 
     # 1) Read each file's release-group MBID locally (parallel tag read) and group tracks by release-group.
+    #    as_completed (NOT ex.map, which yields in submission order) so one slow NAS read can't stall the
+    #    whole batch, and paint a live count ~1x/sec so the phase is visibly progressing.
     log_msg(f"[INFO] MusicBrainz original dates: reading release-group MBIDs for {len(todo):,} tracks...")
     rg_tracks = {}      # release_group_mbid -> [rating_key, ...]
-    no_rg = 0
-    def _rgid(item):
-        rk, fp = item
-        return (rk, _read_mb_file_tags(fp).get("release_group_mbid"))
+    no_rg = done = 0
+    _last = [0.0]
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-        for rk, rg in ex.map(_rgid, todo):
+        futs = {ex.submit(_read_mb_file_tags, fp): rk for rk, fp in todo}
+        for fut in concurrent.futures.as_completed(futs):
+            rk = futs[fut]
+            try:
+                rg = (fut.result() or {}).get("release_group_mbid")
+            except Exception:
+                rg = None
             if rg:
                 rg_tracks.setdefault(rg, []).append(rk)
             else:
                 no_rg += 1
+            done += 1
+            now = time.time()
+            if now - _last[0] >= 1.0 or done == len(todo):
+                _last[0] = now
+                log_msg(f"MB original dates: reading tags [{done:,}/{len(todo):,}] · "
+                        f"{len(rg_tracks):,} release-groups so far ", end='\r')
+    log_msg("")
     if not rg_tracks:
         log_msg(f"[INFO] MusicBrainz original dates: no release-group MBIDs on the {len(todo):,} undated tracks.")
         return
