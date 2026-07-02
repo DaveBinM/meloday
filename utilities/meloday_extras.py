@@ -227,6 +227,12 @@ _EXTRAS_COVER_COLORS = {
     "global_3mo":             ((26, 158, 146), (8, 44, 60)),     # fresh teal — "Just Released"
     "global_12mo":            ((72, 78, 176),  (18, 20, 66)),    # indigo — "The Last 12 Months"
     "global_year":            ((126, 72, 184), (40, 20, 72)),    # violet — "Class of the Year"
+    # 5 global genre radio stations
+    "electronic_radio":       ((60, 80, 230),  (200, 40, 170)),  # electric blue → magenta
+    "rock_radio":             ((190, 50, 45),  (50, 20, 20)),    # crimson → black
+    "pop_radio":              ((255, 90, 150), (120, 40, 150)),  # hot pink → purple
+    "indie_radio":            ((200, 120, 70), (60, 55, 85)),    # warm amber → muted slate
+    "soundtracks_radio":      ((200, 170, 90), (30, 40, 80)),    # gold → deep blue (cinematic)
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -797,6 +803,12 @@ _COVER_BG_STYLES = {
     "global_3mo": ("globe", 1),
     "global_12mo": ("globe", 2),
     "global_year": ("globe", 3),
+    # --- 5 global GENRE radio stations: genre-evocative families at free variants ---
+    "electronic_radio": ("equalizer", 3),
+    "rock_radio": ("amp_stack", 7),
+    "pop_radio": ("halftone", 3),
+    "indie_radio": ("mod_target", 3),
+    "soundtracks_radio": ("film_strip", 3),
     # --- misc ---
     "discover_weekly": ("radial", 0),
     "folk_acoustic": ("acoustic_guitar", 0),
@@ -838,6 +850,8 @@ _PROFILE_ICON = {
     "scotland_now": "radio", "london_now": "radio", "uk_now": "radio", "australia_now": "radio",
     "scotland_australia_now": "radio", "uk_australia_now": "radio", "global_radio": "radio",
     "global_3mo": "radio", "global_12mo": "radio", "global_year": "radio",
+    "electronic_radio": "radio", "rock_radio": "radio", "pop_radio": "radio",
+    "indie_radio": "radio", "soundtracks_radio": "radio",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -2281,6 +2295,51 @@ _MOOD_PROFILES = {
 # Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's tracks day-to-day.
 # Enhance:  reissue/archival guard (earliest known year must also be the current year); score/classical excluded.
     "global_year": {"bpm": 120, "energy": -7, "danceability": 0.60, "brightness": 0.45, "beat_confidence": 0.80, "onset_rate": 5.6, "dynamic_complexity": 0.42, "arousal": 0.66, "valence": 0.61, "vocal_presence": 0.75},
+# ── electronic_radio → "Electronic Radio" ─────────────────────────────────────────────────
+# Theme:    Global electronic radio — the biggest current electronic + a few classics.
+# Sound:    GENRE-gated (Discogs parent = electronic); centroid below is metadata only.
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate (whole library) · genre: electronic.
+# Music:    Genre gate + most-popular contemporary (last 5y) + ~10% throwback classics · 1-per-artist.
+# Criteria: genre-gated (parent electronic) · no origin gate · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue.
+# Enhance:  —
+    "electronic_radio":  {"bpm": 124, "energy": -6, "danceability": 0.70, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.34, "arousal": 0.78, "valence": 0.66, "vocal_presence": 0.52},
+# ── rock_radio → "Rock Radio" ─────────────────────────────────────────────────────────────
+# Theme:    Global rock radio — mainstream/classic/hard rock (the indie scene lives on Indie Radio).
+# Sound:    GENRE-gated (Discogs parent = rock, mainstream-rock positives, indie excluded); centroid metadata only.
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate · genre: rock (mainstream).
+# Music:    Genre gate + most-popular contemporary + ~10% throwback classics · 1-per-artist.
+# Criteria: genre-gated (parent rock, mainstream) · no origin gate · 90% + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue.
+# Enhance:  —
+    "rock_radio":        {"bpm": 122, "energy": -9, "danceability": 0.50, "brightness": 0.34, "beat_confidence": 0.74, "onset_rate": 5.2, "dynamic_complexity": 0.48, "arousal": 0.70, "valence": 0.60, "vocal_presence": 0.66},
+# ── pop_radio → "Pop Radio" ───────────────────────────────────────────────────────────────
+# Theme:    Global pop radio — the biggest pop hits, current + classic.
+# Sound:    GENRE-gated (Discogs parent ∈ electronic/pop/rock, pop positives); centroid metadata only.
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate · genre: pop (mainstream).
+# Music:    Genre gate + most-popular contemporary + ~10% throwback classics · 1-per-artist.
+# Criteria: genre-gated (pop) · no origin gate · 90% + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue.
+# Enhance:  —
+    "pop_radio":         {"bpm": 118, "energy": -8, "danceability": 0.66, "brightness": 0.48, "beat_confidence": 0.76, "onset_rate": 4.8, "dynamic_complexity": 0.40, "arousal": 0.66, "valence": 0.74, "vocal_presence": 0.80},
+# ── indie_radio → "Indie Radio" ───────────────────────────────────────────────────────────
+# Theme:    Global indie radio — indie rock + indie pop (distinct from mainstream Rock Radio).
+# Sound:    GENRE-gated (parent rock/pop, indie positives); centroid metadata only.
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate · genre: indie.
+# Music:    Genre gate + most-popular contemporary + ~10% throwback classics · 1-per-artist.
+# Criteria: genre-gated (indie rock + pop) · no origin gate · 90% + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue.
+# Enhance:  —
+    "indie_radio":       {"bpm": 122, "energy": -10, "danceability": 0.52, "brightness": 0.36, "beat_confidence": 0.72, "onset_rate": 5.0, "dynamic_complexity": 0.46, "arousal": 0.64, "valence": 0.58, "vocal_presence": 0.72},
+# ── soundtracks_radio → "Soundtracks Radio" ───────────────────────────────────────────────
+# Theme:    Global soundtracks radio — instrumental film/TV/game scores by composers.
+# Sound:    GENRE-gated (parent classical/stage & screen, score positives); KEEPS score/classical artists.
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate · genre: score/soundtrack.
+# Music:    Genre gate + score-exclusion BYPASSED (_SOUNDTRACK_RADIO) + most-popular themes · 1-per-composer.
+# Criteria: genre-gated (score) · no origin gate · KEEP composers · 90% + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-composer daily re-roll rotates their score catalogue.
+# Enhance:  score-exclusion bypass — its gate already guarantees score content.
+    "soundtracks_radio": {"bpm": 92, "energy": -15, "danceability": 0.24, "brightness": 0.24, "beat_confidence": 0.44, "onset_rate": 2.8, "dynamic_complexity": 0.70, "arousal": 0.42, "valence": 0.50, "vocal_presence": 0.20},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4617,6 +4676,11 @@ _MOOD_MIX_NAMES = {
     "global_3mo":             "Just Released • Meloday+",
     "global_12mo":            "The Last 12 Months • Meloday+",
     "global_year":            "Class of the Year • Meloday+",
+    "electronic_radio":       "Electronic Radio • Meloday+",
+    "rock_radio":             "Rock Radio • Meloday+",
+    "pop_radio":              "Pop Radio • Meloday+",
+    "indie_radio":            "Indie Radio • Meloday+",
+    "soundtracks_radio":      "Soundtracks Radio • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -5104,7 +5168,8 @@ _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
                      "scottish_hits", "australian_hits", "london_hits",
                      "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
                      "scotland_australia_now", "uk_australia_now", "global_radio",
-                     "global_3mo", "global_12mo", "global_year"}
+                     "global_3mo", "global_12mo", "global_year",
+                     "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5265,6 +5330,8 @@ _PROFILE_CATEGORY = {
     "london_now": "geo_scene", "uk_now": "geo_scene", "australia_now": "geo_scene",
     "scotland_australia_now": "geo_scene", "uk_australia_now": "geo_scene", "global_radio": "geo_scene",
     "global_3mo": "geo_scene", "global_12mo": "geo_scene", "global_year": "geo_scene",
+    "electronic_radio": "geo_scene", "rock_radio": "geo_scene", "pop_radio": "geo_scene",
+    "indie_radio": "geo_scene", "soundtracks_radio": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -5664,6 +5731,13 @@ _PROFILE_STYLE_SIGNALS = {
     "rap_rock": (["rap-rock", "rap rock", "rap-metal", "rap metal", "nu metal", "nü metal", "funk metal", "rapcore"], ["ambient", "folk", "gospel", "classical"]),
     "festival_edm": (["edm", "big room", "electro house", "future bass", "complextro"], ["metal", "country", "folk", "ambient", "gospel"]),
     "soundtracks": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
+    # --- global genre RADIO stations (tight positives — current pop is electronic-produced & genre-blurred, so
+    #     parent-only gates leak the big pop stars into every genre) ---
+    "electronic_radio": (["house", "deep house", "tech house", "progressive house", "electro house", "techno", "minimal techno", "detroit techno", "acid house", "trance", "progressive trance", "goa trance", "big room", "edm", "future bass", "drum and bass", "drum'n'bass", "jungle", "dubstep", "uk garage", "breakbeat", "big beat", "idm", "hardstyle", "gabber", "hard techno"], ["metal", "country", "folk", "pop"]),
+    "rock_radio": (["album rock", "arena rock", "hard rock", "classic rock", "blues rock", "blues-rock", "southern rock", "glam rock", "psychedelic rock", "prog rock", "progressive rock", "heavy metal", "rock & roll", "garage rock", "post-grunge", "post grunge", "grunge"], ["rap", "techno", "edm", "drill", "country"]),
+    "indie_radio": (["alternative/indie rock", "indie rock", "college rock", "modern rock", "jangle pop", "garage rock revival", "indie pop", "left-field pop", "twee pop", "chamber pop", "baroque pop", "noise pop", "psychedelic pop", "bedroom pop", "sophisti-pop", "c-86", "indie electronic", "dream pop", "shoegaze", "post-punk", "post-punk revival", "slacker rock", "math rock"], ["metal", "rap", "techno", "drill"]),
+    "pop_radio": (["contemporary pop/rock", "dance-pop", "teen pop", "vocal pop", "traditional pop", "pop idol", "social media pop", "europop", "euro-pop", "power pop", "synth pop", "synth-pop", "electropop", "art pop", "pop-soul", "hi-nrg", "nu-disco", "bubblegum"], ["metal", "punk", "country", "experimental"]),
+    "soundtracks_radio": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
     "rave_cave": (["donk", "hard house", "hard trance", "hardstyle", "hard techno", "schranz", "gabber", "happy hardcore", "jumpstyle", "makina"], ["ambient", "folk", "classical", "gospel", "rap", "k-pop"]),
     "festive": (["christmas", "holidays"], []),
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
@@ -5826,6 +5900,8 @@ _STYLE_DEFINED_PROFILES = {
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
     "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave",
+    # global genre RADIO stations (genre gate composed with the radio branch; no geo gate)
+    "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio",
     "festive",
     "spring_acoustic",
     "spring_strings",
@@ -5947,6 +6023,11 @@ _STYLE_DEFINED_PROFILES = {
 # from genuine tags (Hannah Laing's real hardstyle 0.15, Darude's hard-trance 0.21) and thinned no pool
 # below usable size. Plex styles are human-curated (no confidence) and always count.
 _DISCOGS_TAG_FLOOR = 0.12
+# Per-profile positive-tag confidence floor override (default _DISCOGS_TAG_FLOOR). electronic_radio needs a
+# HIGH floor: the Discogs classifier sprays low-confidence House/Deep-House tags (0.12-0.27) onto four-on-the-
+# floor modern pop (Miley "Flowers"=0.27 house, Taylor=0.18 tropical house), so a 0.12 gate floods it with pop.
+# Real electronic acts score their genre 0.4+; 0.30 keeps them and drops the pop spray.
+_PROFILE_TAG_FLOOR = {"electronic_radio": 0.45}
 
 def _track_style_tags(entry, min_conf=0.0):
     """Lowercased style/genre tags for matching: Plex STYLES (granular, human-curated) + the Discogs-400
@@ -6034,6 +6115,12 @@ _PROFILE_GENRE_PARENT = {
     "strings_romance": {"classical", "stage & screen"}, "piano_romance": {"classical", "stage & screen"},
     "spring_strings": {"classical", "stage & screen"}, "cinematic_epic": {"classical", "stage & screen"},
     "soundtracks": {"classical", "stage & screen"},
+    # --- global genre RADIO stations ---
+    "electronic_radio": {"electronic"},
+    "rock_radio": {"rock"},
+    "indie_radio": {"rock", "pop"},
+    "pop_radio": {"electronic", "pop", "rock"},
+    "soundtracks_radio": {"classical", "stage & screen"},
     "winter_frost": {"classical", "stage & screen", "electronic"},  # WHY: admits ambient (Electronic parent), the frost half currently rejected (audit winter_frost-1)
     # --- Pop (scatters across parents) ---
     "chart_pop": {"electronic", "pop", "rock"}, "synth_pop": {"electronic", "pop", "rock"},
@@ -6147,7 +6234,7 @@ def _has_required_style(entry, profile_key):
         if profile_key in _LASTFM_GATED:
             tags = _entry_lastfm_tags(entry)                     # crowd genre labels (Discogs can't name these)
         else:
-            tags = _discogs_subgenres(entry, _DISCOGS_TAG_FLOOR)  # Discogs subgenres only, confidence-floored
+            tags = _discogs_subgenres(entry, _PROFILE_TAG_FLOOR.get(profile_key, _DISCOGS_TAG_FLOOR))  # Discogs subgenres only, confidence-floored (per-profile override)
         # Word-boundary token match (see _positive_matches): "mod" matches the subgenre "mod" but not
         # "modern", "dub" not "dubstep", "am pop" not "dream pop" — the systemic fix for the leak class.
         if not tags or not any(_positive_matches(sub, tag) for tag in tags for sub in positive_subs):
@@ -13277,7 +13364,8 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
                                  "scottish_hits", "australian_hits", "london_hits",
                                  "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
                                  "scotland_australia_now", "uk_australia_now", "global_radio",
-                                 "global_3mo", "global_12mo", "global_year")
+                                 "global_3mo", "global_12mo", "global_year",
+                                 "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -13375,8 +13463,19 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     "global_3mo":  {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"days": 90}},
     "global_12mo": {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"days": 365}},
     "global_year": {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"mode": "current_year"}},
+    # --- GLOBAL GENRE stations: whole-library, gated by GENRE (via _STYLE_DEFINED_PROFILES, no _PROFILE_GEO_GATE).
+    #     Same current-focused 90/10 config as global_radio. soundtracks_radio additionally bypasses the branch's
+    #     score/classical artist exclusion via _SOUNDTRACK_RADIO. ---
+    "electronic_radio":  {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
+    "rock_radio":        {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
+    "pop_radio":         {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
+    "indie_radio":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
+    "soundtracks_radio": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
 }
 _GEO_RADIO_PROFILES = set(_GEO_RADIO)
+# soundtracks_radio KEEPS score/classical artists (its genre gate already ensures score content) — the radio
+# branch's normal score-artist exclusion would empty its pool, so it's bypassed via this set.
+_SOUNDTRACK_RADIO = {"soundtracks_radio"}
 _GEO_RADIO_SPLIT = {   # two-location blends: (specA, specB) — the branch draws ~50/50 from each nation's bucket
     "scotland_australia_now": ({"places": {"scotland"},  "scene": {"scotland"}},
                                {"places": {"australia"}, "scene": {"australia"}}),
@@ -13958,6 +14057,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if profile_key in _STYLE_DEFINED_PROFILES:
         _cand_keys = [rk for rk in essentia_cache
                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
+        if profile_key in _SOUNDTRACK_RADIO:   # scores are INSTRUMENTAL — drop soundtrack SONGS (Lady Gaga "Shallow")
+            _cand_keys = [rk for rk in _cand_keys if (essentia_cache[rk].get("vocal_presence") or 0) < 0.4]
     else:
         _cand_keys = list(essentia_cache)
 
@@ -14118,7 +14219,11 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _by_a = defaultdict(list)
         for rk in uniq:
             _by_a[(essentia_cache.get(rk, {}).get("artist") or "").lower()].append(rk)
-        _skip = {a for a, rks in _by_a.items() if _is_score_classical_artist([essentia_cache[r] for r in rks])}
+        # Normally exclude score/classical artists (a radio station plays songs, not film cues); soundtracks_radio
+        # KEEPS them — its instrumental score gate (parent + instrumental filter at _cand_keys) already ensures
+        # composer content, and the normal exclusion would empty its pool.
+        _skip = set() if profile_key in _SOUNDTRACK_RADIO else \
+                {a for a, rks in _by_a.items() if _is_score_classical_artist([essentia_cache[r] for r in rks])}
         # Split each artist into a LIST of CONTEMPORARY tracks + a LIST of THROWBACK classics — BOTH re-rolled
         # daily across the artist's releases for variety (a deep-catalogue act like Simple Minds / Gerry Rafferty
         # rotates its whole back catalogue over time, not one track on repeat). OLD (-> throwback) if the comp-
