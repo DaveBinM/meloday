@@ -71,7 +71,7 @@ except ImportError:
 
 # --- Optional: PIL for cover generation ---
 try:
-    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
     _PIL_AVAILABLE = True
 except ImportError:
     _PIL_AVAILABLE = False
@@ -218,7 +218,7 @@ _EXTRAS_COVER_COLORS = {
     "uk_hits":         ((20, 56, 140), (10, 28, 80)),      # Union Jack blue
     "scotland_now":    ((30, 110, 170), (16, 56, 96)),     # Saltire blue (contemporary Scottish radio)
     "london_now":      ((196, 52, 58), (70, 18, 26)),      # London red (contemporary London radio)
-    "uk_now":          ((20, 56, 140), (10, 28, 80)),      # Union Jack blue (union_jack bg hard-codes flag colours)
+    "uk_now":          ((206, 40, 58), (10, 28, 80)),      # union_jack bg hard-codes the flag; vivid RED accent for "Now" — on-scheme + pops on the blue field (blue-on-blue was invisible)
     "australia_now":   ((46, 140, 82), (212, 160, 40)),    # green & gold — green sky, golden sun (contemporary Australian radio)
     # 6 new radio stations: split blends fade one nation's colour into the other; globals get 4 distinct globe tints
     "scotland_australia_now": ((30, 110, 170), (212, 160, 40)),  # saltire blue → Aussie gold
@@ -866,6 +866,11 @@ _PROFILE_ICON_ROTATE = {
 #   kind       "single" or "cluster" (music notes). Romance clusters are set via _HEART_MODE.
 _ICON_DEFAULT_META = {"extent": 205, "base_scale": 1.0, "tilt": 10, "anchor": (0.50, 0.40), "kind": "single"}
 _ICON_META = {
+    # Radio-station emblem: OFF-CENTRE (upper-right) so it never covers the cover's focal art (the amp
+    # cabinet, the mod target's bullseye, the equalizer bars…); smaller than the hero default and kept on a
+    # tilt, with low jitter for a consistent family look. Its speaker/display cutouts are filled with a dark
+    # backing tone (see _SOLID_BACKING_GLYPHS) so a busy background can't show through them.
+    "radio":               {"anchor": (0.52, 0.37), "extent": 200, "tilt": 12, "jitter": 0.45},
     # Music profiles render a composed note cluster (mixes music_note + music_note_2).
     "music_note":          {"kind": "cluster", "extent": 215},
     "beach_access":        {"tilt_bias": -16, "tilt": 5},   # umbrella leans clockwise
@@ -886,6 +891,16 @@ _ICON_META = {
 # Per-profile overrides (merged over _ICON_META) — a deliberate placement spread across
 # same-glyph siblings (sun / moon profiles) or a bespoke size.
 _ICON_PROFILE_OVERRIDE = {
+    # Radio-station covers — the emblem is placed per-cover in its own negative space and sized to fit (NOT a
+    # fixed spot/size): globes CONTAIN it inside the sphere; the focal-art covers (amp / mod-target / EQ) get a
+    # small stamp tucked clear of the hero element. Others keep the _ICON_META["radio"] upper-right default.
+    "global_radio":     {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},  # inside the globe
+    "global_3mo":       {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},
+    "global_12mo":      {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},
+    "global_year":      {"anchor": (0.50, 0.42), "base_scale": 0.82, "tilt": 6, "jitter": 0.10},   # above the big "2026"
+    "rock_radio":       {"anchor": (0.86, 0.13), "base_scale": 0.38, "jitter": 0.04},   # small, tucked into the top-right CORNER, clear right of the cab (~50px gap) at head level
+    "indie_radio":      {"anchor": (0.83, 0.16), "base_scale": 0.58, "jitter": 0.10},   # top-right corner, off the roundel, a bit larger
+    "electronic_radio": {"anchor": (0.70, 0.15), "base_scale": 0.52, "jitter": 0.10},   # high above the EQ bars (clear gap)
     # round 3: keep glyphs clear of busy art (smaller / moved off the focal element)
     "first_date":     {"anchor": (0.30, 0.30), "base_scale": 0.66},   # hearts small, off the candle
     "heatwave":       {"anchor": (0.30, 0.28), "base_scale": 0.70},   # smaller, higher
@@ -4674,8 +4689,8 @@ _MOOD_MIX_NAMES = {
     "uk_australia_now":       "UK × Australia • Meloday+",
     "global_radio":           "Global Radio • Meloday+",
     "global_3mo":             "Just Released • Meloday+",
-    "global_12mo":            "The Last 12 Months • Meloday+",
-    "global_year":            "Class of the Year • Meloday+",
+    "global_12mo":            "Past Year • Meloday+",
+    "global_year":            "Class of the Year • Meloday+",  # overridden to "Class of {year}" after _NOW_YEAR is defined
     "electronic_radio":       "Electronic Radio • Meloday+",
     "rock_radio":             "Rock Radio • Meloday+",
     "pop_radio":              "Pop Radio • Meloday+",
@@ -6260,6 +6275,9 @@ def _has_required_style(entry, profile_key):
 # Era windows for the nostalgia mixes, so "throwbacks" are actually old. Computed relative to
 # the current year so the window never goes stale. (None = open end.)
 _NOW_YEAR = date.today().year
+# global_year ("current calendar year" station) shows the actual year, dynamically — the cover's "default"
+# title style renders a trailing 4-digit year as a large accent line, so this reads "Class of" / "{year}".
+_MOOD_MIX_NAMES["global_year"] = f"Class of {_NOW_YEAR} • Meloday+"
 _PROFILE_YEAR_WINDOW = {
     # ---- 7 decade mixes (era) ----
     "decade_60s": (1960, 1969),
@@ -11115,6 +11133,10 @@ _TWO_TONE_GLYPHS = {
     "hot_tub",
 }
 
+# Glyphs whose INTERIOR cutouts are filled with a dark backing tone so a busy cover background can't show
+# through the holes (see _draw_glyph's `backing`). The radio's speaker + tuning display are those cutouts.
+_SOLID_BACKING_GLYPHS = {"radio"}
+
 _MS_FONT_CACHE = {}
 
 
@@ -11134,7 +11156,7 @@ def _load_ms_font(size, fill=1):
 
 
 def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
-                stroke_width=0, stroke_fill=None, fill2=None):
+                stroke_width=0, stroke_fill=None, fill2=None, backing=None):
     """Render a Material Symbol glyph centred at (cx, cy) at `size` px em, optionally tilted,
     mirrored (flip = horizontal) and outlined (stroke), compositing onto RGBA `layer` via its
     own tile (so it can rotate/mirror freely). A two-tone glyph with `fill2` is drawn as a filled
@@ -11155,6 +11177,16 @@ def _draw_glyph(layer, icon_name, cx, cy, size, fill, tilt=0, flip=False,
               stroke_width=stroke_width, stroke_fill=stroke_fill)
     if two_tone:                                                 # darker interior/outline detail over the body
         draw.text((pad - l, pad - t), ch, font=_load_ms_font(sz, 0), fill=fill2)
+    if backing is not None:
+        # Fill the glyph's INTERIOR holes (the radio's speaker + tuning display) so a busy background can't
+        # show through them: build the solid silhouette (glyph ∪ interior holes) and lay it UNDER the glyph in
+        # `backing`, so the holes read as that dark tone (a real radio's speaker/screen) instead of the art.
+        _am   = tile.split()[3].point(lambda p: 255 if p > 40 else 0)   # glyph alpha → binary
+        _ext  = _am.copy(); ImageDraw.floodfill(_ext, (0, 0), 255)      # flood the exterior; interior holes stay 0
+        _silh = ImageChops.lighter(_am, ImageChops.invert(_ext))         # glyph ∪ holes = solid silhouette
+        _back = Image.new("RGBA", tile.size, (0, 0, 0, 0))
+        _back.paste(backing, (0, 0), _silh)
+        tile = Image.alpha_composite(_back, tile)
     if flip:
         tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
     if tilt:
@@ -11413,8 +11445,9 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
     margin  = 40
     bar_top = int(H * 0.78)
     ax, ay  = meta["anchor"]
-    cx = ax * W + rng.uniform(-0.12 * W, 0.12 * W)
-    cy = ay * H + rng.uniform(-0.06 * H, 0.06 * H)
+    _jit = meta.get("jitter", 1.0)
+    cx = ax * W + rng.uniform(-0.12 * W, 0.12 * W) * _jit
+    cy = ay * H + rng.uniform(-0.06 * H, 0.06 * H) * _jit
     cx = max(margin + R_clamp, min(W - margin - R_clamp, cx))
     cy = max(margin + R_clamp, min(bar_top - 18 - R_clamp, cy))
     if cy - R_clamp < 100 and cx - R_clamp < 240:        # avoid the top-left Meloday+ badge
@@ -11457,7 +11490,12 @@ def _draw_icon_overlay(img, key, color_top, color_bottom, rng):
                                 rng=rng, fill=fill, n=cluster_n, stroke=stroke)
     else:
         angle = meta.get("tilt_bias", 0) + rng.uniform(-meta["tilt"], meta["tilt"])
-        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False), fill2=fill2)
+        backing = None
+        if icon_name in _SOLID_BACKING_GLYPHS:                    # fill the glyph's cutouts with a dark in-hue tone
+            _fl = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+            _bt = tuple(int(c * 0.42) for c in rgb) if _fl >= 110 else tuple(min(255, int(c + (255 - c) * 0.5)) for c in rgb)
+            backing = (*_bt, alpha)
+        _draw_glyph(overlay, icon_name, cx, cy, size, fill, tilt=angle, flip=meta.get("flip", False), fill2=fill2, backing=backing)
         if key == "rainy_day":                       # little ripples landing below the cloud
             _draw_ripples_below(overlay, cx, cy, size, rgb, alpha)
         elif key == "friday_night":                  # scatter non-overlapping music notes around it
@@ -11595,6 +11633,14 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
             (m_year.group(1), (255, 255, 255, 255), font_title),
             (m_year.group(2), _accent_rgba,          font_year),
         ]
+    elif " × " in title:
+        # Blend stations ("Scotland × Australia", "UK × Australia"): ALWAYS two lines — "{A} ×" / "{B}" —
+        # so a short one (UK × Australia) doesn't collapse onto a single line the way a long one wraps.
+        _a, _b = title.split(" × ", 1)
+        segments = [
+            (f"{_a} ×", (255, 255, 255, 255), font_title),
+            (_b,        (255, 255, 255, 255), font_title),
+        ]
     elif len(words) == 2:
         # Two-word title: word-per-line; second word in accent color
         segments = [
@@ -11617,20 +11663,27 @@ def _apply_cover_text(img, title, subtitle=None, accent_color=None, text_style="
     y_pos = H - 72 - SUBTITLE_RESERVE - total_h
 
     # --- Draw title segments ---
+    # Dense shadow HALO (not a single pass): the "default" style has no solid bar, so on busy / bright
+    # backgrounds (union-jack flag, gold film-strip) a thin shadow leaves the title — and the accent word,
+    # which can share the background hue — hard to read. Drawing the shadow at several small offsets builds a
+    # dark halo hugging the glyphs; after the blur it reads on any background while keeping the no-bar look.
+    _HALO = ((0, 0), (-4, 0), (4, 0), (0, -4), (0, 4), (-3, -3), (3, 3))
     for text, color, font in segments:
         b  = text_draw.textbbox((0, 0), text, font=font)
         lh = b[3] - b[1]
-        shadow_draw.text((margin, y_pos), text, font=font, fill=(0, 0, 0, 160))
+        for _dx, _dy in _HALO:
+            shadow_draw.text((margin + _dx, y_pos + _dy), text, font=font, fill=(0, 0, 0, 200))
         text_draw.text((margin, y_pos),   text, font=font, fill=color)
         y_pos += lh + LINE_GAP
 
     # --- Subtitle ---
     if subtitle and font_sub:
         sub_y = H - 72 - SUBTITLE_RESERVE + 20
-        shadow_draw.text((margin, sub_y), subtitle, font=font_sub, fill=(0, 0, 0, 120))
+        for _dx, _dy in _HALO:
+            shadow_draw.text((margin + _dx, sub_y + _dy), subtitle, font=font_sub, fill=(0, 0, 0, 150))
         text_draw.text((margin, sub_y),   subtitle, font=font_sub, fill=(255, 255, 255, 200))
 
-    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=30))
+    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=34))
     result = Image.alpha_composite(img, shadow_layer)
     return Image.alpha_composite(result, text_layer)
 

@@ -39,7 +39,8 @@ PIN_YEAR, PIN_WEEK = 2026, 25                 # fixed seed → stable sheet
 
 
 def _title_for(key):
-    return me._MOOD_MIX_NAMES.get(key, key.replace("_", " ").title())
+    # The real build strips " • Meloday+" before drawing (the badge already shows it) — mirror that.
+    return me._MOOD_MIX_NAMES.get(key, key.replace("_", " ").title()).replace(" • Meloday+", "")
 
 
 def render_inmemory(key, year=PIN_YEAR, week=PIN_WEEK):
@@ -54,8 +55,12 @@ def render_inmemory(key, year=PIN_YEAR, week=PIN_WEEK):
     img = me._render_bg(style, ct, cb, v, rng)
     img = me._add_bottom_vignette(img)
     img = me._draw_icon_overlay(img, key, ct, cb, rng)
-    text_style = "bar" if key in me._MOOD_PROFILE_KEYS else "default"
-    img = me._apply_cover_text(img, _title_for(key), None, accent_color=ct, text_style=text_style)
+    # Mirror _generate_extras_cover exactly: geo-radio family uses the word-per-line "default" style with a
+    # brightened accent; all other mood profiles use the "bar" style. (The old rule missed _GEO_RADIO_PROFILES,
+    # so it previewed every radio station in the wrong bar style.)
+    text_style = "default" if key in me._GEO_RADIO_PROFILES else ("bar" if key in me._MOOD_PROFILE_KEYS else "default")
+    accent = me._brighten_accent(ct) if key in me._GEO_RADIO_PROFILES else ct
+    img = me._apply_cover_text(img, _title_for(key), None, accent_color=accent, text_style=text_style)
     return img.convert("RGB")
 
 
