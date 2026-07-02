@@ -1139,23 +1139,38 @@ def _release_age_days(release_date, year, now):
     return 1e9
 
 def _refresh_due(synced_at, release_date, year, has_data, source, now):
-    """Should this track's <source> data be (re)fetched? Never-synced -> yes. Otherwise the
-    cadence adapts: missing data on a young release retries soon (MB/LRCLIB may not have had it
-    yet); empty GEO retries monthly regardless of age; Last.fm refreshes fast for new releases
-    (listeners/tags evolve) and slows as it ages; geo/lyrics settle to yearly once found."""
+    """Should this track's <source> data be (re)fetched? Never-synced -> yes. Otherwise the cadence
+    adapts to ORIGINAL release age (release_date, else Plex year): empty GEO retries monthly regardless
+    of age; empty Last.fm retries fast (3d <90d / 14d <1yr) so a new release is caught as soon as it's
+    indexed; Last.fm WITH data is very aggressive for new releases — DAILY <30d, easing 3/7/21/60d — and
+    settles to 120d for >2yr catalog (listeners/tags move fastest right after release); geo/lyrics
+    settle to yearly once found."""
     if synced_at is None:
         return True
     age = (now - synced_at) / 86400.0
     rel = _release_age_days(release_date, year, now)
     if not has_data:
-        # WHY geo is flat 30d (not 21/180 by release age): artist origin is editor-CONTRIBUTED and accrues
+        # WHY geo is flat 30d (not release-age tiered): artist origin is editor-CONTRIBUTED and accrues
         # independent of release age, so an old release still missing geo is just as likely to get filled as
         # a new one — the "old + empty = probably never" assumption is wrong for geo (it left a just-added MB
         # origin unseen for up to 180d). The empty pool is tiny (~300 artists ~= 5 min at <=1 req/s), so a
-        # monthly recheck of every empty is cheap. Lyrics/Last.fm empties keep the release-age cadence.
-        threshold = 30 if source == "geo" else (21 if rel < 365 else 180)
+        # monthly recheck of every empty is cheap.
+        if source == "geo":
+            threshold = 30
+        elif source == "lastfm":                    # aggressive retry so a new release is caught once LFM indexes it
+            threshold = 3 if rel < 90 else (14 if rel < 365 else 180)
+        else:                                        # lyrics: young retries soon, old settles
+            threshold = 21 if rel < 365 else 180
     elif source == "lastfm":
-        threshold = 14 if rel < 90 else (45 if rel < 730 else 120)
+        # WHY tiered/aggressive: listeners + tags move fastest right after release, so refresh DAILY for the
+        # first month and ease off as it ages; >2yr catalog is settled at 120d. Cheap — recent tracks are a
+        # small slice and Last.fm allows <=5 req/s. (Bounded by how often the sync actually runs.)
+        if   rel < 30:  threshold = 1
+        elif rel < 90:  threshold = 3
+        elif rel < 180: threshold = 7
+        elif rel < 365: threshold = 21
+        elif rel < 730: threshold = 60
+        else:           threshold = 120
     else:   # geo / lyrics
         threshold = 365
     return age >= threshold
