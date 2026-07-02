@@ -13359,15 +13359,15 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     # score = listeners * recency_base ** (year - cut) — and the recent pick becomes a weighted sample so the
     # freshest/biggest currents heavy-rotate (throwback stays listener-ranked; classics are timeless). 1.0 = off.
     # Routed via _is_geo_radio in _build_mix_tracks.
-    "scotland_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
-    "london_now":   {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
-    "uk_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 80, "throwback_pool": 40, "recency_base": 1.6},
-    "australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
+    "scotland_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 60, "recency_base": 1.6},
+    "london_now":   {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 60, "recency_base": 1.6},
+    "uk_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 80, "throwback_pool": 70, "recency_base": 1.6},
+    "australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 60, "recency_base": 1.6},
     # --- two-location 50/50 blends: `_GEO_RADIO_SPLIT` draws half the slots from each nation's bucket ---
-    "scotland_australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 40, "recency_base": 1.6},
-    "uk_australia_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 40, "recency_base": 1.6},
+    "scotland_australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 70, "recency_base": 1.6},
+    "uk_australia_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 70, "recency_base": 1.6},
     # --- GLOBAL (no origin gate — no _PROFILE_GEO_GATE entry): most-popular contemporary + throwback, whole library ---
-    "global_radio": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 80, "recency_base": 1.6},
+    "global_radio": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
     # --- GLOBAL release-window "new music": pure contemporary (throwback_frac 0), gated to a release window.
     #     `window` = {"days": N} rolling OR {"mode": "current_year"}; new-ness ALSO needs the comp-inclusive
     #     earliest year in-window (kills reissues/archival releases of old songs). recency_base mild — the
@@ -13389,6 +13389,11 @@ _GEO_RADIO_SPLIT = {   # two-location blends: (specA, specB) — the branch draw
 # rotation), only the track per artist cycles. Per-mix log lives in the geo-rotation file: "surfaced": {rk: ord}.
 _RADIO_SURFACE_WINDOW = 14
 _RADIO_SURFACE_FLOOR  = 0.3
+# Throwback pick softening: the classic bucket weights artists by (top-classic listeners ** _THROW_POP_EXP), so
+# raw global popularity no longer monopolises the ~5 daily classic slots — the mid-tier canon (Del Amitri, Big
+# Country, Deacon Blue …) rotates in alongside the giants. 1.0 = raw-listener dominance; lower = flatter. Applies
+# to every station's throwback bucket; the CONTEMPORARY bucket is unaffected (currents stay the biggest hits).
+_THROW_POP_EXP = 0.5
 # A title that marks a re-record / remaster / re-version / reissue — i.e. NOT new material, however recent its
 # release year. Used by the geo-radio split to keep these out of "contemporary" (a radio station treats them as
 # the OLD songs they are). KEEPS "radio edit" / "single version" / "album version" — those ARE the radio cut.
@@ -14114,12 +14119,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         for rk in uniq:
             _by_a[(essentia_cache.get(rk, {}).get("artist") or "").lower()].append(rk)
         _skip = {a for a, rks in _by_a.items() if _is_score_classical_artist([essentia_cache[r] for r in rks])}
-        # Split each artist into a LIST of CONTEMPORARY tracks (re-rolled daily across releases for variety) + a
-        # THROWBACK classic. OLD (-> throwback) if comp-inclusive year predates the cut OR the title marks a
-        # re-record/reissue (_REISSUE_RE) — a radio station plays those as the old songs they are, never "current";
-        # is_alt_recording keeps remix/live/extended out of contemporary too. uniq is listener-desc, so throw_by_a's
-        # first-seen per artist is their top classic.
-        recent_by_a, throw_by_a = defaultdict(list), {}
+        # Split each artist into a LIST of CONTEMPORARY tracks + a LIST of THROWBACK classics — BOTH re-rolled
+        # daily across the artist's releases for variety (a deep-catalogue act like Simple Minds / Gerry Rafferty
+        # rotates its whole back catalogue over time, not one track on repeat). OLD (-> throwback) if the comp-
+        # inclusive year predates the cut OR the title marks a re-record/reissue (_REISSUE_RE) — a radio station
+        # plays those as the old songs they are, never "current"; is_alt_recording keeps remix/live out of contemporary.
+        recent_by_a, throw_by_a = defaultdict(list), defaultdict(list)
         for rk in uniq:
             e = essentia_cache.get(rk, {}); a = (e.get("artist") or "").lower()
             if not a or a in _skip:
@@ -14131,9 +14136,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             elif ay >= cut and not is_re and not meloday.is_alt_recording(t):
                 recent_by_a[a].append(rk)
             elif (0 < ay < cut) or is_re:
-                if a not in throw_by_a:
-                    throw_by_a[a] = rk
-        throw_sorted = sorted(throw_by_a.values(), key=lambda rk: -_lis(rk))           # classics: pure popularity
+                throw_by_a[a].append(rk)              # ALL of the artist's classics — rotated daily like the contemporary bucket
         cur_ord  = date.today().toordinal()
         # Soft surfacing rotation: a track the station featured in the last _RADIO_SURFACE_WINDOW days is
         # down-weighted (never banned), so the catalogue turns over while the big hits still recur and the pool
@@ -14156,45 +14159,46 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 r -= w
                 if r <= 0: return it
             return items[-1]
-        def _rep_track(a):   # the artist's representative TODAY: pick a RELEASE (coverage + freshness), then a
-            rng = random.Random(f"radio-rep-{cur_ord}-{profile_key}-{a}")   # track within it (top-listener, fresh)
-            by_alb = defaultdict(list)
-            for rk in recent_by_a[a]:
+        def _rep_from(a, src):   # the artist's representative TODAY from src (recent_by_a / throw_by_a): pick a
+            rng = random.Random(f"radio-rep-{cur_ord}-{profile_key}-{a}")   # RELEASE (coverage+freshness) then a
+            by_alb = defaultdict(list)                                      # track within it (top-listener, fresh)
+            for rk in src[a]:
                 by_alb[_album(rk)].append(rk)
             albums = list(by_alb)
             alb = _wchoice(albums, [max(_fresh(rk) for rk in by_alb[al]) for al in albums], rng)
             trks = by_alb[alb]
             return _wchoice(trks, [(_lis(rk) or 1) * _fresh(rk) for rk in trks], rng)
-        # Rank ARTISTS into the pool by their ceiling score (the same big artists qualify, recency-leaning); the
-        # representative TRACK is then re-rolled per day, so prolific artists rotate across all their releases.
-        def _ceiling(a): return max(_rscore(rk) for rk in recent_by_a[a])
+        def _rep_track(a): return _rep_from(a, recent_by_a)
+        # Rank ARTISTS into the pool by their ceiling (the same big artists qualify); the representative TRACK is
+        # re-rolled per day (_rep_from), so a prolific artist rotates across all their releases — for BOTH the
+        # contemporary bucket (recent_by_a) and the throwback bucket (throw_by_a).
+        def _ceiling(a):       return max(_rscore(rk) for rk in recent_by_a[a])   # recency-leaning (currents)
+        def _throw_ceiling(a): return max(_lis(rk)    for rk in throw_by_a[a])    # the artist's biggest classic
         recent_artists = sorted(recent_by_a, key=lambda a: -_ceiling(a))
+        throw_artists  = sorted(throw_by_a,  key=lambda a: -_throw_ceiling(a))
         _frac    = cfg["throwback_frac"]
         n_throw  = (max(1, round(mix_size * _frac)) if _frac > 0 else 0)   # window stations set 0 -> pure new releases
         n_recent = mix_size - n_throw
         _used = set()
-        def _artist(rk): return (essentia_cache.get(rk, {}).get("artist") or "").lower()
-        def _pick_throw(cands, want):     # classics: fresh-weighted daily sample (rotate the classics too)
-            cands = [rk for rk in cands if _artist(rk) not in _used]
-            rng = random.Random(f"radio-{cur_ord}-{profile_key}-t")
-            keyed = sorted(((rng.random() ** (1.0 / max((_lis(rk) or 1) * _fresh(rk), 1e-9)), rk) for rk in cands), reverse=True)
-            out = []
-            for _, rk in keyed[:want]:
-                out.append(rk); _used.add(_artist(rk))
-            return out
-        def _sample_recent(artists, want):   # A-Res over ARTISTS: weight = ceiling ONLY (roster stays popularity-
-            rng = random.Random(f"radio-{cur_ord}-{profile_key}-r")   # stable so the giants recur); the surfacing
-            keyed = []                                                # rotation lives inside _rep_track (the track)
+        def _sample(artists, want, src, weight, tag):   # A-Res over ARTISTS; each artist's TRACK is re-rolled daily
+            rng = random.Random(f"radio-{cur_ord}-{profile_key}-{tag}")   # across their catalogue via _rep_from(a, src)
+            keyed = []
             for a in artists:
                 if a in _used: continue
-                rep = _rep_track(a)
+                rep = _rep_from(a, src)
                 if rep is None: continue
-                keyed.append((rng.random() ** (1.0 / max(_ceiling(a), 1e-9)), a, rep))
+                keyed.append((rng.random() ** (1.0 / max(weight(a, rep), 1e-9)), a, rep))
             keyed.sort(reverse=True)
             out = []
             for _, a, rep in keyed[:want]:
                 out.append(rep); _used.add(a)
             return out
+        # contemporary: weight = the recency-leaning ceiling ONLY (roster stays popularity-stable, the giants recur)
+        def _sample_recent(artists, want): return _sample(artists, want, recent_by_a, lambda a, rep: _ceiling(a), "r")
+        # throwback: weight = the artist's biggest classic × the freshness of TODAY's rolled classic — so a deep-
+        # catalogue act (Rafferty/Simple Minds), which always has an unplayed classic to offer, keeps recurring and
+        # cycles through MORE of its back catalogue, while a one-classic artist cedes the slot once played.
+        def _sample_throw(artists, want): return _sample(artists, want, throw_by_a, lambda a, rep: _throw_ceiling(a) ** _THROW_POP_EXP * _fresh(rep), "t")
         # throwbacks first (the giants take the classic slots), then contemporary skipping those artists
         if _split:
             # Two-location blend: draw ~half of each bucket from each nation. An artist's origin is artist-level,
@@ -14204,12 +14208,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             _tp = cfg["throwback_pool"]; _rp = cfg["recent_pool"]
             recA = [a for a in recent_artists if _origin_match(essentia_cache.get(recent_by_a[a][0], {}), specA)]
             recB = [a for a in recent_artists if _origin_match(essentia_cache.get(recent_by_a[a][0], {}), specB)]
-            thrA = [rk for rk in throw_sorted if _origin_match(essentia_cache.get(rk, {}), specA)]
-            thrB = [rk for rk in throw_sorted if _origin_match(essentia_cache.get(rk, {}), specB)]
-            pool = (_pick_throw(thrA[:_tp], n_throw - n_throw // 2) + _pick_throw(thrB[:_tp], n_throw // 2)
+            thrA = [a for a in throw_artists  if _origin_match(essentia_cache.get(throw_by_a[a][0], {}), specA)]
+            thrB = [a for a in throw_artists  if _origin_match(essentia_cache.get(throw_by_a[a][0], {}), specB)]
+            pool = (_sample_throw(thrA[:_tp], n_throw - n_throw // 2) + _sample_throw(thrB[:_tp], n_throw // 2)
                     + _sample_recent(recA[:_rp], n_recent - n_recent // 2) + _sample_recent(recB[:_rp], n_recent // 2))
         else:
-            pool = _pick_throw(throw_sorted[:cfg["throwback_pool"]], n_throw) + _sample_recent(recent_artists[:cfg["recent_pool"]], n_recent)
+            pool = _sample_throw(throw_artists[:cfg["throwback_pool"]], n_throw) + _sample_recent(recent_artists[:cfg["recent_pool"]], n_recent)
         random.Random(f"radio-order-{cur_ord}-{profile_key}").shuffle(pool)
         # Persist: the once-a-day __built__ sentinel (gates _scene_done_today) + the surfacing log (pruned + today's
         # pool stamped at cur_ord), so tomorrow's build down-weights what we just played.
