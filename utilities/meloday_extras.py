@@ -13222,8 +13222,23 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     recent_rks = set()
     if _excl_days > 0 and history_entries:
         _cut = datetime.now(tz=timezone.utc) - timedelta(days=_excl_days)
-        recent_rks = {str(e.ratingKey) for e in history_entries
-                      if e.viewedAt and e.viewedAt >= _cut}
+        _played = {str(e.ratingKey) for e in history_entries
+                   if e.viewedAt and e.viewedAt >= _cut}
+        # Exclude by SONG, not file: playing ONE copy (e.g. a single) also keeps its album/comp twins out of
+        # every mix for the window. WHY: the showcase/radio branches collapse each song to its canonical copy,
+        # so a per-file exclusion let a played single's album copy re-surface. Mirrors the _is_geo scene
+        # branch's version-safe rule, lifted here so radios + era + normal mood mixes all inherit it.
+        _played_songs = set()
+        for _rk in _played:
+            _e = essentia_cache.get(_rk)
+            if _e:
+                _sk = _entry_song_key(_e)
+                if _sk[1]:                              # skip empty-title keys so we don't nuke a whole artist
+                    _played_songs.add(_sk)
+        recent_rks = set(_played)
+        if _played_songs:                               # one guarded cache pass (only when there were plays)
+            recent_rks |= {rk for rk, e in essentia_cache.items()
+                           if _entry_song_key(e) in _played_songs}
 
     # Listening-hour affinity (build-time): the share of each track's plays that fall within
     # ~2h of the current local hour, so the rotating mixes lean toward what you actually play now.
