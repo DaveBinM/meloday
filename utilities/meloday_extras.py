@@ -220,6 +220,13 @@ _EXTRAS_COVER_COLORS = {
     "london_now":      ((196, 52, 58), (70, 18, 26)),      # London red (contemporary London radio)
     "uk_now":          ((20, 56, 140), (10, 28, 80)),      # Union Jack blue (union_jack bg hard-codes flag colours)
     "australia_now":   ((46, 140, 82), (212, 160, 40)),    # green & gold — green sky, golden sun (contemporary Australian radio)
+    # 6 new radio stations: split blends fade one nation's colour into the other; globals get 4 distinct globe tints
+    "scotland_australia_now": ((30, 110, 170), (212, 160, 40)),  # saltire blue → Aussie gold
+    "uk_australia_now":       ((20, 56, 140),  (212, 160, 40)),  # union blue → Aussie gold
+    "global_radio":           ((26, 96, 150),  (8, 26, 54)),     # deep ocean blue
+    "global_3mo":             ((26, 158, 146), (8, 44, 60)),     # fresh teal — "Just Released"
+    "global_12mo":            ((72, 78, 176),  (18, 20, 66)),    # indigo — "The Last 12 Months"
+    "global_year":            ((126, 72, 184), (40, 20, 72)),    # violet — "Class of the Year"
     "stormy": ((60, 70, 95), (20, 24, 40)),
     "foggy": ((150, 158, 168), (70, 76, 88)),
     "snow_day": ((214, 228, 244), (140, 160, 196)),
@@ -783,6 +790,13 @@ _COVER_BG_STYLES = {
     "uk_scene": ("union_jack", 0),
     "uk_hits": ("union_jack", 1),
     "uk_now": ("union_jack", 2),
+    # --- 6 new radio stations: split blends reuse a partner family's free variant; globals get the globe family ---
+    "scotland_australia_now": ("tartan", 3),
+    "uk_australia_now": ("union_jack", 3),
+    "global_radio": ("globe", 0),
+    "global_3mo": ("globe", 1),
+    "global_12mo": ("globe", 2),
+    "global_year": ("globe", 3),
     # --- misc ---
     "discover_weekly": ("radial", 0),
     "folk_acoustic": ("acoustic_guitar", 0),
@@ -822,6 +836,8 @@ _PROFILE_ICON = {
     "scottish_hits": "star", "australian_hits": "star", "london_hits": "star",
     "uk_hits": "star",
     "scotland_now": "radio", "london_now": "radio", "uk_now": "radio", "australia_now": "radio",
+    "scotland_australia_now": "radio", "uk_australia_now": "radio", "global_radio": "radio",
+    "global_3mo": "radio", "global_12mo": "radio", "global_year": "radio",
 }
 
 # Profiles whose icon rotates weekly — the per-ISO-week rng picks one each Monday.
@@ -2211,6 +2227,60 @@ _MOOD_PROFILES = {
 # Flow:     DJ-ordered (SMOOTH); day-seeded start for day-to-day variety.
 # Enhance:  —
     "australia_now":   {"bpm": 122, "energy": -7, "danceability": 0.56, "brightness": 0.45, "beat_confidence": 0.78, "onset_rate": 5.6, "dynamic_complexity": 0.44, "arousal": 0.67, "valence": 0.63, "vocal_presence": 0.78},
+# ── scotland_australia_now → "Scotland × Australia" ───────────────────────────────────────
+# Theme:    A 50/50 blend of current Scottish + Australian radio — both scenes, evenly split.
+# Sound:    No sound/genre gate — any genre from either origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years + ~10% throwback · origin-gated: scotland + australia (50/50 buckets).
+# Music:    Union origin gate + _GEO_RADIO_SPLIT 50/50 bucket draw; most-popular contemporary + throwbacks · 1-per-artist.
+# Criteria: no genre/sound gate · origin-gated (SCO∪AUS, 50/50) · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue day-to-day.
+# Enhance:  50/50 nation split via _GEO_RADIO_SPLIT.
+    "scotland_australia_now": {"bpm": 118, "energy": -8, "danceability": 0.55, "brightness": 0.42, "beat_confidence": 0.76, "onset_rate": 5.4, "dynamic_complexity": 0.46, "arousal": 0.63, "valence": 0.59, "vocal_presence": 0.77},
+# ── uk_australia_now → "UK × Australia" ───────────────────────────────────────────────────
+# Theme:    A 50/50 blend of current UK + Australian radio — both scenes, evenly split.
+# Sound:    No sound/genre gate — any genre from either origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years + ~10% throwback · origin-gated: united kingdom + australia (50/50 buckets).
+# Music:    Union origin gate + _GEO_RADIO_SPLIT 50/50 bucket draw; most-popular contemporary + throwbacks · 1-per-artist.
+# Criteria: no genre/sound gate · origin-gated (UK∪AUS, 50/50) · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue day-to-day.
+# Enhance:  50/50 nation split via _GEO_RADIO_SPLIT.
+    "uk_australia_now": {"bpm": 120, "energy": -8, "danceability": 0.58, "brightness": 0.43, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.60, "vocal_presence": 0.76},
+# ── global_radio → "Global Radio" ─────────────────────────────────────────────────────────
+# Theme:    The most-popular current releases worldwide + classic throwbacks — no borders.
+# Sound:    No sound/genre gate — any genre (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate (whole library).
+# Music:    Whole-library most-popular contemporary (last 5y, newer-leaning) + ~10% throwback classics · 1-per-artist.
+# Criteria: no genre/sound gate · NO origin gate · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue day-to-day.
+# Enhance:  —
+    "global_radio": {"bpm": 120, "energy": -7, "danceability": 0.60, "brightness": 0.45, "beat_confidence": 0.80, "onset_rate": 5.6, "dynamic_complexity": 0.42, "arousal": 0.66, "valence": 0.61, "vocal_presence": 0.75},
+# ── global_3mo → "Just Released" ──────────────────────────────────────────────────────────
+# Theme:    The newest music on earth — global releases from the last 3 months.
+# Sound:    No sound/genre gate — any genre (centroid below is metadata only).
+# Era/Geo:  releases in the last 90 days · NO origin gate · pure new material (no throwback).
+# Music:    Windowed new releases (last 90d, comp-inclusive-earliest-year-guarded) by global popularity · 1-per-artist.
+# Criteria: no genre/sound gate · NO origin gate · last-90-days window · 0% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's new tracks day-to-day.
+# Enhance:  reissue/archival guard (earliest known year must also be in-window); score/classical excluded.
+    "global_3mo": {"bpm": 121, "energy": -7, "danceability": 0.61, "brightness": 0.46, "beat_confidence": 0.80, "onset_rate": 5.7, "dynamic_complexity": 0.41, "arousal": 0.67, "valence": 0.60, "vocal_presence": 0.75},
+# ── global_12mo → "The Last 12 Months" ────────────────────────────────────────────────────
+# Theme:    Everything big from the past year — global releases from the last 12 months.
+# Sound:    No sound/genre gate — any genre (centroid below is metadata only).
+# Era/Geo:  releases in the last 365 days · NO origin gate · pure new material (no throwback).
+# Music:    Windowed new releases (last 365d, comp-inclusive-earliest-year-guarded) by global popularity · 1-per-artist.
+# Criteria: no genre/sound gate · NO origin gate · last-365-days window · 0% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's recent tracks day-to-day.
+# Enhance:  reissue/archival guard (earliest known year must also be in-window); score/classical excluded.
+    "global_12mo": {"bpm": 120, "energy": -7, "danceability": 0.60, "brightness": 0.45, "beat_confidence": 0.80, "onset_rate": 5.6, "dynamic_complexity": 0.42, "arousal": 0.66, "valence": 0.61, "vocal_presence": 0.75},
+# ── global_year → "Class of the Year" ─────────────────────────────────────────────────────
+# Theme:    This year's cohort — global releases from the current calendar year.
+# Sound:    No sound/genre gate — any genre (centroid below is metadata only).
+# Era/Geo:  releases in the current calendar year · NO origin gate · pure new material (no throwback).
+# Music:    Current-year releases (comp-inclusive-earliest-year-guarded) by global popularity · 1-per-artist.
+# Criteria: no genre/sound gate · NO origin gate · current-calendar-year window · 0% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's tracks day-to-day.
+# Enhance:  reissue/archival guard (earliest known year must also be the current year); score/classical excluded.
+    "global_year": {"bpm": 120, "energy": -7, "danceability": 0.60, "brightness": 0.45, "beat_confidence": 0.80, "onset_rate": 5.6, "dynamic_complexity": 0.42, "arousal": 0.66, "valence": 0.61, "vocal_presence": 0.75},
     # ---- 25 weather/seasonal mixes ----
 # ── stormy → "Stormy Mix" ─────────────────────────────────────────────────────────────────
 # Theme:    Dramatic, ominous, brooding, volatile, intense.
@@ -4541,6 +4611,12 @@ _MOOD_MIX_NAMES = {
     "london_now":      "London Now • Meloday+",
     "uk_now":          "UK Now • Meloday+",
     "australia_now":   "Australia Now • Meloday+",
+    "scotland_australia_now": "Scotland × Australia • Meloday+",
+    "uk_australia_now":       "UK × Australia • Meloday+",
+    "global_radio":           "Global Radio • Meloday+",
+    "global_3mo":             "Just Released • Meloday+",
+    "global_12mo":            "The Last 12 Months • Meloday+",
+    "global_year":            "Class of the Year • Meloday+",
     "stormy": "Stormy Mix • Meloday+",
     "foggy": "Foggy Mix • Meloday+",
     "snow_day": "Snow Day Mix • Meloday+",
@@ -5026,7 +5102,9 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 # the daily mixes they're always there, and their content refreshes once a day via their date-seed shuffle.
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
                      "scottish_hits", "australian_hits", "london_hits",
-                     "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now"}
+                     "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
+                     "scotland_australia_now", "uk_australia_now", "global_radio",
+                     "global_3mo", "global_12mo", "global_year"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
@@ -5185,6 +5263,8 @@ _PROFILE_CATEGORY = {
     "scottish_hits": "geo_scene", "australian_hits": "geo_scene", "london_hits": "geo_scene",
     "uk_scene": "geo_scene", "uk_hits": "geo_scene", "scotland_now": "geo_scene",
     "london_now": "geo_scene", "uk_now": "geo_scene", "australia_now": "geo_scene",
+    "scotland_australia_now": "geo_scene", "uk_australia_now": "geo_scene", "global_radio": "geo_scene",
+    "global_3mo": "geo_scene", "global_12mo": "geo_scene", "global_year": "geo_scene",
 }
 
 # Mood tag signals per profile: (positive_substrings, negative_substrings).
@@ -6514,6 +6594,10 @@ _PROFILE_GEO_GATE = {
     "london_now":      {"places": {"london"},    "scene": {"london"}},
     "uk_now":          {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "australia_now":   {"places": {"australia"}, "scene": {"australia"}},
+    # Two-location blends: union gate keeps BOTH nations; the 50/50 split into buckets happens in the branch
+    # via _GEO_RADIO_SPLIT. (The four GLOBAL stations have NO entry here on purpose — no origin gate.)
+    "scotland_australia_now": {"places": {"scotland", "australia"}, "scene": {"scotland", "australia"}},
+    "uk_australia_now":       {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain", "australia"}, "scene": {"british", "australia"}},
 }
 # Geo HITS mixes — same origin gate as the scenes above, but selected like the decade mixes (top-N by global
 # Last.fm listeners) instead of the scenes' equal-weight artist rotation. Routed via _is_geo_hits in _build_mix_tracks.
@@ -10689,8 +10773,54 @@ def _make_union_jack_background(w, h, color_top, color_bottom, v=0, rng=None):
     draw.rectangle([0, cy - rcw, w, cy + rcw], fill=(*red, 255))
     return img
 
+def _make_globe_background(w, h, color_top, color_bottom, v=0, rng=None):
+    """A latitude/longitude wireframe globe — a softly-shaded sphere with meridians (vertical ellipses) and
+    tilted parallels (horizontal ellipses) over the station's gradient. RGBA like every generator; build on
+    _make_gradient_image + 4-tuple fills (the union_jack RGBA gotcha). Centred/symmetric -> in _BG_SYMMETRIC
+    (no h-flip twin). The four GLOBAL radio stations use variants 0-3."""
+    import math
+    # (meridians, parallels-per-hemisphere, axial tilt°, grid alpha, sphere radius as frac of min(w,h)/2)
+    configs = [(7, 5, 18, 150, 0.74), (9, 6, 12, 135, 0.72), (6, 4, 24, 165, 0.78), (8, 5, 15, 145, 0.70)]
+    n_mer, n_par, tilt_d, galpha, rfrac = configs[min(v, len(configs) - 1)]
+    img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
+    draw = ImageDraw.Draw(img, 'RGBA')
+    cx, cy = w / 2.0, h / 2.0
+    R    = min(w, h) * 0.5 * rfrac
+    tilt = math.radians(tilt_d)
+    def _tint(c, f):                       # blend colour c toward white by fraction f
+        return tuple(int(c[i] + (255 - c[i]) * f) for i in range(3))
+    grid, rim, core = _tint(color_top, 0.55), _tint(color_top, 0.82), _tint(color_top, 0.20)
+    # shaded sphere: concentric discs, lighter at the core -> darker at the limb (a lit-sphere feel)
+    steps = 20
+    for i in range(steps, 0, -1):
+        f  = i / steps                     # 1 = limb, ->0 = core
+        rr = R * f
+        shade = tuple(int(core[j] + (color_bottom[j] - core[j]) * f) for j in range(3))
+        draw.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(*shade, 255))
+    # parallels (latitude): tilted horizontal ellipses either side of the equator
+    for k in range(1, n_par + 1):
+        for lat in (k, -k):
+            latr = (lat / (n_par + 1)) * (math.pi / 2)
+            y  = cy - R * math.sin(latr) * math.cos(tilt)
+            wx = R * math.cos(latr)
+            wy = max(1.0, R * math.cos(latr) * math.sin(tilt))
+            draw.ellipse([cx - wx, y - wy, cx + wx, y + wy], outline=(*grid, galpha), width=2)
+    eq_wy = max(1.0, R * math.sin(tilt))   # equator, a touch bolder
+    draw.ellipse([cx - R, cy - eq_wy, cx + R, cy + eq_wy], outline=(*grid, min(255, galpha + 60)), width=3)
+    # meridians (longitude): vertical ellipses, horizontal semi-axis = R*sin(theta); the edge-on one is a line
+    for k in range(n_mer):
+        th = -math.pi / 2 + math.pi * (k + 0.5) / n_mer
+        a  = abs(R * math.sin(th))
+        if a < 1.5:
+            draw.line([(cx, cy - R), (cx, cy + R)], fill=(*grid, galpha), width=2)
+        else:
+            draw.ellipse([cx - a, cy - R, cx + a, cy + R], outline=(*grid, galpha), width=2)
+    draw.ellipse([cx - R, cy - R, cx + R, cy + R], outline=(*rim, 255), width=max(3, int(R * 0.02)))   # rim
+    return img
+
 _BG_GENERATORS = {
     "union_jack":       _make_union_jack_background,
+    "globe":            _make_globe_background,
     "geometric":        _make_geometric_background,
     "circles":          _make_concentric_circles_background,
     "radial":           _make_radial_glow_background,
@@ -10814,7 +10944,7 @@ _BG_BASE_COUNTS = {name: (_BG_VARIANT_COUNTS_OVERRIDE.get(name) or _bg_variant_c
 # WHY: an h-flip of an off-centre/asymmetric pattern is a genuinely different cover (and the per-key
 # rng means even the same base variant renders differently per playlist), so asymmetric families
 # offer 2× distinct variants for free — enough headroom for ~269 unique covers without huge tables.
-_BG_SYMMETRIC = {"union_jack", "starburst", "amp_stack", "staff_lines", "vinyl_grooves", "tartan",
+_BG_SYMMETRIC = {"union_jack", "globe", "starburst", "amp_stack", "staff_lines", "vinyl_grooves", "tartan",
                  # round-2 deterministic/centred families whose h-mirror would be a redundant twin:
                  "mod_target", "columns", "film_strip", "zen", "grid_paper", "pine_forest",
                  "tropical_leaves", "gingham", "cassette", "open_road", "holiday_lights",
@@ -13145,7 +13275,9 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         return any((v or {}).get("last") == cur_ord for v in (_geo_rot.get(scene) or {}).values())
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
                                  "scottish_hits", "australian_hits", "london_hits",
-                                 "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now")
+                                 "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
+                                 "scotland_australia_now", "uk_australia_now", "global_radio",
+                                 "global_3mo", "global_12mo", "global_year")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
 
     active_profiles = active_general + active_weather + active_seasonal + active_pinned
@@ -13231,8 +13363,26 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     "london_now":   {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
     "uk_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 80, "throwback_pool": 40, "recency_base": 1.6},
     "australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 55, "throwback_pool": 30, "recency_base": 1.6},
+    # --- two-location 50/50 blends: `_GEO_RADIO_SPLIT` draws half the slots from each nation's bucket ---
+    "scotland_australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 40, "recency_base": 1.6},
+    "uk_australia_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 40, "recency_base": 1.6},
+    # --- GLOBAL (no origin gate — no _PROFILE_GEO_GATE entry): most-popular contemporary + throwback, whole library ---
+    "global_radio": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 80, "recency_base": 1.6},
+    # --- GLOBAL release-window "new music": pure contemporary (throwback_frac 0), gated to a release window.
+    #     `window` = {"days": N} rolling OR {"mode": "current_year"}; new-ness ALSO needs the comp-inclusive
+    #     earliest year in-window (kills reissues/archival releases of old songs). recency_base mild — the
+    #     window is already narrow. 1-per-artist + the daily _rep_track re-roll still rotate an artist's hits. ---
+    "global_3mo":  {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"days": 90}},
+    "global_12mo": {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"days": 365}},
+    "global_year": {"recent_years": 5, "throwback_frac": 0.0, "recent_pool": 200, "throwback_pool": 0, "recency_base": 1.3, "window": {"mode": "current_year"}},
 }
 _GEO_RADIO_PROFILES = set(_GEO_RADIO)
+_GEO_RADIO_SPLIT = {   # two-location blends: (specA, specB) — the branch draws ~50/50 from each nation's bucket
+    "scotland_australia_now": ({"places": {"scotland"},  "scene": {"scotland"}},
+                               {"places": {"australia"}, "scene": {"australia"}}),
+    "uk_australia_now":       ({"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
+                               {"places": {"australia"}, "scene": {"australia"}}),
+}
 # Geo-radio variety: a track the station featured in the last _RADIO_SURFACE_WINDOW days is SOFT-deprioritised
 # (weight × down to _RADIO_SURFACE_FLOOR, never hard-banned) so each artist's REPRESENTATIVE track rotates
 # across their catalogue day-to-day. The artist ROSTER stays popularity-stable (the giants recur — power
@@ -13928,6 +14078,20 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         cfg  = _GEO_RADIO[profile_key]
         cut  = _NOW_YEAR - cfg["recent_years"]
         base = cfg.get("recency_base", 1.0)
+        _split = _GEO_RADIO_SPLIT.get(profile_key)      # two-location 50/50 blend (else None)
+        # Release-window "new music" station: eligibility is a rolling day-window (or the current calendar year)
+        # on the ORIGINAL release date, AND the comp-inclusive earliest year must ALSO be in-window (a recent
+        # remaster/archival release of an old song is NOT new). No throwback bucket (throwback_frac 0).
+        _win = cfg.get("window")
+        if _win and _win.get("mode") == "current_year":
+            _win_start_year = _NOW_YEAR
+            def _in_window(rk): return _entry_original_year(essentia_cache.get(rk, {})) == _NOW_YEAR
+        elif _win:
+            _win_start      = date.fromordinal(date.today().toordinal() - _win["days"])
+            _win_start_year = _win_start.year
+            def _in_window(rk):
+                d = _entry_original_date(essentia_cache.get(rk, {}))
+                return d is not None and d >= _win_start
         _ayr = _song_year_anycopy_map(essentia_cache)   # comp-INCLUSIVE earliest year (proves "not brand-new")
         def _lis(rk): return essentia_cache.get(rk, {}).get("lastfm_listeners") or 0
         def _ay(rk):
@@ -13961,7 +14125,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             if not a or a in _skip:
                 continue
             t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t))
-            if ay >= cut and not is_re and not meloday.is_alt_recording(t):
+            if _win:                                   # release-window station: windowed new material only, no throwback
+                if _in_window(rk) and ay >= _win_start_year and not is_re and not meloday.is_alt_recording(t):
+                    recent_by_a[a].append(rk)
+            elif ay >= cut and not is_re and not meloday.is_alt_recording(t):
                 recent_by_a[a].append(rk)
             elif (0 < ay < cut) or is_re:
                 if a not in throw_by_a:
@@ -14002,7 +14169,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         # representative TRACK is then re-rolled per day, so prolific artists rotate across all their releases.
         def _ceiling(a): return max(_rscore(rk) for rk in recent_by_a[a])
         recent_artists = sorted(recent_by_a, key=lambda a: -_ceiling(a))
-        n_throw  = max(1, round(mix_size * cfg["throwback_frac"]))
+        _frac    = cfg["throwback_frac"]
+        n_throw  = (max(1, round(mix_size * _frac)) if _frac > 0 else 0)   # window stations set 0 -> pure new releases
         n_recent = mix_size - n_throw
         _used = set()
         def _artist(rk): return (essentia_cache.get(rk, {}).get("artist") or "").lower()
@@ -14028,7 +14196,20 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 out.append(rep); _used.add(a)
             return out
         # throwbacks first (the giants take the classic slots), then contemporary skipping those artists
-        pool = _pick_throw(throw_sorted[:cfg["throwback_pool"]], n_throw) + _sample_recent(recent_artists[:cfg["recent_pool"]], n_recent)
+        if _split:
+            # Two-location blend: draw ~half of each bucket from each nation. An artist's origin is artist-level,
+            # so any of their tracks decides the bucket; a dual-origin artist (Jimmy Barnes) sits in both lists
+            # and is claimed by whichever bucket the shared _used set reaches first. Throwbacks partitioned too.
+            specA, specB = _split
+            _tp = cfg["throwback_pool"]; _rp = cfg["recent_pool"]
+            recA = [a for a in recent_artists if _origin_match(essentia_cache.get(recent_by_a[a][0], {}), specA)]
+            recB = [a for a in recent_artists if _origin_match(essentia_cache.get(recent_by_a[a][0], {}), specB)]
+            thrA = [rk for rk in throw_sorted if _origin_match(essentia_cache.get(rk, {}), specA)]
+            thrB = [rk for rk in throw_sorted if _origin_match(essentia_cache.get(rk, {}), specB)]
+            pool = (_pick_throw(thrA[:_tp], n_throw - n_throw // 2) + _pick_throw(thrB[:_tp], n_throw // 2)
+                    + _sample_recent(recA[:_rp], n_recent - n_recent // 2) + _sample_recent(recB[:_rp], n_recent // 2))
+        else:
+            pool = _pick_throw(throw_sorted[:cfg["throwback_pool"]], n_throw) + _sample_recent(recent_artists[:cfg["recent_pool"]], n_recent)
         random.Random(f"radio-order-{cur_ord}-{profile_key}").shuffle(pool)
         # Persist: the once-a-day __built__ sentinel (gates _scene_done_today) + the surfacing log (pruned + today's
         # pool stamped at cur_ord), so tomorrow's build down-weights what we just played.
