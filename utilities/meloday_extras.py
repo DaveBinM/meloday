@@ -7397,8 +7397,9 @@ def _parse_args():
     p = argparse.ArgumentParser(description="Meloday Extras — Supplementary Playlists")
     p.add_argument(
         "--playlist", default="all",
-        choices=PLAYLIST_IDS + ["all"],
-        help="Which playlist to generate (default: all)",
+        help="Which playlist(s) to generate: a single id, a comma-separated list (e.g. "
+             "daily_mixes,on_repeat,discover_weekly — built in ONE process / one cache load), "
+             "or 'all' (default).",
     )
     p.add_argument("--debug", action="store_true")
     p.add_argument(
@@ -14840,7 +14841,15 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
 
 def main():
     args = _parse_args()
-    to_run = PLAYLIST_IDS if args.playlist == "all" else [args.playlist]
+    if args.playlist == "all":
+        to_run = PLAYLIST_IDS
+    else:
+        # accept a single id or a comma-separated list — one process, one cache load, builds each in order
+        to_run = [pid.strip() for pid in args.playlist.split(",") if pid.strip()]
+        _unknown = [pid for pid in to_run if pid not in PLAYLIST_IDS]
+        if _unknown:
+            raise SystemExit(f"[ERROR] Unknown playlist id(s): {', '.join(_unknown)}. "
+                             f"Valid ids: {', '.join(PLAYLIST_IDS)} (or 'all').")
 
     xlog("=== Meloday Extras ===")
 
