@@ -13544,6 +13544,31 @@ _GEO_RADIO_PROFILES = set(_GEO_RADIO)
 # soundtracks_radio KEEPS score/classical artists (its genre gate already ensures score content) — the radio
 # branch's normal score-artist exclusion would empty its pool, so it's bypassed via this set.
 _SOUNDTRACK_RADIO = {"soundtracks_radio"}
+# Narrow crowd tags that mark genuine SCREEN music — deliberately NOT the broad 'composer'/'score'/'classical'
+# tags, which also sit on Mozart/Bach, so concert classical can't sneak back in via them.
+_SCREEN_LASTFM_TAGS = {"soundtrack", "soundtracks", "film score", "film music", "film soundtrack",
+                       "original score", "movie", "cinematic", "video game music", "game music"}
+def _is_screen_content(entry):
+    """True if `entry` is genuine film/TV/game SCORE material — the curated SELECTION gate for soundtracks_radio.
+    WHY: the Discogs AUDIO classifier stamps 'Stage & Screen---Soundtrack/Score' onto ANY instrumental,
+    cinematic-sounding track (jazz outros, trance intros, an indie band's orchestral album prelude, neoclassical
+    piano albums), so that tag alone leaked non-scores in. Gate on CURATED signals instead — ANY of:
+      • a Plex screen GENRE ('stage & screen' / 'game') or an explicit score/soundtrack STYLE, OR
+      • a fully-untagged entry — thin-metadata score/game composers (Nintendo OSTs, the Gotham theme), OR
+      • a NARROW Last.fm crowd soundtrack/film tag — rescues film composers Plex mis-tags as plain 'Classical'
+        (e.g. James Horner, whose crowd tags include 'soundtrack').
+    Concert classical (Mozart/Bach) and neoclassical ALBUM tracks (Hania Rani, Max Richter's own records) carry
+    a non-screen Plex genre AND lack a narrow soundtrack crowd tag, so they're correctly excluded (STRICT)."""
+    genres = {str(g).lower() for g in (entry.get("genres") or [])}
+    if "stage & screen" in genres or "game" in genres:
+        return True
+    styles = [str(s).lower() for s in (entry.get("styles") or [])]
+    if any(s.endswith("score") or "soundtrack" in s or "film music" in s
+           or "movie theme" in s or "video game" in s or "game music" in s for s in styles):
+        return True
+    if not genres:                                  # fully-untagged -> thin-metadata score/game composer
+        return True
+    return bool(_entry_lastfm_tags(entry) & _SCREEN_LASTFM_TAGS)
 _GEO_RADIO_SPLIT = {   # two-location blends: (specA, specB) — the branch draws ~50/50 from each nation's bucket
     "scotland_australia_now": ({"places": {"scotland"},  "scene": {"scotland"}},
                                {"places": {"australia"}, "scene": {"australia"}}),
@@ -14136,8 +14161,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if profile_key in _STYLE_DEFINED_PROFILES:
         _cand_keys = [rk for rk in essentia_cache
                       if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
-        if profile_key in _SOUNDTRACK_RADIO:   # scores are INSTRUMENTAL — drop soundtrack SONGS (Lady Gaga "Shallow")
-            _cand_keys = [rk for rk in _cand_keys if (essentia_cache[rk].get("vocal_presence") or 0) < 0.4]
+        if profile_key in _SOUNDTRACK_RADIO:   # scores are INSTRUMENTAL film/TV/game content — drop soundtrack
+            _cand_keys = [rk for rk in _cand_keys                        # SONGS (vocals) AND non-score instrumentals
+                          if (essentia_cache[rk].get("vocal_presence") or 0) < 0.4   # (jazz/trance/indie/classical)
+                          and _is_screen_content(essentia_cache[rk])]    # via curated tags, not the Discogs audio model
     else:
         _cand_keys = list(essentia_cache)
 
