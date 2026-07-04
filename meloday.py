@@ -17,6 +17,9 @@ import concurrent.futures
 import multiprocessing
 import logging
 import argparse
+import sys
+import fcntl
+import threading
 from datetime import datetime, timedelta, date, timezone
 from zoneinfo import ZoneInfo
 from collections import Counter
@@ -190,6 +193,98 @@ def _restore_env(prev):
             os.environ.pop(k, None)
         else:
             os.environ[k] = v
+
+# ---------------------------------------------------------------------------
+# Single-instance lock + runtime watchdog (shared by meloday.py and meloday_extras.py)
+#
+# WHY: overlapping cron fires (meloday.py at 7 hours/day; meloday_extras mood_mixes up to
+# 3×/hour) had no mutual exclusion and no runtime bound, so a slow or hung run let the next
+# fire stack on top. Each copy loads the ~3.8 GB essentia cache, so a few deep exhausts RAM
+# (observed on prod: load ~30, 23G/30G, orphaned spawn_main workers). The flock guard makes a
+# redundant run exit cleanly; the watchdog force-exits a run that overruns so it can never
+# hold its lock (or its RAM) forever.
+# ---------------------------------------------------------------------------
+
+# Lockfiles live here. MUST be on a LOCAL filesystem — flock is a silent no-op on many
+# network mounts, so never point this at the Plex share.
+LOCK_DIR = resolve_path("assets/locks", BASE_DIR)
+
+# Runtime safety limits, read from config.yml `runtime:` (all optional; 0 disables a watchdog).
+_rt_cfg = config.get("runtime", {})
+MELODAY_MAX_SECONDS     = int(float(_rt_cfg.get("meloday_max_minutes", 90)) * 60)
+EXTRAS_MAX_SECONDS      = int(float(_rt_cfg.get("extras_max_minutes",  40)) * 60)
+RESOLVE_TIMEOUT_SECONDS = int(_rt_cfg.get("resolve_timeout_seconds", 180))
+
+# Holds the lock fd for the whole process lifetime. It's a raw os.open() fd, so (unlike a file
+# object) the garbage collector never closes it — we still keep an explicit reference for clarity.
+_INSTANCE_LOCK_FD = None
+
+def single_instance_guard(name, log=log_text):
+    """Acquire an exclusive, non-blocking flock so only one '<name>' run exists at a time.
+
+    If another run already holds it, log a [SKIP] line and exit 0 (a redundant cron fire is a
+    no-op, not an error). The kernel releases the lock automatically when this process dies —
+    even on SIGKILL/OOM — which is why flock beats a stale-prone PID file here. Fails OPEN on
+    infrastructure errors (unwritable lockdir) so a lock problem can never stop playlist runs.
+    """
+    global _INSTANCE_LOCK_FD
+    try:
+        os.makedirs(LOCK_DIR, exist_ok=True)
+        # O_CREAT WITHOUT O_TRUNC: a contender that fails the flock below must not wipe the
+        # holder's pid (open("w") truncates on open — before flock — so it can't be used here).
+        fd = os.open(os.path.join(LOCK_DIR, f"{name}.lock"), os.O_RDWR | os.O_CREAT, 0o644)
+    except Exception as e:
+        log(f"[WARN] single-instance lock unavailable ({e}); proceeding without it")
+        return
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        log(f"[SKIP] Another '{name}' run is active — exiting")
+        os.close(fd)
+        sys.exit(0)
+    _INSTANCE_LOCK_FD = fd            # keep the fd for the whole process — do NOT close it
+    try:
+        os.ftruncate(fd, 0)          # only the holder rewrites the pid, so it stays readable for debugging
+        os.write(fd, f"{os.getpid()}\n".encode())
+        os.fsync(fd)
+    except Exception:
+        pass
+
+def _kill_child_processes(log=log_text):
+    """Best-effort recursive kill of this process's children (analysis / spawn_main workers) so the
+    watchdog's os._exit doesn't leave orphans reparented to init still burning CPU. Uses psutil
+    (already a dependency); lazy-imported so a broken psutil never blocks the force-exit itself."""
+    try:
+        import psutil
+        me = psutil.Process()
+        kids = me.children(recursive=True)
+        for p in kids:
+            try: p.kill()
+            except Exception: pass
+        _gone, alive = psutil.wait_procs(kids, timeout=3)
+        for p in alive:
+            try: p.kill()
+            except Exception: pass
+    except Exception as e:
+        log(f"[WATCHDOG] child cleanup skipped: {e}")
+
+def start_watchdog(name, max_seconds, log=log_text):
+    """Force-exit this process if it runs longer than max_seconds (0/None disables).
+
+    A daemon thread — deliberately NOT signal.SIGALRM — because at timeout the main thread is
+    almost always blocked in a C-level ProcessPoolExecutor.shutdown(wait=True) or a plexapi socket
+    read, where a Python signal handler wouldn't run until the GIL returned (it can sit undelivered
+    through the whole hang). A separate OS thread always runs, and os._exit is a direct _exit(2)
+    that bypasses atexit and the stdlib concurrent.futures thread-join a hung worker would wedge.
+    """
+    if not max_seconds or max_seconds <= 0:
+        return
+    def _watch():
+        threading.Event().wait(max_seconds)   # sleeps the full interval; never set → always times out
+        log(f"[WATCHDOG] '{name}' exceeded {max_seconds}s — force-exiting")
+        _kill_child_processes(log)
+        os._exit(1)
+    threading.Thread(target=_watch, name=f"watchdog-{name}", daemon=True).start()
 
 # MELODAY_SKIP_TF_MODELS is set by pre_analyze.py in the main process before spawning
 # workers. With 'spawn' context, workers re-import meloday.py; loading the TF C++
@@ -3064,6 +3159,12 @@ def find_first_and_last_tracks(tracks, period):
     return first, last
 
 def main():
+    # Single-instance guard FIRST — before the log truncate below — so a redundant cron fire
+    # that's about to skip doesn't wipe the running run's log. The lock frees automatically when
+    # this process dies. The watchdog then bounds this run so a hang can't hold the lock forever.
+    single_instance_guard("meloday")
+    start_watchdog("meloday", MELODAY_MAX_SECONDS)
+
     # Force log truncation once at the start of the main process
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         f.truncate(0)
@@ -3204,10 +3305,16 @@ def main():
                             if data:
                                 _essentia_cache[str(tid)] = data
                                 new_entries[str(tid)] = data
+                                # WHY: flush in batches so a watchdog kill (or any crash) mid-backlog
+                                # never discards completed analysis — the next run resumes from a warmer
+                                # cache and converges instead of re-analysing from zero. UPSERT is idempotent.
+                                if len(new_entries) >= 50:
+                                    _upsert_cache_entries(new_entries)
+                                    new_entries = {}
                         except Exception as e:
                             log_text(f"[WARN] Analysis worker failed for track {futures[future]}: {e}")
                 _restore_env(_prev_caps)
-                _upsert_cache_entries(new_entries)
+                _upsert_cache_entries(new_entries)   # flush the remainder (< 50 since the last batch)
             else:
                 log_text("[OK] All tracks are cached and up-to-date.")
 

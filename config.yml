@@ -39,6 +39,11 @@ bridging:
   enabled: true                                     # Set to false to skip adding bridging tracks between sonic jumps
   smart_truncation: false                           # Set to true to ensure max_tracks isn't exceeded. Set to false to ensure the best sonic flow
 
+runtime:                                            # Overlap protection + hang bounds. Lockfiles live in assets/locks/ (MUST be a local filesystem — flock no-ops on network mounts)
+  meloday_max_minutes: 90                            # Force-exit a meloday.py run after N minutes (0 disables). Backstop for a hung run holding its lock; paired with incremental cache writes so analysis isn't lost
+  extras_max_minutes: 40                             # Force-exit a meloday_extras.py run after N minutes (0 disables). Extras never run Essentia, so this only trips on a true hang
+  resolve_timeout_seconds: 180                       # Per-batch cap for parallel Plex track fetches (resolve_tracks_by_keys) so a stalled Plex call can't wedge an extras run
+
 playlist:
   auto_apply_optimization: false                    # Set to true to automatically update this file with values from the optimizer
   exclude_played_days: 3                            # Ignore tracks played in the last X days to avoid repeats

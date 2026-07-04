@@ -7422,6 +7422,30 @@ def _parse_args():
     return args
 
 
+def _extras_lock_key(to_run, args):
+    """Single-instance lock key.
+
+    The frequent mood_mixes runs must not stack on a slow copy of THEMSELVES (the observed failure),
+    but the plain / --time-context / --weather-context variants touch DISJOINT mixes (the general
+    slate vs the time-of-day switches vs the weather mixes — see the cron comments; they already run
+    concurrently today), so they get SEPARATE keys and may still overlap. That keeps a boundary-hour
+    time switch (e.g. the 5am morning mixes, fired at the same minute as the plain hourly run) from
+    being skipped just because the plain run happened to grab a shared lock first.
+      - mood_mixes + --time-context     -> extras-mood_mixes-time
+      - mood_mixes + --weather-context  -> extras-mood_mixes-weather
+      - mood_mixes (plain / --reselect) -> extras-mood_mixes  (plain hourly + weekly reselect both
+                                                               rebuild the general slate → serialise)
+      - everything else                 -> extras-batch       (daily/weekly batches, top_songs, 'all')
+    """
+    if set(to_run) == {"mood_mixes"}:
+        if getattr(args, "time_context", False):
+            return "extras-mood_mixes-time"
+        if getattr(args, "weather_context", False):
+            return "extras-mood_mixes-weather"
+        return "extras-mood_mixes"
+    return "extras-batch"
+
+
 # ---------------------------------------------------------------------------
 # Plex playlist CRUD (no cover art — simpler than meloday.py's version)
 # ---------------------------------------------------------------------------
@@ -7546,12 +7570,25 @@ def resolve_tracks_by_keys(plex, rating_keys, workers=16):
         except Exception:
             return rk, None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+    # Bounded so a stalled Plex batch can't wedge the whole extras run: cap the total wait and
+    # tear the pool down non-blocking. NOTE: cancel_futures only cancels QUEUED work — a thread
+    # already inside plex.fetchItem isn't interruptible from Python, so PlexServer(timeout=…) is what
+    # bounds each call; meloday.start_watchdog() is the ultimate backstop for a truly stuck socket
+    # (it bypasses the interpreter's worker-thread join on exit).
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+    try:
         futures = {ex.submit(_fetch, rk): rk for rk in keys}
-        for f in concurrent.futures.as_completed(futures):
-            rk, t = f.result()
-            if t and not _too_long(t):
-                result[rk] = t
+        try:
+            for f in concurrent.futures.as_completed(futures, timeout=meloday.RESOLVE_TIMEOUT_SECONDS):
+                rk, t = f.result()
+                if t and not _too_long(t):
+                    result[rk] = t
+        except concurrent.futures.TimeoutError:
+            unresolved = len(keys) - len(result)
+            xlog(f"[WARN] resolve_tracks_by_keys: {unresolved} of {len(keys)} key(s) unresolved after "
+                 f"{meloday.RESOLVE_TIMEOUT_SECONDS}s — proceeding without them")
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
     return result
 
 
@@ -14850,6 +14887,13 @@ def main():
         if _unknown:
             raise SystemExit(f"[ERROR] Unknown playlist id(s): {', '.join(_unknown)}. "
                              f"Valid ids: {', '.join(PLAYLIST_IDS)} (or 'all').")
+
+    # Prevent overlapping runs from stacking (the observed failure: hourly mood_mixes piling up, each
+    # loading the ~3.8 GB cache → RAM exhaustion). A second run with the same key skips cleanly; the
+    # watchdog bounds this one so a hung Plex/DB call can't hold the lock forever. Helpers in meloday.py.
+    _lock_key = _extras_lock_key(to_run, args)
+    meloday.single_instance_guard(_lock_key, log=xlog)
+    meloday.start_watchdog(_lock_key, meloday.EXTRAS_MAX_SECONDS, log=xlog)
 
     xlog("=== Meloday Extras ===")
 

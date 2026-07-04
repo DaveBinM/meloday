@@ -6,5 +6,8 @@ assets/geo_scene_rotation.json
 assets/mbid_artist_names.json
 assets/lastfm_artist_top_tracks.json
 
+# Runtime single-instance lockfiles (created by single_instance_guard) — never commit
+assets/locks/
+
 # Dev-only: holds the real Plex token + OpenAI key — never commit
 live/
