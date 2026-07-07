@@ -7622,13 +7622,15 @@ def build_excluded_album_keys(music):
 # can't. EVERY consumer treats a None vector as "fall back to the acoustic path", so partial coverage and a
 # missing numpy degrade gracefully. WHY: emb_effnet/emb_musicnn were collected but unused (audit Tier-4).
 _EMB_FIELD  = "emb_effnet"
+_EMB_DIMS   = {"effnet": 1280, "musicnn": 200}   # expected vector length per model — used to reject corrupt blobs
 _EMB_WEIGHT = 0.25          # "sounds-like" cohesion pull in _combined_score (self-cohesion centroid, or a
                             # profile's seed centroid). Tuned: lifts top-50 pairwise sim ~0.83->0.93 (mood) /
                             # 0.71->0.77 (genre); the lift flattens past 0.25, so 0.25 avoids over-dominating
                             # the acoustic/tag terms while keeping most of the cohesion gain.
 
 def _track_emb(entry, which="effnet"):
-    """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / empty).
+    """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / corrupt —
+    wrong-size or non-finite).
     `which`: 'effnet' (1280-d Discogs — genre / sub-style) or 'musicnn' (200-d MSD — vibe / sounds-like)."""
     if not _NUMPY_AVAILABLE:
         return None
@@ -7639,14 +7641,22 @@ def _track_emb(entry, which="effnet"):
         v = np.frombuffer(blob, dtype=np.float32)
     except (TypeError, ValueError):
         return None
-    if v.size == 0:
+    # WHY: reject a wrong-size or non-finite blob so it degrades to the graceful acoustic fallback rather
+    # than reaching np.dot. A file that fails the 16 kHz decode stores a 4-byte NaN scalar (mean() of an
+    # empty model output); its shape (1,) vs a centroid's (200,)/(1280,) raises "shapes not aligned" and,
+    # at the unguarded weather call-site, aborted the whole mood-mix build. isfinite(n) is O(1) on the norm
+    # we already compute and also neutralises any future full-size NaN blob.
+    if v.size != _EMB_DIMS.get(which, 0):
         return None
     n = float(np.linalg.norm(v))
-    return (v / n) if n else None
+    if not (n and np.isfinite(n)):
+        return None
+    return v / n
 
 def _emb_cosine(a, b):
-    """Cosine similarity of two already-normalised embeddings (a dot product); 0.0 if either is None."""
-    if a is None or b is None:
+    """Cosine similarity of two already-normalised embeddings (a dot product); 0.0 if either is None or
+    their shapes differ (belt-and-suspenders — _track_emb already rejects wrong-size vectors)."""
+    if a is None or b is None or a.shape != b.shape:
         return 0.0
     return float(np.dot(a, b))
 
@@ -13340,9 +13350,17 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
         seen_rks = set(recent_rks) | _external_used_rks(existing, building)   # cross-run dedup
         mixes = []
         for profile_key in sorted(to_add):
-            tracks = _build_mix_tracks(
-                profile_key, essentia_cache, history_entries,
-                excluded_album_keys, mix_size, plex, hard_exclude_rks=seen_rks)
+            # WHY try/except: isolate each mix's build. Before, one mix raising (e.g. a corrupt embedding
+            # blob) aborted the whole build_mood_mixes; the caller's broad except then applied NO adds/removes,
+            # freezing the weather slate at its previous state. Now a single failure logs + skips, and
+            # to_remove still applies. Mirrors the MODE 2/3 loop's guard below.
+            try:
+                tracks = _build_mix_tracks(
+                    profile_key, essentia_cache, history_entries,
+                    excluded_album_keys, mix_size, plex, hard_exclude_rks=seen_rks)
+            except Exception:
+                xlog(f"[ERROR] mood_mixes: build '{profile_key}' failed, skipping:\n{traceback.format_exc()}")
+                continue
             seen_rks.update(str(t.ratingKey) for t in tracks)
             mixes.append((_MOOD_MIX_NAMES[profile_key], profile_key, tracks))
         return mixes, list(to_remove)

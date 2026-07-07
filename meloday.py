@@ -1036,10 +1036,19 @@ def _fill_missing_acoustic(data, file_path, audio=None, track_title=""):
             # Cache the mean embeddings so any future head needs no audio re-read.
             # WHY no _mood_models gate: emb-only mode (--sync-embeddings) loads no heads, but must
             # still persist the vectors it was launched to backfill. emb_effnet/emb_musicnn are
-            # always computed above whenever this TF block runs, so the store is safe.
+            # always computed above whenever this TF block runs.
+            # WHY the shape/finite guard: a file that fails the 16 kHz decode yields an empty audio_tf, so
+            # the models emit an empty array; mean() of that is a NaN scalar → a 4-byte blob that later
+            # crashes np.dot in the extras "sounds-like" scoring ((1,) vs (200/1280,)). Store only a
+            # full-size, all-finite vector; else leave NULL — a missing embedding degrades gracefully
+            # everywhere, a corrupt one does not. isfinite also rejects the (0,1280)→NaN-vector variant.
             if data.get("emb_effnet") is None:
-                data["emb_effnet"]  = emb_effnet.mean(axis=0).astype(_np.float32).tobytes()
-                data["emb_musicnn"] = emb_musicnn.mean(axis=0).astype(_np.float32).tobytes()
+                _ef = _np.atleast_2d(emb_effnet).mean(axis=0)
+                _em = _np.atleast_2d(emb_musicnn).mean(axis=0)
+                if (_ef.size == 1280 and _em.size == 200
+                        and _np.all(_np.isfinite(_ef)) and _np.all(_np.isfinite(_em))):
+                    data["emb_effnet"]  = _ef.astype(_np.float32).tobytes()
+                    data["emb_musicnn"] = _em.astype(_np.float32).tobytes()
         except Exception as tf_err:
             log_text(f"[WARN] TF inference failed: {tf_err}")
 

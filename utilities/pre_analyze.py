@@ -2928,12 +2928,27 @@ def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
     WHY: embeddings were added after most tracks were analysed (~65% lack them); the extras "sounds-like"
     features (discovery / seed mixes / Daily-Mix clustering / DJ flow) use them with graceful fallback, so
     coverage directly improves them. --workers N / --no-nice / --dry-run / --limit; safe to re-run (only
-    touches NULL-embedding rows). (audit Tier-4 embeddings backfill)"""
+    touches NULL or corrupt wrong-size rows). (audit Tier-4 embeddings backfill)"""
     import meloday
     conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
     conn.execute("PRAGMA journal_mode=WAL")
     meloday._ensure_db_schema(conn)
-    total = conn.execute("SELECT COUNT(*) FROM essentia_cache WHERE emb_effnet IS NULL").fetchone()[0]
+    # Purge corrupt embeddings before counting. WHY: a file that fails the 16 kHz decode stores a wrong-size
+    # (4-byte NaN) blob that (a) poisons the extras "sounds-like" scoring — np.dot raises "shapes not aligned"
+    # — and (b) is skipped by the plain "IS NULL" backfill filter, so it never self-repairs. NULL it here so
+    # reads stop crashing and it becomes eligible for the retry below; the write-side shape/finite guard then
+    # re-skips it if the decode still fails, so it settles cleanly at NULL. Length-based → only ever matches
+    # corruption (a valid vector is always exactly 5120/800 B; NULLs are excluded by IS NOT NULL).
+    _corrupt_where = ("(emb_effnet IS NOT NULL AND length(emb_effnet)<>5120) "
+                      "OR (emb_musicnn IS NOT NULL AND length(emb_musicnn)<>800)")
+    _corrupt = conn.execute(f"SELECT COUNT(*) FROM essentia_cache WHERE {_corrupt_where}").fetchone()[0]
+    if _corrupt:
+        print(f"[INFO] sync_embeddings: purging {_corrupt} corrupt (wrong-size) embedding row(s)")
+        if not dry_run:
+            conn.execute(f"UPDATE essentia_cache SET emb_effnet=NULL, emb_musicnn=NULL WHERE {_corrupt_where}")
+            conn.commit()
+    total = conn.execute(
+        "SELECT COUNT(*) FROM essentia_cache WHERE emb_effnet IS NULL OR length(emb_effnet)<>5120").fetchone()[0]
     print(f"[INFO] sync_embeddings: {total} tracks missing embeddings")
     if dry_run:
         conn.close(); return
@@ -2948,7 +2963,7 @@ def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
             "mood_happy", "moodtheme", "genre_discogs")
     rows = conn.execute(
         "SELECT rating_key, file_path, " + ", ".join(cols) +
-        " FROM essentia_cache WHERE emb_effnet IS NULL AND file_path IS NOT NULL"
+        " FROM essentia_cache WHERE (emb_effnet IS NULL OR length(emb_effnet)<>5120) AND file_path IS NOT NULL"
     ).fetchall()
     conn.close()
     if limit:
