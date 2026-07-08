@@ -2879,7 +2879,7 @@ _MOOD_PROFILES = {
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_musicnn sounds-like cohesion (applied)
     "spa_bath": {"bpm": 70, "energy": -18, "danceability": 0.18, "brightness": 0.18, "beat_confidence": 0.4, "onset_rate": 1.5, "dynamic_complexity": 0.68, "arousal": 0.16, "valence": 0.65, "vocal_presence": 0.3},
-# ── power_nap → "Forty Winks" ─────────────────────────────────────────────────────────────
+# ── power_nap → "Power Nap" ─────────────────────────────────────────────────────────────
 # Theme:    Delicate, languid, dreamy, atmospheric, hypnotic.
 # Sound:    Slow 66bpm, very low energy, low groove; dark-toned, near-instrumental.
 # Era/Geo:  Any era · any origin.
@@ -4754,7 +4754,7 @@ _MOOD_MIX_NAMES = {
     "gaming": "Game On • Meloday+",
     "gardening": "Green Thumb • Meloday+",
     "spa_bath": "Spa Day • Meloday+",
-    "power_nap": "Forty Winks • Meloday+",
+    "power_nap": "Power Nap • Meloday+",
     "throwback_anthems": "Throwback Anthems Mix • Meloday+",
     "old_friends": "Old Friends Mix • Meloday+",
     "campfire": "Campfire Mix • Meloday+",
