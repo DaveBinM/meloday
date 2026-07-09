@@ -5800,7 +5800,11 @@ _PROFILE_STYLE_SIGNALS = {
     "industrial": (["industrial", "electro-industrial", "industrial metal", "industrial dance"], ["folk", "country", "gospel"]),
     "vaporwave": (["vaporwave", "chillwave", "ambient pop", "plunderphonics"], ["metal", "punk", "hardcore"]),
     "downtempo": (["downtempo", "trip-hop", "chillwave", "idm", "ambient techno"], ["metal", "punk", "hardcore"]),
-    "hyperpop": (["hyperpop", "glitch", "bubblegum", "social media pop"], ["metal", "blues", "country"]),
+    "hyperpop": (["hyperpop", "glitch", "social media pop"], ["metal", "blues", "country"]),  # WHY dropped 'bubblegum': Discogs Bubblegum = 60s/Y2K pop, not hyperpop — it admitted Destiny's Child (.34)/J.Lo/Kesha (quality audit)
+    # date_night is NOT style-gated (mood mix) — negatives-only entry: the +0.10 _style_tag_boost penalty
+    # soft-down-ranks gothic-metal/industrial ballads (HIM "Gone With the Sin" surfaced via dark-romance
+    # mood tags in the quality audit) without excluding anything.
+    "date_night": ([], ["metal", "gothic", "industrial", "hardcore"]),
     "classic_rock": (["album rock", "arena rock", "hard rock", "blues-rock", "southern rock", "american trad rock"], ["techno", "rap", "edm"]),
     "heavy_riffs": (["heavy metal", "hard rock", "alternative metal", "nü metal", "funk metal", "metalcore"], ["ambient", "folk", "gospel"]),
     "punk_energy": (["pop punk", "punk revival", "hardcore punk", "skatepunk", "punk/new wave"], ["ambient", "jazz", "gospel"]),
@@ -6042,7 +6046,30 @@ _DISCOGS_TAG_FLOOR = 0.12
 # HIGH floor: the Discogs classifier sprays low-confidence House/Deep-House tags (0.12-0.27) onto four-on-the-
 # floor modern pop (Miley "Flowers"=0.27 house, Taylor=0.18 tropical house), so a 0.12 gate floods it with pop.
 # Real electronic acts score their genre 0.4+; 0.30 keeps them and drops the pop spray.
-_PROFILE_TAG_FLOOR = {"electronic_radio": 0.45}
+_PROFILE_TAG_FLOOR = {
+    # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
+    # classifier's low-confidence spray passing floor-less gates — Ramones in chart_pop (.21 'power pop'),
+    # Aretha in swagger (.20 'funk'), Olivia Newton-John in melbourne_psych (.17), Blue in london_mod (.14,
+    # 'beat' token ⊂ 'big beat')… Floors chosen per profile: the smallest sweep value that ejects that mix's
+    # named aliens while its gate pool stays healthy (measured pools noted). electronic_radio predates the
+    # audit (the pop-bleed fix).
+    "electronic_radio":  0.45,
+    "melbourne_folk":    0.20,   # pool 2858 — ejects Smith Street Band/Avalanches/Illy spray
+    "melbourne_sunset":  0.20,   # pool 2988 — ejects Nick Cave 'surf' .13-class spray
+    "swing_bigband":     0.25,   # pool 165  — ejects Sinatra-ballad/Ace of Base 'rnb/swing' leaks
+    "chart_pop":         0.25,   # pool 580  — ejects the 'power pop' rock spray (Ramones/Benatar)
+    "melbourne_pubrock": 0.30,   # pool 1152 — ejects Tina Arena "In Command"/TISM spray; 0.30 (not .25) cleans the
+                                 # runner-up picks too. RESIDUAL: Tina Arena "Be a Man" carries a ≥.30 Discogs conf
+                                 # (confident mis-tag — no reasonable floor ejects it; needs emb-outlier rejection)
+    "melbourne_psych":   0.22,   # ejects Olivia N-J .17 / Bee Gees "Indian Gin" .20. NOT 0.25: city mixes intersect
+                                 # the geo tier gate, and style-pool 426 ∩ Melbourne starved the build to n=32
+    "london_mod":        0.25,   # pool 277  — ejects Blue/Lulu/Bonzo 'beat' collisions
+    "swagger":           0.25,   # pool 855  — ejects Aretha 'funk' + g-funk spray
+    "rockabilly_surf":   0.30,   # pool 276  — ejects Marvelettes 'rock & roll' .29 / 'psychobilly' spray
+    "emo_poppunk":       0.30,   # pool 544  — ejects Amy Macdonald acoustic .27 (some .17-.22 legits drop; pool rich)
+    "afrobeat":          0.15,   # tiny pool (201 @.12) — gentle: ejects the .12-.14 spray only (verify-guarded)
+    "hyperpop":          0.20,   # small pool — with 'bubblegum' removed from positives (verify-guarded)
+}
 
 def _track_style_tags(entry, min_conf=0.0):
     """Lowercased style/genre tags for matching: Plex STYLES (granular, human-curated) + the Discogs-400
