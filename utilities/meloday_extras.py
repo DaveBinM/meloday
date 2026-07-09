@@ -13548,6 +13548,10 @@ _ERA_MIN_LISTENERS = 300_000   # decade mix: a track must clear this Last.fm lis
 _ERA_RESCUE_TOP_N = 5          # decade ANTHEM-RESCUE: also keep each artist's own Last.fm top-N signature
 _ERA_RESCUE_MIN   = 150_000    # songs (>= this many listeners) that fell below the top-150 cut, so genuine
                                # classics the tight cap drops (The Twist, Get Ready, Jailbreak) aren't lost
+_ERA_ARTIST_SONGS = 5          # each artist's max decade-pool footprint (via _cap_artist_footprint). WHY: the
+                               # 60s pool was 46% Beatles (78/168 slots) -> a 32-artist cast airing near-
+                               # identically daily; capping widens it to ~47 while keeping every artist's
+                               # top-5 anthems. Measured no-op for the wider decades (70s-20s ±1-2 artists).
 _GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits): keep the top-N songs by
                                # global Last.fm listeners per origin. N IS the auto per-location floor — the
                                # Nth-song listener count varies by place (London's bar ~2.5x Scotland's) and
@@ -13568,6 +13572,21 @@ _GEO_HITS_HYBRID = {           # per-profile selection for the geo HITS mixes: a
     "london_hits":     {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000, "artist_songs": 5},
     "uk_hits":         {"floor": 400_000,      "top_n": 5, "rescue": 150_000, "artist_songs": 5},
 }
+def _cap_artist_footprint(rks, cap, essentia_cache):
+    """Truncate a listener-ranked rk list to each artist's top-`cap` songs. WHY: a top-N-by-listeners pool
+    otherwise lets one deep popular catalogue crowd breadth out entirely — Franz Ferdinand held 36/236
+    Scottish Hits slots (a 42-artist cast for 50 daily slots) and the Beatles 78/168 of the 60s decade pool
+    (a 32-artist cast airing near-identically every day). Shared by the geo-hits and decade (era) branches;
+    cap=None/0 -> unchanged."""
+    if not cap:
+        return rks
+    ac = Counter(); out = []
+    for rk in rks:
+        a = (essentia_cache.get(rk, {}).get("artist") or "").lower()
+        if ac[a] >= cap:
+            continue
+        ac[a] += 1; out.append(rk)
+    return out
 _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popular CONTEMPORARY songs (released in
     # the last `recent_years`) + ~throwback_frac throwback classics, 1-per-artist — like a place-only radio
     # station. recent/throwback_pool cap the distinct-artist candidate windows the daily pick draws from.
@@ -14537,15 +14556,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         # BEFORE the base slice, so a deep popular catalogue can't crowd other acts' hits out of the pool
         # (Franz Ferdinand held 36/236 Scottish slots -> only 42 artists for 50 daily slots — the same cast
         # aired every day). The anthem-rescue below still scans the FULL `uniq`, unchanged.
-        base_src = uniq
-        _pa = _hyb.get("artist_songs")
-        if _pa:
-            _ac = Counter(); base_src = []
-            for rk in uniq:
-                a = (essentia_cache.get(rk, {}).get("artist") or "").lower()
-                if _ac[a] >= _pa:
-                    continue
-                _ac[a] += 1; base_src.append(rk)
+        base_src = _cap_artist_footprint(uniq, _hyb.get("artist_songs"), essentia_cache)
         # base = the "biggest hits" core: >= floor (deep origins like the UK) or the top-`cap` by listeners.
         if _hyb.get("floor") is not None:
             pool = [rk for rk in base_src if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _hyb["floor"]]
@@ -14663,7 +14674,10 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 best[sk] = (sc, rk)
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
-        floored = [rk for rk in uniq
+        # Per-artist footprint cap — same mechanism as the hits mixes (_cap_artist_footprint): without it the
+        # 60s pool was 46% Beatles (78/168 slots) -> a 32-artist cast airing near-identically every day.
+        capped = _cap_artist_footprint(uniq, _ERA_ARTIST_SONGS, essentia_cache)
+        floored = [rk for rk in capped
                    if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _ERA_MIN_LISTENERS]
         # the recognisable canon, capped at ~3x mix_size to keep the anthems FREQUENT: a bigger pool
         # dilutes them (measured: 00s anthems fall from ~33% of days at 150 to ~13% at the full ~1900).
@@ -14673,7 +14687,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         def _n_artists(rks):
             return len({(essentia_cache.get(rk, {}).get("artist") or "").lower() for rk in rks if rk})
         use_floor = len(floored) >= mix_size and _n_artists(floored[:mix_size * 3]) >= mix_size
-        pool = (floored if use_floor else uniq)[:mix_size * 3]
+        pool = (floored if use_floor else capped)[:mix_size * 3]
         # Anthem-rescue: ADD each artist's own Last.fm top-N (>= _ERA_RESCUE_MIN) that fell below the cut, so
         # genuine decade classics the tight top-150 drops aren't lost. Only adds from `uniq` (already in-decade
         # + comp/VA-filtered), so every rescued track passes the SAME decade gate as the base — never out-of-decade.
