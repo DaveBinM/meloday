@@ -13559,10 +13559,14 @@ _GEO_HITS_HYBRID = {           # per-profile selection for the geo HITS mixes: a
     # Last.fm top_n (>= rescue listeners) ADDED on top, so genuine signatures Last.fm UNDER-COUNTS on split/quoted
     # pages aren't dropped (Bowie "Heroes" 248k = his #2; Fleetwood Mac "The Chain" 628k sits below London's ~648k
     # top-200 cut). Rescue only adds — the "biggest hits" base is unchanged. top_n/rescue shared + tunable.
-    "scottish_hits":   {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
-    "australian_hits": {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
-    "london_hits":     {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000},
-    "uk_hits":         {"floor": 400_000,      "top_n": 5, "rescue": 150_000},
+    # artist_songs = each artist's max pool footprint. WHY: deep popular catalogues crowded the listener-ranked
+    # base out of breadth (Franz Ferdinand held 36/236 Scottish slots -> a 42-artist pool for 50 daily slots, so
+    # the SAME cast aired every day); capping at 5 widens Scotland to ~61 artists (Deacon Blue / Gerry Cinnamon /
+    # Teenage Fanclub enter) and stops Beatles-class depth monopolising the UK daily shuffle odds.
+    "scottish_hits":   {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000, "artist_songs": 5},
+    "australian_hits": {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000, "artist_songs": 5},
+    "london_hits":     {"cap": _GEO_HITS_POOL, "top_n": 5, "rescue": 150_000, "artist_songs": 5},
+    "uk_hits":         {"floor": 400_000,      "top_n": 5, "rescue": 150_000, "artist_songs": 5},
 }
 _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popular CONTEMPORARY songs (released in
     # the last `recent_years`) + ~throwback_frac throwback classics, 1-per-artist — like a place-only radio
@@ -14529,11 +14533,24 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
         _hyb = _GEO_HITS_HYBRID.get(profile_key) or {}
+        # Per-artist footprint cap (artist_songs): truncate the listener-ranked list to each artist's top-N
+        # BEFORE the base slice, so a deep popular catalogue can't crowd other acts' hits out of the pool
+        # (Franz Ferdinand held 36/236 Scottish slots -> only 42 artists for 50 daily slots — the same cast
+        # aired every day). The anthem-rescue below still scans the FULL `uniq`, unchanged.
+        base_src = uniq
+        _pa = _hyb.get("artist_songs")
+        if _pa:
+            _ac = Counter(); base_src = []
+            for rk in uniq:
+                a = (essentia_cache.get(rk, {}).get("artist") or "").lower()
+                if _ac[a] >= _pa:
+                    continue
+                _ac[a] += 1; base_src.append(rk)
         # base = the "biggest hits" core: >= floor (deep origins like the UK) or the top-`cap` by listeners.
         if _hyb.get("floor") is not None:
-            pool = [rk for rk in uniq if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _hyb["floor"]]
+            pool = [rk for rk in base_src if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _hyb["floor"]]
         else:
-            pool = [rk for rk in uniq
+            pool = [rk for rk in base_src
                     if (essentia_cache.get(rk, {}).get("lastfm_listeners") or 0) >= _GEO_HITS_MIN_LISTENERS][:_hyb.get("cap", _GEO_HITS_POOL)]
         # Anthem-rescue: ADD each artist's OWN Last.fm top-N signatures (>= rescue) that fell below the base cut,
         # so genuine hits Last.fm under-counts on split/quoted pages aren't dropped (Bowie "Heroes"; Fleetwood
