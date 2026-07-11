@@ -1939,7 +1939,7 @@ _MOOD_PROFILES = {
 # Criteria: no genre gate · pop +1 · soft daypart lean · lyric-themes · moodclass · cat:melancholy_blue
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_musicnn sounds-like cohesion + lyric_lang=en soft lean (applied)
-    "sad_bangers": {"bpm": 124, "energy": -8, "danceability": 0.70, "brightness": 0.34, "beat_confidence": 0.78, "onset_rate": 6.0, "dynamic_complexity": 0.40, "arousal": 0.80, "valence": 0.32, "vocal_presence": 0.72},
+    "sad_bangers": {"bpm": 124, "energy": -8, "danceability": 0.70, "brightness": 0.34, "beat_confidence": 0.78, "onset_rate": 6.0, "dynamic_complexity": 0.40, "arousal": 0.80, "valence": 0.32, "vocal_presence": 0.72, "valence_weight": 8.0},
 # ── power_ballads → "Lighters Up" ─────────────────────────────────────────────────────────
 # Theme:    Dramatic, passionate, theatrical, rousing, anthemic.
 # Sound:    Slow 78bpm, mid energy, low groove; warm-toned, vocal-forward.
@@ -2002,7 +2002,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic, pop, rock} · floor 400k listeners · pop +1 · moodclass · cat:electronic_edm_pop
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "dance_pop": {"bpm": 122, "energy": -8, "danceability": 0.74, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.0, "dynamic_complexity": 0.40, "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.76},
+    "dance_pop": {"bpm": 122, "energy": -8, "danceability": 0.44, "brightness": 0.46, "beat_confidence": 0.78, "onset_rate": 5.0, "dynamic_complexity": 0.40, "arousal": 0.72, "valence": 0.75, "vocal_presence": 0.76},
 # ── indie_pop → "Indie Darlings" ──────────────────────────────────────────────────────────
 # Theme:    Bright, playful, sweet, quirky, sparkling.
 # Sound:    Mid 112bpm, low energy, danceable; bright.
@@ -2057,7 +2057,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · floor 400k listeners · pop +1 · moodclass · cat:electronic_edm_pop
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.72, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
+    "festival_edm": {"bpm": 128, "energy": -6, "danceability": 0.40, "brightness": 0.48, "beat_confidence": 0.84, "onset_rate": 5.6, "dynamic_complexity": 0.32, "arousal": 0.86, "valence": 0.78, "vocal_presence": 0.48},
 # ── soundtracks → "Soundtracks & Scores" ──────────────────────────────────────────────────
 # Theme:    Epic, dramatic, majestic, atmospheric, reflective.
 # Sound:    Mid-slow 92bpm, low energy, low groove; dark-toned, near-instrumental.
@@ -2481,7 +2481,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic, funk / soul} · pop +1 · season:summer · lyric-themes · moodclass · cat:season_summer
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "summer_heat": {"bpm": 118, "energy": -10, "danceability": 0.72, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.55},
+    "summer_heat": {"bpm": 118, "energy": -10, "danceability": 0.46, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.55},
 # ── summer_breeze → "Summer Breeze Mix" ───────────────────────────────────────────────────
 # Theme:    Mellow, warm, smooth, easygoing, sunny.
 # Sound:    Mid 100bpm, low energy, danceable; bright.
@@ -2824,7 +2824,7 @@ _MOOD_PROFILES = {
 # Criteria: no genre gate · pop -1 · soft daypart lean · moodclass · cat:wellness_sleep
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_musicnn sounds-like cohesion (applied)
-    "yoga_stretch": {"bpm": 90, "energy": -16, "danceability": 0.28, "brightness": 0.22, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.62, "vocal_presence": 0.35},
+    "yoga_stretch": {"bpm": 90, "energy": -16, "danceability": 0.28, "brightness": 0.22, "beat_confidence": 0.45, "onset_rate": 2.5, "dynamic_complexity": 0.6, "arousal": 0.25, "valence": 0.62, "vocal_presence": 0.28},
 # ── meditation → "Meditation Mix" ─────────────────────────────────────────────────────────
 # Theme:    Meditative, soothing, spiritual, spacious, devotional.
 # Sound:    Slow 64bpm, very low energy, low groove; dark-toned, near-instrumental.
@@ -3041,7 +3041,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic, funk / soul} · pop +0.5 · lyric-themes · moodclass · cat:soul_funk_rnb
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "funk_disco": {"bpm": 116, "energy": -11, "danceability": 0.74, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.62},
+    "funk_disco": {"bpm": 116, "energy": -11, "danceability": 0.46, "brightness": 0.42, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.8, "vocal_presence": 0.62},
 # ── neo_soul → "Neo-Soul & Quiet Storm Mix" ───────────────────────────────────────────────
 # Theme:    Sensual, smooth, warm, sophisticated, intimate.
 # Sound:    Mid-slow 82bpm, low energy, moderate groove; dark-toned, vocal-forward.
@@ -3113,7 +3113,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {hip hop} · pop +0.5 · lyric-themes · moodclass · cat:hiphop
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "trap_mode": {"bpm": 140, "energy": -9, "danceability": 0.62, "brightness": 0.1, "beat_confidence": 0.72, "onset_rate": 3, "dynamic_complexity": 0.35, "arousal": 0.78, "valence": 0.35, "vocal_presence": 0.62},
+    "trap_mode": {"bpm": 140, "energy": -9, "danceability": 0.62, "brightness": 0.1, "beat_confidence": 0.72, "onset_rate": 3, "dynamic_complexity": 0.35, "arousal": 0.78, "valence": 0.35, "vocal_presence": 0.95},
 # ── lofi_beats → "Lo-Fi Beats Mix" ────────────────────────────────────────────────────────
 # Theme:    Mellow, hypnotic, relaxed, nostalgic, soothing.
 # Sound:    Mid-slow 84bpm, low energy, danceable; dark-toned, near-instrumental.
@@ -3131,7 +3131,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · pop +0.5 · lyric-themes · moodclass · cat:electronic_house_techno
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "house_party": {"bpm": 123, "energy": -9, "danceability": 0.78, "brightness": 0.4, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.72, "valence": 0.74, "vocal_presence": 0.55},
+    "house_party": {"bpm": 123, "energy": -9, "danceability": 0.44, "brightness": 0.4, "beat_confidence": 0.8, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.72, "valence": 0.74, "vocal_presence": 0.55},
 # ── deep_house → "Deep House Late Mix" ────────────────────────────────────────────────────
 # Theme:    Hypnotic, stylish, nocturnal, smooth, cosmopolitan.
 # Sound:    Upbeat 122bpm, mid energy, very danceable; dark-toned.
@@ -3167,7 +3167,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · pop +0.5 · moodclass · cat:electronic_bass
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "dnb": {"bpm": 174, "energy": -8, "danceability": 0.55, "brightness": 0.28, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.4, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
+    "dnb": {"bpm": 107, "energy": -8, "danceability": 0.55, "brightness": 0.28, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.4, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
 # ── bass_drop → "Bass Drop Mix" ───────────────────────────────────────────────────────────
 # Theme:    Heavy, dark, intense, menacing, visceral.
 # Sound:    Fast 142bpm, mid energy, danceable; dark-toned.
@@ -3185,7 +3185,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · pop +0.5 · lyric-themes · moodclass · cat:electronic_bass
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "uk_garage": {"bpm": 134, "energy": -10, "danceability": 0.7, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
+    "uk_garage": {"bpm": 134, "energy": -10, "danceability": 0.44, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
 # ── synthwave → "Synthwave & Retrowave Mix" ───────────────────────────────────────────────
 # Theme:    Nostalgic, nocturnal, stylish, hypnotic, atmospheric.
 # Sound:    Mid 110bpm, low energy, danceable; dark-toned.
@@ -3248,7 +3248,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · pop +0.5 · moodclass · cat:rock_heavy
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "heavy_riffs": {"bpm": 130, "energy": -7, "danceability": 0.45, "brightness": 0.18, "beat_confidence": 0.82, "onset_rate": 6, "dynamic_complexity": 0.45, "arousal": 0.85, "valence": 0.35, "vocal_presence": 0.55},
+    "heavy_riffs": {"bpm": 130, "energy": -7, "danceability": 0.45, "brightness": 0.18, "beat_confidence": 0.82, "onset_rate": 6, "dynamic_complexity": 0.45, "arousal": 0.85, "valence": 0.35, "vocal_presence": 0.93},
 # ── punk_energy → "Punk Energy Mix" ───────────────────────────────────────────────────────
 # Theme:    Aggressive, rebellious, brash, raucous, defiant.
 # Sound:    Fast 165bpm, mid energy, moderate groove; warm-toned.
@@ -3257,7 +3257,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:rock_punk
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "punk_energy": {"bpm": 165, "energy": -8, "danceability": 0.42, "brightness": 0.26, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.45, "arousal": 0.88, "valence": 0.45, "vocal_presence": 0.7},
+    "punk_energy": {"bpm": 107, "energy": -8, "danceability": 0.42, "brightness": 0.26, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.45, "arousal": 0.88, "valence": 0.45, "vocal_presence": 0.7},
 # ── garage_grunge → "Garage & Grunge Mix" ─────────────────────────────────────────────────
 # Theme:    Gritty, brash, rebellious, raw, fierce.
 # Sound:    Upbeat 124bpm, mid energy, danceable; dark-toned.
@@ -3266,7 +3266,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · pop +0.5 · lyric-themes · moodclass · cat:rock_punk
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "garage_grunge": {"bpm": 124, "energy": -9, "danceability": 0.45, "brightness": 0.2, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.65},
+    "garage_grunge": {"bpm": 124, "energy": -9, "danceability": 0.45, "brightness": 0.2, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.94},
 # ── emo_poppunk → "Emo & Pop-Punk Mix" ────────────────────────────────────────────────────
 # Theme:    Angst-ridden, cathartic, earnest, yearning, fierce.
 # Sound:    Upbeat 135bpm, mid energy, danceable; dark-toned, vocal-forward.
@@ -3383,7 +3383,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {jazz} · pop +0.5 · moodclass · cat:jazz_lounge
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "bebop": {"bpm": 165, "energy": -12, "danceability": 0.4, "brightness": 0.3, "beat_confidence": 0.65, "onset_rate": 7, "dynamic_complexity": 0.72, "arousal": 0.78, "valence": 0.55, "vocal_presence": 0.2},
+    "bebop": {"bpm": 123, "energy": -12, "danceability": 0.4, "brightness": 0.3, "beat_confidence": 0.65, "onset_rate": 7, "dynamic_complexity": 0.72, "arousal": 0.78, "valence": 0.55, "vocal_presence": 0.2},
 # ── swing_bigband → "Swing & Big Band Mix" ────────────────────────────────────────────────
 # Theme:    Lively, exuberant, celebratory, brassy, playful.
 # Sound:    Fast 150bpm, low energy, danceable; warm-toned.
@@ -3554,7 +3554,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · moodclass · cat:rock_punk
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "glasgow_postpunk": {"bpm": 132, "energy": -10, "danceability": 0.48, "brightness": 0.22, "beat_confidence": 0.78, "onset_rate": 6, "dynamic_complexity": 0.48, "arousal": 0.78, "valence": 0.5, "vocal_presence": 0.62},
+    "glasgow_postpunk": {"bpm": 132, "energy": -10, "danceability": 0.48, "brightness": 0.22, "beat_confidence": 0.78, "onset_rate": 6, "dynamic_complexity": 0.48, "arousal": 0.78, "valence": 0.5, "vocal_presence": 0.94},
 # ── glasgow_house → "Glasgow House Mix" ───────────────────────────────────────────────────
 # Theme:    Hypnotic, stylish, lively, cosmopolitan, nocturnal.
 # Sound:    Upbeat 124bpm, mid energy, very danceable; warm-toned.
@@ -3563,7 +3563,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · lyric-themes · moodclass · cat:electronic_house_techno
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "glasgow_house": {"bpm": 124, "energy": -10, "danceability": 0.7, "brightness": 0.26, "beat_confidence": 0.78, "onset_rate": 5, "dynamic_complexity": 0.4, "arousal": 0.65, "valence": 0.6, "vocal_presence": 0.45},
+    "glasgow_house": {"bpm": 124, "energy": -10, "danceability": 0.44, "brightness": 0.26, "beat_confidence": 0.78, "onset_rate": 5, "dynamic_complexity": 0.4, "arousal": 0.65, "valence": 0.6, "vocal_presence": 0.45},
 # ── glasgow_underground → "Glasgow Underground Mix" ───────────────────────────────────────
 # Theme:    Hypnotic, dark, driving, nocturnal, intense.
 # Sound:    Upbeat 130bpm, mid energy, very danceable; dark-toned, near-instrumental.
@@ -3671,7 +3671,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · lyric-themes · moodclass · cat:electronic_bass
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion + lyric_lang=en soft lean (applied)
-    "london_garage": {"bpm": 134, "energy": -10, "danceability": 0.7, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
+    "london_garage": {"bpm": 134, "energy": -10, "danceability": 0.43, "brightness": 0.3, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.4, "arousal": 0.7, "valence": 0.62, "vocal_presence": 0.55},
 # ── london_grime → "London Grime Mix" ─────────────────────────────────────────────────────
 # Theme:    Aggressive, brash, menacing, gritty, defiant.
 # Sound:    Fast 140bpm, mid energy, danceable; dark-toned.
@@ -3698,7 +3698,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · moodclass · cat:electronic_bass
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "london_jungle": {"bpm": 172, "energy": -8, "danceability": 0.55, "brightness": 0.24, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.42, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
+    "london_jungle": {"bpm": 124, "energy": -8, "danceability": 0.55, "brightness": 0.24, "beat_confidence": 0.85, "onset_rate": 7.5, "dynamic_complexity": 0.42, "arousal": 0.85, "valence": 0.55, "vocal_presence": 0.45},
 # ── melbourne_folk → "Melbourne Folk Mix" ─────────────────────────────────────────────────
 # Theme:    Warm, earnest, wistful, pastoral, gentle.
 # Sound:    Mid-slow 92bpm, low energy, moderate groove; warm-toned.
@@ -3770,7 +3770,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · moodclass · cat:rock_punk
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "melbourne_postpunk": {"bpm": 128, "energy": -9, "danceability": 0.46, "brightness": 0.16, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.62},
+    "melbourne_postpunk": {"bpm": 128, "energy": -9, "danceability": 0.46, "brightness": 0.16, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.5, "arousal": 0.78, "valence": 0.45, "vocal_presence": 0.90},
 # ── melbourne_psych → "Melbourne Psych Mix" ───────────────────────────────────────────────
 # Theme:    Hypnotic, trippy, manic, driving, druggy.
 # Sound:    Upbeat 132bpm, mid energy, danceable; dark-toned.
@@ -3788,7 +3788,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {rock} · moodclass · cat:rock_punk
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "melbourne_garagepunk": {"bpm": 150, "energy": -8, "danceability": 0.45, "brightness": 0.22, "beat_confidence": 0.82, "onset_rate": 7, "dynamic_complexity": 0.48, "arousal": 0.85, "valence": 0.45, "vocal_presence": 0.65},
+    "melbourne_garagepunk": {"bpm": 150, "energy": -8, "danceability": 0.45, "brightness": 0.22, "beat_confidence": 0.82, "onset_rate": 7, "dynamic_complexity": 0.48, "arousal": 0.85, "valence": 0.45, "vocal_presence": 0.94},
 # ── melbourne_club → "Melbourne Club Mix" ─────────────────────────────────────────────────
 # Theme:    Exuberant, lively, euphoric, driving, bright.
 # Sound:    Upbeat 128bpm, mid energy, very danceable; warm-toned.
@@ -3797,7 +3797,7 @@ _MOOD_PROFILES = {
 # Criteria: style gate parent {electronic} · moodclass · cat:electronic_house_techno
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
-    "melbourne_club": {"bpm": 128, "energy": -8, "danceability": 0.74, "brightness": 0.34, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.8, "valence": 0.68, "vocal_presence": 0.45},
+    "melbourne_club": {"bpm": 128, "energy": -8, "danceability": 0.44, "brightness": 0.34, "beat_confidence": 0.82, "onset_rate": 5.5, "dynamic_complexity": 0.35, "arousal": 0.8, "valence": 0.68, "vocal_presence": 0.45},
 # ── melbourne_techno → "Melbourne Techno Mix" ─────────────────────────────────────────────
 # Theme:    Hypnotic, dark, driving, nocturnal, intense.
 # Sound:    Upbeat 130bpm, mid energy, very danceable; dark-toned, near-instrumental.
@@ -3831,7 +3831,7 @@ _MOOD_PROFILES = {
 # Criteria: no genre gate · pop +1 · scheduled TuTh 12-14 / weekends 8-12 · lyric-themes · cat:workout_energy
 # Flow:     DJ smooth: greedy+2-opt on beatmatch (octave-BPM) + Camelot key + energy.
 # Enhance:  integrated_loudness steadiness + emb_musicnn sounds-like cohesion (applied)
-    "running":    {"bpm": 160, "energy": -6,  "danceability": 0.45, "brightness": 0.28,
+    "running":    {"bpm": 126, "energy": -6,  "danceability": 0.45, "brightness": 0.28,
                    "beat_confidence": 0.80, "onset_rate": 6.0, "dynamic_complexity": 0.42,
                    "arousal": 0.85, "valence": 0.60, "vocal_presence": 0.55},
 # ── party → "Party Mix" ───────────────────────────────────────────────────────────────────
@@ -4036,7 +4036,7 @@ _MOOD_PROFILES = {
 # Enhance:  emb_musicnn sounds-like cohesion + lyric_lang=en soft lean (applied)
     "cathartic":        {"bpm": 108, "energy": -10, "danceability": 0.38, "brightness": 0.22,
                          "beat_confidence": 0.55, "onset_rate": 4.5, "dynamic_complexity": 0.70,
-                         "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.80},
+                         "arousal": 0.70, "valence": 0.40, "vocal_presence": 0.80, "valence_weight": 8.0},
 # ── confidence_boost → "Feelin' Myself" ───────────────────────────────────────────────────
 # Theme:    Confident, powerful, lively, gutsy, swaggering.
 # Sound:    Upbeat 118bpm, mid energy, danceable; warm-toned.
@@ -5926,6 +5926,14 @@ for _k in ("jazz_dinner", "smooth_jazz", "winter_jazz", "autumn_jazz", "london_j
     _sig = _PROFILE_STYLE_SIGNALS.get(_k)
     _PROFILE_STYLE_SIGNALS[_k] = ((_sig[0] if _sig else []),
                                   list(_sig[1] if _sig else []) + ["comedy", "parody", "novelty"])
+# Catalogue S15: after_work is a clock-off DECOMPRESSION mix and windy a mid-energy weather mix, but both
+# filled with peak-time club/trance/eurodance (the Darude/Oakenfold/Vengaboys class). Soft-push that family
+# out; every token vocab-verified present in the style/Discogs tags ('big room'/'hard dance' don't exist).
+for _k in ("after_work", "windy"):
+    _sig = _PROFILE_STYLE_SIGNALS.get(_k)
+    _PROFILE_STYLE_SIGNALS[_k] = ((_sig[0] if _sig else []),
+                                  list(_sig[1] if _sig else [])
+                                  + ["trance", "hardstyle", "hard house", "eurodance", "euro house", "hi-nrg"])
 del _k, _sig
 
 # Profiles whose identity IS a genre — positives above are required (the candidate pool is
@@ -8157,7 +8165,7 @@ def _acoustic_distance_to_centroid(entry, centroid):
             ev = ev if ev is not None else pv
             ea = ea if ea is not None else pa
         if ev is not None and centroid.get("valence") is not None:
-            _add((ev - centroid["valence"]) ** 2, _VALENCE_WEIGHT)
+            _add((ev - centroid["valence"]) ** 2, centroid.get("valence_weight", _VALENCE_WEIGHT))  # per-profile override (catalogue S15: sad_bangers/cathartic enforce the "sad" axis at 3x, mirroring vocal_weight)
         if ea is not None and centroid.get("arousal") is not None:
             _add((ea - centroid["arousal"]) ** 2, _AROUSAL_WEIGHT)
     # Vocal axis — TF value preferred, genre/style proxy as fallback until TF data lands.
@@ -13764,6 +13772,14 @@ _SCREEN_EXCLUDED_PROFILES = {
 # "(Performance Track … Without Background Vocals)" surfaced in three mixes; skits/interludes pad others.
 _FRAGMENT_TITLE_RE = re.compile(r"\((skit|interlude)\)|karaoke|performance track", re.I)
 
+# Catalogue S15: hard per-profile facet bounds at the candidate stage — for intents a SOFT lean cannot
+# enforce. WHY: sad_bangers selected pure party tracks (valence 0.57) because flat tag boosts outrank any
+# centroid facet weight (weights act on a normalised distance; boosts act on the score directly). The
+# library has 2,734 danceable tracks at valence <=0.45 — a hard cap guarantees the "sad" half of the brief.
+_PROFILE_FACET_BOUNDS = {
+    "sad_bangers": [("valence", None, 0.45)],
+}
+
 def _is_screen_content(entry):
     """True if `entry` is genuine film/TV/game SCORE material — the curated SELECTION gate for soundtracks_radio.
     WHY: the Discogs AUDIO classifier stamps 'Stage & Screen---Soundtrack/Score' onto ANY instrumental,
@@ -14389,6 +14405,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _cand_keys = [rk for rk in _cand_keys if not _is_screen_content(essentia_cache[rk])]
     _cand_keys = [rk for rk in _cand_keys
                   if not _FRAGMENT_TITLE_RE.search(essentia_cache[rk].get("title") or "")]
+    # Catalogue S15: hard facet bounds (see _PROFILE_FACET_BOUNDS) — tracks without the facet stay eligible.
+    for _f, _lo, _hi in _PROFILE_FACET_BOUNDS.get(profile_key, ()):
+        _cand_keys = [rk for rk in _cand_keys
+                      if not isinstance(essentia_cache[rk].get(_f), (int, float))
+                      or ((_lo is None or essentia_cache[rk][_f] >= _lo)
+                          and (_hi is None or essentia_cache[rk][_f] <= _hi))]
 
     # Embedding "sounds-like" cohesion: compute the mix's core embedding centroid ONCE, then
     # _combined_score pulls candidates toward it. emb_effnet (sub-style) for genre-gated mixes, emb_musicnn
