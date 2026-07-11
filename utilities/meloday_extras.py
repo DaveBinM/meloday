@@ -7583,11 +7583,14 @@ def _extras_lock_key(to_run, args):
 # ---------------------------------------------------------------------------
 def _upsert_extras_playlist(plex, name, tracks, description,
                             cover_key=None, cover_title=None, cover_subtitle=None,
-                            cover_tracks=None, existing_playlists=None):
+                            cover_tracks=None, existing_playlists=None, pre_ordered=False):
     """
     cover_tracks:        pass the mix's track list to generate a Daily Mix collage cover.
     existing_playlists:  pre-fetched {title: playlist_obj} dict; avoids a full plex.playlists()
                          call per update. Populated in main() and passed through.
+    pre_ordered:         True when the caller already DJ-sequenced the tracks (_build_mix_tracks
+                         output). MUST be set there — re-smoothing would flatten the arc mixes'
+                         energy arc, not just waste work.
     """
     # Single chokepoint for EVERY extras playlist: show the canonical (studio-original) copy of each song.
     # Post-selection, order-preserving — ranking/length unchanged; live/remix/extended keep their own copy.
@@ -7596,6 +7599,13 @@ def _upsert_extras_playlist(plex, name, tracks, description,
     if not valid:
         xlog(f"[WARN] '{name}': no valid tracks — skipping.")
         return
+    # DJ-Smooth every playlist that didn't arrive pre-sequenced (user's call, 2026-07-11: every non-arc
+    # playlist plays as a Smooth set). This deliberately trades the rank/priority orders the stats
+    # builders emitted (On Repeat's most-played-first, Release Radar's newest-first) for listening flow —
+    # WHICH tracks made the list is unchanged. Runs after canonicalize so the copies that will actually
+    # play are what get sequenced.
+    if not pre_ordered:
+        valid = _dj_order(valid, meloday._essentia_cache)
     try:
         existing = (existing_playlists or {}).get(name) or \
                    next((pl for pl in plex.playlists() if getattr(pl, "title", "") == name), None)
@@ -15091,9 +15101,11 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             - _rating_dist_bonus(getattr(t, "userRating", None))
         ))
     combined = combined[:mix_size]
-    if not _is_era:                        # DJ flow: re-sequence for smooth mixing — incl. the geo scenes
-        # (varied music benefits most); only the decade mixes keep their day-seeded shuffle (no DJ re-order).
-        combined = _dj_order(combined, essentia_cache, arc=(profile_key in _DJ_ARC_PROFILES))
+    # DJ flow: re-sequence EVERY mix for smooth mixing (arc for the beat-driven set). The decade mixes
+    # were originally left on their day-seeded shuffle, but per the user's call (2026-07-11) every
+    # non-arc playlist plays as a Smooth-sequenced set. Ordering only — it runs AFTER the
+    # combined[:mix_size] slice, so WHICH tracks rotate each day is untouched.
+    combined = _dj_order(combined, essentia_cache, arc=(profile_key in _DJ_ARC_PROFILES))
     return combined
 
 
@@ -15229,7 +15241,9 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
                 _pick_description(profile_key),
                 cover_key=profile_key,
                 cover_title=name.replace(" • Meloday+", ""),
-                existing_playlists=ep)
+                existing_playlists=ep,
+                pre_ordered=True)   # _build_mix_tracks already Smooth/Arc-sequenced these
+
 
 
 def main():
