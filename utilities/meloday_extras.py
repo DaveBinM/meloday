@@ -14197,7 +14197,17 @@ _DJ_ARC_PROFILES = {
     # build->peak->wind-down set arc. WHY: any electronic-based mix should flow like a DJ set.
     "industrial", "hyperpop", "chiptune",
 }
-_DJ_ARC_WEIGHT = 2.0   # how strongly the energy ARC pulls vs adjacent-transition smoothness
+# WHY a band and not a weight: the old greedy used a 2.0 arc-pull weight against the transition cost,
+# but greedy consumption has no lookahead — it spent the best-matching tracks early and the measured
+# peak landed anywhere from 8% (london_jungle) to 96% (glasgow_underground) through the set vs the 75%
+# target. Rank-assignment guarantees the macro arc; the band is how far a track may drift from its
+# assigned intensity slot while the swap pass smooths transitions. Sweep over all 23 arc mixes
+# (band: transition-cost delta vs old greedy / median curve-MAE / peaks in [65,80]%):
+#   0.08 +21.8% .156 23/23 | 0.12 +15.3% .169 23/23 | 0.16 +12.7% .167 23/23 | 0.20 +9.2% .169 23/23
+#   (all with the peak pinned; unpinned the peak drifts out of window for 2-10 mixes at every band).
+# 0.16 is the knee — half the smoothness cost of 0.08 for the same curve fidelity; 0.20 buys little
+# more and its worst early-set jump rises 0.49 -> 0.59 (breaks the warm-up ramp).
+_DJ_ARC_BAND = 0.16
 
 
 def _dj_transition(ea, eb, emb_a=None, emb_b=None):
@@ -14247,7 +14257,12 @@ def _dj_order(tracks, essentia_cache, arc=False):
                         order[i:j + 1] = order[i:j + 1][::-1]; improved = True
         return order
 
-    # ARC mode: energy ease-in -> peak ~75% -> wind-down, with beatmatched/harmonic transitions
+    # ARC mode: energy ease-in -> peak ~75% -> wind-down, with beatmatched/harmonic transitions.
+    # Built by RANK-ASSIGNMENT, not greedy: positions sorted by target intensity <-> tracks sorted by
+    # intensity is the curve-MAE-minimal assignment for the given tracks, so the macro arc is guaranteed
+    # by construction. (The old greedy walk drifted wherever transitions led: measured peak positions
+    # ranged 8%-96% vs the 75% target, wind-downs held near-peak spikes, and track 2 jumped from the
+    # quietest opener to mid energy because target(0)=0.45 contradicted the min-intensity opener.)
     def _intensity(e):
         comp = w = 0.0
         if e.get("arousal")      is not None: comp += 0.30 * e["arousal"];                               w += 0.30
@@ -14261,13 +14276,51 @@ def _dj_order(tracks, essentia_cache, arc=False):
     n = len(tracks)
     def _target(i):
         p = i / (n - 1)
-        return 0.45 + 0.55 * (p / 0.75) ** 0.85 if p <= 0.75 else 1.0 - 0.45 * ((p - 0.75) / 0.25)
-    rem = tracks[:]
-    first = min(rem, key=lambda t: norm[str(t.ratingKey)]); rem.remove(first); order = [first]
-    for i in range(1, n):
-        T, prev = _target(i), order[-1]
-        nxt = min(rem, key=lambda t: _DJ_ARC_WEIGHT * abs(norm[str(t.ratingKey)] - T) + _c(prev, t))
-        rem.remove(nxt); order.append(nxt)
+        if p <= 0.10:                       # true ease-in ramp (the set warms up over the first ~5 tracks)
+            return 0.05 + (p / 0.10) * 0.40
+        if p <= 0.75:                       # build to the peak at ~75%
+            return 0.45 + 0.55 * ((p - 0.10) / 0.65) ** 0.85
+        return 1.0 - 0.55 * ((p - 0.75) / 0.25)   # wind-down, deeper than the old 0.45 drop so the set lands calm
+    targ = [_target(i) for i in range(n)]
+    pos_by_target = sorted(range(n), key=lambda i: targ[i])
+    trk_by_inten  = sorted(tracks, key=lambda t: norm[str(t.ratingKey)])
+    order = [None] * n
+    for p, t in zip(pos_by_target, trk_by_inten):
+        order[p] = t
+    # Transition-smoothing swap pass, constrained to the arc: a swap is allowed only between positions
+    # whose TARGETS differ <= _DJ_ARC_BAND, so tracks trade places along the curve without bending it.
+    # The single peak track is pinned — near the peak the curve flattens, so an unpinned peak wanders
+    # (sweep: peaks stayed in [65,80]% for 23/23 mixes pinned vs as few as 13/23 unpinned).
+    peak_pos = max(range(n), key=lambda i: norm[str(order[i].ratingKey)])
+    _memo = {}
+    def _cm(a, b):
+        k = (str(a.ratingKey), str(b.ratingKey))
+        if k not in _memo:
+            _memo[k] = _c(a, b)
+        return _memo[k]
+    def _swap_delta(i, j):
+        a, b = order[i], order[j]
+        if j == i + 1:
+            before = (_cm(order[i-1], a) if i else 0.0) + (_cm(b, order[j+1]) if j + 1 < n else 0.0)
+            after  = (_cm(order[i-1], b) if i else 0.0) + (_cm(a, order[j+1]) if j + 1 < n else 0.0)
+        else:
+            before = ((_cm(order[i-1], a) if i else 0.0) + _cm(a, order[i+1])
+                      + _cm(order[j-1], b) + (_cm(b, order[j+1]) if j + 1 < n else 0.0))
+            after  = ((_cm(order[i-1], b) if i else 0.0) + _cm(b, order[i+1])
+                      + _cm(order[j-1], a) + (_cm(a, order[j+1]) if j + 1 < n else 0.0))
+        return after - before
+    improved, rounds = True, 0
+    while improved and rounds < 40:
+        improved, rounds = False, rounds + 1
+        for i in range(n):
+            if i == peak_pos:
+                continue
+            for j in range(i + 1, n):
+                if j == peak_pos or abs(targ[i] - targ[j]) > _DJ_ARC_BAND:
+                    continue
+                if _swap_delta(i, j) < -1e-9:
+                    order[i], order[j] = order[j], order[i]
+                    improved = True
     return order
 
 
