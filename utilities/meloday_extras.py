@@ -12304,11 +12304,11 @@ def build_release_radar(plex, music, essentia_cache, centroid, excluded_album_ke
 
     def _sort_key(item):
         rel, affinity, _, art_k, _ = item
-        week     = rel.isocalendar()[1]
-        is_known = 1 if art_k in known_artists else 0
-        # Sort descending: newest week first; within week, known artists before
-        # library-only; within that group, higher acoustic affinity wins.
-        return (rel.year, week, is_known, affinity)
+        iso      = rel.isocalendar()          # ISO year+week TOGETHER — rel.year broke at the Dec/Jan
+        is_known = 1 if art_k in known_artists else 0   # boundary (2024-12-30 is ISO 2025-W01; the old
+        # Sort descending: newest week first; within week, known artists before   # (2024, 1) key sorted a
+        # library-only; within that group, higher acoustic affinity wins.         # December release LAST)
+        return (iso[0], iso[1], is_known, affinity)
 
     window_days = RELEASE_RADAR_START_DAYS
     album_data  = []
@@ -12463,7 +12463,7 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
     n_new_explore = n_new - n_new_safe  # stretch picks
 
     pool_size = max(300, target * 8)
-    explore_start = pool_size
+    explore_start = min(pool_size, len(new_artist_scored) // 2)   # scale to the ACTUAL pool — a fixed 300 emptied the stretch tier on smaller pools (catalogue S14)
     explore_end   = pool_size + target * 4
 
     # Resolve all candidates in one shot
@@ -12539,7 +12539,19 @@ def build_discover_weekly(plex, history_entries, essentia_cache, centroid,
 
     # Interleave: safe new → familiar → stretch, cycling through all three
     # so the playlist flows as one curated mix rather than grouped sections.
-    return _round_robin_interleave([new_safe_tracks, familiar_tracks, explore_tracks], target)
+    result = _round_robin_interleave([new_safe_tracks, familiar_tracks, explore_tracks], target)
+    # Back-fill to target from the remaining ranked candidates — the fixed tier caps + interleave
+    # previously returned ~25/30 whenever any tier ran short (catalogue S14).
+    if len(result) < target:
+        for _, rk in new_artist_scored + familiar_artist_scored:
+            if len(result) >= target:
+                break
+            t = track_map.get(rk)
+            if not _eligible(rk, t):
+                continue
+            _accept(t)
+            result.append(t)
+    return result
 
 
 # --- 5. Daily Mixes ---
@@ -12677,6 +12689,7 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
         artist_count = Counter()
 
         history_tracks = []
+        taken_rks = set()
         for rk in history_rks:
             if len(history_tracks) >= n_history:
                 break
@@ -12690,11 +12703,14 @@ def build_daily_mixes(plex, history_entries, essentia_cache, excluded_album_keys
                 continue
             artist_count[ak] += 1
             history_tracks.append(t)
+            taken_rks.add(rk)
 
         library_tracks = []
         for rk in library_rks:
             if len(library_tracks) >= n_library:
                 break
+            if rk in taken_rks:   # a once-played track sits in BOTH pools — taking it twice shorted the
+                continue          # mix post-dedup and double-counted its artist (catalogue S14)
             t = track_map.get(rk)
             if not t or is_low_rated(t):
                 continue
@@ -12750,7 +12766,8 @@ def build_rediscovery(plex, history_entries, excluded_album_keys, target=40):
         pk = str(getattr(e, "parentRatingKey", "") or "")
         if pk in excluded_album_keys:
             continue
-        all_time_plays[rk] += 1
+        if e.viewedAt >= silence_ceiling:     # count plays over THIS builder's own 720d window only
+            all_time_plays[rk] += 1           # (shared-history span varied with co-run playlists — S14)
         if rk not in last_played or e.viewedAt > last_played[rk]:
             last_played[rk] = e.viewedAt
 
@@ -12995,7 +13012,11 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
         xlog("[INFO] deep_cuts: no recent artist history.")
         return []
 
-    all_time_plays = Counter(str(e.ratingKey) for e in history_entries)
+    # Plays counted over THIS builder's own 180-day window. WHY: the shared history list spans
+    # whatever lookback the co-run playlists requested, so "deep cut (<=2 plays)" silently meant
+    # 6 months alone but YEARS when co-run with top_songs — catalogue S14. Now deterministic.
+    plays_180d = Counter(str(e.ratingKey) for e in history_entries
+                         if e.viewedAt and e.viewedAt >= window_cutoff)
     top_artist_set = set(top_artists)
 
     # Use essentia cache to find tracks per artist (avoids a full music.search())
@@ -13012,8 +13033,8 @@ def build_deep_cuts(plex, history_entries, essentia_cache, excluded_album_keys,
         if not artist_rks:
             continue
 
-        well_played_rks = [rk for rk in artist_rks if all_time_plays.get(rk, 0) > 2]
-        deep_cut_rks    = [rk for rk in artist_rks if all_time_plays.get(rk, 0) <= 2]
+        well_played_rks = [rk for rk in artist_rks if plays_180d.get(rk, 0) > 2]
+        deep_cut_rks    = [rk for rk in artist_rks if plays_180d.get(rk, 0) <= 2]
         if not deep_cut_rks:
             continue
 
