@@ -677,3 +677,62 @@ NEEDED were re-evaluated and confirmed healthy.
 
 *Artifacts: session scratchpad (v2 metrics + tracklists, review chunks + results, verified_flags.jsonl,
 w4_results.json). Builds are date-deterministic; the harness re-runs any of this on demand.*
+
+---
+
+## Fix round 1 — applied 2026-07-11 (commits 3ae08a0 · f62d6d3 · 6830d6e · 28a2ce5)
+
+User-selected scope: S2 S3 S4 S6 S7 S8 S11 S13 S14 S15 + the melbourne_psych floor; S5 nation-fill kept
+by choice; S1/S9/S10 deferred. All values measured from the cache before writing (vocabulary counts in the
+code's WHY comments) — six genre-knowledge tokens were caught dead by that check and removed.
+
+- **S6 (geo)**: `_origin_match` scene fallback now word-boundary and bounded — it fires only with no MB
+  origin or an in-nation origin (MusicBrainz stays the authority; a crowd tag can no longer override
+  Johannesburg). New `within` nation bound kills London-Ontario collisions. CORRECTIONS from review: Tyla
+  is the SA singer per the files' own MBID (verified); **Sofia Isella's origin (LA-born, Queensland area)
+  is VALID dual-origin MB data, not corruption — the earlier resync recommendation was wrong** and her
+  australia membership is by design. Verified: Tyla/Ye/Julie London/Bieber/Loud Luxury excluded everywhere;
+  21 Savage/Riva Starr/Sofia pass by design.
+- **S5 regression**: melbourne_psych floor 0.22 → 0.15 — Bee Gees 22 → 2 tracks, 29 artists.
+- **S2/S3**: positives reworked + floors extended across ~45 gates; blocked-subs mechanism
+  (rnb/swing + new jack swing, big/new beat, garage rock, tropical house); 7 floors sweep-tuned after
+  build-testing caught starvation. Verified: all 57 changed gates build healthily, every verified leak
+  ejected. Residuals (confident mis-tags, floor-immune): Tiësto 'Get Down' (Bassline .303, uk_garage),
+  Girls Aloud 'Some Kind of Miracle' (Brit Pop .349, britpop_rock). Library-bound: chiptune (~20 artists),
+  hyperpop (zero real hyperpop subs), london_jazz (21 city artists).
+- **S4**: score cues excluded from the jazz family + industrial/downtempo/vaporwave/post_rock/stoner_rock.
+- **S7**: worship/praise-only soft negatives on the romantic/emotional families (CCM broadly untouched).
+- **S8**: skit/interlude/karaoke/performance-track exclusion (all 4 suffixed titles caught) + comedy/parody
+  negatives on the serious-jazz family.
+- **S11/S13**: facet targets recalibrated to post-gate pool medians (vocal 0.90-0.95 punk family;
+  danceability 0.40-0.46 dance family; tempo in stored-BPM space); yoga_stretch vocal 0.35→0.28
+  (violations 22%→8%).
+- **S15**: after_work/windy club-trance negatives (banger cast 8→2 artists); sad_bangers fixed decisively
+  via the new `_PROFILE_FACET_BOUNDS` hard cap (valence ≤0.45): 0.57→0.40, zero party offenders, the list
+  now reads as actual sad bangers. cathartic improved (gecs gone). gaming/heatwave/summer_roadtrip/
+  school_days/dinner_party accepted as documented.
+- **S14**: DW back-fills to 30 (pool-scaled explore band); daily mixes no longer double-count once-played
+  tracks; deep_cuts/rediscovery play windows deterministic (invariant under old-history noise); Release
+  Radar ISO-year sort key. PROD-VERIFY still open: history-row userRating test on daedalus.
+
+## S12 spec (measured, NOT implemented — awaiting approval)
+
+Goal: keep re-records/reissues out of the wrong decade without excluding correctly-dated material.
+Measured against every decade pool:
+
+**Finding: remaster titles are NOT one class.** In the 60s-00s pools, "(remastered)" tracks are almost all
+CORRECTLY dated by their original-date file tags (Bee Gees 2012 remasters of 60s songs, Australian Crawl
+80s, Eurythmics 90s — ~400 tracks a naive title guard would wrongly evict). The genuine disease lives in
+the 10s/20s pools, where a remaster title + modern resolved year is a contradiction (Haddaway "(remastered)"
+dated 2020s; Lynyrd Skynyrd "(remastered) (live)" dated 2010s).
+
+**Proposed rule (two parts):**
+1. RE-RECORD class — `re-record(ed)`, `new version/recording`, `'NN version`, `Taylor's Version` —
+   excluded from EVERY decade pool: new performances are never era canon. Impact: 58 tracks, zero false
+   positives in review (Coolio ×4, Gloria Gaynor re-records, Empire of the Sun "(new version)", Nicole
+   "(2022 Version)" ×3, Kylie "(new version 2015)").
+2. REMASTER class — excluded ONLY from decade_10s + decade_20s. Impact: 49 tracks, all inspected samples
+   genuinely mis-dated older material. The 60s-00s remasters (~396) stay — they are correctly dated.
+
+Per-decade impact (re-record-drop / remaster-drop-if-10s-20s-rule): 60s 0/– · 70s 6/– · 80s 7/– ·
+90s 2/– · 00s 18/– · 10s 2/20 · 20s 23/29. Full lists: session scratchpad `s12_spec.json`/`s12_split.json`.
