@@ -5734,7 +5734,7 @@ _PROFILE_STYLE_SIGNALS = {
     # the others are hard-gated. Pop lists carry BOTH Plex + genre_discogs spellings) ---
     "power_ballads": (["arena rock", "album rock", "soft rock", "adult contemporary", "hard rock", "contemporary pop/rock"], ["rap", "techno", "drill"]),
     "neoclassical": (["neo-classical", "modern composition", "chamber music", "classical crossover", "contemporary instrumental", "classical"], ["film score", "original score", "soundtracks", "rap", "metal", "punk"]),
-    "yacht_rock": (["soft rock", "adult contemporary", "sophisti-pop", "blue-eyed soul", "pop-soul", "quiet storm"], ["metal", "rap", "punk", "techno", "drill", "hardcore"]),  # WHY: dropped "am pop" — substring ⊂ "dream pop" (2845-track leak) (audit substr-fix)
+    "yacht_rock": (["soft rock", "aor"], ["metal", "rap", "punk", "techno", "drill", "hardcore"]),  # WHY: +aor (750 real tracks), dropped adult contemporary/pop-soul/quiet storm — they pulled boy bands & modern country into the yacht canon (catalogue S3; sophisti-pop/blue-eyed soul are Plex styles, not Discogs subs — vocab-checked zero)
     "swagger": (["contemporary rap", "hardcore rap", "contemporary r&b", "g-funk", "funk", "west coast rap"], ["folk", "ambient", "classical", "metal", "country"]),
     "chart_pop": (["contemporary pop/rock", "dance-pop", "teen pop", "vocal pop", "traditional pop", "pop idol", "social media pop", "europop", "euro-pop", "power pop", "bubblegum", "sunshine pop", "brill building pop", "pop-soul"], ["punk", "metal", "experimental", "country"]),
     "dance_pop": (["dance-pop", "dance-rock", "alternative dance", "euro-dance", "eurodance", "hi-nrg", "nu-disco", "italo-disco", "euro-disco", "post-disco", "electroclash", "eurobeat"], ["metal", "folk", "ambient", "country"]),
@@ -5760,7 +5760,7 @@ _PROFILE_STYLE_SIGNALS = {
     "spring_jangle": (["indie pop", "jangle pop", "dream pop", "twee pop"], []),
     "summer_heat": (["disco", "funk", "club/dance"], []),  # dropped "house" (22k swamped the disco/funk intent)
     "summer_breeze": (["soft rock", "adult contemporary", "sophisti-pop"], []),  # WHY: dropped "am pop" (⊂ "dream pop"); +sophisti-pop keeps breadth (audit substr-fix)
-    "summer_tropical": (["latin", "reggae", "afro", "tropical", "bossa"], []),
+    "summer_tropical": (["latin", "reggae", "reggaeton", "tropical", "bossa nova", "cumbia", "salsa", "samba", "mpb"], []),  # 'tropical house' BLOCKED (catalogue S3 — it flooded the mix with EDM); dropped bare 'afro'/'bossa' fragments for the real sub names
     "autumn_leaves": (["folk", "singer/songwriter", "americana"], []),
     "autumn_jazz": (["jazz", "soul", "smooth jazz"], []),
     "autumn_embers": (["classic rock", "blues rock", "southern rock", "arena rock", "aor"], []),  # Discogs subgenres
@@ -5785,22 +5785,22 @@ _PROFILE_STYLE_SIGNALS = {
     "after_hours_rnb": (["contemporary r&b", "alternative r&b", "new jack swing", "quiet storm"], ["metal", "punk", "country"]),
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
     "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop", "conscious"], ["metal", "country", "ambient"]),  # Discogs subgenres
-    "conscious_flow": (["conscious", "jazzy hip-hop", "instrumental", "boom bap"], ["metal", "screamo", "edm"]),  # Discogs subgenres
+    "conscious_flow": (["conscious", "jazzy hip-hop", "boom bap"], ["metal", "screamo", "edm"]),  # WHY dropped 'instrumental': it admitted non-rap singers/instrumentals outright (catalogue S3)
     "g_funk": (["g-funk", "gangsta"], ["metal", "punk", "ambient"]),  # Discogs subgenres
     "trap_mode": (["trap", "cloud rap", "crunk", "gangsta"], ["folk", "ambient", "classical"]),  # Discogs subgenres
     "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat"], ["metal", "punk", "hardcore"]),  # dropped "downtempo" (pulled 13k generic downtempo, not lo-fi beats)
     "house_party": (["house", "tech-house", "progressive house", "club/dance", "euro-dance"], ["metal", "country", "ambient"]),
     "deep_house": (["deep house", "microhouse", "minimal techno", "tech-house", "left-field house"], ["metal", "punk", "country"]),
     "techno": (["techno", "minimal techno", "detroit techno", "acid house", "industrial dance"], ["folk", "country", "gospel"]),
-    "trance": (["trance", "progressive trance", "goa trance", "euro-dance", "hi-nrg"], ["metal", "country", "blues"]),
-    "dnb": (["jungle", "drum'n'bass", "breakbeat", "idm", "bass music"], ["folk", "country", "ambient"]),  # WHY: split the "jungle/drum'n'bass" composite — word-boundary matching treats them as two separate positives (audit substr-fix-systemic)
+    "trance": (["trance", "progressive trance", "goa trance", "psy-trance", "hard trance"], ["metal", "country", "blues"]),  # WHY dropped euro-dance/hi-nrg: zero real ≥0.2 tracks — they only ever matched spray; the mix had drifted tech-house (catalogue S3)
+    "dnb": (["jungle", "drum'n'bass", "drum n bass", "breakbeat"], ["folk", "country", "ambient"]),  # WHY dropped idm/bass music: they admitted house/trance remixes of pop — under half the mix was dnb (catalogue S3); both dnb spellings kept (vocab: 'drum n bass' 898@0.2)
     "bass_drop": (["dubstep", "bass music", "grime", "trap (edm)"], ["folk", "country", "jazz"]),
-    "uk_garage": (["uk garage", "garage", "bass music", "broken beat", "bassline"], ["metal", "country", "folk"]),
+    "uk_garage": (["uk garage", "speed garage", "garage house", "bassline", "broken beat"], ["metal", "country", "folk"]),  # WHY dropped bare 'garage' (token-matched 'garage rock') + 'bass music': the mix had become commercial house/EDM (catalogue S3); all tokens vocab-checked real
     "synthwave": (["synthwave", "neo-electro", "new romantic"], ["metal", "country", "gospel"]),  # dropped bare "electro" (substring of the "electronic" parent → pulled the whole electronic pool)
     "industrial": (["industrial", "electro-industrial", "industrial metal", "industrial dance"], ["folk", "country", "gospel"]),
-    "vaporwave": (["vaporwave", "chillwave", "ambient pop", "plunderphonics"], ["metal", "punk", "hardcore"]),
+    "vaporwave": (["vaporwave", "chillwave"], ["metal", "punk", "hardcore"]),  # WHY trimmed: ambient pop/plunderphonics have zero ≥0.2-conf tracks; the mix filled with score cues + lofi flips (catalogue S3 + S4)
     "downtempo": (["downtempo", "trip-hop", "chillwave", "idm", "ambient techno"], ["metal", "punk", "hardcore"]),
-    "hyperpop": (["hyperpop", "glitch", "social media pop"], ["metal", "blues", "country"]),  # WHY dropped 'bubblegum': Discogs Bubblegum = 60s/Y2K pop, not hyperpop — it admitted Destiny's Child (.34)/J.Lo/Kesha (quality audit)
+    "hyperpop": (["hyperpop", "glitch", "electroclash"], ["metal", "blues", "country"]),  # WHY dropped 'bubblegum' (admitted Destiny's Child .34) and 'social media pop' (zero Discogs tracks); +electroclash (271 real). NOTE library-bound: no track carries an actual 'hyperpop' sub ≥0.12 — the mix leans glitch/electroclash by necessity (catalogue S3)
     # date_night is NOT style-gated (mood mix) — negatives-only entry: the +0.10 _style_tag_boost penalty
     # soft-down-ranks gothic-metal/industrial ballads (HIM "Gone With the Sin" surfaced via dark-romance
     # mood tags in the quality audit) without excluding anything.
@@ -5814,20 +5814,20 @@ _PROFILE_STYLE_SIGNALS = {
     "blues_bar": (["blues-rock", "electric blues", "chicago blues", "regional blues", "punk blues"], ["edm", "techno", "gospel"]),
     "psych_haze": (["neo-psychedelia", "shoegaze", "space rock", "dream pop", "kraut rock"], ["gospel", "country", "rap"]),
     "prog_rock": (["progressive rock", "prog rock"], ["rap", "country", "gospel"]),  # Last.fm community tags (Discogs can't name prog)
-    "stoner_rock": (["stoner metal", "doom metal", "acid rock", "space rock"], ["gospel", "folk", "jazz"]),
+    "stoner_rock": (["stoner rock", "doom metal", "sludge metal"], ["gospel", "folk", "jazz"]),  # WHY dropped acid/space rock: they admitted dream pop & motorik indie (Cocteau Twins/Stereolab — catalogue S3); 'stoner metal' has zero Discogs tracks (vocab-checked)
     "reggae_dub": (["roots reggae", "dub", "dancehall", "ska", "contemporary reggae", "reggae-pop"], ["metal", "techno", "screamo"]),
-    "afrobeat": (["afrobeat", "highlife", "african", "afro-cuban", "soukous"], ["metal", "techno", "screamo"]),  # Discogs subgenres (library-thin)
+    "afrobeat": (["afrobeat", "highlife", "afro-cuban", "soukous"], ["metal", "techno", "screamo"]),  # WHY dropped 'african': it admitted anything world-adjacent — céilidh bands, Mario Kart, skits (catalogue S3); library-thin, accept a small pool
     "latin_heat": (["latin pop", "salsa", "cumbia", "reggaeton", "latin dance", "tropical"], ["metal", "ambient", "screamo"]),
     "bossa_samba": (["bossa", "samba", "latin jazz", "mpb"], ["metal", "techno", "screamo"]),  # Discogs subgenres (bossa matches bossa nova/bossanova)
     "celtic_folk": (["celtic", "celtic rock", "celtic fusion", "british folk", "traditional celtic"], ["techno", "rap", "metal"]),
     "ska": (["ska", "ska-punk", "third wave ska revival", "ska revival"], ["ambient", "techno", "drill"]),
     "bebop": (["hard bop", "bop", "post-bop", "avant-garde jazz"], ["edm", "metal", "gospel"]),
-    "swing_bigband": (["swing", "big band", "swing", "retro swing", "traditional pop"], ["metal", "techno", "screamo"]),
+    "swing_bigband": (["swing", "big band"], ["metal", "techno", "screamo"]),  # WHY dropped 'traditional pop': crooner-ballad drift; 'swing' is BLOCKED from matching rnb/swing + new jack swing (catalogue S3; vocab-checked — no 'swing revival'/'retro swing' subs exist)
     "smooth_jazz": (["smooth jazz", "crossover jazz", "lounge", "cool", "quiet storm"], ["metal", "punk", "drill"]),
     "country_roads": (["country", "honky tonk", "country rock"], ["techno", "metal", "drill"]),  # Discogs subgenres
     "outlaw_country": (["honky tonk", "bluegrass", "country rock", "country"], ["techno", "edm", "gospel"]),  # Discogs subgenres
-    "bluegrass": (["bluegrass", "progressive bluegrass", "country-folk", "string bands", "new acoustic"], ["techno", "metal", "drill"]),
-    "rockabilly_surf": (["rockabilly", "surf", "rockabilly revival", "psychobilly", "rock & roll"], ["techno", "drill", "gospel"]),
+    "bluegrass": (["bluegrass"], ["techno", "metal", "drill"]),  # WHY dropped 'country-folk': the British-folk vector (Gaelic mouth music in bluegrass — catalogue S3); the other former tokens have zero Discogs tracks (vocab-checked)
+    "rockabilly_surf": (["rockabilly", "surf", "psychobilly"], ["techno", "drill", "gospel"]),  # WHY dropped 'rock & roll': it pulled Motown + generic 60s rock (Marvelettes .29 — catalogue S3); 'rockabilly revival' has zero Discogs tracks (vocab-checked)
     "cinematic_epic": (["soundtrack", "score", "neo-romantic"], ["rap", "punk", "drill"]),  # Discogs subgenres
     "ambient_drift": (["ambient", "dark ambient", "new age", "experimental ambient"], ["rap", "punk", "metal"]),
     "post_rock": (["post rock", "math rock"], ["rap", "drill", "gospel"]),  # Discogs subgenres
@@ -5911,6 +5911,22 @@ _PROFILE_STYLE_SIGNALS = {
                    "soundtrack", "new age", "film music", "post-rock"],
                   ["singer/songwriter"]),
 }
+
+# Catalogue S7: keep WORSHIP music out of the romantic/emotional families. The 'devotion' concept was
+# pulling praise & worship (a fifth of that mix); the user's line: CCM broadly is FINE, worship music
+# specifically is not — so the negatives are worship-terms only, never 'ccm'/'christian'. Soft +0.10.
+for _k in ("devotion", "hopeful", "emotional", "evening_unwind", "vulnerable", "wedding_day",
+           "moving_on", "situationship", "love_songs", "yearning"):
+    _sig = _PROFILE_STYLE_SIGNALS.get(_k)
+    _PROFILE_STYLE_SIGNALS[_k] = ((_sig[0] if _sig else []),
+                                  list(_sig[1] if _sig else []) + ["worship", "praise & worship", "praise"])
+# Catalogue S8b: comedy/parody acts (the Richard Cheese class) out of the serious jazz mixes — soft negative.
+for _k in ("jazz_dinner", "smooth_jazz", "winter_jazz", "autumn_jazz", "london_jazz", "bebop",
+           "acid_jazz", "swing_bigband", "romantic_jazz", "bossa_samba"):
+    _sig = _PROFILE_STYLE_SIGNALS.get(_k)
+    _PROFILE_STYLE_SIGNALS[_k] = ((_sig[0] if _sig else []),
+                                  list(_sig[1] if _sig else []) + ["comedy", "parody", "novelty"])
+del _k, _sig
 
 # Profiles whose identity IS a genre — positives above are required (the candidate pool is
 # hard-filtered to them in _build_mix_tracks). focus/deep_work stay a soft nudge.
@@ -6046,6 +6062,17 @@ _DISCOGS_TAG_FLOOR = 0.12
 # HIGH floor: the Discogs classifier sprays low-confidence House/Deep-House tags (0.12-0.27) onto four-on-the-
 # floor modern pop (Miley "Flowers"=0.27 house, Taylor=0.18 tropical house), so a 0.12 gate floods it with pop.
 # Real electronic acts score their genre 0.4+; 0.30 keeps them and drops the pop spray.
+_PROFILE_BLOCKED_SUBS = {
+    # Subs that may NOT satisfy a gate even though a positive word-matches them. WHY: word-boundary
+    # matching can't separate a positive that is a TOKEN of an unrelated subgenre — 'swing' ⊂ 'RnB/Swing'
+    # put Destiny's Child in Swing & Big Band at conf .34 (survives any floor); 'big beat' admitted a
+    # boyband remix to the mod mix; 'tropical' ⊂ 'tropical house' flooded the latin mixes with EDM.
+    "swing_bigband":   {"rnb/swing", "swingbeat", "new jack swing"},
+    "london_mod":      {"big beat", "new beat"},
+    "uk_garage":       {"garage rock"},
+    "latin_heat":      {"tropical house"},
+    "summer_tropical": {"tropical house"},
+}
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
     # classifier's low-confidence spray passing floor-less gates — Ramones in chart_pop (.21 'power pop'),
@@ -6056,7 +6083,7 @@ _PROFILE_TAG_FLOOR = {
     "electronic_radio":  0.45,
     "melbourne_folk":    0.20,   # pool 2858 — ejects Smith Street Band/Avalanches/Illy spray
     "melbourne_sunset":  0.20,   # pool 2988 — ejects Nick Cave 'surf' .13-class spray
-    "swing_bigband":     0.25,   # pool 165  — ejects Sinatra-ballad/Ace of Base 'rnb/swing' leaks
+    "swing_bigband":     0.15,   # tuned: 0.25 + the tightened positives left 15 artists/max 19 (Sinatra residency); sweep: 0.15 = 41 artists/max 2 — the R&B disease stays out via _PROFILE_BLOCKED_SUBS regardless
     "chart_pop":         0.25,   # pool 580  — ejects the 'power pop' rock spray (Ramones/Benatar)
     "melbourne_pubrock": 0.30,   # pool 1152 — ejects Tina Arena "In Command"/TISM spray; 0.30 (not .25) cleans the
                                  # runner-up picks too. RESIDUAL: Tina Arena "Be a Man" carries a ≥.30 Discogs conf
@@ -6069,7 +6096,52 @@ _PROFILE_TAG_FLOOR = {
     "rockabilly_surf":   0.30,   # pool 276  — ejects Marvelettes 'rock & roll' .29 / 'psychobilly' spray
     "emo_poppunk":       0.30,   # pool 544  — ejects Amy Macdonald acoustic .27 (some .17-.22 legits drop; pool rich)
     "afrobeat":          0.15,   # tiny pool (201 @.12) — gentle: ejects the .12-.14 spray only (verify-guarded)
-    "hyperpop":          0.20,   # small pool — with 'bubblegum' removed from positives (verify-guarded)
+    "hyperpop":          0.15,   # library-bound (no real hyperpop subs) — wider floor over glitch/electroclash
+    # --- catalogue fix round 1 (S2 floor round-2 + S3 gates; disposition doc has the per-gate evidence).
+    # Every floor here is the smallest sweep value that ejects that gate's verified leaks with a healthy
+    # pool; city mixes were build-tested for n=50 / max-per-artist (the melbourne_psych lesson).
+    "g_funk":            0.25,   # only ~1 genuine g-funk track in 50 — low-conf 'gangsta' spray flood
+    "boom_bap":          0.25,   # half the list was trap/drill via spray
+    "conscious_flow":    0.25,   # non-rap singers entered at .12-.18
+    "chiptune":          0.20,   # any-electronic spray out; LIBRARY-BOUND cast (~20 artists, one act dominates — sweep-measured; a floor cannot fix concentration)
+    "trance":            0.30,   # tech-house spray — exact 'trance' pool is deep (1,264@0.2)
+    "dnb":               0.25,   # pop-remix spray
+    "uk_garage":         0.25,   # commercial-house spray
+    "britpop_rock":      0.30,   # Girls Aloud-class British-pop spray at low conf
+    "indie_pop":         0.30,   # a third of the mix was major-label chart pop via spray
+    "vaporwave":         0.20,
+    "yacht_rock":        0.25,
+    "bluegrass":         0.20,
+    "country_roads":     0.25,   # Discogs sprays 'Country' on British folk singer-songwriters
+    "outlaw_country":    0.25,
+    "latin_heat":        0.25,   # EDM flood — plus 'tropical house' BLOCKED
+    "summer_tropical":   0.20,
+    "ska":               0.25,   # only ~15/50 had ska content
+    "stoner_rock":       0.20,
+    "gospel":            0.15,   # tiny pool; the soul/disco flood was .12-.14 spray
+    "rap_rock":          0.20,   # the gate had collapsed into generic 90s/00s alt-rock; 0.30 over-thinned (25 artists/max 6) — sweep: 0.20 = 42 artists/max 2
+    "glasgow_soul":      0.15,   # city mix — 0.25 starved (25 artists/max 16); sweep: 0.15 = 46 artists/max 2, spray still out
+    "melbourne_soul":    0.15,   # city mix — 0.20 starved (27 artists/max 11); sweep: 0.15 = 37 artists/max 2
+    "summer_breeze":     0.20,
+    "winter_cosy":       0.25,   # boyband/AC ballads in the soul gate
+    "spring_jangle":     0.25,   # chart-pop cluster
+    "motown_soul":       0.20,
+    "heavy_riffs":       0.25,   # Smiths/soft-rock tail
+    "garage_grunge":     0.15,   # 0.25 collapsed the pool to 41 (!); sweep: 0.15 = pool 249, 50 artists
+    "classic_rock":      0.25,   # 2000s pop-punk cluster
+    "celtic_folk":       0.25,   # Scottish nationality ≠ Celtic genre
+    "blues_bar":         0.25,
+    "reggae_dub":        0.25,   # afrobeats/pop conflation
+    "synthwave":         0.25,
+    "punk_energy":       0.25,
+    "psych_haze":        0.20,
+    "neo_soul":          0.20,
+    "after_hours_rnb":   0.20,
+    "festival_edm":      0.25,   # promo club-mix padding
+    "rave_cave":         0.20,   # 0.25 pinched the balanced pool (max 4/artist); sweep: 0.20 = 47 artists/max 3
+    "pop_radio":         0.25,   # post-punk/indie leak into a mainstream-hits scope
+    "rock_radio":        0.25,   # pop/country leak
+    "indie_radio":       0.25,
 }
 
 def _track_style_tags(entry, min_conf=0.0):
@@ -6278,6 +6350,9 @@ def _has_required_style(entry, profile_key):
             tags = _entry_lastfm_tags(entry)                     # crowd genre labels (Discogs can't name these)
         else:
             tags = _discogs_subgenres(entry, _PROFILE_TAG_FLOOR.get(profile_key, _DISCOGS_TAG_FLOOR))  # Discogs subgenres only, confidence-floored (per-profile override)
+            _blk = _PROFILE_BLOCKED_SUBS.get(profile_key)
+            if _blk:                        # subs a positive may word-match but must NOT grant membership
+                tags = [t for t in tags if t not in _blk]
         # Word-boundary token match (see _positive_matches): "mod" matches the subgenre "mod" but not
         # "modern", "dub" not "dubstep", "am pop" not "dream pop" — the systemic fix for the leak class.
         if not tags or not any(_positive_matches(sub, tag) for tag in tags for sub in positive_subs):
@@ -13676,6 +13751,19 @@ _SOUNDTRACK_RADIO = {"soundtracks_radio"}
 # tags, which also sit on Mozart/Bach, so concert classical can't sneak back in via them.
 _SCREEN_LASTFM_TAGS = {"soundtrack", "soundtracks", "film score", "film music", "film soundtrack",
                        "original score", "movie", "cinematic", "video game music", "game music"}
+# Catalogue S4: gated mixes the film/game score pool polluted (Discogs tags cues as ambient/jazz/
+# electronic) — these drop screen content outright, reusing the same curated detector Soundtracks Radio
+# keeps. The cue-friendly mixes (focus, meditation, three_am, witching_hour, the cinematic family) are
+# deliberately NOT here.
+_SCREEN_EXCLUDED_PROFILES = {
+    "jazz_dinner", "smooth_jazz", "winter_jazz", "autumn_jazz", "london_jazz", "bebop",
+    "acid_jazz", "bossa_samba", "romantic_jazz", "swing_bigband",
+    "industrial", "downtempo", "vaporwave", "post_rock", "stoner_rock",
+}
+# Catalogue S8: album fragments and karaoke artifacts never belong in a generated mix — a karaoke
+# "(Performance Track … Without Background Vocals)" surfaced in three mixes; skits/interludes pad others.
+_FRAGMENT_TITLE_RE = re.compile(r"\((skit|interlude)\)|karaoke|performance track", re.I)
+
 def _is_screen_content(entry):
     """True if `entry` is genuine film/TV/game SCORE material — the curated SELECTION gate for soundtracks_radio.
     WHY: the Discogs AUDIO classifier stamps 'Stage & Screen---Soundtrack/Score' onto ANY instrumental,
@@ -14295,6 +14383,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                           and _is_screen_content(essentia_cache[rk])]    # via curated tags, not the Discogs audio model
     else:
         _cand_keys = list(essentia_cache)
+    # Catalogue S4: mixes the score-cue pool polluted drop screen content outright (inverse of the
+    # soundtracks gate). S8: fragments/karaoke artifacts are excluded from every generated mix.
+    if profile_key in _SCREEN_EXCLUDED_PROFILES:
+        _cand_keys = [rk for rk in _cand_keys if not _is_screen_content(essentia_cache[rk])]
+    _cand_keys = [rk for rk in _cand_keys
+                  if not _FRAGMENT_TITLE_RE.search(essentia_cache[rk].get("title") or "")]
 
     # Embedding "sounds-like" cohesion: compute the mix's core embedding centroid ONCE, then
     # _combined_score pulls candidates toward it. emb_effnet (sub-style) for genre-gated mixes, emb_musicnn
