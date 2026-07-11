@@ -6061,8 +6061,9 @@ _PROFILE_TAG_FLOOR = {
     "melbourne_pubrock": 0.30,   # pool 1152 — ejects Tina Arena "In Command"/TISM spray; 0.30 (not .25) cleans the
                                  # runner-up picks too. RESIDUAL: Tina Arena "Be a Man" carries a ≥.30 Discogs conf
                                  # (confident mis-tag — no reasonable floor ejects it; needs emb-outlier rejection)
-    "melbourne_psych":   0.22,   # ejects Olivia N-J .17 / Bee Gees "Indian Gin" .20. NOT 0.25: city mixes intersect
-                                 # the geo tier gate, and style-pool 426 ∩ Melbourne starved the build to n=32
+    "melbourne_psych":   0.15,   # WAS 0.22 — that ∩ the Melbourne geo tier starved the pool so hard the artist
+                                 # ladder relaxed to 22 Bee Gees tracks (catalogue S5 regression). 0.15 keeps the
+                                 # worst spray out while the cast stays broad; accept the odd borderline leak.
     "london_mod":        0.25,   # pool 277  — ejects Blue/Lulu/Bonzo 'beat' collisions
     "swagger":           0.25,   # pool 855  — ejects Aretha 'funk' + g-funk spray
     "rockabilly_surf":   0.30,   # pool 276  — ejects Marvelettes 'rock & roll' .29 / 'psychobilly' spray
@@ -6716,14 +6717,17 @@ _PROFILE_ORIGIN.update({
 _PROFILE_GEO_GATE = {
     "scotland_scene":  {"places": {"scotland"},  "scene": {"scotland"}},
     "australia_scene": {"places": {"australia"}, "scene": {"australia"}},
-    "london_scene":    {"places": {"london"},    "scene": {"london"}},
+    "london_scene":    {"places": {"london"},    "scene": {"london"},
+                        "within": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}},
     "scottish_hits":   {"places": {"scotland"},  "scene": {"scotland"}},
     "australian_hits": {"places": {"australia"}, "scene": {"australia"}},
-    "london_hits":     {"places": {"london"},    "scene": {"london"}},
+    "london_hits":     {"places": {"london"},    "scene": {"london"},
+                        "within": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}},
     "uk_scene":        {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "uk_hits":         {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "scotland_now":    {"places": {"scotland"},  "scene": {"scotland"}},
-    "london_now":      {"places": {"london"},    "scene": {"london"}},
+    "london_now":      {"places": {"london"},    "scene": {"london"},
+                        "within": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}},
     "uk_now":          {"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
     "australia_now":   {"places": {"australia"}, "scene": {"australia"}},
     # Two-location blends: union gate keeps BOTH nations; the 50/50 split into buckets happens in the branch
@@ -6745,13 +6749,15 @@ _GEO_HITS_PROFILES = {"scottish_hits", "australian_hits", "london_hits", "uk_hit
 # single hard gate + popularity rotation. This changes SELECTION only; _dj_order still orders picks sonically.
 _UK_PLACES = {"united kingdom", "england", "scotland", "wales", "northern ireland"}
 _GEO_TIERS_BY_CITY = {
-    "glasgow":   [{"places": {"glasgow"},   "scene": {"glasgow"}},
+    # tier0 `within`: the scene-tag fallback's nation bound (see _origin_match) — an in-nation artist
+    # crowd-tagged with the city still promotes to the city tier, a foreign same-named-city artist can't.
+    "glasgow":   [{"places": {"glasgow"},   "scene": {"glasgow"},   "within": {"scotland"}},
                   {"places": {"scotland"},  "scene": {"scotland"}},
                   {"places": _UK_PLACES}],
-    "london":    [{"places": {"london"},    "scene": {"london"}},
+    "london":    [{"places": {"london"},    "scene": {"london"},    "within": {"england"}},
                   {"places": {"england"},   "scene": {"england"}},
                   {"places": _UK_PLACES}],
-    "melbourne": [{"places": {"melbourne"}, "scene": {"melbourne"}},
+    "melbourne": [{"places": {"melbourne"}, "scene": {"melbourne"}, "within": {"victoria", "australia"}},
                   {"places": {"victoria"},  "scene": {"victoria"}},
                   {"places": {"australia"}}],
 }
@@ -6781,13 +6787,29 @@ def _origin_match(entry, spec):
             places.add(v.lower())
         elif isinstance(v, (list, tuple)):
             places.update(x.lower() for x in v if isinstance(x, str))
+    # `within` — optional nation bound for city-named specs: when the artist HAS an MB origin, it must
+    # also intersect the nation set, so a same-named city elsewhere can't qualify. WHY: places={'london'}
+    # admitted London ONTARIO (Justin Bieber, Loud Luxury) and consolidated-places noise (Julie London,
+    # a Santa Rosa artist) into London-scoped playlists. Origin-less artists fall through to the scene
+    # fallback below, which carries the same bound.
+    within = {w.lower() for w in spec.get("within", ())}
+    if within and places and not (within & places):
+        return False
     if {p.lower() for p in spec.get("places", ())} & places:
         return True
     scene = spec.get("scene")
     if scene:
-        lf = list(entry.get("lastfm_artist_tags") or {}) + list(entry.get("lastfm_track_tags") or {})
-        if any(s in t for s in (x.lower() for x in scene) for t in lf):
-            return True
+        # Scene-tag fallback is now BOUNDED and word-boundary. WHY: it previously fired on a crowd-tag
+        # SUBSTRING even when authoritative MB data said the artist is foreign — Tyla (MB: Johannesburg)
+        # passed the UK gate via a tag containing 'british', and 'london' matched inside 'julie london'.
+        # It fires only for artists with NO MB origin at all, or whose origin already sits inside the
+        # spec's nation (`within`, else the spec's own places) — the designed birthplace-vs-scene case
+        # (an Aberdeen-born act tagged 'glasgow') still promotes, a foreign act never does.
+        bound = within or {p.lower() for p in spec.get("places", ())}
+        if not places or (bound & places):
+            lf = list(entry.get("lastfm_artist_tags") or {}) + list(entry.get("lastfm_track_tags") or {})
+            if any(_positive_matches(s, t) for s in (x.lower() for x in scene) for t in lf):
+                return True
     return False
 
 
