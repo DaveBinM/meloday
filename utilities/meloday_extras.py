@@ -13859,6 +13859,62 @@ _REISSUE_RE = re.compile(
     r"|\b(?:version|mix|edit|re-?master(?:ed)?|recording|cut)\s+(?:19|20)\d{2}\b"
     r"|['’]\d{2}\s+(?:version|mix|edit|re-?master(?:ed)?|recording|cut)\b", re.I)
 
+# Catalogue S12 — decade re-record/remaster guard. WHY its own narrow regexes and NOT _REISSUE_RE: the
+# radio regex above is deliberately broad ("anniversary", year-marked mix/edit) and mass-false-flags
+# legit decade material (Brandi Carlile "Anniversary" is a SONG; Fatboy Slim "(Calvin Harris edit 2013)"
+# IS the genuine 2013 hit). Three-part rule, validated row-by-row against the complete candidate lists:
+#  1. "'NN version" titles: in the 60s-00s TRUST THE TITLE'S YEAR — exclude only when it falls outside
+#     the decade (Blondie "Once I Had a Love (1975 version)" = the original '75 demo, KEPT in the 70s;
+#     Nazareth "This Flight Tonight (1991 version)" of a 1973 song, EXCLUDED from the 70s). In the
+#     10s/20s the marker itself signals an older original — a new song needs no "(2022 Version)" tag —
+#     so exclude even when the year is in-decade (Nicole's 2022 re-records of her 80s schlager hits,
+#     Soft Cell "Night and the City (2023 version)" of the 2002 original).
+#  2. Wordless re-record markers (re-recorded / new version / new recording / Taylor's Version): in the
+#     10s/20s always exclude (the streaming-era rights-reclaim class: Coolio / Salt-N-Pepa / Redbone
+#     "(Re-Recorded)", Pet Shop Boys "(new version)" — none are decade canon however the copy is dated);
+#     in the 60s-00s exclude only when the copy's OWN year is outside the decade (PSB's 2024 re-records
+#     leave the 80s/90s; Tears for Fears "Change (new version)" own=1983 STAYS — it IS an 80s recording,
+#     as are Kevin Rowland/Go-Betweens '80s "new version"s and the Libertines' 2003 "(new recording)").
+#  3. remaster(ed) titles: exclude ONLY in the 10s/20s, where the title + a modern resolved year is a
+#     contradiction (mis-dated Haddaway/Skynyrd-live/Tiësto-reissue class, 58 measured). In the 60s-00s
+#     pools remasters are CORRECTLY dated by their original-date tags (~400 tracks — Bee Gees "(2012
+#     remaster)" of 1968 songs, Australian Crawl class) and MUST stay.
+#  Exemption: "(from The Vault)" — a vault track is a FIRST-EVER release, not a re-record of anything
+#  the charts knew (Taylor's Version vault tracks incl. the 10-minute All Too Well were genuine 2021
+#  releases → 20s canon), so its own date already places it correctly. Without this, 16 vault tracks
+#  would be false-positived out of the 20s; the 6 non-vault TV re-records of released 2010-12 songs
+#  (Ronan, Today Was a Fairytale…) stay excluded, and the 00s/10s TV exclusions only ever fire when the
+#  library holds the ORIGINAL copies (song-earliest-year ≤2009/2012 requires them), which then represent
+#  the song in its true decade.
+# Documented residuals (reviewed, accepted): TLC "Creep (TLC Version)" (artist-name versions can't be
+# pattern-matched without eating "album/single/Aretha version"); Bowie "(2020 mix)" pair (year-marked
+# mix ≠ vintage but matching it would evict the Fatboy Slim class; popularity-invisible in a top-150 pool).
+_ERA_RERECORD_RE = re.compile(r"\bre-?record(?:ed|ing)?\b|\bnew\s+(?:version|recording)\b|taylor['’]?s version", re.I)
+_ERA_YEARVER_RE  = re.compile(r"\b((?:19|20)\d{2})\s+version\b", re.I)
+_ERA_REMASTER_RE = re.compile(r"\bre-?master(?:ed)?\b", re.I)
+_ERA_MODERN_DECADES = {"decade_10s", "decade_20s"}
+
+
+def _era_wrong_vintage(entry, profile_key, lo, hi):
+    """True when this COPY's recording vintage contradicts the decade pool it landed in (catalogue S12)."""
+    title = entry.get("title") or ""
+    if "from the vault" in title.lower():   # vault tracks are FIRST releases — their own date is the era
+        return False
+    m = _ERA_YEARVER_RE.search(title)
+    if m:                                   # rule 1: a year-marked "version" dates its own recording…
+        if profile_key in _ERA_MODERN_DECADES:
+            return True                     # …but in the 10s/20s the marker itself means "of an older song"
+        y = int(m.group(1))
+        return not (lo <= y <= hi)
+    if _ERA_RERECORD_RE.search(title):      # rule 2: wordless re-record markers
+        if profile_key in _ERA_MODERN_DECADES:
+            return True
+        oy = _entry_original_year(entry)
+        return not (oy and lo <= oy <= hi)
+    if profile_key in _ERA_MODERN_DECADES and _ERA_REMASTER_RE.search(title):
+        return True                         # rule 3: remaster titles only lie in the modern decades
+    return False
+
 # Decade/era mixes drop compilation albums (Various-Artists comps + single-artist Greatest Hits/Best Of).
 # Authoritative source = the MusicBrainz `release_types` read from each file's tags (cached); for the ~1%
 # of tracks not yet tagged, fall back to the file-path folder convention.
@@ -14845,6 +14901,18 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         if _EXCLUDE_COMPS_FROM_ERA:
             _kh = [rk for rk in history_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
             _kl = [rk for rk in library_rks if not _era_is_comp(essentia_cache.get(rk, {}))]
+            if _kh or _kl:
+                history_rks, library_rks = _kh, _kl
+        # Catalogue S12: drop copies whose TITLE says the recording isn't from this decade (re-records,
+        # out-of-decade "'NN version"s, 10s/20s-only remaster titles — see _era_wrong_vintage). Runs
+        # BEFORE the canonical collapse so a song with both a re-record and an era-true copy keeps the
+        # era-true one instead of the collapse ever preferring the re-record.
+        _lo, _hi = _PROFILE_YEAR_WINDOW.get(profile_key, (None, None))
+        if _lo is not None and _hi is not None:
+            _kh = [rk for rk in history_rks
+                   if not _era_wrong_vintage(essentia_cache.get(rk, {}), profile_key, _lo, _hi)]
+            _kl = [rk for rk in library_rks
+                   if not _era_wrong_vintage(essentia_cache.get(rk, {}), profile_key, _lo, _hi)]
             if _kh or _kl:
                 history_rks, library_rks = _kh, _kl
         # Collapse the same song appearing on multiple albums/compilations/reissues into ONE entry,

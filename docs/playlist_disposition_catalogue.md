@@ -670,8 +670,9 @@ NEEDED were re-evaluated and confirmed healthy.
 7. **S13 yoga_stretch vocal target** (one number) + decide the hard-vs-soft instrumental gate.
 8. **S7 worship negatives** for the romantic/emotional families.
 9. **S8 novelty/fragment title markers** (skits, interludes, karaoke backing tracks).
-10. **S12 decade re-record title guard**; **S10 same-title in-mix dedup**; **S14 builder fixes**
-    (DW backfill, daily-mix double-count, deep_cuts lookback, radar ISO-year) + the rating PROD-VERIFY.
+10. ~~**S12 decade re-record title guard**~~ (APPLIED — see the S12 section below); **S10 same-title
+    in-mix dedup**; **S14 builder fixes** (DW backfill, daily-mix double-count, deep_cuts lookback,
+    radar ISO-year) + the rating PROD-VERIFY.
 11. **S9 near-duplicate selectors** and **S15 intent mismatches** — design/taste decisions per playlist.
 12. **S11 facet-target recalibration** — optional hygiene so future audits don't false-flag.
 
@@ -715,24 +716,40 @@ code's WHY comments) — six genre-knowledge tokens were caught dead by that che
   tracks; deep_cuts/rediscovery play windows deterministic (invariant under old-history noise); Release
   Radar ISO-year sort key. PROD-VERIFY still open: history-row userRating test on daedalus.
 
-## S12 spec (measured, NOT implemented — awaiting approval)
+## S12 — decade re-record/remaster guard (IMPLEMENTED)
 
-Goal: keep re-records/reissues out of the wrong decade without excluding correctly-dated material.
-Measured against every decade pool:
+`_era_wrong_vintage()` + `_ERA_RERECORD_RE`/`_ERA_YEARVER_RE`/`_ERA_REMASTER_RE`, applied in the era
+branch before the canonical collapse (so a song with both a re-record and an era-true copy keeps the
+era-true one). NOT `_REISSUE_RE` — the radio regex is deliberately broad and false-flags legit decade
+material (Brandi Carlile "Anniversary" is a song; Fatboy Slim "(Calvin Harris edit 2013)" IS the 2013 hit).
 
-**Finding: remaster titles are NOT one class.** In the 60s-00s pools, "(remastered)" tracks are almost all
-CORRECTLY dated by their original-date file tags (Bee Gees 2012 remasters of 60s songs, Australian Crawl
-80s, Eurythmics 90s — ~400 tracks a naive title guard would wrongly evict). The genuine disease lives in
-the 10s/20s pools, where a remaster title + modern resolved year is a contradiction (Haddaway "(remastered)"
-dated 2020s; Lynyrd Skynyrd "(remastered) (live)" dated 2010s).
+**Final rule (three parts + one exemption), each part validated row-by-row against the complete
+per-decade candidate lists — the full-review pass changed the spec in three places:**
 
-**Proposed rule (two parts):**
-1. RE-RECORD class — `re-record(ed)`, `new version/recording`, `'NN version`, `Taylor's Version` —
-   excluded from EVERY decade pool: new performances are never era canon. Impact: 58 tracks, zero false
-   positives in review (Coolio ×4, Gloria Gaynor re-records, Empire of the Sun "(new version)", Nicole
-   "(2022 Version)" ×3, Kylie "(new version 2015)").
-2. REMASTER class — excluded ONLY from decade_10s + decade_20s. Impact: 49 tracks, all inspected samples
-   genuinely mis-dated older material. The 60s-00s remasters (~396) stay — they are correctly dated.
+1. `'NN version` titles: 60s-00s TRUST THE TITLE'S YEAR — exclude only if it falls outside the decade
+   (Blondie "(1975 version)" = the original '75 demo, KEPT in the 70s; Dolly '73, Jeff Wayne "The 1978
+   Version", EWF '87, Kenny Rogers '81 all kept; Nazareth "(1991 version)" of a 1973 song excluded).
+   In the 10s/20s the marker itself signals an older original — exclude even in-decade (Nicole's 2022
+   re-records of her 80s hits, Soft Cell "(2023 version)" of the 2002 original). ← *review refinement 1:
+   the spec's flat "exclude everywhere" would have evicted five era-true 60s-00s recordings.*
+2. Wordless re-record markers (re-recorded / new version / new recording / Taylor's Version): 10s/20s
+   always exclude; 60s-00s only when the copy's OWN year is outside the decade — Tears for Fears
+   "Change (new version)" (1983), Kevin Rowland, Go-Betweens, the Libertines "(new recording)" (2003)
+   are era-true contemporary alternates and STAY; PSB's 2024 "new version"s leave the 80s/90s.
+3. Remaster titles: excluded ONLY in the 10s/20s (title + modern resolved year = contradiction:
+   Haddaway/Skynyrd-live/Tiësto-reissue class). The ~410 60s-00s remaster-titled tracks are correctly
+   dated by original-date tags (Bee Gees/Australian Crawl/Godsmack) — verified all kept.
+4. **"(from The Vault)" exemption** ← *review refinement 2: the spec lists had missed every Taylor's
+   Version row (curly-apostrophe titles vs the probe's straight `'`). Vault tracks are FIRST-EVER
+   releases (incl. the 10-minute All Too Well) → genuine 20s canon, kept; the 6 non-vault TV re-records
+   of released 2010-12 songs (Ronan, Today Was a Fairytale…) stay excluded. The 00s/10s TV exclusions
+   only fire when the library holds the originals — verified each excluded song's original copy remains
+   in its true decade pool (Love Story → 00s, All Too Well → 10s).*
 
-Per-decade impact (re-record-drop / remaster-drop-if-10s-20s-rule): 60s 0/– · 70s 6/– · 80s 7/– ·
-90s 2/– · 00s 18/– · 10s 2/20 · 20s 23/29. Full lists: session scratchpad `s12_spec.json`/`s12_split.json`.
+Final measured impact (excluded rks): 60s 0 · 70s 3 · 80s 2 · 90s 1 · 00s 19 · 10s 38 · 20s 62.
+Verified: 47-row keep/exclude oracle ALL PASS; 410 protected remasters kept; all 7 decade builds n=50,
+max/artist ≤2, zero wrong-vintage tracks selected. Documented residuals (reviewed, accepted): TLC
+"Creep (TLC Version)" (artist-name versions unmatchable without eating "album/single/Aretha version");
+Bowie "(2020 mix)" pair (matching year-mix would evict the Fatboy class; popularity-invisible);
+Chicago "25 or 6 to 4" / Kinks 2020s reissues have CLEAN titles — no title guard can catch them, their
+fix is an MB original-date resync (out of S12 scope).
