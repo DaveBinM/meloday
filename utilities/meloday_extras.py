@@ -5790,14 +5790,14 @@ _PROFILE_STYLE_SIGNALS = {
     "trap_mode": (["trap", "cloud rap", "crunk", "gangsta"], ["folk", "ambient", "classical"]),  # Discogs subgenres
     "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat"], ["metal", "punk", "hardcore"]),  # dropped "downtempo" (pulled 13k generic downtempo, not lo-fi beats)
     "house_party": (["house", "tech-house", "progressive house", "club/dance", "euro-dance"], ["metal", "country", "ambient"]),
-    "deep_house": (["deep house", "microhouse", "minimal techno", "tech-house", "left-field house"], ["metal", "punk", "country"]),
-    "techno": (["techno", "minimal techno", "detroit techno", "acid house", "industrial dance"], ["folk", "country", "gospel"]),
+    "deep_house": (["deep house", "microhouse", "left-field house"], ["metal", "punk", "country"]),  # WHY dropped 'minimal techno' + 'tech-house': the tech-house token admitted the Fisher/Swedish House Mafia big-room pole the deep/soulful brief excludes (ARC audit)
+    "techno": (["techno", "minimal techno", "detroit techno", "hard techno", "dub techno"], ["folk", "country", "gospel"]),  # WHY dropped 'acid house'/'industrial dance', added hard/dub techno (118/250 tracks ≥.2): ARC audit — the mix was ⅔ deep/melodic house (deep house×30 vs techno×20 in-selection), median 123bpm, zero warehouse techno; with floor .30 + Slam-class seeds it rebuilt techno×50/50
     "trance": (["trance", "progressive trance", "goa trance", "psy-trance", "hard trance"], ["metal", "country", "blues"]),  # WHY dropped euro-dance/hi-nrg: zero real ≥0.2 tracks — they only ever matched spray; the mix had drifted tech-house (catalogue S3)
     "dnb": (["jungle", "drum'n'bass", "drum n bass", "breakbeat"], ["folk", "country", "ambient"]),  # WHY dropped idm/bass music: they admitted house/trance remixes of pop — under half the mix was dnb (catalogue S3); both dnb spellings kept (vocab: 'drum n bass' 898@0.2)
-    "bass_drop": (["dubstep", "bass music", "grime", "trap (edm)"], ["folk", "country", "jazz"]),
-    "uk_garage": (["uk garage", "speed garage", "garage house", "bassline", "broken beat"], ["metal", "country", "folk"]),  # WHY dropped bare 'garage' (token-matched 'garage rock') + 'bass music': the mix had become commercial house/EDM (catalogue S3); all tokens vocab-checked real
+    "bass_drop": (["dubstep", "grime", "trap (edm)"], ["folk", "country", "jazz"]),  # WHY dropped 'bass music' + floor .25: weak .13-.20 dubstep tags admitted Fall Out Boy/downtempo pop, and a US-rap bloc rode grime-tag misfires (ARC audit)
+    "uk_garage": (["uk garage", "speed garage", "garage house"], ["metal", "country", "folk"]),  # WHY dropped bare 'garage' earlier (token-matched 'garage rock'), then 'bassline' (POLLUTED — its top artists are Tiësto/Aoki/Marshmello-class EDM, bassline .82 on Marshmello; the mix was ~60% mainstage) and finally 'broken beat' (Bugz in the Attic = a different West-London scene; the re-read caught it). ukg-core pool 375 fills 50/50 artists (ARC audit)
     "synthwave": (["synthwave", "neo-electro", "new romantic"], ["metal", "country", "gospel"]),  # dropped bare "electro" (substring of the "electronic" parent → pulled the whole electronic pool)
-    "industrial": (["industrial", "electro-industrial", "industrial metal", "industrial dance"], ["folk", "country", "gospel"]),
+    "industrial": (["industrial", "electro-industrial", "industrial metal", "industrial dance"], ["folk", "country", "gospel", "deep techno", "dub techno", "downtempo", "ambient", "big beat", "trip hop"]),  # WHY the added negatives: the ARC audit's split — deep/dub-techno co-tags mark the melodic-techno cluster (Avery/Modeselektor class) inside an industrial gate, and a trip-hop/big-beat tail rode fourth-slot industrial .12-.25 tags; the negatives soft-penalise those poles (floor .30 does the hard work)
     "vaporwave": (["vaporwave", "chillwave"], ["metal", "punk", "hardcore"]),  # WHY trimmed: ambient pop/plunderphonics have zero ≥0.2-conf tracks; the mix filled with score cues + lofi flips (catalogue S3 + S4)
     "downtempo": (["downtempo", "trip-hop", "chillwave", "idm", "ambient techno"], ["metal", "punk", "hardcore"]),
     "hyperpop": (["hyperpop", "glitch", "electroclash"], ["metal", "blues", "country"]),  # WHY dropped 'bubblegum' (admitted Destiny's Child .34) and 'social media pop' (zero Discogs tracks); +electroclash (271 real). NOTE library-bound: no track carries an actual 'hyperpop' sub ≥0.12 — the mix leans glitch/electroclash by necessity (catalogue S3)
@@ -5843,7 +5843,7 @@ _PROFILE_STYLE_SIGNALS = {
     "glasgow_postpunk": (["post-punk", "new wave/post-punk revival", "punk"], ["ambient", "gospel", "classical"]),
     "glasgow_house": (["house", "left-field house", "tech-house", "disco"], ["metal", "country", "folk"]),
     "glasgow_underground": (["techno", "minimal techno", "detroit techno", "acid house"], ["folk", "country", "gospel"]),
-    "glasgow_bass": (["idm", "bassline", "dubstep", "breakbeat"], ["folk", "country", "gospel"]),  # Discogs subgenres
+    "glasgow_bass": (["idm", "dubstep", "breakbeat", "glitch"], ["folk", "country", "gospel"]),  # WHY swapped polluted 'bassline' (Tiësto-class EDM carries it) for 'glitch' (151 real ≥.2): the Rustie/HudMo axis was 7/50 against a 123-130bpm tech-house bloc (ARC audit)
     "glasgow_late": (["downtempo", "trip-hop", "electronica", "ambient techno"], ["metal", "punk", "gospel"]),
     "london_dub": (["dub", "roots reggae", "dancehall", "reggae-pop"], ["metal", "techno", "screamo"]),
     "london_soul": (["blue-eyed soul", "neo-soul", "contemporary r&b", "acid jazz"], ["metal", "punk", "drill"]),
@@ -5853,10 +5853,10 @@ _PROFILE_STYLE_SIGNALS = {
     "london_britpop": (["brit pop"], ["metal", "techno", "gospel"]),  # Discogs subgenre
     "london_indie": (["indie rock", "new wave/post-punk revival", "garage rock revival"], ["metal", "techno", "gospel"]),
     "london_calling": (["punk", "post-punk", "oi!", "new wave"], ["ambient", "gospel", "classical"]),
-    "london_garage": (["uk garage", "garage", "broken beat", "bassline"], ["metal", "country", "folk"]),
+    "london_garage": (["uk garage", "speed garage", "garage house"], ["metal", "country", "folk"]),  # WHY: had BOTH round-1 diseases uk_garage was cured of — bare 'garage' + polluted 'bassline' — and read as a 2000s pop-house list; 'broken beat' dropped with uk_garage's (different scene). Shares uk_garage's verified vocabulary (ARC audit)
     "london_grime": (["grime", "uk drill", "bass music"], ["folk", "country", "ambient"]),
-    "london_dubstep": (["dubstep", "bass music", "uk garage"], ["folk", "country", "gospel"]),
-    "london_jungle": (["jungle", "drum n bass", "breakbeat", "breaks", "big beat"], ["folk", "country", "ambient"]),  # Discogs subgenres
+    "london_dubstep": (["dubstep", "uk garage", "grime"], ["folk", "country", "gospel"]),  # WHY dropped 'bass music' for 'grime' (389 real ≥.2): 119-131bpm 4/4 house was padding the 140 list (ARC audit)
+    "london_jungle": (["jungle", "drum'n'bass", "drum n bass", "halftime"], ["folk", "country", "ambient"]),  # WHY dropped 'breaks' (word-matched 'progressive breaks' — Oakenfold prog-house padded positions 7-33), 'big beat', and finally 'breakbeat' too (the re-read found a 130-135bpm Stanton Warriors nu-skool block that isn't jungle at any octave); added 'halftime' (379 real ≥.2). Post-fix composition: drum n bass×50 / jungle×20 / halftime×15, pool 678 (ARC audit)
     "melbourne_folk": (["folk", "folk rock", "neofolk", "celtic"], ["metal", "techno", "drill"]),  # Discogs subgenres
     "melbourne_dream": (["dream pop", "jangle pop", "indie pop", "neo-psychedelia"], ["metal", "techno", "drill"]),
     "melbourne_soul": (["soul", "funk", "neo soul", "jazz-funk"], ["metal", "screamo", "drill"]),  # Discogs subgenres
@@ -5868,7 +5868,7 @@ _PROFILE_STYLE_SIGNALS = {
     "melbourne_psych": (["psychedelic rock", "garage rock"], ["gospel", "country", "ambient"]),  # Discogs subgenres
     "melbourne_garagepunk": (["punk", "pop punk", "hardcore", "melodic hardcore", "garage rock"], ["ambient", "gospel", "classical"]),  # Discogs subgenres
     "melbourne_club": (["house", "progressive house", "electro", "club/dance"], ["folk", "country", "gospel"]),
-    "melbourne_techno": (["techno", "minimal techno", "tech-house", "acid house"], ["folk", "country", "gospel"]),
+    "melbourne_techno": (["techno", "minimal techno", "acid techno", "hard techno"], ["folk", "country", "gospel"]),  # WHY dropped 'tech-house'/'acid house': they ARE the house-drift (house×30/tech house×14 in-selection, Kylie/Veronicas pop-house remixes); 9/50 tracks had zero techno-family sub at any conf
     # ----- style-defined genre mixes (positives required) -----
     "synthpop_romance": (["synth pop", "synthwave", "new romantic", "new wave",
                           "indie electronic", "dance-pop", "sophisti-pop", "dream pop",
@@ -6078,6 +6078,15 @@ _PROFILE_BLOCKED_SUBS = {
     "swing_bigband":   {"rnb/swing", "swingbeat", "new jack swing"},
     "london_mod":      {"big beat", "new beat"},
     "uk_garage":       {"garage rock"},
+    # WHY trance blocks 'tech trance': the positive 'trance' word-matches the 'tech trance' sub, which is a
+    # catch-all on driving 128-136 house/techno — 241 tracks carry tech trance ≥.3 with NO trance-proper
+    # sub ≥.3 (James Hype class, ARC audit). Real trance still qualifies via its plain 'trance' tag (416
+    # co-tagged tracks unaffected).
+    "trance":          {"tech trance"},
+    # WHY glasgow_house blocks 'tropical house': the 'house' positive word-matches it, and it is the tag
+    # riding on Scottish POP (sea-shanty dance-pop, Saint PHNX, ili) — none of it scene house. 5 tracks
+    # still carry it as a co-tag on genuine house picks; they qualify via real house tags instead.
+    "glasgow_house":   {"tropical house"},
     "latin_heat":      {"tropical house"},
     "summer_tropical": {"tropical house"},
 }
@@ -6104,7 +6113,7 @@ _PROFILE_TAG_FLOOR = {
     "rockabilly_surf":   0.30,   # pool 276  — ejects Marvelettes 'rock & roll' .29 / 'psychobilly' spray
     "emo_poppunk":       0.30,   # pool 544  — ejects Amy Macdonald acoustic .27 (some .17-.22 legits drop; pool rich)
     "afrobeat":          0.15,   # tiny pool (201 @.12) — gentle: ejects the .12-.14 spray only (verify-guarded)
-    "hyperpop":          0.15,   # library-bound (no real hyperpop subs) — wider floor over glitch/electroclash
+    "hyperpop":          0.30,   # WAS 0.15 — incidental electroclash .26-.30 co-tags on techno-dominant tracks admitted Robert Hood/Mr Fingers/Kangding Ray (ARC audit); 0.30 pool = 74 (library-bound, documented) but all 8 verified leaks die and glitch/electroclash lead the mix
     # --- catalogue fix round 1 (S2 floor round-2 + S3 gates; disposition doc has the per-gate evidence).
     # Every floor here is the smallest sweep value that ejects that gate's verified leaks with a healthy
     # pool; city mixes were build-tested for n=50 / max-per-artist (the melbourne_psych lesson).
@@ -6145,8 +6154,29 @@ _PROFILE_TAG_FLOOR = {
     "psych_haze":        0.20,
     "neo_soul":          0.20,
     "after_hours_rnb":   0.20,
-    "festival_edm":      0.25,   # promo club-mix padding
-    "rave_cave":         0.20,   # 0.25 pinched the balanced pool (max 4/artist); sweep: 0.20 = 47 artists/max 3
+    "festival_edm":      0.30,   # WAS 0.25 — the pop-circuit-remix stratum (Maroon 5/Cutmore, Britney/Kaskade) sat at .25-.30 (ARC audit); residuals: Chris Brown/Black Box carry ≥.30 confident tags
+    "rave_cave":         0.25,   # WAS 0.20 — .20-.24 Jumpstyle/Hardstyle spray pulled experimental club-pop (A.G. Cook, PinkPantheress, Marshmello halftime) into hard dance (ARC audit); build: 46 artists/max 5
+    # --- ARC-mix selection audit round: every floor below is the smallest sweep value
+    # ejecting that mix's ADVERSARIALLY-VERIFIED editorial flags with a full n=50 build (per-profile
+    # evidence in the commit + docs/playlist_disposition_catalogue.md ARC section). Confident ≥floor
+    # mis-tags that survive are documented residuals (Tina Arena class), not floor failures.
+    "techno":            0.30,   # deep-house drift died: techno×50/50 post-fix (was techno×20)
+    "glasgow_underground": 0.30, # Glaswegian film composers/indie passed on geography with techno ≤.21
+    "melbourne_techno":  0.25,   # with the tech-house positive dropped: techno×45/50
+    "glasgow_house":     0.30,   # half the list was Glasgow indie/rock with house ≤.20 (85-115bpm run); .30 also drops the Texas/Shooglenifty .26-.29 trad-pop class the re-read caught. RESIDUAL: Deacon Blue "Closing Time" house .50 (confident mis-tag)
+    "melbourne_club":    0.25,   # non-dance Melbourne indie (King Gizzard/Alpine) at .16-.22
+    "london_garage":     0.25,   # matches uk_garage; pop-house remix bloc died with the vocabulary fix
+    "glasgow_bass":      0.20,   # city∩style thin — 0.20 keeps 50 artists; tech-house bloc dies via vocabulary
+    "london_dubstep":    0.25,   # 119-131bpm house padding at .12-.24
+    "bass_drop":         0.25,   # weak .13-.20 dubstep tags admitted pop/downtempo
+    "london_grime":      0.30,   # grime-tag spray on anything dark 135-145bpm (Ultravox live!); grime×78 post-fix
+    "london_jungle":     0.30,   # prog-breaks padding at .25-.29 even after the vocabulary fix
+    "industrial":        0.30,   # fourth-slot industrial .12-.25 admitted trip-hop/big-beat tail; industrial×63 post-fix.
+                                 # NOT 0.35: that pool (83) collapsed breadth to 24 artists/max 10 (swing_bigband lesson —
+                                 # keep breadth, document stragglers). RESIDUALS at .30: ~5 confident .32-.40 mis-tags
+                                 # (Nazareth live, Rick James, Grouper drone, TobyMac, Nessa Barrett)
+    "funk_disco":        0.20,   # weak fourth-slot nu-disco .12-.16 admitted Rogue Traders/1D bootlegs
+    "deep_house":        0.25,   # pop-artist material at .12-.24 (the Fisher class dies via vocabulary)
     "pop_radio":         0.25,   # post-punk/indie leak into a mainstream-hits scope
     "rock_radio":        0.25,   # pop/country leak
     "indie_radio":       0.25,
@@ -8325,6 +8355,21 @@ def _artist_key(track):
     return norm_text(primary_artist(name))
 
 
+# "X (Y Extended Remix)" and "X (Y Remix)" are the SAME remix in two cut lengths — remix-package singles
+# ship both (Armin/Afrojack packages; the t e s t p r e s s dup reached a built mix twice). And a bare
+# "(extended mix/version)" is the same RECORDING as the base title, just longer (Soft Cell "Memorabilia",
+# Aqua "Barbie Girl" — 304 same-artist groups measured, all clean). Two-step SONG-KEY collapse (never in
+# lastfm_query_title itself — that must keep matching Last.fm's own page titles):
+#   1. "extended (remix|edit)" -> "remix|edit"   (same remix, keyed with its remixer)
+#   2. any remaining standalone "extended mix|version" -> removed (merges with the base title)
+# Bare "extended" not followed by those words is left alone (219 titles legitimately contain the word).
+_EXTENDED_REMIX_RE = re.compile(r"\bextended\s+(remix|edit)\b")
+_EXTENDED_CUT_RE_2 = re.compile(r"\s*\bextended\s+(?:mix|version)\b")
+
+def _collapse_extended_cut(title_key):
+    """Apply the two-step extended-cut collapse to an already-normalised title key."""
+    return _EXTENDED_CUT_RE_2.sub("", _EXTENDED_REMIX_RE.sub(r"\1", title_key)).strip()
+
 def _song_key(track):
     """
     Deduplication key: normalised (track_artist, lastfm_query_title) pair.
@@ -8337,7 +8382,7 @@ def _song_key(track):
     artist = norm_text(primary_artist(track_artist_name(track)))
     # WHY: lastfm_query_title (not clean_title) so a different RECORDING (remix/live/acoustic) keys as its OWN
     # song — independently selectable in a mix — while reissues (remaster/deluxe) still collapse onto the original.
-    title  = norm_text(lastfm_query_title(getattr(track, "title", "") or ""))
+    title  = _collapse_extended_cut(norm_text(lastfm_query_title(getattr(track, "title", "") or "")))
     return (artist, title)
 
 
@@ -13801,7 +13846,9 @@ _SCREEN_EXCLUDED_PROFILES = {
 }
 # Catalogue S8: album fragments and karaoke artifacts never belong in a generated mix — a karaoke
 # "(Performance Track … Without Background Vocals)" surfaced in three mixes; skits/interludes pad others.
-_FRAGMENT_TITLE_RE = re.compile(r"\((skit|interlude)\)|karaoke|performance track", re.I)
+# "- Mixed" suffix = a DJ-mix crossfaded album rip (starts/ends mid-blend; 14 in the library, ARC audit
+# caught one opening house_party) — never playlist a crossfaded file standalone.
+_FRAGMENT_TITLE_RE = re.compile(r"\((skit|interlude)\)|karaoke|performance track|-\s*mixed\s*$", re.I)
 
 # Catalogue S15: hard per-profile facet bounds at the candidate stage — for intents a SOFT lean cannot
 # enforce. WHY: sad_bangers selected pure party tracks (valence 0.57) because flat tag boosts outrank any
@@ -13809,6 +13856,11 @@ _FRAGMENT_TITLE_RE = re.compile(r"\((skit|interlude)\)|karaoke|performance track
 # library has 2,734 danceable tracks at valence <=0.45 — a hard cap guarantees the "sad" half of the brief.
 _PROFILE_FACET_BOUNDS = {
     "sad_bangers": [("valence", None, 0.45)],
+    # london_grime is an MC-LED brief but ⅓ of its selections were instrumental dubstep/bass (ARC audit).
+    # Measured: the MC core (Stormzy/Skepta/Wiley class, n=591) has vocal_presence median .90 / p10 .44;
+    # the instrumental strays (n=496) median .37. A .40 floor keeps ~90% of the core and halves the
+    # instrumentals — tags can't express "has an MC", the vocal facet can.
+    "london_grime": [("vocal_presence", 0.40, None)],
 }
 
 def _is_screen_content(entry):
@@ -13969,8 +14021,9 @@ def _era_is_comp(entry):
 def _entry_song_key(entry):
     # WHY: lastfm_query_title (not clean_title) — a remix/live/acoustic keys as its OWN song (own listener
     # count, its own decade-collapse entry, not borrowing the original's popularity), reissues still collapse.
+    # _collapse_extended_cut mirrors _song_key: extended + standard cuts of the same remix/recording are one song.
     return (norm_text(primary_artist(entry.get("artist") or "")),
-            norm_text(lastfm_query_title(entry.get("title") or "")))
+            _collapse_extended_cut(norm_text(lastfm_query_title(entry.get("title") or ""))))
 def _song_min_year_map(essentia_cache):
     """Earliest cached year per song (artist+title) — so decade/era gating uses a track's ORIGINAL
     release rather than a reissue/compilation album year (Plex `year` is the album's, which is wrong
@@ -14380,6 +14433,23 @@ _EMB_SEEDS = {
     # indie_rock: big indie / alt-rock anthems
     "indie_rock": ["the killers", "arctic monkeys", "kings of leon", "the strokes", "interpol", "foals",
                    "two door cinema club", "phoenix", "vampire weekend", "bloc party", "franz ferdinand"],
+    # --- ARC-mix audit seed sets. Every artist below was DATA-NOMINATED (cache ranked artists by
+    # high-confidence on-intent tracks), identity-verified via origin/MBID (Slam=Glasgow/Soma duo,
+    # Robert Hood=Detroit; the Tyla lesson), collision-checked against the SUBSTRING matching this dict
+    # uses ("sophie" REJECTED — it also matches sophie ellisbextor's 163 tracks), and the joint centroid
+    # separation-tested against that mix's drift class (techno AUC≈.99, ukg/glasgow_bass .95).
+    # Patrick Topping was rejected by the data (tech-house profile); Sub Focus/DJ Fresh sets tested
+    # weakest (AUC .86) and were rebuilt from the nominations.
+    "techno":           ["slam", "inigo kennedy", "clouds", "robert hood"],
+    "melbourne_techno": ["pugilist", "partiboi69", "1tbsp"],
+    "uk_garage":        ["mj cole", "sammy virji", "interplanetary criminal", "basement jaxx"],
+    "london_garage":    ["mj cole", "sammy virji", "interplanetary criminal", "basement jaxx"],
+    "glasgow_bass":     ["rustie", "hudson mohawke", "proc fiskal"],
+    "london_jungle":    ["alix perez", "chase status", "netsky", "nia archives"],
+    "london_grime":     ["wiley", "dizzee rascal", "skepta", "flowdan"],
+    "glasgow_house":    ["barry cant swim", "big miz", "mylo", "nightcrawlers"],
+    "hyperpop":         ["a g cook"],
+    "industrial":       ["nine inch nails", "accessory", "clouds"],
 }
 _SEED_EMB_CENTROID_CACHE = {}
 
