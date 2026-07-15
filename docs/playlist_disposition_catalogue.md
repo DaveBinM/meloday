@@ -753,3 +753,34 @@ max/artist ≤2, zero wrong-vintage tracks selected. Documented residuals (revie
 Bowie "(2020 mix)" pair (matching year-mix would evict the Fatboy class; popularity-invisible);
 Chicago "25 or 6 to 4" / Kinks 2020s reissues have CLEAN titles — no title guard can catch them, their
 fix is an MB original-date resync (out of S12 scope).
+
+---
+
+## ARC-mix selection audit (2026-07, commit 4bbbf01) — supersedes the rows above for the 23 DJ-Arc mixes
+
+Full re-audit on the refreshed prod cache (164,363 tracks): metrics sweep + 3-agent editorial review
+(244 flags → 223 adversarially confirmed) + post-fix re-read. **18 of 23 gates rebuilt; verdict now
+on-brief for all 23** (composition proof: techno ×50/50 techno-tagged, was ×20; grime ×78;
+industrial ×63; drum n bass ×50 in london_jungle).
+
+Mechanism summary (full WHYs inline in `utilities/meloday_extras.py`):
+
+- **Tag-pollution discoveries**: 'bassline' = Tiësto/Marshmello-class EDM (dropped from all three
+  bass/garage gates); 'broken beat' = a different West-London scene; 'tech trance' = a catch-all on
+  driving house (blocked for trance); 'tropical house' rode Scottish trad-pop ('house' word-matches
+  it — blocked for glasgow_house); london_jungle's 'breaks'/'breakbeat' admitted 130bpm nu-skool.
+- **14 new + 4 raised floors**, sweep-tuned per profile with build tests; industrial kept at .30
+  (breadth over purity — .35 collapsed to 24 artists/max 10).
+- **9 data-nominated `_EMB_SEEDS` sets**, identity/collision/separation-verified ('sophie' rejected:
+  substring-matches Sophie Ellis-Bextor; Patrick Topping rejected by his own tag profile).
+- **london_grime vocal_presence ≥.40** facet bound (MC-led brief; measured core .90 vs strays .37).
+- **Two-step extended-cut song-key collapse** (304 groups) + '- Mixed' crossfade-rip exclusion.
+
+Documented residuals (confident ≥floor mis-tags — the Tina Arena class, floor-immune):
+glasgow_house Deacon Blue (house .50); glasgow_underground Jimmy Somerville + Blue Boy remixes;
+industrial ~5 at .32-.40 (Nazareth live, Rick James, Grouper, TobyMac, Nessa Barrett); trance
+Primal Scream/Shygirl; rave_cave DJ Ötzi + the AFROJACK/NLW alias dup; festival_edm Chris Brown/
+Black Box; deep_house Robin Schulz; melbourne_club Saskwatch; bass_drop ScHoolboy Q; london_dubstep
+Billy Idol CRAY remix; london_grime Amy Winehouse Moody Boyz dub; melbourne_techno Xavier Rudd (.26).
+Metadata anomalies worth a file check: "harry styles — Ready, Steady, Go!" (likely mistagged file),
+"olivia rodrigo — my way" (no such release).
