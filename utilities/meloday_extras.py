@@ -227,6 +227,7 @@ _EXTRAS_COVER_COLORS = {
     "global_3mo":             ((26, 158, 146), (8, 44, 60)),     # fresh teal — "Just Released"
     "global_12mo":            ((72, 78, 176),  (18, 20, 66)),    # indigo — "The Last 12 Months"
     "global_year":            ((126, 72, 184), (40, 20, 72)),    # violet — "Class of the Year"
+    "four_corners":           ((214, 148, 54),  (18, 44, 78)),   # golden sun → ocean navy — a lit world globe (distinct from the blue/purple globals)
     # 5 global genre radio stations
     "electronic_radio":       ((60, 80, 230),  (200, 40, 170)),  # electric blue → magenta
     "rock_radio":             ((190, 50, 45),  (50, 20, 20)),    # crimson → black
@@ -803,6 +804,7 @@ _COVER_BG_STYLES = {
     "global_3mo": ("globe", 1),
     "global_12mo": ("globe", 2),
     "global_year": ("globe", 3),
+    "four_corners": ("globe", 4),   # densest-grid globe, gold-on-navy — the whole-world station
     # --- 5 global GENRE radio stations: genre-evocative families at free variants ---
     "electronic_radio": ("equalizer", 3),
     "rock_radio": ("amp_stack", 7),
@@ -849,6 +851,7 @@ _PROFILE_ICON = {
     "uk_hits": "star",
     "scotland_now": "radio", "london_now": "radio", "uk_now": "radio", "australia_now": "radio",
     "scotland_australia_now": "radio", "uk_australia_now": "radio", "global_radio": "radio",
+    "four_corners": "radio",
     "global_3mo": "radio", "global_12mo": "radio", "global_year": "radio",
     "electronic_radio": "radio", "rock_radio": "radio", "pop_radio": "radio",
     "indie_radio": "radio", "soundtracks_radio": "radio",
@@ -895,6 +898,7 @@ _ICON_PROFILE_OVERRIDE = {
     # fixed spot/size): globes CONTAIN it inside the sphere; the focal-art covers (amp / mod-target / EQ) get a
     # small stamp tucked clear of the hero element. Others keep the _ICON_META["radio"] upper-right default.
     "global_radio":     {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},  # inside the globe
+    "four_corners":     {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},  # inside the globe
     "global_3mo":       {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},
     "global_12mo":      {"anchor": (0.50, 0.46), "base_scale": 0.90, "tilt": 6, "jitter": 0.10},
     "global_year":      {"anchor": (0.50, 0.42), "base_scale": 0.82, "tilt": 6, "jitter": 0.10},   # above the big "2026"
@@ -2274,6 +2278,16 @@ _MOOD_PROFILES = {
 # Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue day-to-day.
 # Enhance:  50/50 nation split via _GEO_RADIO_SPLIT.
     "uk_australia_now": {"bpm": 120, "energy": -8, "danceability": 0.58, "brightness": 0.43, "beat_confidence": 0.78, "onset_rate": 5.5, "dynamic_complexity": 0.44, "arousal": 0.64, "valence": 0.60, "vocal_presence": 0.76},
+# ── four_corners → "Four Corners" ─────────────────────────────────────────────────────────
+# Theme:    An equal quarter each of current Scottish, rest-of-UK, Australian, and world radio.
+# Sound:    No sound/genre gate — any genre from any origin (centroid below is metadata only).
+# Era/Geo:  ~90% last 5 years + ~10% throwback · NO origin gate — the 4-way split IS the geo filter.
+# Music:    _GEO_RADIO_SPLIT 4-way equal bucket draw (SCO / rest-UK / AUS / world incl. origin-unknown);
+#           most-popular contemporary + throwbacks · 1-per-artist. No anthem-rescue (radio model).
+# Criteria: no genre/sound gate · 4-way equal split (≈14/13/12/11) · 90% contemporary + 10% throwback · PINNED · cat:geo_scene
+# Flow:     Day-seeded shuffle; per-artist daily re-roll rotates each act's catalogue day-to-day.
+# Enhance:  4-region equal split via _GEO_RADIO_SPLIT; buckets mutually exclusive via `exclude`.
+    "four_corners": {"bpm": 119, "energy": -8, "danceability": 0.57, "brightness": 0.43, "beat_confidence": 0.77, "onset_rate": 5.5, "dynamic_complexity": 0.45, "arousal": 0.64, "valence": 0.60, "vocal_presence": 0.77},
 # ── global_radio → "Global Radio" ─────────────────────────────────────────────────────────
 # Theme:    The most-popular current releases worldwide + classic throwbacks — no borders.
 # Sound:    No sound/genre gate — any genre (centroid below is metadata only).
@@ -4687,6 +4701,7 @@ _MOOD_MIX_NAMES = {
     "australia_now":   "Australia Now • Meloday+",
     "scotland_australia_now": "Scotland × Australia • Meloday+",
     "uk_australia_now":       "UK × Australia • Meloday+",
+    "four_corners":           "Four Corners • Meloday+",
     "global_radio":           "Global Radio • Meloday+",
     "global_3mo":             "Just Released • Meloday+",
     "global_12mo":            "Past Year • Meloday+",
@@ -5182,7 +5197,7 @@ _SEASONAL_PROFILES = {"autumn_mix", "winter_mix", "spring_mix", "summer_evening"
 _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
                      "scottish_hits", "australian_hits", "london_hits",
                      "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
-                     "scotland_australia_now", "uk_australia_now", "global_radio",
+                     "scotland_australia_now", "uk_australia_now", "four_corners", "global_radio",
                      "global_3mo", "global_12mo", "global_year",
                      "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio"}
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
@@ -5344,6 +5359,7 @@ _PROFILE_CATEGORY = {
     "uk_scene": "geo_scene", "uk_hits": "geo_scene", "scotland_now": "geo_scene",
     "london_now": "geo_scene", "uk_now": "geo_scene", "australia_now": "geo_scene",
     "scotland_australia_now": "geo_scene", "uk_australia_now": "geo_scene", "global_radio": "geo_scene",
+    "four_corners": "geo_scene",
     "global_3mo": "geo_scene", "global_12mo": "geo_scene", "global_year": "geo_scene",
     "electronic_radio": "geo_scene", "rock_radio": "geo_scene", "pop_radio": "geo_scene",
     "indie_radio": "geo_scene", "soundtracks_radio": "geo_scene",
@@ -6908,7 +6924,20 @@ def _origin_match(entry, spec):
     within = {w.lower() for w in spec.get("within", ())}
     if within and places and not (within & places):
         return False
+    # `exclude` — optional disqualifying place set: an artist whose consolidated places hit any excluded
+    # name is rejected outright. WHY: the origin gate is otherwise positive-only, so "rest of the UK"
+    # (UK but NOT Scotland) and "the world" (everywhere but SCO/UK/AUS) can't be expressed — the four
+    # buckets of the Four Corners radio need to be mutually exclusive so a Scottish artist is NEVER in the
+    # rest-of-UK or world bucket regardless of sampling order.
+    exclude = {e.lower() for e in spec.get("exclude", ())}
+    if exclude and (places & exclude):
+        return False
     if {p.lower() for p in spec.get("places", ())} & places:
+        return True
+    # Exclusion-only spec (has `exclude`, no `places`/`scene`) = a catch-all matching everything not
+    # excluded, INCLUDING origin-less artists — the "rest of the world" bucket (user chose to include the
+    # ~327 origin-unknown artists there). A spec with neither places/scene NOR exclude still matches nothing.
+    if exclude and not spec.get("places") and not spec.get("scene"):
         return True
     scene = spec.get("scene")
     if scene:
@@ -11117,10 +11146,11 @@ def _make_globe_background(w, h, color_top, color_bottom, v=0, rng=None):
     """A latitude/longitude wireframe globe — a softly-shaded sphere with meridians (vertical ellipses) and
     tilted parallels (horizontal ellipses) over the station's gradient. RGBA like every generator; build on
     _make_gradient_image + 4-tuple fills (the union_jack RGBA gotcha). Centred/symmetric -> in _BG_SYMMETRIC
-    (no h-flip twin). The four GLOBAL radio stations use variants 0-3."""
+    (no h-flip twin). The four GLOBAL radio stations use variants 0-3; Four Corners uses variant 4."""
     import math
     # (meridians, parallels-per-hemisphere, axial tilt°, grid alpha, sphere radius as frac of min(w,h)/2)
-    configs = [(7, 5, 18, 150, 0.74), (9, 6, 12, 135, 0.72), (6, 4, 24, 165, 0.78), (8, 5, 15, 145, 0.70)]
+    configs = [(7, 5, 18, 150, 0.74), (9, 6, 12, 135, 0.72), (6, 4, 24, 165, 0.78), (8, 5, 15, 145, 0.70),
+               (10, 6, 20, 140, 0.76)]   # v4 (four_corners): densest meridian grid, a distinct fifth look
     n_mer, n_par, tilt_d, galpha, rfrac = configs[min(v, len(configs) - 1)]
     img  = _make_gradient_image(w, h, color_top, color_bottom, diagonal=True)
     draw = ImageDraw.Draw(img, 'RGBA')
@@ -11276,7 +11306,7 @@ def _bg_variant_count(fn):
     return max(ks) + 1 if ks else None
 
 # Generators whose variant table is an inline literal / procedural (no named configs list) — set by hand.
-_BG_VARIANT_COUNTS_OVERRIDE = {"ripples": 6, "confetti": 8, "tartan": 4, "cityscape": 4, "brushstrokes": 10}
+_BG_VARIANT_COUNTS_OVERRIDE = {"ripples": 6, "confetti": 8, "tartan": 4, "cityscape": 4, "brushstrokes": 10, "globe": 5}
 _BG_BASE_COUNTS = {name: (_BG_VARIANT_COUNTS_OVERRIDE.get(name) or _bg_variant_count(fn) or 1)
                    for name, fn in _BG_GENERATORS.items()}
 
@@ -13695,7 +13725,7 @@ def build_mood_mixes(plex, history_entries, essentia_cache, excluded_album_keys,
     active_pinned = [k for k in ("scotland_scene", "australia_scene", "london_scene",
                                  "scottish_hits", "australian_hits", "london_hits",
                                  "uk_scene", "uk_hits", "scotland_now", "london_now", "uk_now", "australia_now",
-                                 "scotland_australia_now", "uk_australia_now", "global_radio",
+                                 "scotland_australia_now", "uk_australia_now", "four_corners", "global_radio",
                                  "global_3mo", "global_12mo", "global_year",
                                  "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio")
                      if k in _MOOD_MIX_NAMES and not _scene_done_today(k)]
@@ -13809,6 +13839,10 @@ _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popul
     # --- two-location 50/50 blends: `_GEO_RADIO_SPLIT` draws half the slots from each nation's bucket ---
     "scotland_australia_now": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 70, "recency_base": 1.6},
     "uk_australia_now":       {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 70, "throwback_pool": 70, "recency_base": 1.6},
+    # --- FOUR-location equal split (no origin gate — the 4-way split IS the geo filter, incl. a "world"
+    #     bucket, so like the globals it has NO _PROFILE_GEO_GATE entry). Wide pools like global_radio since
+    #     each of the 4 regions is only a quarter; the [:pool] cap is a no-op for the smaller regions. ---
+    "four_corners":          {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
     # --- GLOBAL (no origin gate — no _PROFILE_GEO_GATE entry): most-popular contemporary + throwback, whole library ---
     "global_radio": {"recent_years": 5, "throwback_frac": 0.10, "recent_pool": 150, "throwback_pool": 120, "recency_base": 1.6},
     # --- GLOBAL release-window "new music": pure contemporary (throwback_frac 0), gated to a release window.
@@ -13884,11 +13918,23 @@ def _is_screen_content(entry):
     if not genres:                                  # fully-untagged -> thin-metadata score/game composer
         return True
     return bool(_entry_lastfm_tags(entry) & _SCREEN_LASTFM_TAGS)
-_GEO_RADIO_SPLIT = {   # two-location blends: (specA, specB) — the branch draws ~50/50 from each nation's bucket
+_GEO_RADIO_SPLIT = {   # multi-location blends: a 2..N-tuple of origin specs — the branch draws an equal share
+                       # of every currents tier from each region's bucket (see the `if _split:` branch).
     "scotland_australia_now": ({"places": {"scotland"},  "scene": {"scotland"}},
                                {"places": {"australia"}, "scene": {"australia"}}),
     "uk_australia_now":       ({"places": {"united kingdom", "england", "scotland", "wales", "northern ireland", "great britain"}, "scene": {"british"}},
                                {"places": {"australia"}, "scene": {"australia"}}),
+    # Four Corners — an equal quarter each from Scotland, the REST of the UK, Australia, and the WORLD.
+    # The buckets are mutually exclusive via `exclude` (see _origin_match), so ordering only decides
+    # dual-origin ties (Jimmy Barnes -> Scotland, sampled first) and the remainder slots (Scotland-leads:
+    # per-region ≈ 14/13/12/11 of 50). "rest of UK" = UK places minus Scotland; "world" = the exclusion-
+    # only catch-all, matching everyone NOT SCO/UK/AUS INCLUDING origin-unknown artists (user's choice).
+    "four_corners":          ({"places": {"scotland"},  "scene": {"scotland"}},
+                              {"places": {"united kingdom", "england", "wales", "northern ireland", "great britain"},
+                               "exclude": {"scotland"}, "scene": {"british"}},
+                              {"places": {"australia"}, "scene": {"australia"}},
+                              {"exclude": {"scotland", "australia", "united kingdom", "england", "wales",
+                                           "northern ireland", "great britain"}}),
 }
 # Geo-radio variety: a track the station featured in the last _RADIO_SURFACE_WINDOW days is SOFT-deprioritised
 # (weight × down to _RADIO_SURFACE_FLOOR, never hard-banned) so each artist's REPRESENTATIVE track rotates
@@ -14885,15 +14931,25 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         n_r36 = round(n_recent * _RECENT36_FRAC) if not _win else 0
         _rp   = cfg["recent_pool"]
         if _split:
-            # Two-location blend: draw ~half of each tier from each nation (origin is artist-level; a dual-origin
-            # artist sits in both lists and is claimed by whichever the shared _used set reaches first).
-            specA, specB = _split; _tp = cfg["throwback_pool"]; _nh = n_recent - n_new - n_r36
-            def _pA(arts, by): return [a for a in arts if _origin_match(essentia_cache.get(by[a][0], {}), specA)]
-            def _pB(arts, by): return [a for a in arts if _origin_match(essentia_cache.get(by[a][0], {}), specB)]
-            pool = (_sample_throw(_pA(throw_artists, throw_by_a)[:_tp], n_throw - n_throw // 2) + _sample_throw(_pB(throw_artists, throw_by_a)[:_tp], n_throw // 2)
-                    + _sample_feat(_pA(new_artists, new_by_a)[:_rp], n_new - n_new // 2, new_by_a, "nA") + _sample_feat(_pB(new_artists, new_by_a)[:_rp], n_new // 2, new_by_a, "nB")
-                    + _sample_feat(_pA(rec36_artists, rec36_by_a)[:_rp], n_r36 - n_r36 // 2, rec36_by_a, "r36A") + _sample_feat(_pB(rec36_artists, rec36_by_a)[:_rp], n_r36 // 2, rec36_by_a, "r36B")
-                    + _sample_recent(_pA(recent_artists, recent_by_a)[:_rp], _nh - _nh // 2) + _sample_recent(_pB(recent_artists, recent_by_a)[:_rp], _nh // 2))
+            # N-location blend: draw an equal share of every tier from each region's bucket. Origin is
+            # artist-level; a dual-origin artist (Jimmy Barnes: Glasgow-born, Australia-based) sits in more
+            # than one list and is claimed by whichever the shared _used set reaches first. `_GEO_RADIO_SPLIT`
+            # values are 2..N-tuples of origin specs; the buckets are made mutually exclusive by the specs'
+            # `exclude` keys (see _origin_match), so ordering only decides dual-origin ties + the remainder.
+            # k=2 reproduces the old n-n//2 / n//2 halving and "nA"/"nB" tags EXACTLY -> byte-identical.
+            specs = _split; k = len(specs); _tp = cfg["throwback_pool"]; _nh = n_recent - n_new - n_r36
+            _SUF = "ABCDEFGH"
+            def _part(n, i): return n // k + (1 if i < n % k else 0)   # split n across k buckets; remainder to the first
+            def _pick(arts, by, sp): return [a for a in arts if _origin_match(essentia_cache.get(by[a][0], {}), sp)]
+            pool = []
+            for i, sp in enumerate(specs):    # throwback classics (shared "t" seed across buckets, as before)
+                pool += _sample_throw(_pick(throw_artists, throw_by_a, sp)[:_tp], _part(n_throw, i))
+            for i, sp in enumerate(specs):    # new-adds 0-3mo
+                pool += _sample_feat(_pick(new_artists, new_by_a, sp)[:_rp], _part(n_new, i), new_by_a, f"n{_SUF[i]}")
+            for i, sp in enumerate(specs):    # recent 3-6mo
+                pool += _sample_feat(_pick(rec36_artists, rec36_by_a, sp)[:_rp], _part(n_r36, i), rec36_by_a, f"r36{_SUF[i]}")
+            for i, sp in enumerate(specs):    # hits + mid-tier (shared "h" seed across buckets, as before)
+                pool += _sample_recent(_pick(recent_artists, recent_by_a, sp)[:_rp], _part(_nh, i))
         else:
             pool = (_sample_throw(throw_artists[:cfg["throwback_pool"]], n_throw)
                     + _sample_feat(new_artists[:_rp], n_new, new_by_a, "n")
