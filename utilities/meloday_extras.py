@@ -6125,6 +6125,11 @@ _PROFILE_BLOCKED_DOMINANT = {
     # rap style (Schoolboy Q Trap .56, Gunna Trap .54, Eminem "Beautiful" Cloud Rap .50, 50 Cent Crunk .36,
     # Central Cee Grime). NOT 'horrorcore'/'gangsta' — those ARE golden-age (Public Enemy, Nas, Mobb Deep).
     "boom_bap": {"trap", "cloud rap", "crunk", "thug rap", "pop rap", "grime", "drill"},
+    # conscious_flow = conscious/boom-bap/jazzy rap (its 'conscious' positive IS the intent). The leak is the
+    # catalogue's "introspective trap" drift — cloud-rap/trap tracks the classifier co-tags 'conscious'
+    # (Eminem "Beautiful" Cloud Rap .50, Denzel Curry .60, Danny Brown .49, Central Cee Trap .41, 50 Cent
+    # Crunk). Reject on the dominant modern-rap sub, same as boom_bap.
+    "conscious_flow": {"trap", "cloud rap", "crunk", "thug rap", "pop rap", "grime", "drill"},
     # after_hours_rnb = smooth/sultry contemporary R&B. 'contemporary r&b' co-occurs with upbeat 80s/90s
     # New Jack Swing on the same tracks (the classifier double-tags them), so reject the ones whose DOMINANT
     # sub is the upbeat-R&B family — leaves the smooth contemporary-R&B core.
