@@ -5800,7 +5800,7 @@ _PROFILE_STYLE_SIGNALS = {
     "motown_soul": (["soul", "rhythm & blues"], ["metal", "rap", "techno"]),  # WHY dropped 'funk'+'disco': they pulled whole ADJACENT genres into a classic-Motown/soul mix — pure disco (Donna Summer/Cerrone/Trammps) and MODERN synth-funk (Luke Million "Arnold" Funk .40 on a synth track/Electronic parent, Vulfpeck, Mark Ronson "Uptown Funk" 2014). Genuine funk-soul (James Brown soul .29, Isleys .25, Gap Band .44) STAYS via its 'soul' tag; only funk/disco lacking a soul tag drops. Pool 2118->1719, genuine-Motown artists carry 'soul' as their top sub (403 of top tags)  # Discogs subgenres (classic soul/funk)
     "after_hours_rnb": (["contemporary r&b", "alternative r&b", "new jack swing", "quiet storm"], ["metal", "punk", "country"]),
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
-    "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop", "conscious"], ["metal", "country", "ambient"]),  # Discogs subgenres
+    "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop"], ["metal", "country", "ambient"]),  # WHY dropped 'conscious': the audio classifier sprays it on nu-metal (Linkin Park/Limp Bizkit Conscious .52/.34) + pop-rap (Black Eyed Peas, Jack Harlow) — it was the top sub on 22/50, the biggest noise vector. Genuine conscious boom-bap (Apollo Brown Boom Bap .49, De La Soul .43) keeps via its boom-bap/jazzy tag. Trap-flood ejected by _PROFILE_BLOCKED_DOMINANT below  # Discogs subgenres
     "conscious_flow": (["conscious", "jazzy hip-hop", "boom bap"], ["metal", "screamo", "edm"]),  # WHY dropped 'instrumental': it admitted non-rap singers/instrumentals outright (catalogue S3)
     "g_funk": (["g-funk", "gangsta"], ["metal", "punk", "ambient"]),  # Discogs subgenres
     "trap_mode": (["trap", "cloud rap", "crunk", "gangsta"], ["folk", "ambient", "classical"]),  # Discogs subgenres
@@ -6115,6 +6115,11 @@ _PROFILE_BLOCKED_SUBS = {
 # Motown/soul is soul/funk/r&b/disco/doo-wop-dominant (never NJS), so no genuine track is lost.
 _PROFILE_BLOCKED_DOMINANT = {
     "motown_soul": {"new jack swing", "rnb/swing", "swingbeat"},
+    # boom_bap = 90s/golden-age + modern boom-bap revival. The gate was ~half TRAP/drill/pop-rap because the
+    # audio classifier gives them a boom-bap-family co-tag; reject the ones whose DOMINANT sub is a modern
+    # rap style (Schoolboy Q Trap .56, Gunna Trap .54, Eminem "Beautiful" Cloud Rap .50, 50 Cent Crunk .36,
+    # Central Cee Grime). NOT 'horrorcore'/'gangsta' — those ARE golden-age (Public Enemy, Nas, Mobb Deep).
+    "boom_bap": {"trap", "cloud rap", "crunk", "thug rap", "pop rap", "grime", "drill"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
