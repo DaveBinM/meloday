@@ -6397,7 +6397,12 @@ def _entry_lastfm_tags(entry):
 # (verified: a Pink-Floyd/Rush-seeded centroid pulled Tiësto DJ mixes; a Nickelback/Creed one pulled
 # Springsteen/McCartney). Their membership comes from Last.fm community tags instead — still RANKED on our
 # own centroid + leans. The positive list in _PROFILE_STYLE_SIGNALS is matched against the Last.fm tags.
-_LASTFM_GATED = {"post_grunge", "prog_rock"}
+# gospel (per-mix pass): the Discogs AUDIO 'gospel' tag is pure mis-tag — at conf >=0.30 its top "gospel"
+# artists are Dolly Parton (17)/Disney/Andrew Lloyd Webber (inspirational country/musical theatre), and the
+# genuine gospel canon is absent from genre_discogs. The Last.fm crowd 'gospel' tag nails it instead: 1105
+# tracks / 49 artists (Aretha 292, Amy Grant 200, Al Green, Mavis Staples, Candi Staton, Leon Bridges, The
+# War and Treaty, Hillsong Worship, Casting Crowns, Chris Tomlin) — gospel/CCM/worship, all on-genre here.
+_LASTFM_GATED = {"post_grunge", "prog_rock", "gospel"}
 
 # (Retired _STYLE_EXACT_PROFILES: london_mod's "mod" no longer leaks into "modern" now that the gate uses
 #  word-boundary token matching for ALL profiles — see _positive_matches above. audit substr-fix-systemic.)
