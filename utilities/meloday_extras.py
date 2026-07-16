@@ -5203,9 +5203,14 @@ _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
+# g_funk (per-mix pass, user call): LIBRARY-BOUND. The genuine West-Coast g-funk canon isn't here —
+# Snoop is the only deep artist (Warren G / Nate Dogg / DJ Quik / Above the Law absent), so a real g-funk
+# gate collapses to a ~36%-Snoop residency, and the broad alternative ('gangsta') was just coast-agnostic
+# gangsta rap (Ludacris/JAY-Z/OutKast). The 'g-funk' AUDIO tag also sprays onto funk/pop (Phil Collins,
+# PSY, Shaggy). Soft-retired (config kept as a stub) so it returns for free if the library gains the canon.
 # (adult_alt was retired for the same reason and is now FULLY removed, not a soft-retired stub. WHY: its
 # style gate matched 0 tracks, so every lingering config entry — centroid, name, floor, etc. — was dead.)
-_RETIRED_PROFILES = {"lofi_beats"}
+_RETIRED_PROFILES = {"lofi_beats", "g_funk"}
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
@@ -5802,7 +5807,7 @@ _PROFILE_STYLE_SIGNALS = {
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
     "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop"], ["metal", "country", "ambient"]),  # WHY dropped 'conscious': the audio classifier sprays it on nu-metal (Linkin Park/Limp Bizkit Conscious .52/.34) + pop-rap (Black Eyed Peas, Jack Harlow) — it was the top sub on 22/50, the biggest noise vector. Genuine conscious boom-bap (Apollo Brown Boom Bap .49, De La Soul .43) keeps via its boom-bap/jazzy tag. Trap-flood ejected by _PROFILE_BLOCKED_DOMINANT below  # Discogs subgenres
     "conscious_flow": (["conscious", "jazzy hip-hop", "boom bap"], ["metal", "screamo", "edm"]),  # WHY dropped 'instrumental': it admitted non-rap singers/instrumentals outright (catalogue S3)
-    "g_funk": (["g-funk", "gangsta"], ["metal", "punk", "ambient"]),  # Discogs subgenres
+    "g_funk": (["g-funk"], ["metal", "punk", "ambient"]),  # dropped 'gangsta' (749 tracks — coast-agnostic gangsta rap, not West-Coast g-funk). RETIRED (library-bound, Snoop-only) — this corrected stub gate is for a future reactivation if the canon lands
     "trap_mode": (["trap", "cloud rap", "crunk", "gangsta"], ["folk", "ambient", "classical"]),  # Discogs subgenres
     "lofi_beats": (["instrumental hip-hop", "lo-fi", "trip-hop", "downbeat"], ["metal", "punk", "hardcore"]),  # dropped "downtempo" (pulled 13k generic downtempo, not lo-fi beats)
     "house_party": (["house", "tech-house", "progressive house", "club/dance", "euro-dance"], ["metal", "country", "ambient"]),
