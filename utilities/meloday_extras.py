@@ -5797,7 +5797,7 @@ _PROFILE_STYLE_SIGNALS = {
     "singalong": (["album rock", "arena rock", "power pop"], []),
     "funk_disco": (["funk", "disco", "funky breaks", "neo-disco", "boogie", "euro-disco", "post-disco"], ["metal", "rap", "ambient"]),
     "neo_soul": (["neo soul", "contemporary r&b", "quiet storm"], ["metal", "punk", "edm"]),  # Discogs subgenres
-    "motown_soul": (["soul", "rhythm & blues", "funk", "disco"], ["metal", "rap", "techno"]),  # Discogs subgenres (classic soul/funk)
+    "motown_soul": (["soul", "rhythm & blues"], ["metal", "rap", "techno"]),  # WHY dropped 'funk'+'disco': they pulled whole ADJACENT genres into a classic-Motown/soul mix — pure disco (Donna Summer/Cerrone/Trammps) and MODERN synth-funk (Luke Million "Arnold" Funk .40 on a synth track/Electronic parent, Vulfpeck, Mark Ronson "Uptown Funk" 2014). Genuine funk-soul (James Brown soul .29, Isleys .25, Gap Band .44) STAYS via its 'soul' tag; only funk/disco lacking a soul tag drops. Pool 2118->1719, genuine-Motown artists carry 'soul' as their top sub (403 of top tags)  # Discogs subgenres (classic soul/funk)
     "after_hours_rnb": (["contemporary r&b", "alternative r&b", "new jack swing", "quiet storm"], ["metal", "punk", "country"]),
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
     "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop", "conscious"], ["metal", "country", "ambient"]),  # Discogs subgenres
@@ -6105,6 +6105,16 @@ _PROFILE_BLOCKED_SUBS = {
     "glasgow_house":   {"tropical house"},
     "latin_heat":      {"tropical house"},
     "summer_tropical": {"tropical house"},
+}
+# Reject a track whose SINGLE highest-confidence Discogs sub is one of these — even if it ALSO carries a
+# qualifying positive tag. WHY this is distinct from _PROFILE_BLOCKED_SUBS: those leaks qualify via a
+# GENUINE positive (not the blocked sub), so removing the blocked sub from the tag list doesn't eject them.
+# motown_soul's 'soul' positive legitimately matched 80s/90s New-Jack-Swing tracks the audio classifier
+# hears as soul (Sheena Easton "What Comes Naturally" NJS .90 / soul .29, Donna Summer "Get Ethnic" NJS .82,
+# Janet Jackson RnB/Swing .36) — not Motown. Their DOMINANT sub is the giveaway, so reject on that. Classic
+# Motown/soul is soul/funk/r&b/disco/doo-wop-dominant (never NJS), so no genuine track is lost.
+_PROFILE_BLOCKED_DOMINANT = {
+    "motown_soul": {"new jack swing", "rnb/swing", "swingbeat"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
@@ -6425,6 +6435,16 @@ def _has_required_style(entry, profile_key):
             mx = max(parents.values())
             top = [p for p, v in parents.items() if v == mx]
             if not all(p in req_parents for p in top):
+                return False
+
+    # Dominant-sub reject (see _PROFILE_BLOCKED_DOMINANT): a qualifying positive can still admit a track
+    # whose HIGHEST-confidence sub marks it as a different genre — reject on that dominant tag.
+    _blk_dom = _PROFILE_BLOCKED_DOMINANT.get(profile_key)
+    if _blk_dom:
+        gd = entry.get("genre_discogs") or {}
+        if isinstance(gd, dict) and gd:
+            top_sub = max(gd.items(), key=lambda kv: kv[1])[0].split("---")[-1].strip().lower()
+            if top_sub in _blk_dom:
                 return False
     return True
 
