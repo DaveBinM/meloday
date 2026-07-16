@@ -5798,7 +5798,7 @@ _PROFILE_STYLE_SIGNALS = {
     "funk_disco": (["funk", "disco", "funky breaks", "neo-disco", "boogie", "euro-disco", "post-disco"], ["metal", "rap", "ambient"]),
     "neo_soul": (["neo soul", "contemporary r&b", "quiet storm"], ["metal", "punk", "edm"]),  # Discogs subgenres
     "motown_soul": (["soul", "rhythm & blues"], ["metal", "rap", "techno"]),  # WHY dropped 'funk'+'disco': they pulled whole ADJACENT genres into a classic-Motown/soul mix — pure disco (Donna Summer/Cerrone/Trammps) and MODERN synth-funk (Luke Million "Arnold" Funk .40 on a synth track/Electronic parent, Vulfpeck, Mark Ronson "Uptown Funk" 2014). Genuine funk-soul (James Brown soul .29, Isleys .25, Gap Band .44) STAYS via its 'soul' tag; only funk/disco lacking a soul tag drops. Pool 2118->1719, genuine-Motown artists carry 'soul' as their top sub (403 of top tags)  # Discogs subgenres (classic soul/funk)
-    "after_hours_rnb": (["contemporary r&b", "alternative r&b", "new jack swing", "quiet storm"], ["metal", "punk", "country"]),
+    "after_hours_rnb": (["contemporary r&b"], ["metal", "punk", "country"]),  # WHY: was 28/50 upbeat NEW JACK SWING (Gap Band NJS .95, TLC .84) + pop (Backstreet Boys, Blue) — the OPPOSITE of sultry after-hours. Dropped 'new jack swing' (the leak) + the two DEAD tokens 'alternative r&b'/'quiet storm' (0 cache matches each). 'contemporary r&b' (631) + the NJS/rnb-swing dominant block below = smooth contemporary R&B. NOTE the modern trap-soul canon (Weeknd/Frank Ocean) can't be gated — Discogs tags it trap/cloud-rap
     "acid_jazz": (["acid jazz", "jazz-funk", "soul jazz", "jazz-house", "fusion", "clubjazz"], ["metal", "screamo", "drill"]),
     "boom_bap": (["boom bap", "hardcore hip-hop", "jazzy hip-hop"], ["metal", "country", "ambient"]),  # WHY dropped 'conscious': the audio classifier sprays it on nu-metal (Linkin Park/Limp Bizkit Conscious .52/.34) + pop-rap (Black Eyed Peas, Jack Harlow) — it was the top sub on 22/50, the biggest noise vector. Genuine conscious boom-bap (Apollo Brown Boom Bap .49, De La Soul .43) keeps via its boom-bap/jazzy tag. Trap-flood ejected by _PROFILE_BLOCKED_DOMINANT below  # Discogs subgenres
     "conscious_flow": (["conscious", "jazzy hip-hop", "boom bap"], ["metal", "screamo", "edm"]),  # WHY dropped 'instrumental': it admitted non-rap singers/instrumentals outright (catalogue S3)
@@ -6120,6 +6120,10 @@ _PROFILE_BLOCKED_DOMINANT = {
     # rap style (Schoolboy Q Trap .56, Gunna Trap .54, Eminem "Beautiful" Cloud Rap .50, 50 Cent Crunk .36,
     # Central Cee Grime). NOT 'horrorcore'/'gangsta' — those ARE golden-age (Public Enemy, Nas, Mobb Deep).
     "boom_bap": {"trap", "cloud rap", "crunk", "thug rap", "pop rap", "grime", "drill"},
+    # after_hours_rnb = smooth/sultry contemporary R&B. 'contemporary r&b' co-occurs with upbeat 80s/90s
+    # New Jack Swing on the same tracks (the classifier double-tags them), so reject the ones whose DOMINANT
+    # sub is the upbeat-R&B family — leaves the smooth contemporary-R&B core.
+    "after_hours_rnb": {"new jack swing", "rnb/swing", "swingbeat"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
