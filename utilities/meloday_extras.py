@@ -5795,7 +5795,7 @@ _PROFILE_STYLE_SIGNALS = {
     "winter_cosy": (["soul", "neo-soul", "quiet storm", "smooth soul"], []),
     "winter_nights": (["downtempo", "ambient techno", "electronica", "trip-hop"], []),
     "winter_jazz": (["smooth jazz", "jazz", "lounge", "vocal jazz"], []),
-    "dinner_party": (["vocal jazz", "soul", "lounge", "bossa nova", "smooth"], []),
+    "dinner_party": (["soul", "funk", "neo soul", "disco", "boogie"], []),  # WHY (user call): the 'vocal jazz'/'lounge'/'bossa nova' jazz pretense never delivered — it builds as a classic soul/funk party (EWF/Chaka Khan/Herbie Hancock, catalogue: "excellent"). Positives now match that reality; screen-excluded to drop the Rocky-theme cue leak
     "study_session": (["instrumental", "classical", "ambient", "post-rock", "score"], []),
     "yoga_stretch": (["ambient", "new age", "instrumental", "classical", "downtempo"], []),
     "meditation": (["ambient", "new age", "modern composition", "experimental ambient"], []),
@@ -6304,7 +6304,7 @@ _PROFILE_GENRE_PARENT = {
     # --- Funk / Soul ---
     "neo_soul": {"funk / soul"}, "motown_soul": {"funk / soul"}, "glasgow_soul": {"funk / soul"},
     "london_soul": {"funk / soul"}, "melbourne_soul": {"funk / soul"},
-    "dinner_party": {"funk / soul", "jazz"},  # WHY: names vocal-jazz/bossa (Jazz parent), rejected under funk/soul-only (audit dinner_party-1)
+    "dinner_party": {"funk / soul"},  # was {funk/soul, jazz} for the vocal-jazz pretense; now a soul/funk mix (user call), so funk/soul only
     "winter_cosy": {"funk / soul"}, "gospel": {"funk / soul"},
     "funk_disco": {"electronic", "funk / soul"}, "after_hours_rnb": {"electronic", "funk / soul"},
     # --- Folk, World, & Country ---
@@ -13925,7 +13925,7 @@ _SCREEN_LASTFM_TAGS = {"soundtrack", "soundtracks", "film score", "film music", 
 # deliberately NOT here.
 _SCREEN_EXCLUDED_PROFILES = {
     "jazz_dinner", "smooth_jazz", "winter_jazz", "autumn_jazz", "london_jazz", "bebop",
-    "acid_jazz", "bossa_samba", "romantic_jazz", "swing_bigband",
+    "acid_jazz", "bossa_samba", "romantic_jazz", "swing_bigband", "dinner_party",
     "industrial", "downtempo", "vaporwave", "post_rock", "stoner_rock",
 }
 # Catalogue S8: album fragments and karaoke artifacts never belong in a generated mix — a karaoke
