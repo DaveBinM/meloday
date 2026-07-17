@@ -5203,14 +5203,20 @@ _PINNED_PROFILES  = {"scotland_scene", "australia_scene", "london_scene",
 _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 # Retired mixes — dropped from the slate because no membership signal survives the pure-Discogs gate:
 # lofi_beats (Discogs has no "Lo-Fi"; the chillhop sound IS Downtempo, already its own mix).
-# g_funk (per-mix pass, user call): LIBRARY-BOUND. The genuine West-Coast g-funk canon isn't here —
-# Snoop is the only deep artist (Warren G / Nate Dogg / DJ Quik / Above the Law absent), so a real g-funk
-# gate collapses to a ~36%-Snoop residency, and the broad alternative ('gangsta') was just coast-agnostic
-# gangsta rap (Ludacris/JAY-Z/OutKast). The 'g-funk' AUDIO tag also sprays onto funk/pop (Phil Collins,
-# PSY, Shaggy). Soft-retired (config kept as a stub) so it returns for free if the library gains the canon.
-# (adult_alt was retired for the same reason and is now FULLY removed, not a soft-retired stub. WHY: its
+# LIBRARY-BOUND mixes (per-mix pass, user call): the genuine canon isn't in the library, so no gate fix
+# produces the real genre — soft-retired (config kept as a stub) so each returns for free if the canon lands.
+#   g_funk — Snoop is the only deep artist (Warren G/Nate Dogg/DJ Quik/Above the Law absent) → a real gate
+#     collapses to ~36% Snoop; the broad 'gangsta' alternative was just coast-agnostic gangsta rap.
+#   yacht_rock — the West-Coast yacht canon (Steely Dan/Doobie Brothers/Michael McDonald/Christopher Cross/
+#     Boz Scaggs) is absent (only Ambrosia); 'soft rock' gives Eagles/Carole King/Glen Campbell (soft-rock/
+#     country-pop), and 'aor' pulled arena/hard rock (Journey/Deep Purple/Toto) — neither is yacht rock.
+#   smooth_jazz — the smooth-jazz canon (Kenny G/Boney James/Grover Washington/Fourplay) is 0 present; the
+#     gate reads as straight-ahead/hard bop jazz instead.
+#   vaporwave — the vaporwave canon (Macintosh Plus/Blank Banshee/Saint Pepsi/2814/Vektroid) is 0 present;
+#     the 'chillwave' proxy just overlaps the downtempo mix.
+# (adult_alt was retired for a related reason and is now FULLY removed, not a soft-retired stub. WHY: its
 # style gate matched 0 tracks, so every lingering config entry — centroid, name, floor, etc. — was dead.)
-_RETIRED_PROFILES = {"lofi_beats", "g_funk"}
+_RETIRED_PROFILES = {"lofi_beats", "g_funk", "yacht_rock", "smooth_jazz", "vaporwave"}
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
