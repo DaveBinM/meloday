@@ -5214,9 +5214,12 @@ _TIME_PROFILES    = set(_TIME_BIASED_PROFILES.keys())
 #     gate reads as straight-ahead/hard bop jazz instead.
 #   vaporwave — the vaporwave canon (Macintosh Plus/Blank Banshee/Saint Pepsi/2814/Vektroid) is 0 present;
 #     the 'chillwave' proxy just overlaps the downtempo mix.
+#   acid_jazz — Jamiroquai (127) is the only deep acid-jazz artist (US3 has 1; no Brand New Heavies/
+#     Incognito/Corduroy/JTQ); the 'acid jazz' tag is 21 tracks mostly mis-tags (Cure/Bowie/Madonna), and
+#     any tightening collapses to house/downtempo. Broad 'jazz-funk'/'fusion' just gave classic 70s funk.
 # (adult_alt was retired for a related reason and is now FULLY removed, not a soft-retired stub. WHY: its
 # style gate matched 0 tracks, so every lingering config entry — centroid, name, floor, etc. — was dead.)
-_RETIRED_PROFILES = {"lofi_beats", "g_funk", "yacht_rock", "smooth_jazz", "vaporwave"}
+_RETIRED_PROFILES = {"lofi_beats", "g_funk", "yacht_rock", "smooth_jazz", "vaporwave", "acid_jazz"}
 _GENERAL_PROFILES = (set(_MOOD_PROFILES)
                      - _TIME_PROFILES
                      - _WEATHER_PROFILES
