@@ -198,6 +198,7 @@ _EXTRAS_COVER_COLORS = {
     "festival_edm": ((90, 70, 230), (200, 40, 170)),
     "soundtracks": ((200, 170, 90), (30, 40, 80)),
     "rave_cave": ((40, 230, 140), (90, 22, 150)),          # acid-green grid over UV purple (rave)
+    "bounce_room": ((255, 40, 150), (30, 18, 120)),        # hot magenta → deep indigo — neon bounce/donk rave
     # ---- 7 decade mixes (era) ----
     "decade_60s": ((240, 150, 60), (200, 70, 120)),
     "decade_70s": ((230, 160, 50), (150, 70, 40)),
@@ -522,6 +523,7 @@ _COVER_BG_STYLES = {
     "london_jungle": ("waveform", 2),
     "melbourne_club": ("grid_perspective", 2),
     "melbourne_techno": ("grid_perspective", 3),
+    "bounce_room": ("equalizer", 4),   # no glyph (user) — the EQ bars carry the cover
     "rave_cave": ("grid_perspective", 4),
     "synth_pop": ("waveform", 3),
     "synthwave": ("grid_perspective", 5),
@@ -1147,6 +1149,7 @@ _DESCRIPTIONS = {
     "festival_edm": ["Big-room, main-stage EDM.", "Hands up — festival drops.", "Build, drop, repeat.", "The anthems that close the set."],
     "soundtracks": ["Scores and soundtracks, big screen to game.", "Sweeping themes and end credits.", "Cinematic and orchestral, score-forward.", "Music from the movies, shows and games."],
     "rave_cave": ["Donk, hardstyle and hard trance.", "Hands up — full send.", "Fast, loud, relentless.", "Rave till the lights come up."],
+    "bounce_room": ["Donk, bounce and hard trance.", "Hannah Laing and the bounce scene.", "Bouncy beats, hands in the air.", "Scottish rave, full send."],
     # ---- 7 decade mixes (era) ----
     "decade_60s": ["The sound of the sixties.", "Where it all kicked off.", "Sixties gold."],
     "decade_70s": ["Seventies grooves and gold.", "Flares, funk and rock.", "The sound of the seventies."],
@@ -2080,6 +2083,9 @@ _MOOD_PROFILES = {
 # Flow:     DJ energy-ARC: ease-in → peak ~75% → wind-down (beatmatched/harmonic transitions).
 # Enhance:  emb_effnet sub-style cohesion (applied)
     "rave_cave": {"bpm": 132, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.66, "valence": 0.66, "vocal_presence": 0.45},
+    # bounce_room: Hannah Laing's donk/hard-trance/hands-up sound (seed-sharpened via _EMB_SEEDS). Rave centroid
+    # with bpm nudged to 143 (the seed's measured tempo); the seed does the sub-style work.
+    "bounce_room": {"bpm": 143, "energy": -8, "danceability": 0.40, "brightness": 0.17, "beat_confidence": 0.62, "onset_rate": 4.3, "dynamic_complexity": 0.44, "arousal": 0.62, "valence": 0.70, "vocal_presence": 0.50},
     # ---- 7 decade mixes (era) ----
 # ── decade_60s → "60s Mix" ────────────────────────────────────────────────────────────────
 # Theme:    Rousing, energetic, stylish, playful.
@@ -4677,6 +4683,7 @@ _MOOD_MIX_NAMES = {
     "festival_edm": "EDM Anthems • Meloday+",
     "soundtracks": "Soundtracks & Scores • Meloday+",
     "rave_cave": "Rave Cave • Meloday+",
+    "bounce_room": "Bounce Room • Meloday+",
     # ---- 7 decade mixes (era) ----
     "decade_60s": "60s Mix • Meloday+",
     "decade_70s": "70s Mix • Meloday+",
@@ -5177,7 +5184,7 @@ _PROFILE_SCHEDULE = {
     "power_nap":         [(None, 13, 16)],
 }
 # Dance / EDM family — present when going out (Fri + weekend nights) AND during workouts (high-energy).
-_DANCE_SCHEDULE_KEYS = {"rave_cave", "festival_edm", "techno", "trance", "dnb", "house_party",
+_DANCE_SCHEDULE_KEYS = {"rave_cave", "bounce_room", "festival_edm", "techno", "trance", "dnb", "house_party",
                         "uk_garage", "bass_drop", "deep_house", "hyperpop", "industrial",
                         "dance_pop", "funk_disco"}
 for _dk in _DANCE_SCHEDULE_KEYS:
@@ -5260,6 +5267,7 @@ _PROFILE_CATEGORY = {
     "london_dubstep": "electronic_bass", "london_jungle": "electronic_bass",
     # electronic_edm_pop
     "festival_edm": "electronic_edm_pop", "rave_cave": "electronic_edm_pop", "hyperpop": "electronic_edm_pop",
+    "bounce_room": "electronic_edm_pop",
     "dance_pop": "electronic_edm_pop", "chiptune": "electronic_edm_pop",
     # electronic_chill
     "synthwave": "electronic_chill", "vaporwave": "electronic_chill", "downtempo": "electronic_chill",
@@ -5403,6 +5411,7 @@ _PROFILE_MOOD_SIGNALS = {
     "festival_edm": (["euphoric", "exuberant", "uplifting", "sparkling", "ecstatic", "exciting"], ["sad", "melancholy", "gritty"]),
     "soundtracks": (["epic", "dramatic", "majestic", "atmospheric", "reflective", "cinematic"], ["aggressive", "silly", "trashy"]),
     "rave_cave": (["euphoric", "aggressive", "pounding", "relentless", "ecstatic", "frenzied"], ["calm", "gentle", "mellow", "sombre"]),
+    "bounce_room": (["euphoric", "pounding", "relentless", "ecstatic", "frenzied", "bouncy"], ["calm", "gentle", "mellow", "sombre"]),
     # ---- 7 decade mixes (era) ----
     "decade_60s": (["rousing", "energetic", "stylish", "playful"], []),
     "decade_70s": (["rousing", "energetic", "stylish", "playful"], []),
@@ -5783,7 +5792,8 @@ _PROFILE_STYLE_SIGNALS = {
     "indie_radio": (["alternative/indie rock", "indie rock", "college rock", "modern rock", "jangle pop", "garage rock revival", "indie pop", "left-field pop", "twee pop", "chamber pop", "baroque pop", "noise pop", "psychedelic pop", "bedroom pop", "sophisti-pop", "c-86", "indie electronic", "dream pop", "shoegaze", "post-punk", "post-punk revival", "slacker rock", "math rock"], ["metal", "rap", "techno", "drill"]),
     "pop_radio": (["contemporary pop/rock", "dance-pop", "teen pop", "vocal pop", "traditional pop", "pop idol", "social media pop", "europop", "euro-pop", "power pop", "synth pop", "synth-pop", "electropop", "art pop", "pop-soul", "hi-nrg", "nu-disco", "bubblegum"], ["metal", "punk", "country", "experimental"]),
     "soundtracks_radio": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
-    "rave_cave": (["donk", "hard house", "hard trance", "hardstyle", "hard techno", "schranz", "gabber", "happy hardcore", "jumpstyle", "makina"], ["ambient", "folk", "classical", "gospel", "rap", "k-pop"]),
+    "bounce_room": (["donk", "hard house", "hard trance", "hardstyle", "hands up", "happy hardcore", "makina", "gabber", "jumpstyle", "hard techno"], ["ambient", "folk", "classical", "gospel"]),  # Hannah Laing's donk/hard-trance/hands-up Scottish rave; floor .20 (below rave_cave's .25) so her .22-.24 cuts pass, the _EMB_SEEDS Hannah seed sharpens toward her scene + down-ranks the EDM spray
+    "rave_cave": (["donk", "hard house", "hard trance", "hardstyle", "hard techno", "schranz", "gabber", "happy hardcore", "jumpstyle", "makina", "hands up"], ["ambient", "folk", "classical", "gospel", "rap", "k-pop"]),  # WHY +'hands up': a genuine rave sub that was missing — Hannah Laing (the artist this mix was built for) leads several cuts with it (e.g. "Have You Ever Loved (Ellie)" Hands Up .35); +1 HL-eligible, pool 362->463, zero new spray at floor .25 (lowering the floor to reach more re-admits the A.G. Cook/PinkPantheress spray)
     "festive": (["christmas", "holidays"], []),
     "spring_acoustic": (["folk", "singer/songwriter", "americana", "indie folk"], []),
     "spring_strings": (["classical", "modern composition", "chamber", "orchestral"], []),
@@ -5972,7 +5982,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave",
+    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room",
     # global genre RADIO stations (genre gate composed with the radio branch; no geo gate)
     "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio",
     "festive",
@@ -6143,6 +6153,13 @@ _PROFILE_BLOCKED_DOMINANT = {
     # New Jack Swing on the same tracks (the classifier double-tags them), so reject the ones whose DOMINANT
     # sub is the upbeat-R&B family — leaves the smooth contemporary-R&B core.
     "after_hours_rnb": {"new jack swing", "rnb/swing", "swingbeat"},
+    # bounce_room: the hard-dance gate + Hannah embedding seed can't separate her donk/hard-trance/hands-up
+    # scene from mainstream-EDM's hard-dance crossover (Tiësto/Guetta/Afrojack are embedding-close AND carry
+    # hardstyle/hands-up tags). The clean split is by DOMINANT sub: the non-rave EDM is dominant electro-
+    # house/house/big-room (Afrojack, Guetta, Edward Maya, Marshmello halftime); Hannah's scene is dominant
+    # donk/hard-trance/hands-up. Reject the former; genuine hands-up rave (even by mainstream DJs) stays.
+    "bounce_room": {"electro house", "house", "big room", "progressive house", "future bass",
+                    "dutch house", "tropical house", "complextro", "halftime", "deep house", "tech house"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
@@ -6210,6 +6227,7 @@ _PROFILE_TAG_FLOOR = {
     "after_hours_rnb":   0.20,
     "festival_edm":      0.30,   # WAS 0.25 — the pop-circuit-remix stratum (Maroon 5/Cutmore, Britney/Kaskade) sat at .25-.30 (ARC audit); residuals: Chris Brown/Black Box carry ≥.30 confident tags
     "rave_cave":         0.25,   # WAS 0.20 — .20-.24 Jumpstyle/Hardstyle spray pulled experimental club-pop (A.G. Cook, PinkPantheress, Marshmello halftime) into hard dance (ARC audit); build: 46 artists/max 5
+    "bounce_room":       0.20,   # lower than rave_cave — the Hannah _EMB_SEEDS seed down-ranks the .20-.24 spray in selection, so we can admit her .22-.24 donk/hard-trance cuts
     # --- ARC-mix selection audit round: every floor below is the smallest sweep value
     # ejecting that mix's ADVERSARIALLY-VERIFIED editorial flags with a full n=50 build (per-profile
     # evidence in the commit + docs/playlist_disposition_catalogue.md ARC section). Confident ≥floor
@@ -6280,7 +6298,7 @@ _PROFILE_GENRE_PARENT = {
     "melbourne_club": {"electronic"},
     "melbourne_techno": {"electronic"}, "london_garage": {"electronic"},
     "summer_heat": {"electronic", "funk / soul"},  # WHY: admits the disco/funk it names (Funk/Soul parent), +1479 (audit summer_heat-1)
-    "rave_cave": {"electronic"},
+    "rave_cave": {"electronic"}, "bounce_room": {"electronic"},
     # --- Rock ---
     "classic_rock": {"rock"}, "heavy_riffs": {"rock"}, "indie_rock": {"rock"},
     "post_grunge": {"rock"}, "prog_rock": {"rock"}, "punk_energy": {"rock"},
@@ -6612,6 +6630,7 @@ _PROFILE_MOODTHEME = {
     "festival_edm": ["party", "energetic", "uplifting", "upbeat"],
     "soundtracks": ["film", "epic", "dramatic", "soundscape"],
     "rave_cave": ["party", "energetic", "powerful", "uplifting"],
+    "bounce_room": ["party", "energetic", "powerful", "uplifting"],
     # Seasonal / weather
     "festive": ["christmas", "holiday"], "summer_heat": ["summer", "party"],
     "summer_breeze": ["summer", "relaxing"], "summer_roadtrip": ["summer", "travel"],
@@ -6691,6 +6710,7 @@ _PROFILE_MOODCLASS = {
     "rap_rock": {"mood_aggressive": 1}, "post_grunge": {"mood_aggressive": 1},
     "festival_edm": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1},
     "rave_cave": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_aggressive": 1},
+    "bounce_room": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_aggressive": 1},
     "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
     "folk_acoustic": {"mood_acoustic": 1}, "spring_acoustic": {"mood_acoustic": 1},
     "celtic_folk": {"mood_acoustic": 1}, "country_roads": {"mood_acoustic": 1},
@@ -8184,6 +8204,8 @@ for _k in _INSTRUMENTAL_VOCAL:
 # (vocal trance/house, voc ~0.5-0.6) still fits. Trade-off: vocal-pop crossovers go too.
 if "rave_cave" in _MOOD_PROFILES:
     _MOOD_PROFILES["rave_cave"]["vocal_weight"] = 2.0
+if "bounce_room" in _MOOD_PROFILES:
+    _MOOD_PROFILES["bounce_room"]["vocal_weight"] = 2.0
 
 
 def _entry_affect_proxy(entry):
@@ -14350,7 +14372,7 @@ def _canonicalize_tracks(plex, tracks, essentia_cache):
 # Pure-acoustic (cached bpm/key/energy); no per-track Plex calls.
 # ---------------------------------------------------------------------------
 _DJ_ARC_PROFILES = {
-    "rave_cave", "techno", "trance", "deep_house", "house_party", "dnb", "bass_drop",
+    "rave_cave", "bounce_room", "techno", "trance", "deep_house", "house_party", "dnb", "bass_drop",
     "uk_garage", "festival_edm", "dance_pop", "funk_disco",
     "glasgow_house", "glasgow_underground", "glasgow_bass",
     "london_garage", "london_grime", "london_dubstep", "london_jungle",
@@ -14526,6 +14548,11 @@ def _seed_centroid(profile_key, essentia_cache):
 # its _SEED_ARTISTS list. WHY: emb_effnet was collected but unused (audit Tier-4: seed & fuzzy mixes).
 _EMB_SEEDS = {
     "acoustic_romance": _SEED_ARTISTS["acoustic_romance"],
+    # bounce_room: Hannah Laing's donk/hard-trance/hands-up Scottish rave. Seed = her + genuine-lane
+    # neighbours (close in embedding AND hard-dance-tagged; all collision-checked) — sharpens the hard-dance
+    # gate toward her scene and down-ranks the mainstream-EDM (Tiësto/Guetta) that shares the 4/4 sound.
+    "bounce_room": ["hannah laing", "cascada", "braaheim", "clouds", "2 unlimited", "darude",
+                    "kettama", "timmy trumpet", "partiboi69"],
     # situationship: yearning bedroom-pop / alt-R&B about undefined relationships
     "situationship": ["clairo", "steve lacy", "the marias", "omar apollo", "snail mail", "beabadoobee",
                       "gracie abrams", "holly humberstone", "phoebe bridgers", "boygenius"],
