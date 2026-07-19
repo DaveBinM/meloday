@@ -6461,6 +6461,31 @@ def _entry_lastfm_tags(entry):
 # War and Treaty, Hillsong Worship, Casting Crowns, Chris Tomlin) — gospel/CCM/worship, all on-genre here.
 _LASTFM_GATED = {"post_grunge", "prog_rock", "gospel"}
 
+# Last.fm crowd-tag EXCLUSION (a NEGATIVE gate, the mirror of _LASTFM_GATED). WHY: the Discogs audio
+# classifier can't hear certain genres inside a polished vocal-pop production — Luke Bryan's country and
+# Neil Sedaka's oldies are mis-tagged "k-pop"/"pop rock" (short_n_sweet), so the Discogs subgenre gate
+# CANNOT keep those crossovers out. The Last.fm COMMUNITY tags name them accurately. Reject a track whose
+# ARTIST carries one of these genres at a confident weight.
+_PROFILE_LASTFM_EXCLUDE = {
+    "short_n_sweet": {"country", "contemporary country", "americana", "nashville", "alt-country",
+                      "oldies", "easy listening", "adult contemporary", "soft rock", "lounge", "crooner"},
+}
+# ARTIST tags only + this weight floor: a genuine country act tags "country" at 100, whereas a stray
+# listener tag on a pop song (e.g. a low-weight "country" TRACK-tag on Sabrina's "Espresso") is noise we
+# ignore. Verified: at weight 30 no track by Sabrina or her pop-girlie seed clears the floor on any banned
+# tag, while every country/crooner crossover (Luke Bryan/Shania/Tom Jones/Carpenters, all weight 30-100) does.
+_LASTFM_EXCLUDE_MIN_WEIGHT = 30
+
+def _lastfm_excluded(entry, profile_key):
+    """True if the track's ARTIST carries a mix-banned Last.fm community genre at >= the weight floor."""
+    bans = _PROFILE_LASTFM_EXCLUDE.get(profile_key)
+    if not bans:
+        return False
+    at = entry.get("lastfm_artist_tags")
+    if not isinstance(at, dict):
+        return False
+    return any(w >= _LASTFM_EXCLUDE_MIN_WEIGHT and str(t).lower() in bans for t, w in at.items())
+
 # (Retired _STYLE_EXACT_PROFILES: london_mod's "mod" no longer leaks into "modern" now that the gate uses
 #  word-boundary token matching for ALL profiles — see _positive_matches above. audit substr-fix-systemic.)
 
@@ -6527,6 +6552,11 @@ def _has_required_style(entry, profile_key):
             top_sub = max(gd.items(), key=lambda kv: kv[1])[0].split("---")[-1].strip().lower()
             if top_sub in _blk_dom:
                 return False
+
+    # Last.fm crowd-tag reject (see _PROFILE_LASTFM_EXCLUDE): a Discogs-mis-tagged crossover (country /
+    # oldies / easy-listening that the audio model paints as pop) is caught by the community genre label.
+    if _lastfm_excluded(entry, profile_key):
+        return False
     return True
 
 
