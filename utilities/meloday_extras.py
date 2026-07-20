@@ -200,6 +200,7 @@ _EXTRAS_COVER_COLORS = {
     "rave_cave": ((40, 230, 140), (90, 22, 150)),          # acid-green grid over UV purple (rave)
     "bounce_room": ((255, 40, 150), (30, 18, 120)),        # hot magenta → deep indigo — neon bounce/donk rave
     "hayden_house": ((255, 140, 70), (55, 30, 95)),        # warm coral-orange → dusk purple — sunset melodic house
+    "neon_glow": ((0, 210, 255), (230, 20, 160)),          # electric cyan → hot magenta — neon synth-pop
     "short_n_sweet": ((255, 120, 180), (120, 80, 200)),    # candy pink → lilac — playful, flirty pop
     "all_too_well": ((150, 35, 50), (120, 65, 30)),        # deep wine/burgundy → autumn amber — bittersweet, the red scarf
     # ---- 7 decade mixes (era) ----
@@ -528,6 +529,7 @@ _COVER_BG_STYLES = {
     "melbourne_techno": ("grid_perspective", 3),
     "bounce_room": ("equalizer", 4),   # no glyph (user) — the EQ bars carry the cover
     "hayden_house": ("ripples", 1),    # no glyph — warm sunset ripples carry the melodic-house cover
+    "neon_glow": ("concentric_pulse", 3),  # no glyph — 80s-synth neon pulse carries the synth-pop cover
     "short_n_sweet": ("confetti", 5),  # no glyph — candy confetti carries the flirty-pop cover
     "all_too_well": ("woodgrain", 6),  # no glyph — warm autumn woodgrain carries the bittersweet cover
     "rave_cave": ("grid_perspective", 4),
@@ -1157,6 +1159,7 @@ _DESCRIPTIONS = {
     "rave_cave": ["Donk, hardstyle and hard trance.", "Hands up — full send.", "Fast, loud, relentless.", "Rave till the lights come up."],
     "bounce_room": ["Donk, bounce and hard trance.", "Hannah Laing and the bounce scene.", "Bouncy beats, hands in the air.", "Scottish rave, full send."],
     "hayden_house": ["Melodic, deep and tropical house.", "Hayden James and the melodic-house scene.", "Sun-soaked house grooves.", "Warm house, hands in the air."],
+    "neon_glow": ["Bright, anthemic synth-pop.", "CHVRCHES and the synth-pop scene.", "Neon synths and big hooks.", "Electropop that glows."],
     "short_n_sweet": ["Cheeky, flirty pop.", "Sabrina Carpenter and playful pop.", "Sweet, sassy and fun.", "Pop with a wink."],
     "all_too_well": ["Bittersweet, confessional pop.", "Taylor Swift and the storytelling songs.", "Heartbreak, nostalgia and catharsis.", "All the feelings, all too well."],
     # ---- 7 decade mixes (era) ----
@@ -2098,6 +2101,9 @@ _MOOD_PROFILES = {
     # hayden_house: Hayden James' warm, vocal-forward melodic/deep/tropical house (seed-sharpened via _EMB_SEEDS).
     # Brighter, calmer and more vocal than the hard-dance centroids; the seed does the sub-style work.
     "hayden_house": {"bpm": 120, "energy": -9, "danceability": 0.55, "brightness": 0.32, "beat_confidence": 0.60, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.50, "valence": 0.64, "vocal_presence": 0.60},
+    # neon_glow: CHVRCHES' bright anthemic synth-pop. Genre-gated (synth-pop is reliably tagged), so the gate +
+    # _EMB_SEEDS scene do the scoping; centroid = their measured means, ballast for the acoustic term.
+    "neon_glow": {"bpm": 122, "energy": -10, "danceability": 0.39, "brightness": 0.14, "beat_confidence": 0.55, "onset_rate": 4.2, "dynamic_complexity": 0.45, "arousal": 0.56, "valence": 0.63, "vocal_presence": 0.78},
     # short_n_sweet: Sabrina Carpenter's cheeky flirty pop. Her genre tags are a systematic mis-tag (61/86
     # dominant "k-pop") and her acoustic profile is generic mid-tempo pop, so the ACOUSTIC centroid barely
     # scopes her — the mix is driven by _PROFILE_LYRIC_THEMES (playful/flirtatious/cheeky) + the _EMB_SEEDS
@@ -4706,6 +4712,7 @@ _MOOD_MIX_NAMES = {
     "rave_cave": "Rave Cave • Meloday+",
     "bounce_room": "Bounce Room • Meloday+",
     "hayden_house": "Hayden's House • Meloday+",
+    "neon_glow": "Neon Glow • Meloday+",
     "short_n_sweet": "Short n' Sweet • Meloday+",
     "all_too_well": "All Too Well • Meloday+",
     # ---- 7 decade mixes (era) ----
@@ -5278,7 +5285,7 @@ _PROFILE_CATEGORY = {
     "melbourne_dream": "rock_psych", "melbourne_psych": "rock_psych",
     # pop
     "chart_pop": "pop", "indie_pop": "pop", "yacht_rock": "pop", "synth_pop": "pop", "glasgow_synth": "pop",
-    "melbourne_sunset": "pop", "short_n_sweet": "pop", "all_too_well": "pop",
+    "melbourne_sunset": "pop", "short_n_sweet": "pop", "all_too_well": "pop", "neon_glow": "pop",
     # electronic_house_techno
     "techno": "electronic_house_techno", "deep_house": "electronic_house_techno",
     "house_party": "electronic_house_techno", "trance": "electronic_house_techno",
@@ -5437,6 +5444,7 @@ _PROFILE_MOOD_SIGNALS = {
     "rave_cave": (["euphoric", "aggressive", "pounding", "relentless", "ecstatic", "frenzied"], ["calm", "gentle", "mellow", "sombre"]),
     "bounce_room": (["euphoric", "pounding", "relentless", "ecstatic", "frenzied", "bouncy"], ["calm", "gentle", "mellow", "sombre"]),
     "hayden_house": (["euphoric", "uplifting", "warm", "sunny", "sensual", "groovy"], ["aggressive", "gritty", "harsh", "sombre"]),
+    "neon_glow": (["euphoric", "uplifting", "bittersweet", "dreamy", "anthemic", "wistful"], ["aggressive", "gritty", "silly", "folksy"]),
     "short_n_sweet": (["playful", "fun", "exuberant", "lively", "sassy", "upbeat"], ["brooding", "bleak", "melancholy", "aggressive"]),
     "all_too_well": (["bittersweet", "wistful", "melancholy", "tender", "yearning", "reflective"], ["aggressive", "exuberant", "frantic", "silly"]),
     # ---- 7 decade mixes (era) ----
@@ -5821,6 +5829,7 @@ _PROFILE_STYLE_SIGNALS = {
     "soundtracks_radio": (["soundtrack", "original score", "film score", "tv soundtrack", "film music", "movie theme", "video game music", "soundtracks", "orchestral", "modern composition"], ["rap", "punk", "drill"]),
     "bounce_room": (["donk", "hard house", "hard trance", "hardstyle", "hands up", "happy hardcore", "makina", "gabber", "jumpstyle", "hard techno"], ["ambient", "folk", "classical", "gospel"]),  # Hannah Laing's donk/hard-trance/hands-up Scottish rave; floor .20 (below rave_cave's .25) so her .22-.24 cuts pass, the _EMB_SEEDS Hannah seed sharpens toward her scene + down-ranks the EDM spray
     "hayden_house": (["deep house", "tropical house", "house", "progressive house", "nu-disco", "indie dance", "melodic house"], ["ambient", "folk", "classical", "gospel", "hardstyle", "gabber", "hard techno"]),  # Hayden James' melodic/deep/tropical house — broad 'house' positive keeps his signature bare-'house'-dominant cuts (e.g. "Just Friends"); _EMB_SEEDS (Hayden + Rüfüs/Kygo/Purple Disco/CamelPhat scene) sharpens toward melodic house, _PROFILE_BLOCKED_DOMINANT rejects the big-room/festival EDM that shares the 4/4 sound
+    "neon_glow": (["synth-pop", "synthpop", "electropop", "indie electronic", "synthwave", "new wave", "dream pop", "indietronica"], ["metal", "gabber", "hardstyle", "drill"]),  # CHVRCHES' bright synth-pop. Genre RELIABLY tagged (synth-pop dominant 38/87) so this is a genuine gate; _EMB_SEEDS (CHVRCHES + Purity Ring/M83/Ladytron/Robyn scene) sharpens toward their bright-anthemic lane, _PROFILE_BLOCKED_DOMINANT rejects the EDM/hip-hop that shares the synth 4/4
     "short_n_sweet": (["k-pop", "dance-pop", "synth-pop", "electropop", "pop rock", "europop", "indie pop", "art pop", "teen pop", "bubblegum"], ["metal", "death metal", "hardcore", "ambient", "folk"]),  # Sabrina Carpenter's cheeky pop. NB: 'k-pop' is a POSITIVE deliberately — the Discogs classifier mis-tags glossy female-pop as k-pop (61/86 of her tracks incl Espresso/Taste/Juno), so it's really a proxy for the polished-pop cluster here; the ACTUAL scoping is done by _PROFILE_LYRIC_THEMES (playful/flirty/cheeky) not the genre gate. Real Korean k-pop is pushed out by the _PROFILE_ORIGIN KR/JP exclude + _LYRIC_EN_PROFILES
     "all_too_well": (["ballad", "pop rock", "alternative rock", "k-pop", "synth-pop", "indie pop", "indie folk", "folk", "singer/songwriter"], ["metal", "death metal", "hardcore", "techno", "reggaeton"]),  # Taylor Swift's confessional storytelling. Her genre is scattered/mis-tagged (ballad 53 / pop-rock 53 / alt-rock 37 / k-pop 27), so these are loose PROXIES — the real scoping is _PROFILE_LYRIC_THEMES (bittersweet/nostalgic/heartbreak). 'contemporary r&b' deliberately dropped (it pulled ZAYN/Weeknd/Don Toliver)
     "rave_cave": (["donk", "hard house", "hard trance", "hardstyle", "hard techno", "schranz", "gabber", "happy hardcore", "jumpstyle", "makina", "hands up"], ["ambient", "folk", "classical", "gospel", "rap", "k-pop"]),  # WHY +'hands up': a genuine rave sub that was missing — Hannah Laing (the artist this mix was built for) leads several cuts with it (e.g. "Have You Ever Loved (Ellie)" Hands Up .35); +1 HL-eligible, pool 362->463, zero new spray at floor .25 (lowering the floor to reach more re-admits the A.G. Cook/PinkPantheress spray)
@@ -6012,7 +6021,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well",
+    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow",
     # global genre RADIO stations (genre gate composed with the radio branch; no geo gate)
     "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio",
     "festive",
@@ -6197,6 +6206,14 @@ _PROFILE_BLOCKED_DOMINANT = {
     # City/CamelPhat lean tech-house; blocking it would cut genuine neighbours).
     "hayden_house": {"electro house", "big room", "complextro", "future bass", "hardstyle",
                      "hands up", "trance", "hard trance", "dutch house", "bassline", "gabber"},
+    # neon_glow: block the EDM/hip-hop whose DOMINANT sub shares the synth 4/4 but isn't synth-pop (Tiësto
+    # electro-house, Chainsmokers tropical-house, Nero d'n'b, Kid Laroi/Yachty cloud-rap, Flaming Lips
+    # experimental). NEVER block synth-pop/electropop/synthwave (CHVRCHES's own lane); bare "house"/"techno"
+    # left out too (CHVRCHES lead a few with those). Residual synth-adjacent giants (The Weeknd) accepted.
+    "neon_glow": {"big room", "electro house", "tropical house", "deep house", "progressive house", "trance",
+                  "dubstep", "drum n bass", "drum and bass", "future bass", "bassline", "trap", "cloud rap",
+                  "pop rap", "thug rap", "gangsta", "experimental", "indie rock", "alternative rock",
+                  "psychedelic rock", "post rock"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
@@ -6266,6 +6283,7 @@ _PROFILE_TAG_FLOOR = {
     "rave_cave":         0.25,   # WAS 0.20 — .20-.24 Jumpstyle/Hardstyle spray pulled experimental club-pop (A.G. Cook, PinkPantheress, Marshmello halftime) into hard dance (ARC audit); build: 46 artists/max 5
     "bounce_room":       0.20,   # lower than rave_cave — the Hannah _EMB_SEEDS seed down-ranks the .20-.24 spray in selection, so we can admit her .22-.24 donk/hard-trance cuts
     "hayden_house":      0.25,   # confident-tag floor — house is a crowded, spray-prone tag; the _EMB_SEEDS seed + blocked-dominant keep it in Hayden's melodic lane
+    "neon_glow":         0.18,   # synth-pop confident-tag floor — isolates genuine synth-pop (real acts score .18+) from the incidental synth spray on EDM/pop; leak drops to ~3 synth-adjacent giants
     "short_n_sweet":     0.15,   # low floor — her hits carry only a faint k-pop mis-tag (Please Please Please k-pop .19), so a higher floor would drop her own tracks; the lyric-theme lever does the real scoping
     "all_too_well":      0.15,   # low floor — her genre is a scattered mis-tag, so the loose gate just needs to admit; the lyric-theme lever does the real scoping
     # --- ARC-mix selection audit round: every floor below is the smallest sweep value
@@ -6339,6 +6357,7 @@ _PROFILE_GENRE_PARENT = {
     "melbourne_techno": {"electronic"}, "london_garage": {"electronic"},
     "summer_heat": {"electronic", "funk / soul"},  # WHY: admits the disco/funk it names (Funk/Soul parent), +1479 (audit summer_heat-1)
     "rave_cave": {"electronic"}, "bounce_room": {"electronic"}, "hayden_house": {"electronic"},
+    "neon_glow": {"electronic", "pop"},
     "short_n_sweet": {"pop"},
     "all_too_well": {"pop", "rock"},
     # --- Rock ---
@@ -6704,6 +6723,7 @@ _PROFILE_MOODTHEME = {
     "rave_cave": ["party", "energetic", "powerful", "uplifting"],
     "bounce_room": ["party", "energetic", "powerful", "uplifting"],
     "hayden_house": ["party", "energetic", "uplifting", "positive"],
+    "neon_glow": ["energetic", "uplifting", "emotional", "melodic"],
     "short_n_sweet": ["happy", "fun", "love", "positive"],
     "all_too_well": ["sad", "emotional", "love", "melancholic"],
     # Seasonal / weather
@@ -6787,6 +6807,7 @@ _PROFILE_MOODCLASS = {
     "rave_cave": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_aggressive": 1},
     "bounce_room": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_aggressive": 1},
     "hayden_house": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_happy": 1},
+    "neon_glow": {"danceability_hl": 1, "mood_electronic": 1, "mood_happy": 1},
     "short_n_sweet": {"danceability_hl": 1, "mood_happy": 1, "mood_party": 1},
     "all_too_well": {"mood_sad": 1, "mood_relaxed": 1},
     "campfire": {"mood_acoustic": 1}, "acoustic_romance": {"mood_acoustic": 1},
@@ -14710,6 +14731,11 @@ _EMB_SEEDS = {
     # sol" is stored accented in the cache (norm_text keeps the ü), so the token must carry the accents.
     "hayden_house": ["hayden james", "rüfüs du sol", "disclosure", "kygo", "purple disco machine", "zhu",
                      "claptone", "gorgon city", "lost frequencies", "camelphat"],
+    # neon_glow: CHVRCHES + their genuine-lane synth-pop scene (collision-checked; "metric" was dropped — it
+    # substring-matches "alex metric" — replaced by "st lucia"). Sharpens the synth-pop gate toward their
+    # bright-anthemic lane and down-ranks the EDM/indie-electronic that shares the synth 4/4.
+    "neon_glow": ["chvrches", "purity ring", "m83", "passion pit", "robyn", "ladytron", "broods",
+                  "the naked and famous", "sylvan esso", "st lucia"],
     # short_n_sweet: Sabrina Carpenter + her pop-girlie peers (all collision-checked). The seed centroid
     # holds the bright-female-pop sound while _PROFILE_LYRIC_THEMES pulls the cheeky/flirty lane within it.
     "short_n_sweet": ["sabrina carpenter", "ariana grande", "tate mcrae", "charli xcx", "olivia rodrigo",
