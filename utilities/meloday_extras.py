@@ -14768,6 +14768,11 @@ _EMB_SEEDS = {
     "hyperpop":         ["a g cook"],
     "industrial":       ["nine inch nails", "accessory", "clouds"],
 }
+# Artist-focused mixes (each built around ONE source artist = _EMB_SEEDS[key][0]). In these the source artist
+# is allowed up to 10% of the playlist (see _build_mix_tracks) instead of the usual 1/artist, so the mix
+# genuinely features them; every OTHER artist still stays at 1. NOT the generic _EMB_SEEDS mixes
+# (acoustic_romance / situationship etc.), which keep strict 1/artist.
+_ARTIST_FOCUS_PROFILES = {"bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow"}
 _SEED_EMB_CENTROID_CACHE = {}
 
 def _seed_emb_centroid(profile_key, essentia_cache):
@@ -15437,6 +15442,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     seen_songs   = set()       # shared across history + library (in-mix song dedup)
     artist_count = Counter()   # shared across history + library (in-mix artist cap)
     BASE_ARTIST_LIMIT = 1      # <=1 track per artist per mix, relaxed only to reach length
+    # Artist-focused mixes feature their SOURCE artist (_EMB_SEEDS[key][0]) up to 10% of the playlist (5 of
+    # 50) instead of 1; every other artist stays at BASE_ARTIST_LIMIT. It's a CAP — a source with few eligible
+    # tracks gets fewer; the seed-centroid ranking means their top tracks fill it on the first 1/artist pass.
+    _source_key = (norm_text(primary_artist(_EMB_SEEDS[profile_key][0]))
+                   if profile_key in _ARTIST_FOCUS_PROFILES and _EMB_SEEDS.get(profile_key) else None)
+    _source_cap = max(1, round(mix_size * 0.10))
 
     def _take(rks, want, artist_limit, out):
         for rk in rks:
@@ -15451,7 +15462,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             if sk in seen_songs:
                 continue
             ak = _artist_key(t)
-            if artist_count[ak] >= artist_limit:
+            lim = _source_cap if (_source_key and ak == _source_key) else artist_limit
+            if artist_count[ak] >= lim:
                 continue
             seen_songs.add(sk)
             artist_count[ak] += 1
@@ -15477,6 +15489,14 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _key = (lambda rk: (_tier_of[rk], _eff_score(rk))) if _tier_of else _eff_score
         history_rks = sorted(history_rks[:n_history * 8], key=_key)
         library_rks = sorted(library_rks[:n_library * 8], key=_key)
+        # Artist-focused mix: give the SOURCE artist's best-fitting tracks first crack at their 10% cap by
+        # prepending them (score-sorted) — otherwise, in a broad genre-gated pool (e.g. Hayden's House), the
+        # source's own tracks rank below the wider scene and never reach the raised cap. _take dedups via
+        # seen_songs, so the later duplicates are skipped; _dj_order re-sequences, so the front-load is invisible.
+        if _source_key:
+            _src_rks = [rk for rk in library_rks           # ALL the source's tracks (score-sorted); _take caps
+                        if track_map.get(rk) and _artist_key(track_map[rk]) == _source_key]   # them at _source_cap
+            library_rks = _src_rks + library_rks           # UNIQUE songs, so a deduped copy doesn't cost a slot
 
     if profile_key in _BALANCED_PROFILES and not _is_showcase:
         # 50/50 balance: ~half ANCHORS — tracks you'll KNOW (played, or popular on Last.fm) or already
