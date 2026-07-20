@@ -13982,6 +13982,26 @@ def _cap_artist_footprint(rks, cap, essentia_cache):
             continue
         ac[a] += 1; out.append(rk)
     return out
+
+def _prefer_clean_versions(rks, essentia_cache):
+    """Drop distinct-key ALT recordings (remix / live / acoustic / demo / compound-extended) PER ARTIST,
+    keeping them only when the artist has NO clean/studio candidate — so the popularity-ranked stations &
+    showcases (radio throwback, hits, decade) show the STUDIO version 'when we can' without ever starving an
+    alt-only artist (e.g. a remix-credited collab). WHY here and not the canonical collapse: an alt recording
+    carries its OWN song key (is_alt_recording / _RECORDING_KW_RE), so it survives the per-key collapse and
+    would otherwise ride in on its own — e.g. Calvin Harris "Thinking About You (GTA remix)" landing in his
+    Scotland Now throwback pool beside the studio original. These branches are all 1-per-artist, so the
+    artist's remixes are redundant with their studio slot. Order-preserving. Mirrors the geo-radio
+    CONTEMPORARY bucket's existing is_alt_recording exclusion, softened with the alt-only fallback."""
+    by_a = defaultdict(list)
+    for rk in rks:
+        by_a[(essentia_cache.get(rk, {}).get("artist") or "").lower()].append(rk)
+    keep = set()
+    for a, arks in by_a.items():
+        clean = [rk for rk in arks
+                 if not meloday.is_alt_recording(essentia_cache.get(rk, {}).get("title") or "")]
+        keep.update(clean or arks)                       # fall back to the alt(s) only if the artist has NO clean copy
+    return [rk for rk in rks if rk in keep]
 _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popular CONTEMPORARY songs (released in
     # the last `recent_years`) + ~throwback_frac throwback classics, 1-per-artist — like a place-only radio
     # station. recent/throwback_pool cap the distinct-artist candidate windows the daily pick draws from.
@@ -15027,6 +15047,12 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                     elif d >= _r36_start: rec36_by_a[a].append(rk)
             elif (0 < ay < cut) or is_re:
                 throw_by_a[a].append(rk)              # ALL of the artist's classics — rotated daily like the contemporary bucket
+        # Prefer the STUDIO recording for the throwback slot (the contemporary bucket already excludes alt at
+        # the split): drop each artist's distinct-key remixes/live/demos unless they have no clean classic,
+        # so the daily _rep_from roll can't surface e.g. "Thinking About You (GTA remix)" over the original.
+        _kept_throw = set(_prefer_clean_versions([rk for rks in throw_by_a.values() for rk in rks], essentia_cache))
+        for _a in list(throw_by_a):
+            throw_by_a[_a] = [rk for rk in throw_by_a[_a] if rk in _kept_throw]
         cur_ord  = date.today().toordinal()
         # Soft surfacing rotation: a track the station featured in the last _RADIO_SURFACE_WINDOW days is
         # down-weighted (never banned), so the catalogue turns over while the big hits still recur and the pool
@@ -15154,6 +15180,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 best[sk] = (sc, rk)
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        uniq = _prefer_clean_versions(uniq, essentia_cache)   # studio over distinct-key remix/live/demo (per artist, alt-only fallback)
         _hyb = _GEO_HITS_HYBRID.get(profile_key) or {}
         # Per-artist footprint cap (artist_songs): truncate the listener-ranked list to each artist's top-N
         # BEFORE the base slice, so a deep popular catalogue can't crowd other acts' hits out of the pool
@@ -15289,6 +15316,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 best[sk] = (sc, rk)
         uniq = sorted((v[1] for v in best.values()),
                       key=lambda rk: -(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0))
+        uniq = _prefer_clean_versions(uniq, essentia_cache)   # studio over distinct-key remix/live/demo (per artist, alt-only fallback)
         # Per-artist footprint cap — same mechanism as the hits mixes (_cap_artist_footprint): without it the
         # 60s pool was 46% Beatles (78/168 slots) -> a 32-artist cast airing near-identically every day.
         capped = _cap_artist_footprint(uniq, _ERA_ARTIST_SONGS, essentia_cache)
