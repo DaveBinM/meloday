@@ -13983,8 +13983,36 @@ def _cap_artist_footprint(rks, cap, essentia_cache):
         ac[a] += 1; out.append(rk)
     return out
 
+# A "(X mix)"/"(X version)"/"- X mix" segment that names a REWORK — a genuinely different recording (a named
+# remix, or a re-arrangement: strings/orchestral/piano/symphonic/church/gospel/dance/club/festival/voiceless/
+# early/alt) — hiding under a bare "mix"/"version" that is_alt_recording (which only knows the explicit words
+# remix/live/acoustic/dub/…) MISSES. It is NOT a cosmetic CUT/MASTER of the studio recording (album / single /
+# radio / original / mono / stereo / 7"/12" / long / edit version|mix) nor a reissue (remaster / anniversary /
+# year / "Taylor's Version"), which ARE the studio track and belong on the stations. The MODIFIER word right
+# before the noun decides it: a cosmetic cut-word -> studio (keep), anything else -> rework. WHY: on Scotland
+# Now, "Desire (Cedric Gervais festival mix)" / "Miracle (Church version)" (Calvin's only copies of those
+# songs — no clean studio cut in the library) rode in because is_alt_recording didn't flag them.
+_REWORK_SEG_RE   = re.compile(r"[\(\[]([^)\]]*\b(?:mix|version)\b[^)\]]*)[\)\]]|\s-\s([^-]*\b(?:mix|version)\b)", re.I)
+_COSMETIC_CUT_RE = re.compile(
+    r"\b(?:album|single|radio|original|main|mono|stereo|clean|explicit|dirty|deluxe|standard|expanded|bonus|"
+    r"digital|vinyl|cd|lp|us|uk|international|full[\s-]?length|long|short|edit(?:ed)?|extended|remaster(?:ed)?|"
+    r"reissue|anniversary)\s+(?:version|mix|edit|cut|master)\b|\b\d+[^\w\s]*\s*(?:version|mix|edit)\b", re.I)
+_POSSESS_VER_RE  = re.compile(r"\b\w+['’]s\s+version\b", re.I)   # "Taylor's Version" = artist re-record, keep as canonical
+
+def _is_rework(title):
+    """True if the title's version segment names a different-recording REWORK hiding under a bare 'mix'/
+    'version' (the ones is_alt_recording misses). See the comment block above for the cosmetic-vs-rework rule."""
+    if not title or meloday.is_alt_recording(title) or _REISSUE_RE.search(title):
+        return False
+    m = _REWORK_SEG_RE.search(title)
+    if not m:
+        return False
+    inner = (m.group(1) or m.group(2) or "").strip()
+    return not (_POSSESS_VER_RE.search(inner) or _COSMETIC_CUT_RE.search(inner))
+
 def _prefer_clean_versions(rks, essentia_cache):
-    """Drop distinct-key ALT recordings (remix / live / acoustic / demo / compound-extended) PER ARTIST,
+    """Drop distinct-key ALT recordings (remix / live / acoustic / demo / compound-extended via
+    is_alt_recording, PLUS bare-"mix"/"version" REWORKS via _is_rework) PER ARTIST,
     keeping them only when the artist has NO clean/studio candidate — so the popularity-ranked stations &
     showcases (radio throwback, hits, decade) show the STUDIO version 'when we can' without ever starving an
     alt-only artist (e.g. a remix-credited collab). WHY here and not the canonical collapse: an alt recording
@@ -13999,7 +14027,8 @@ def _prefer_clean_versions(rks, essentia_cache):
     keep = set()
     for a, arks in by_a.items():
         clean = [rk for rk in arks
-                 if not meloday.is_alt_recording(essentia_cache.get(rk, {}).get("title") or "")]
+                 if not meloday.is_alt_recording(essentia_cache.get(rk, {}).get("title") or "")
+                 and not _is_rework(essentia_cache.get(rk, {}).get("title") or "")]
         keep.update(clean or arks)                       # fall back to the alt(s) only if the artist has NO clean copy
     return [rk for rk in rks if rk in keep]
 _GEO_RADIO = {                 # geo RADIO mixes: ~(1-throwback_frac) most-popular CONTEMPORARY songs (released in
@@ -15037,9 +15066,9 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                 continue
             t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t))
             if _win:                                   # release-window station: windowed new material only, no throwback
-                if _in_window(rk) and ay >= _win_start_year and not is_re and not meloday.is_alt_recording(t):
+                if _in_window(rk) and ay >= _win_start_year and not is_re and not meloday.is_alt_recording(t) and not _is_rework(t):
                     recent_by_a[a].append(rk)
-            elif ay >= cut and not is_re and not meloday.is_alt_recording(t):
+            elif ay >= cut and not is_re and not meloday.is_alt_recording(t) and not _is_rework(t):
                 recent_by_a[a].append(rk)
                 d = _entry_original_date(e)            # age-band for the featured tiers (ay>=d.year kills mis-tagged reissues)
                 if d is not None and ay >= d.year:
@@ -15047,8 +15076,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                     elif d >= _r36_start: rec36_by_a[a].append(rk)
             elif (0 < ay < cut) or is_re:
                 throw_by_a[a].append(rk)              # ALL of the artist's classics — rotated daily like the contemporary bucket
-        # Prefer the STUDIO recording for the throwback slot (the contemporary bucket already excludes alt at
-        # the split): drop each artist's distinct-key remixes/live/demos unless they have no clean classic,
+        # Prefer the STUDIO recording for the throwback slot (the contemporary bucket already excludes alt/
+        # rework at the split): drop each artist's remixes/live/demos/reworks unless they have no clean classic,
         # so the daily _rep_from roll can't surface e.g. "Thinking About You (GTA remix)" over the original.
         _kept_throw = set(_prefer_clean_versions([rk for rks in throw_by_a.values() for rk in rks], essentia_cache))
         for _a in list(throw_by_a):
