@@ -14963,6 +14963,21 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         [rk for rk in _cand_keys if not play_counts.get(rk)],
         key=_combined_score
     )
+    # Artist-focused mix: feature the SOURCE artist (_EMB_SEEDS[key][0]) up to 10% (5 of 50) instead of 1/artist.
+    # Pull their STUDIO tracks (not remixes/reworks OF them) to the FRONT of the full score-sorted library HERE —
+    # before the pool is truncated to 8x — so their hits land in the candidate pool + get resolved even when
+    # their remixes out-fit them and rank below the cut (Calvin Harris = 206 tracks / 95 alt). Their alt/extra
+    # copies are dropped so a remix can't fill a source slot; every OTHER artist stays at 1/artist. It's a CAP
+    # (a source with < cap studio tracks gets fewer). _source_key/_cap + _src_clean are reused downstream.
+    _source_key = (norm_text(primary_artist(_EMB_SEEDS[profile_key][0]))
+                   if profile_key in _ARTIST_FOCUS_PROFILES and _EMB_SEEDS.get(profile_key) else None)
+    _source_cap = max(1, round(mix_size * 0.10))
+    _src_clean  = []
+    if _source_key:
+        _src_all   = [rk for rk in library_rks
+                      if norm_text(primary_artist(essentia_cache.get(rk, {}).get("artist") or "")) == _source_key]
+        _src_clean = _prefer_clean_versions(_src_all, essentia_cache)[:_source_cap]
+        library_rks = _src_clean + [rk for rk in library_rks if rk not in (set(_src_all) - set(_src_clean))]
 
     # Decade/era + nostalgia mixes: keep only era-appropriate tracks, gating on the song's EARLIEST
     # year across the library (its original release) rather than the album year — so reissues and
@@ -15442,12 +15457,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     seen_songs   = set()       # shared across history + library (in-mix song dedup)
     artist_count = Counter()   # shared across history + library (in-mix artist cap)
     BASE_ARTIST_LIMIT = 1      # <=1 track per artist per mix, relaxed only to reach length
-    # Artist-focused mixes feature their SOURCE artist (_EMB_SEEDS[key][0]) up to 10% of the playlist (5 of
-    # 50) instead of 1; every other artist stays at BASE_ARTIST_LIMIT. It's a CAP — a source with few eligible
-    # tracks gets fewer; the seed-centroid ranking means their top tracks fill it on the first 1/artist pass.
-    _source_key = (norm_text(primary_artist(_EMB_SEEDS[profile_key][0]))
-                   if profile_key in _ARTIST_FOCUS_PROFILES and _EMB_SEEDS.get(profile_key) else None)
-    _source_cap = max(1, round(mix_size * 0.10))
+    # (_source_key / _source_cap / _src_clean were computed above, right after library_rks was built.)
 
     def _take(rks, want, artist_limit, out):
         for rk in rks:
@@ -15493,10 +15503,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         # prepending them (score-sorted) — otherwise, in a broad genre-gated pool (e.g. Hayden's House), the
         # source's own tracks rank below the wider scene and never reach the raised cap. _take dedups via
         # seen_songs, so the later duplicates are skipped; _dj_order re-sequences, so the front-load is invisible.
-        if _source_key:
-            _src_rks = [rk for rk in library_rks           # ALL the source's tracks (score-sorted); _take caps
-                        if track_map.get(rk) and _artist_key(track_map[rk]) == _source_key]   # them at _source_cap
-            library_rks = _src_rks + library_rks           # UNIQUE songs, so a deduped copy doesn't cost a slot
+        if _src_clean:                            # re-prepend the source's studio tracks after the _eff_score
+            library_rks = _src_clean + library_rks    # re-sort so _take gives them first crack at the cap
 
     if profile_key in _BALANCED_PROFILES and not _is_showcase:
         # 50/50 balance: ~half ANCHORS — tracks you'll KNOW (played, or popular on Last.fm) or already
