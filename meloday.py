@@ -250,6 +250,25 @@ def single_instance_guard(name, log=log_text):
     except Exception:
         pass
 
+def _worker_parent_sentinel():
+    """Pool-worker initializer: force-exit this worker the moment its parent dies.
+
+    WHY: stock spawn pool workers never notice a dead parent — the exit sentinel only arrives
+    from a LIVE parent's manager thread, and sibling workers hold the call-queue pipe open so no
+    EOF ever comes. After an OOM-kill / os._exit / crash of the parent, workers linger forever:
+    idle ones block on the queue at 0% CPU, mid-inference ones keep burning CPU (observed on prod:
+    ~70 orphans at 0.7-1.1 GB each). parent_process().join() returns the moment the parent dies,
+    for ANY cause. Known limit: a worker whose main thread holds the GIL inside native code can't
+    run this thread — reap_orphaned_workers() (SIGKILL, GIL-independent) sweeps that tail.
+    """
+    pp = multiprocessing.parent_process()
+    if pp is None:
+        return   # defensive: not a spawned child
+    def _watch():
+        pp.join()          # returns when the parent process dies
+        os._exit(1)
+    threading.Thread(target=_watch, name="parent-sentinel", daemon=True).start()
+
 def _kill_child_processes(log=log_text):
     """Best-effort recursive kill of this process's children (analysis / spawn_main workers) so the
     watchdog's os._exit doesn't leave orphans reparented to init still burning CPU. Uses psutil
@@ -257,16 +276,58 @@ def _kill_child_processes(log=log_text):
     try:
         import psutil
         me = psutil.Process()
-        kids = me.children(recursive=True)
-        for p in kids:
-            try: p.kill()
-            except Exception: pass
-        _gone, alive = psutil.wait_procs(kids, timeout=3)
-        for p in alive:
-            try: p.kill()
-            except Exception: pass
+        # WHY: a single children() snapshot LEAKED workers — the analysis pool (max_tasks_per_child)
+        # respawns replacements while we kill, so anything spawned after the snapshot survived the
+        # sweep and was orphaned by the watchdog itself. Re-snapshot until no children remain (or 4
+        # passes); a last-instant straggler is then caught by _worker_parent_sentinel once os._exit
+        # lands and the parent is truly gone.
+        for _pass in range(4):
+            kids = me.children(recursive=True)
+            if not kids:
+                break
+            for p in kids:
+                try: p.kill()
+                except Exception: pass
+            psutil.wait_procs(kids, timeout=1)
     except Exception as e:
         log(f"[WATCHDOG] child cleanup skipped: {e}")
+
+def reap_orphaned_workers(log=log_text):
+    """Kill THIS venv's multiprocessing strays whose parent is gone (run at every entry-point start).
+
+    WHY: workers can outlive every in-process cleanup — the parent may die by OOM-SIGKILL (no
+    atexit), or a worker stuck in GIL-held native code can't run its parent-sentinel thread. Those
+    orphans (plus their now-parentless resource_tracker) sat for days holding 0.7-1.1 GB each. Each
+    scheduled run sweeps them: matches ONLY processes running this exact interpreter whose cmdline
+    is a multiprocessing worker/tracker AND whose parent is missing/init/non-python — a live run's
+    workers have a live python parent and are never touched. Best-effort: never blocks the run.
+    """
+    try:
+        import psutil
+        my_exe = os.path.realpath(sys.executable)
+        victims = []
+        for p in psutil.process_iter(attrs=["pid", "cmdline"]):
+            try:
+                cmd = " ".join(p.info["cmdline"] or ())
+                if ("--multiprocessing-fork" not in cmd
+                        and "multiprocessing.resource_tracker" not in cmd):
+                    continue
+                if os.path.realpath(p.exe()) != my_exe:
+                    continue   # some other app's workers — never touch
+                parent = p.parent()
+                if parent is not None and parent.pid != 1 and "python" in parent.name().lower():
+                    continue   # parent is a live python → an active run's worker
+                victims.append(p)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+        for p in victims:
+            try: p.kill()
+            except Exception: pass
+        if victims:
+            psutil.wait_procs(victims, timeout=3)
+            log(f"[REAP] killed {len(victims)} orphaned worker process(es) from previous runs")
+    except Exception as e:
+        log(f"[REAP] orphan sweep skipped: {e}")
 
 def start_watchdog(name, max_seconds, log=log_text):
     """Force-exit this process if it runs longer than max_seconds (0/None disables).
@@ -3178,6 +3239,9 @@ def main():
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         f.truncate(0)
 
+    # After the truncate so the [REAP] line survives in this run's log
+    reap_orphaned_workers()   # sweep any workers a dead previous run left behind
+
     # NEW: Initialize global plex connection only here
     global plex
     plex = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=120)
@@ -3305,7 +3369,10 @@ def main():
                 # numpy work (sonic refinement, embedding cosine) keeps full threading. Precautionary
                 # — base Essentia is largely single-threaded — and matches the pre_analyze pools.
                 _prev_caps = _set_thread_caps()
-                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10) as executor:
+                # initializer: each worker self-terminates if this parent dies (OOM/watchdog/crash) —
+                # without it, spawn workers survive a dead parent forever (see _worker_parent_sentinel).
+                with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_workers, max_tasks_per_child=10,
+                                                            initializer=_worker_parent_sentinel) as executor:
                     # Use submit/as_completed so one crashing worker doesn't abort the whole batch
                     futures = {executor.submit(analysis_worker, tid, *ts_map[tid]): tid for tid in to_analyze}
                     for future in concurrent.futures.as_completed(futures):

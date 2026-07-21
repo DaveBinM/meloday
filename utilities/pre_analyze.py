@@ -23,18 +23,19 @@ from meloday import (
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
     _mood_models, _moodtheme_model, _genre_model, _read_mb_file_tags, lastfm_query_title, is_alt_recording,
-    _parse_original_ts,
+    _parse_original_ts, single_instance_guard, reap_orphaned_workers, _worker_parent_sentinel,
 )
 
 # --- LOGGING SETUP ---
 LOG_FILE = os.path.join(BASE_DIR, "logs", "pre_analyze.log")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
-# Spawned worker processes re-import this module from scratch. Using mode='w' in a
-# worker would truncate the log file. Main process uses 'w' (fresh log each run);
-# all other processes use 'a' so worker breadcrumb entries are preserved.
-_log_mode = 'w' if multiprocessing.current_process().name == 'MainProcess' else 'a'
-file_handler = logging.FileHandler(LOG_FILE, mode=_log_mode, encoding='utf-8')
+# Spawned worker processes re-import this module from scratch, so ALWAYS open in append mode.
+# WHY 'a' even in MainProcess (was 'w'): the mode='w' truncate happened at IMPORT time — before the
+# single-instance guard in __main__ could run — so a cron fire that was about to [SKIP] wiped the
+# in-flight run's log. The fresh-log-per-run truncate now happens explicitly in __main__, after the
+# guard has been acquired.
+file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 logger = logging.getLogger("PreAnalyze")
@@ -48,6 +49,9 @@ worker_plex = None
 def init_worker():
     """Initializes a single Plex session per worker process."""
     global worker_plex
+    # WHY: self-terminate if the parent dies (OOM-SIGKILL bypasses every atexit) — stock spawn
+    # workers otherwise linger forever holding ~1 GB each (observed on prod).
+    _worker_parent_sentinel()
     # WHY: nice the analysis workers so a full bulk_analyze yields CPU to the daily Meloday cron / other
     # work under contention (full speed when the box is idle). (audit Tier-4: considerate analysis)
     try:
@@ -368,6 +372,9 @@ atexit.register(_bf_kill_workers)
 def _bf_init(force_emb, nice):
     """Worker initialiser: set the embedding-backfill flag and (optionally) lower CPU priority."""
     import meloday
+    # WHY: self-terminate if the parent dies (OOM-SIGKILL bypasses every atexit) — stock spawn
+    # workers otherwise linger forever holding ~1 GB each (observed on prod).
+    _worker_parent_sentinel()
     meloday._FORCE_EMB_BACKFILL = bool(force_emb)
     if nice:
         try: os.nice(10)
@@ -3059,6 +3066,27 @@ if __name__ == "__main__":
             except Exception:
                 return None
         return None
+
+    # Single-instance guard: pre_analyze runs legitimately span hours (days for --sync-embeddings),
+    # so the 10:00/22:00 --full crons CAN collide — without a lock the second run doubles the worker
+    # fleet on an already-loaded box. The lyrics batch is API-bound (no pools) and must not be
+    # blocked by a days-long analysis run, so it gets its own key. Deliberately NO watchdog here:
+    # long runs are legitimate. Spawn workers re-import this module as __mp_main__ and never enter
+    # this block, so they don't contend for the lock.
+    _lock_key = "pre_analyze-lyrics" if "--sync-lyrics-batch" in sys.argv else "pre_analyze"
+    single_instance_guard(_lock_key, log=log_msg)
+    # Fresh log per run — AFTER the guard (see the file_handler comment: a skipped fire must not
+    # wipe the in-flight run's log), and BEFORE the reap so its [REAP] line survives. Only the
+    # analysis key truncates: a lyrics-batch run may legally run alongside an analysis run
+    # (separate lock keys) and must not wipe its in-flight log — it just appends.
+    if _lock_key == "pre_analyze":
+        try:
+            with open(LOG_FILE, 'w', encoding='utf-8'):
+                pass
+        except Exception:
+            pass
+    reap_orphaned_workers(log=log_msg)   # sweep workers a dead previous run left behind
+
     if "--sync-lyrics-batch" in sys.argv:
         sync_lyrics_batch_until_done(limit=_arg_limit(), force="--force" in sys.argv,
                                      resume="--resume" in sys.argv,

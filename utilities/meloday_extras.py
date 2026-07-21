@@ -15721,6 +15721,7 @@ def main():
     _lock_key = _extras_lock_key(to_run, args)
     meloday.single_instance_guard(_lock_key, log=xlog)
     meloday.start_watchdog(_lock_key, meloday.EXTRAS_MAX_SECONDS, log=xlog)
+    meloday.reap_orphaned_workers(log=xlog)   # sweep workers a dead previous run left behind
 
     xlog("=== Meloday Extras ===")
 
