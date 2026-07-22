@@ -18,7 +18,7 @@ import logging
 from datetime import timedelta, datetime
 from meloday import (
     PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, analyze_track_essentia,
-    save_essentia_cache, ESSENTIA_ENABLED,
+    ESSENTIA_ENABLED,
     ESSENTIA_CACHE_PATH, _essentia_cache, PlexServer, BASE_DIR,
     get_local_path, _migrate_json_to_sqlite, get_optimal_workers, _ensure_db_schema,
     _fill_missing_acoustic, _TF_MODELS_LOADED, primary_artist, norm_text, canonical_artist,
@@ -110,7 +110,7 @@ def load_essentia_cache_exclusive():
             "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
             "lyric_valence, lyric_themes, lyric_lang, "
             "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
-            "lyric_themes_raw, artist_mbid, release_types "
+            "artist_mbid, release_types "
             "FROM essentia_cache"
         ).fetchall()
         conn.close()
@@ -125,7 +125,7 @@ def load_essentia_cache_exclusive():
                 lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
                 lyric_valence, lyric_themes_j, lyric_lang, \
                 title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
-                lyric_themes_raw_j, artist_mbid, release_types_j in rows:
+                artist_mbid, release_types_j in rows:
             result[rk] = {
                 "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
                 "year": year, "artist": artist,
@@ -154,7 +154,8 @@ def load_essentia_cache_exclusive():
                 "lastfm_listeners": lastfm_listeners,
                 "lyric_valence": lyric_valence,
                 "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
-                "lyric_themes_raw": json.loads(lyric_themes_raw_j) if lyric_themes_raw_j else None,
+                # lyric_themes_raw deliberately NOT loaded (588 MB of parsed dicts): its only readers
+                # are direct-SQL (Phase C vocab build); the upsert COALESCEs it so round-trips keep it.
                 "lyric_lang": lyric_lang,
                 "title": title, "release_date": release_date,
                 "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,

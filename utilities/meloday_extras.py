@@ -15854,7 +15854,9 @@ def main():
     music = plex.library.section(MUSIC_LIBRARY)
     xlog(f"[OK] Plex: {plex.friendlyName}")
 
-    load_essentia_cache()
+    # "extras" profile: skips the columns extras never reads (staleness/sync timestamps, TF mood
+    # heads, dead lyric_themes_raw...) — the full load cost ~3.55 GB and was the OOM-kill victim.
+    load_essentia_cache(profile="extras")
     ec = meloday._essentia_cache
     xlog(f"[OK] Essentia cache: {len(ec)} entries")
 

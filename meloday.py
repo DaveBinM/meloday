@@ -594,22 +594,68 @@ def prefetch_label_exclusions():
 
 # --- SQLite cache helpers ---
 
-_UPSERT_SQL = """
-    INSERT OR REPLACE INTO essentia_cache
-    (rating_key, bpm, key, energy, year, artist, genres, styles, moods, file_path,
-     track_updated_at, album_updated_at, artist_updated_at, danceability, brightness,
-     beat_confidence, integrated_loudness, onset_rate, dynamic_complexity,
-     arousal, valence, vocal_presence,
-     mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic,
-     mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn,
-     lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners,
-     lyric_valence, lyric_themes, lyric_lang,
-     title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at,
-     lyric_themes_raw, artist_mbid, release_types)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?)
-"""
+# All value columns, in the exact positional order _entry_to_row emits (rating_key prepended).
+_CACHE_ALL_COLUMNS = (
+    "bpm", "key", "energy", "year", "artist", "genres", "styles", "moods", "file_path",
+    "track_updated_at", "album_updated_at", "artist_updated_at", "danceability", "brightness",
+    "beat_confidence", "integrated_loudness", "onset_rate", "dynamic_complexity",
+    "arousal", "valence", "vocal_presence",
+    "mood_happy", "mood_sad", "mood_aggressive", "mood_relaxed", "mood_party", "mood_acoustic",
+    "mood_electronic", "danceability_hl", "moodtheme", "genre_discogs", "emb_effnet", "emb_musicnn",
+    "lastfm_artist_tags", "lastfm_track_tags", "artist_origin", "lastfm_listeners",
+    "lyric_valence", "lyric_themes", "lyric_lang",
+    "title", "release_date", "lastfm_synced_at", "geo_synced_at", "lyrics_synced_at",
+    "lyric_themes_raw", "artist_mbid", "release_types",
+)
+
+# Per-process load profiles. WHY: the full 48-column load costs ~3.55 GB of RAM per process
+# (measured: 164k rows; embeddings 978 MB, lyric_themes(+_raw) 1.09 GB, artist_origin 246 MB ...)
+# and was the direct cause of prod OOM kills — yet each process READS only a subset:
+#   core   — everything meloday.py's own run touches: DJ-order acoustics, tag resolution,
+#            staleness timestamps, canonical_artist (artist_mbid), _entry_original_* (release_date),
+#            PLUS the _fill_missing_acoustic presence-gate columns (integrated_loudness,
+#            dynamic_complexity, mood_happy, moodtheme, genre_discogs) — dropping a gate column
+#            would make every stale-path track re-decode audio to recompute "missing" TF heads.
+#   extras — everything meloday_extras reads (embeddings, lyric/lastfm/origin enrichment, title,
+#            release_types...) minus what it never touches: staleness timestamps, sync timestamps,
+#            the mood_* heads (only ever written), artist_mbid, and dead-in-RAM lyric_themes_raw.
+# Consumers all use entry.get(), so an unloaded column reads as None — same as an unpopulated one.
+_CACHE_COLUMNS_CORE = (
+    "bpm", "key", "energy", "year", "artist", "genres", "styles", "moods", "file_path",
+    "track_updated_at", "album_updated_at", "artist_updated_at", "danceability", "brightness",
+    "beat_confidence", "integrated_loudness", "onset_rate", "dynamic_complexity",
+    "arousal", "valence", "vocal_presence",
+    "mood_happy", "moodtheme", "genre_discogs", "release_date", "artist_mbid",
+)
+_CACHE_COLUMNS_EXTRAS = tuple(c for c in _CACHE_ALL_COLUMNS if c not in {
+    "lyric_themes_raw",                                                # dead in RAM everywhere (SQL-only readers)
+    "lastfm_synced_at", "geo_synced_at", "lyrics_synced_at",           # freshness checks are SQL-side (pre_analyze)
+    "mood_happy", "mood_sad", "mood_aggressive", "mood_relaxed",       # TF heads: written by analysis,
+    "mood_party", "mood_acoustic", "mood_electronic",                  #   never read by extras scoring
+    "track_updated_at", "album_updated_at", "artist_updated_at",       # staleness is meloday/pre_analyze-only
+    "artist_mbid",                                                     # extras uses the already-canonical artist
+})
+_CACHE_PROFILES = {"core": _CACHE_COLUMNS_CORE, "extras": _CACHE_COLUMNS_EXTRAS}
+
+# INSERT ... ON CONFLICT DO UPDATE (NOT "INSERT OR REPLACE"). WHY: REPLACE deletes+reinserts the
+# whole row, so every column absent from the in-memory entry would be written NULL. With profile
+# loading, meloday's entries deliberately do NOT carry the extras/enrichment columns — a stale-path
+# round-trip (loaded entry → metadata refresh → upsert, see analyze_track_essentia) under REPLACE
+# would wipe embeddings/lyrics/Last.fm data for every stale track (the same bug class that once
+# wiped ~67k embeddings via pre_analyze). Rule: columns in the CORE profile are always present in
+# any entry meloday writes → plain assignment (fresh analysis wins); everything else is COALESCE'd
+# (keep the stored value unless the incoming entry actually carries one). This also stops a
+# stale-path write from clobbering a CONCURRENT pre_analyze sync's updates to those columns.
+_UPSERT_SQL = (
+    "INSERT INTO essentia_cache (rating_key, " + ", ".join(_CACHE_ALL_COLUMNS) + ")\n"
+    "    VALUES (" + ", ".join("?" * (len(_CACHE_ALL_COLUMNS) + 1)) + ")\n"
+    "    ON CONFLICT(rating_key) DO UPDATE SET\n      "
+    + ",\n      ".join(
+        (f"{c}=excluded.{c}" if c in _CACHE_COLUMNS_CORE
+         else f"{c}=COALESCE(excluded.{c}, essentia_cache.{c})")
+        for c in _CACHE_ALL_COLUMNS
+    )
+)
 
 _CANONICAL_COLUMNS = (
     "rating_key TEXT PRIMARY KEY NOT NULL, "
@@ -796,55 +842,27 @@ def _entry_to_row(rk, d):
             d.get("artist_mbid"),
             json.dumps(d["release_types"]) if d.get("release_types") is not None else None)
 
-def _row_to_entry(row):
-    rk, bpm, key, energy, danceability, brightness, year, artist, \
-        genres_j, styles_j, moods_j, file_path, \
-        track_updated_at, album_updated_at, artist_updated_at, \
-        beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, \
-        arousal, valence, vocal_presence, \
-        mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, \
-        mood_electronic, danceability_hl, moodtheme_j, genre_discogs_j, emb_effnet, emb_musicnn, \
-        lastfm_artist_j, lastfm_track_j, artist_origin_j, lastfm_listeners, \
-        lyric_valence, lyric_themes_j, lyric_lang, \
-        title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, \
-        lyric_themes_raw_j, artist_mbid, release_types_j = row
-    return rk, {
-        "bpm": bpm, "key": key, "energy": energy, "danceability": danceability, "brightness": brightness,
-        "year": year, "artist": artist,
-        "genres": json.loads(genres_j) if genres_j else [],
-        "styles": json.loads(styles_j) if styles_j else [],
-        "moods":  json.loads(moods_j) if moods_j else [],
-        "file_path": file_path,
-        "track_updated_at": track_updated_at,
-        "album_updated_at": album_updated_at,
-        "artist_updated_at": artist_updated_at,
-        "beat_confidence": beat_confidence,
-        "integrated_loudness": integrated_loudness,
-        "onset_rate": onset_rate,
-        "dynamic_complexity": dynamic_complexity,
-        "arousal": arousal,
-        "valence": valence,
-        "vocal_presence": vocal_presence,
-        "mood_happy": mood_happy, "mood_sad": mood_sad, "mood_aggressive": mood_aggressive,
-        "mood_relaxed": mood_relaxed, "mood_party": mood_party, "mood_acoustic": mood_acoustic,
-        "mood_electronic": mood_electronic, "danceability_hl": danceability_hl,
-        "moodtheme": json.loads(moodtheme_j) if moodtheme_j else None,
-        "genre_discogs": json.loads(genre_discogs_j) if genre_discogs_j else None,
-        "emb_effnet": emb_effnet, "emb_musicnn": emb_musicnn,
-        "lastfm_artist_tags": json.loads(lastfm_artist_j) if lastfm_artist_j else None,
-        "lastfm_track_tags": json.loads(lastfm_track_j) if lastfm_track_j else None,
-        "artist_origin": json.loads(artist_origin_j) if artist_origin_j else None,
-        "lastfm_listeners": lastfm_listeners,
-        "lyric_valence": lyric_valence,
-        "lyric_themes": json.loads(lyric_themes_j) if lyric_themes_j else None,
-        "lyric_themes_raw": json.loads(lyric_themes_raw_j) if lyric_themes_raw_j else None,
-        "lyric_lang": lyric_lang,
-        "title": title, "release_date": release_date,
-        "lastfm_synced_at": lastfm_synced_at, "geo_synced_at": geo_synced_at,
-        "lyrics_synced_at": lyrics_synced_at,
-        "artist_mbid": artist_mbid,
-        "release_types": json.loads(release_types_j) if release_types_j else None,
-    }
+# JSON columns and their empty-value defaults: list-tags load as [] (callers iterate them
+# directly), dict/enrichment columns load as None (callers guard with `or {}` / is-None checks).
+_CACHE_LIST_COLUMNS = frozenset({"genres", "styles", "moods"})
+_CACHE_JSON_COLUMNS = frozenset({
+    "moodtheme", "genre_discogs", "lastfm_artist_tags", "lastfm_track_tags",
+    "artist_origin", "lyric_themes", "lyric_themes_raw", "release_types",
+})
+
+def _row_to_entry(row, cols):
+    """Builds a cache entry {col: value} from a (rating_key, *cols) row. Tuple-driven so the
+    same code path serves every load profile; entry keys are the shared module-level column-name
+    strings, so 164k entries don't duplicate key objects."""
+    entry = {}
+    for name, val in zip(cols, row[1:]):
+        if name in _CACHE_JSON_COLUMNS:
+            entry[name] = json.loads(val) if val else None
+        elif name in _CACHE_LIST_COLUMNS:
+            entry[name] = json.loads(val) if val else []
+        else:
+            entry[name] = val
+    return row[0], entry
 
 def _migrate_json_to_sqlite():
     """One-time migration: imports the legacy JSON cache into the SQLite database."""
@@ -865,44 +883,31 @@ def _migrate_json_to_sqlite():
     except Exception as e:
         m_print(f"[WARN] JSON migration failed: {e}")
 
-def load_essentia_cache():
+def load_essentia_cache(profile="core"):
+    """Loads the cache into meloday._essentia_cache, selecting ONLY the columns the calling
+    process reads (see _CACHE_PROFILES). WHY: the full-column load cost ~3.55 GB per process and
+    caused prod OOM kills; the core profile drops the ~2.5 GB of extras-only enrichment
+    (embeddings, lyric/lastfm/origin data) that meloday.py never reads. Rows are streamed
+    (no fetchall) so the raw row tuples never co-reside with the built dict — the old
+    fetchall-then-build pattern transiently doubled peak RSS."""
     global _essentia_cache
     _migrate_json_to_sqlite()
     if not os.path.exists(ESSENTIA_CACHE_PATH):
         _essentia_cache = {}
         return
+    cols = _CACHE_PROFILES[profile]
     try:
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         _ensure_db_schema(conn)
-        rows = conn.execute(
-            "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
-            "track_updated_at, album_updated_at, artist_updated_at, "
-            "beat_confidence, integrated_loudness, onset_rate, dynamic_complexity, "
-            "arousal, valence, vocal_presence, "
-            "mood_happy, mood_sad, mood_aggressive, mood_relaxed, mood_party, mood_acoustic, "
-            "mood_electronic, danceability_hl, moodtheme, genre_discogs, emb_effnet, emb_musicnn, "
-            "lastfm_artist_tags, lastfm_track_tags, artist_origin, lastfm_listeners, "
-            "lyric_valence, lyric_themes, lyric_lang, "
-            "title, release_date, lastfm_synced_at, geo_synced_at, lyrics_synced_at, "
-            "lyric_themes_raw, artist_mbid, release_types "
-            "FROM essentia_cache"
-        ).fetchall()
+        cache = {}
+        for row in conn.execute("SELECT rating_key, " + ", ".join(cols) + " FROM essentia_cache"):
+            rk, entry = _row_to_entry(row, cols)
+            cache[rk] = entry
         conn.close()
-        _essentia_cache = {rk: entry for rk, entry in (_row_to_entry(r) for r in rows)}
+        _essentia_cache = cache
     except Exception as e:
         m_print(f"[WARN] Could not load Essentia cache: {e}")
         _essentia_cache = {}
-
-def save_essentia_cache():
-    os.makedirs(os.path.dirname(ESSENTIA_CACHE_PATH), exist_ok=True)
-    try:
-        conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=120)
-        _ensure_db_schema(conn)
-        conn.executemany(_UPSERT_SQL, [_entry_to_row(rk, d) for rk, d in _essentia_cache.items()])
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        m_print(f"[ERROR] Could not save Essentia cache safely: {e}")
 
 def _upsert_cache_entries(entries):
     """Writes only the specified {rk: data} subset to SQLite, without touching the rest of the cache."""
