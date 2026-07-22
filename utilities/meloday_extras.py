@@ -202,6 +202,7 @@ _EXTRAS_COVER_COLORS = {
     "hayden_house": ((255, 140, 70), (55, 30, 95)),        # warm coral-orange → dusk purple — sunset melodic house
     "feel_so_close": ((255, 50, 130), (40, 25, 120)),      # hot pink → deep indigo — festival big-room EDM
     "gravity": ((196, 138, 74), (52, 44, 82)),            # warm honey-amber → dusk plum — acoustic songwriter at dusk
+    "phantoms": ((150, 80, 170), (32, 28, 66)),          # violet phantom → dark indigo — moody mid-2000s emo
     "neon_glow": ((0, 210, 255), (230, 20, 160)),          # electric cyan → hot magenta — neon synth-pop
     "short_n_sweet": ((255, 120, 180), (120, 80, 200)),    # candy pink → lilac — playful, flirty pop
     "all_too_well": ((150, 35, 50), (120, 65, 30)),        # deep wine/burgundy → autumn amber — bittersweet, the red scarf
@@ -533,6 +534,7 @@ _COVER_BG_STYLES = {
     "hayden_house": ("ripples", 1),    # no glyph — warm sunset ripples carry the melodic-house cover
     "feel_so_close": ("laser_fan", 5), # no glyph — festival lasers carry the big-room EDM cover
     "gravity": ("acoustic_guitar", 1),  # fingerpicked acoustic guitar — the singer-songwriter cover (folk_acoustic uses variant 0)
+    "phantoms": ("lightning", 4),       # storm-bolt energy — the emo/pop-punk angst cover (guitar/amp_stack families full)
     "neon_glow": ("concentric_pulse", 3),  # no glyph — 80s-synth neon pulse carries the synth-pop cover
     "short_n_sweet": ("confetti", 5),  # no glyph — candy confetti carries the flirty-pop cover
     "all_too_well": ("woodgrain", 6),  # no glyph — warm autumn woodgrain carries the bittersweet cover
@@ -1165,6 +1167,7 @@ _DESCRIPTIONS = {
     "hayden_house": ["Melodic, deep and tropical house.", "Hayden James and the melodic-house scene.", "Sun-soaked house grooves.", "Warm house, hands in the air."],
     "feel_so_close": ["Festival big-room EDM.", "Calvin Harris and the main-stage sound.", "Peak-time drops, euphoric builds.", "This is what you came for."],
     "gravity": ["Warm, acoustic songcraft.", "John Mayer and the singer-songwriter lane.", "Fingerpicked folk with a soul streak.", "Continuum and the quiet hits."],
+    "phantoms": ["Mid-2000s emo and pop-punk.", "Acceptance and the Phantoms-era scene.", "Yearning hooks and big choruses.", "Take cover — this one's contagious."],
     "neon_glow": ["Bright, anthemic synth-pop.", "CHVRCHES and the synth-pop scene.", "Neon synths and big hooks.", "Electropop that glows."],
     "short_n_sweet": ["Cheeky, flirty pop.", "Sabrina Carpenter and playful pop.", "Sweet, sassy and fun.", "Pop with a wink."],
     "all_too_well": ["Bittersweet, confessional pop.", "Taylor Swift and the storytelling songs.", "Heartbreak, nostalgia and catharsis.", "All the feelings, all too well."],
@@ -2111,6 +2114,7 @@ _MOOD_PROFILES = {
     # reliably tagged); the gate + _EMB_SEEDS scene do the scoping, centroid = his measured means. Uses DJ-Arc.
     "feel_so_close": {"bpm": 125, "energy": -8, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.60, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.60, "valence": 0.67, "vocal_presence": 0.68},
     "gravity": {"bpm": 112, "energy": -11, "danceability": 0.40, "brightness": 0.12, "beat_confidence": 0.55, "onset_rate": 3.7, "dynamic_complexity": 0.45, "arousal": 0.52, "valence": 0.47, "vocal_presence": 0.81},   # DATA-derived: mean acoustic features of his 26 hits — mid-tempo, warm/dark, high-vocal. Secondary here (the hit-embedding at weight 5.0 leads); keeps the acoustic term from fighting the sound
+    "phantoms": {"bpm": 115, "energy": -9, "danceability": 0.35, "brightness": 0.14, "beat_confidence": 2.05, "onset_rate": 3.2, "dynamic_complexity": 3.33, "arousal": 0.57, "valence": 0.63, "vocal_presence": 0.95},   # DATA-derived: mean acoustic features of Acceptance's hits — mid-tempo anthemic emo, high-vocal. Secondary (effnet hit-embedding at weight 9 leads)
     # neon_glow: CHVRCHES' bright anthemic synth-pop. Genre-gated (synth-pop is reliably tagged), so the gate +
     # _EMB_SEEDS scene do the scoping; centroid = their measured means, ballast for the acoustic term.
     "neon_glow": {"bpm": 122, "energy": -10, "danceability": 0.39, "brightness": 0.14, "beat_confidence": 0.55, "onset_rate": 4.2, "dynamic_complexity": 0.45, "arousal": 0.56, "valence": 0.63, "vocal_presence": 0.78},
@@ -4724,6 +4728,7 @@ _MOOD_MIX_NAMES = {
     "hayden_house": "Hayden's House • Meloday+",
     "feel_so_close": "Feel So Close • Meloday+",
     "gravity": "Gravity • Meloday+",
+    "phantoms": "Phantoms • Meloday+",
     "neon_glow": "Neon Glow • Meloday+",
     "short_n_sweet": "Short n' Sweet • Meloday+",
     "all_too_well": "All Too Well • Meloday+",
@@ -5312,6 +5317,7 @@ _PROFILE_CATEGORY = {
     "festival_edm": "electronic_edm_pop", "rave_cave": "electronic_edm_pop", "hyperpop": "electronic_edm_pop",
     "bounce_room": "electronic_edm_pop", "feel_so_close": "electronic_edm_pop",
     "gravity": "rock_indie",   # warm acoustic singer-songwriter / roots — groups with the indie/singer-songwriter mixes for slate diversity
+    "phantoms": "rock_punk",   # mid-2000s emo/pop-punk — groups with emo_poppunk/punk_energy for slate diversity
     "dance_pop": "electronic_edm_pop", "chiptune": "electronic_edm_pop",
     # electronic_chill
     "synthwave": "electronic_chill", "vaporwave": "electronic_chill", "downtempo": "electronic_chill",
@@ -5459,6 +5465,7 @@ _PROFILE_MOOD_SIGNALS = {
     "hayden_house": (["euphoric", "uplifting", "warm", "sunny", "sensual", "groovy"], ["aggressive", "gritty", "harsh", "sombre"]),
     "feel_so_close": (["euphoric", "energetic", "uplifting", "exciting", "exuberant", "sparkling"], ["sombre", "gentle", "mellow", "gritty"]),
     "gravity": (["warm", "earnest", "intimate", "mellow", "organic", "tender"], ["aggressive", "boisterous", "euphoric"]),   # warm acoustic singer-songwriter — John Mayer's hit-sound (folk_acoustic warmth), not party/aggressive
+    "phantoms": (["yearning", "earnest", "cathartic", "anthemic", "bittersweet", "fierce"], ["calm", "peaceful", "serene"]),   # anthemic-emotional emo/pop-punk — Acceptance's yearning-hook lane (emo_poppunk kin), not calm
     "neon_glow": (["euphoric", "uplifting", "bittersweet", "dreamy", "anthemic", "wistful"], ["aggressive", "gritty", "silly", "folksy"]),
     "short_n_sweet": (["playful", "fun", "exuberant", "lively", "sassy", "upbeat"], ["brooding", "bleak", "melancholy", "aggressive"]),
     "all_too_well": (["bittersweet", "wistful", "melancholy", "tender", "yearning", "reflective"], ["aggressive", "exuberant", "frantic", "silly"]),
@@ -5846,6 +5853,7 @@ _PROFILE_STYLE_SIGNALS = {
     "hayden_house": (["deep house", "tropical house", "house", "progressive house", "nu-disco", "indie dance", "melodic house"], ["ambient", "folk", "classical", "gospel", "hardstyle", "gabber", "hard techno"]),  # Hayden James' melodic/deep/tropical house — broad 'house' positive keeps his signature bare-'house'-dominant cuts (e.g. "Just Friends"); _EMB_SEEDS (Hayden + Rüfüs/Kygo/Purple Disco/CamelPhat scene) sharpens toward melodic house, _PROFILE_BLOCKED_DOMINANT rejects the big-room/festival EDM that shares the 4/4 sound
     "feel_so_close": (["house", "electro house", "big room", "electro", "progressive house", "dance-pop", "nu-disco", "tropical house", "complextro", "future house", "dutch house", "eurodance"], ["metal", "folk", "classical", "country"]),  # Calvin Harris' festival big-room/electro-house. Genre reliably tagged (house 74/206 + electro-house 34); the mainstream EDM giants (Guetta/Tiësto/Avicii) that leak into Hayden's House are Calvin's genuine LANE here, so his _EMB_SEEDS seeds them and the blockdom keeps big-room. Distinct from hayden_house (peak-time festival vs sunset-melodic)
     "gravity": (["folk", "indie rock", "alternative rock", "pop rock", "folk rock", "country", "country rock", "americana", "neo soul", "soul", "blues rock", "modern electric blues", "electric blues", "southern rock", "rhythm & blues", "psychedelic rock", "bluegrass", "singer/songwriter", "acoustic"], ["edm", "techno", "trap"]),  # HIT-ANCHORED (embedding-LED, not genre-gated): John Mayer's Discogs tags scatter across folk/indie/alt-rock/neo-soul (his hits read folk/indie, NOT blues) — no genre gate isolates him. So this is a broad COHERENCE gate (his whole lane) that just strips non-lane noise (EDM/hip-hop via the parent gate + _PROFILE_BLOCKED_DOMINANT); the real selector is _EMB_ANCHOR_TRACKS (his hits' musicnn "sounds-like" centroid) at _PROFILE_EMB_WEIGHT 5.0. Verified: the hit-embedding surfaces his true sound = warm acoustic singer-songwriter (Jack Johnson/Paul Simon/Nick Mulvey/David Gray/Iron & Wine) + roots-soul (Ben Harper/Mavis Staples/Marcus King), his hits (Slow Dancing, Gravity) featured
+    "phantoms": (["emo", "pop punk", "post-hardcore", "alternative rock", "pop rock", "indie rock", "hard rock", "punk", "screamo", "melodic hardcore", "emo-pop", "power pop", "post-grunge", "arena rock"], ["metal", "techno", "trap"]),  # HIT-ANCHORED (embedding-LED). UNLIKE gravity, Acceptance's genre is CLEAN (dominant alt-rock 51/71, Last.fm alt-rock-100/emo-40), so this broad rock COHERENCE gate + parent {rock} just scopes the scene and the EFFNET hit-anchor (sub-style, tighter than musicnn for a clean-tagged band) at _PROFILE_EMB_WEIGHT 9 does the selecting. Positives span their own tags (some tracks read hard rock/arena rock/AOR). Verified: nails the mid-2000s emo/pop-punk scene (Anberlin/Jimmy Eat World/Taking Back Sunday/The Used/Saosin/Mayday Parade/Dashboard/Yellowcard), Acceptance's 5 hits (So Contagious/Take Cover/The Letter) featured
     "neon_glow": (["synth-pop", "synthpop", "electropop", "indie electronic", "synthwave", "new wave", "dream pop", "indietronica"], ["metal", "gabber", "hardstyle", "drill"]),  # CHVRCHES' bright synth-pop. Genre RELIABLY tagged (synth-pop dominant 38/87) so this is a genuine gate; _EMB_SEEDS (CHVRCHES + Purity Ring/M83/Ladytron/Robyn scene) sharpens toward their bright-anthemic lane, _PROFILE_BLOCKED_DOMINANT rejects the EDM/hip-hop that shares the synth 4/4
     "short_n_sweet": (["k-pop", "dance-pop", "synth-pop", "electropop", "pop rock", "europop", "indie pop", "art pop", "teen pop", "bubblegum"], ["metal", "death metal", "hardcore", "ambient", "folk"]),  # Sabrina Carpenter's cheeky pop. NB: 'k-pop' is a POSITIVE deliberately — the Discogs classifier mis-tags glossy female-pop as k-pop (61/86 of her tracks incl Espresso/Taste/Juno), so it's really a proxy for the polished-pop cluster here; the ACTUAL scoping is done by _PROFILE_LYRIC_THEMES (playful/flirty/cheeky) not the genre gate. Real Korean k-pop is pushed out by the _PROFILE_ORIGIN KR/JP exclude + _LYRIC_EN_PROFILES
     "all_too_well": (["ballad", "pop rock", "alternative rock", "k-pop", "synth-pop", "indie pop", "indie folk", "folk", "singer/songwriter"], ["metal", "death metal", "hardcore", "techno", "reggaeton"]),  # Taylor Swift's confessional storytelling. Her genre is scattered/mis-tagged (ballad 53 / pop-rock 53 / alt-rock 37 / k-pop 27), so these are loose PROXIES — the real scoping is _PROFILE_LYRIC_THEMES (bittersweet/nostalgic/heartbreak). 'contemporary r&b' deliberately dropped (it pulled ZAYN/Weeknd/Don Toliver)
@@ -6038,7 +6046,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity",
+    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity", "phantoms",
     # global genre RADIO stations (genre gate composed with the radio branch; no geo gate)
     "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio",
     "festive",
@@ -6245,6 +6253,12 @@ _PROFILE_BLOCKED_DOMINANT = {
     "gravity": {"techno", "electro house", "big room", "house", "trance", "drum n bass", "dubstep", "future bass",
                 "trap", "cloud rap", "hip hop", "pop rap", "thug rap", "gangsta", "grime", "k-pop", "new jack swing",
                 "disco", "hi-nrg", "eurodance", "synth-pop", "electropop"},
+    # phantoms: strip the far genres a rock-parent gate can still admit on a stray tag — the HEAVY metalcore/
+    # deathcore/thrash (harder than the melodic emo scene) + any dance/hip-hop/electronic. Deliberately NOT
+    # 'alternative rock'/'pop punk'/'emo'/'punk'/'hard rock': those ARE Acceptance's + the scene's own dominants.
+    "phantoms": {"death metal", "black metal", "metalcore", "deathcore", "thrash", "grindcore", "nu metal",
+                 "techno", "house", "electro house", "big room", "trance", "dubstep", "drum n bass", "trap",
+                 "cloud rap", "hip hop", "k-pop", "disco", "synth-pop"},
 }
 _PROFILE_TAG_FLOOR = {
     # WHY each entry: the 251-mix quality audit (docs/embedding_genre_quality_audit.md) showed the Discogs
@@ -6316,6 +6330,7 @@ _PROFILE_TAG_FLOOR = {
     "hayden_house":      0.25,   # confident-tag floor — house is a crowded, spray-prone tag; the _EMB_SEEDS seed + blocked-dominant keep it in Hayden's melodic lane
     "feel_so_close":     0.20,   # confident-tag floor — isolates genuine house/electro-house from the incidental spray; the _EMB_SEEDS festival-EDM seed sharpens toward Calvin's lane
     "gravity":           0.11,   # LOW floor — a broad coherence gate (his whole lane); the hit-embedding centroid, not the tag, does the selecting. 0.11 admits his acoustic hits (Slow Dancing modern-electric-blues 0.12) that a higher floor drops
+    "phantoms":          0.12,   # LOW floor — a broad rock coherence gate; the effnet hit-embedding does the selecting. Their scene reads alt-rock-dominant so 0.12 admits it without demanding a strong emo-specific tag
     "neon_glow":         0.18,   # synth-pop confident-tag floor — isolates genuine synth-pop (real acts score .18+) from the incidental synth spray on EDM/pop; leak drops to ~3 synth-adjacent giants
     "short_n_sweet":     0.15,   # low floor — her hits carry only a faint k-pop mis-tag (Please Please Please k-pop .19), so a higher floor would drop her own tracks; the lyric-theme lever does the real scoping
     "all_too_well":      0.15,   # low floor — her genre is a scattered mis-tag, so the loose gate just needs to admit; the lyric-theme lever does the real scoping
@@ -6392,6 +6407,7 @@ _PROFILE_GENRE_PARENT = {
     "rave_cave": {"electronic"}, "bounce_room": {"electronic"}, "hayden_house": {"electronic"},
     "feel_so_close": {"electronic", "pop"},
     "gravity": {"rock", "folk, world, & country", "funk / soul", "blues"},   # his lane's Discogs parents — the coherence gate: dominant parent must be one of these, which strips the EDM/hip-hop/pop the hit-embedding would otherwise pull. "folk, world, & country" spelled with commas (exact parent string); rock+folk+funk/soul+blues span singer-songwriter/roots/soul
+    "phantoms": {"rock"},   # dominant parent must be rock — the coherence gate that strips the pop/electronic/hip-hop the effnet hit-embedding might otherwise pull; the emo/pop-punk scene is rock-parent throughout
     "neon_glow": {"electronic", "pop"},
     "short_n_sweet": {"pop"},
     "all_too_well": {"pop", "rock"},
@@ -6766,6 +6782,7 @@ _PROFILE_MOODTHEME = {
     "hayden_house": ["party", "energetic", "uplifting", "positive"],
     "feel_so_close": ["party", "energetic", "uplifting", "upbeat"],
     "gravity": ["emotional", "melancholic", "love", "relaxing"],
+    "phantoms": ["emotional", "melancholic", "energetic", "powerful"],
     "neon_glow": ["energetic", "uplifting", "emotional", "melodic"],
     "short_n_sweet": ["happy", "fun", "love", "positive"],
     "all_too_well": ["sad", "emotional", "love", "melancholic"],
@@ -6852,6 +6869,8 @@ _PROFILE_MOODCLASS = {
     "hayden_house": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_happy": 1},
     "feel_so_close": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1},
     "gravity": {"mood_acoustic": 1, "mood_relaxed": 1},   # warm, acoustic, mellow singer-songwriter — leans acoustic + relaxed, away from party/electronic/aggressive
+    # phantoms: intentionally NO moodclass — no Essentia mood-class fits emo (mood_sad fought their upbeat-anthemic
+    # valence 0.63 and pulled harder post-grunge; measured CORE 26->27, OUT 7->5 dropping it). The effnet hit-embedding leads.
     "neon_glow": {"danceability_hl": 1, "mood_electronic": 1, "mood_happy": 1},
     "short_n_sweet": {"danceability_hl": 1, "mood_happy": 1, "mood_party": 1},
     "all_too_well": {"mood_sad": 1, "mood_relaxed": 1},
@@ -7328,6 +7347,14 @@ _PROFILE_LYRIC_THEMES = {
     # sad-everything across genre; 'contemporary r&b' dropped from the gate handles the R&B crossover.
     "all_too_well": ["bittersweet", "yearning", "nostalgic", "euphoric_sadness", "cathartic", "wistful", "heartbroken", "regret", "post_breakup_longing", "unresolved_attachment", "missing_someone", "late_night_introspection", "rumination", "betrayal"],
     "situationship": ["yearning", "restless", "anxious", "conflicted", "uncertain", "bittersweet", "vulnerable", "unresolved_attachment", "relationship_limbo", "mixed_signals", "push_pull_dynamics", "drifting_apart", "emotional_distance", "communication_breakdown", "fear_of_abandonment", "searching_for_intimacy", "missing_someone"],
+    # phantoms (Acceptance / emo): a SECONDARY reinforcement, not the primary lever — emo is a lyric-DEFINED
+    # genre, so leaning on the confessional signature is on-genre. Aligned to Acceptance's own themes (anxious/
+    # pleading/vulnerable/unresolved). Measured effect on top of the effnet SOUND anchor: cut sound-similar-but-
+    # -less-emo outliers (Weezer/The Fray/The Wombats/Twin Atlantic, OUT 5->3) + pulled DEEPER genuine scene
+    # (Midtown/American Hi-Fi/The Story So Far) + refined to the more-emo track per artist. NOTE it can't cut
+    # every adjacent: 2000s alt-rock shares emo's confessional lyrics (Three Days Grace 69/78 tracks, The Fray
+    # 63/64 score just as emo), so the SOUND embedding stays primary; this only nudges within the sound lane.
+    "phantoms": ["heartbroken", "yearning", "vulnerable", "euphoric_sadness", "bittersweet", "missing_someone", "unresolved_attachment", "relationship_limbo", "cathartic", "post_breakup_longing", "longing", "pleading", "anxious"],
     "sad_bangers": ["euphoric_sadness", "cathartic", "bittersweet", "melancholic", "dancefloor_catharsis", "sad_banger", "post_breakup_longing", "living_in_the_moment"],
     "power_ballads": ["dramatic", "passionate", "yearning", "triumphant", "overcoming_obstacles", "self_empowerment"],
     "restless": ["restless", "anxious", "tense", "urgent", "frustrated", "brooding", "intrusive_thoughts", "late_night", "survival_mode", "feeling_trapped", "feeling_stuck", "time_running_out", "emotional_overwhelm", "inner_turmoil", "late_night_introspection", "keep_moving_forward"],
@@ -8075,6 +8102,9 @@ _PROFILE_EMB_WEIGHT = {
                       # Paul Simon/Iron & Wine/Ben Harper) rises monotonically (GOOD 7->19); 5.0 makes the
                       # musicnn cosine spread (~0.10) ≈ the acoustic-distance spread (~0.4), so the SOUND leads
                       # while the acoustic centroid still sanity-checks. Higher adds pop-adjacent noise.
+    "phantoms": 9.0,  # effnet hit-anchor LEADS. Higher than gravity's 5.0 because EFFNET cosines run lower/
+                      # tighter than musicnn (p50 .63 vs .70), so a given lead needs more weight. Swept 6/10:
+                      # scene-core rises (23->24 of 36) while outliers hold at 4; 9 sits in that tight regime.
 }
 
 def _track_emb(entry, which="effnet"):
@@ -14797,6 +14827,7 @@ _EMB_SEEDS = {
     # tracks (musicnn), NOT this list, so _seed_emb_centroid ignores it. Kept as a single-entry marker because
     # the _ARTIST_FOCUS_PROFILES source-cap reads _EMB_SEEDS[key][0] to identify the source artist (John Mayer).
     "gravity": ["john mayer"],
+    "phantoms": ["acceptance"],   # hit-anchored (see _EMB_ANCHOR_TRACKS); single-entry source marker for the _ARTIST_FOCUS_PROFILES cap
     # neon_glow: CHVRCHES + their genuine-lane synth-pop scene (collision-checked; "metric" was dropped — it
     # substring-matches "alex metric" — replaced by "st lucia"). Sharpens the synth-pop gate toward their
     # bright-anthemic lane and down-ranks the EDM/indie-electronic that shares the synth 4/4.
@@ -14838,24 +14869,35 @@ _EMB_SEEDS = {
 # is allowed up to 10% of the playlist (see _build_mix_tracks) instead of the usual 1/artist, so the mix
 # genuinely features them; every OTHER artist still stays at 1. NOT the generic _EMB_SEEDS mixes
 # (acoustic_romance / situationship etc.), which keep strict 1/artist.
-_ARTIST_FOCUS_PROFILES = {"bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity"}
+_ARTIST_FOCUS_PROFILES = {"bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity", "phantoms"}
 
-# HIT-ANCHORED embedding seeds — {profile: (artist_norm, [title_cues])}. For an artist the Discogs GENRE model
-# mis-places, the genre gate can't find their lane (John Mayer reads folk/indie/alt-rock, so a blues gate admits
-# only his 2 neo-soul cuts + the dense neo-soul pool → a neo-soul mix; a blues-tag gate admits blues-rock but
-# not his acoustic hits). The fix: anchor the embedding centroid on the artist's SIGNATURE HIT tracks (title-cue
-# matched) using the emb_musicnn "sounds-like" (vibe) vector — that mean captures the actual SOUND of the hits
-# (Mayer's = warm acoustic singer-songwriter blended with his roots-blues touches), which a light coherence gate
-# + a strong _PROFILE_EMB_WEIGHT then let DRIVE selection. Distinct from _EMB_SEEDS (artist-average effnet pull):
-# this is track-level + musicnn + the primary selector, not a 0.25 sub-style tiebreak. Verified: all 30 cued
-# Mayer tracks carry a musicnn vector (well above _emb_centroid's 5-track floor).
+# HIT-ANCHORED embedding seeds — {profile: (artist_norm, [title_cues], which)}. Anchor the embedding centroid on
+# an artist's SIGNATURE HIT tracks (title-cue matched, exact-artist), which a light coherence gate + a strong
+# _PROFILE_EMB_WEIGHT then let DRIVE selection (not the 0.25 sub-style tiebreak _EMB_SEEDS gives). The 3rd element
+# picks the embedding, and WHICH ONE depends on how the Discogs model tags the artist:
+#   • 'musicnn' (200-d MSD, "sounds-like"/vibe) — when the genre model MIS-PLACES the artist, so the effnet
+#     genre head would cluster by the wrong genre. John Mayer reads folk/indie/alt-rock (a blues gate gave a
+#     neo-soul mix); musicnn captures his true SOUND = warm acoustic singer-songwriter + roots-blues.
+#   • 'effnet' (1280-d Discogs, sub-style) — when the genre IS clean, so the sub-style head stays TIGHTER to the
+#     scene. Acceptance is reliably alt-rock/emo; effnet anchors their exact mid-2000s emo/pop-punk scene, where
+#     musicnn drifts to radio-alt (Bush/Goo Goo Dolls/3 Doors Down). Measured: effnet OUT 4 vs musicnn OUT 11.
+# All cued tracks must carry that vector (verify — well above _emb_centroid's 5-track floor). effnet cosines run
+# lower/tighter than musicnn, so effnet anchors need a higher _PROFILE_EMB_WEIGHT (Acceptance 9 vs Gravity 5).
 _EMB_ANCHOR_TRACKS = {
     "gravity": ("john mayer",
                 ["gravity", "slow dancing in a burning room", "vultures", "neon", "belief",
                  "waiting on the world to change", "stop this train", "who says", "the heart of life",
                  "daughters", "edge of desire", "still feel like your man", "in your atmosphere", "free fallin",
                  "new light", "love on the weekend", "changing", "moving on and getting over",
-                 "queen of california", "born and raised", "you're gonna live forever in me"]),
+                 "queen of california", "born and raised", "you're gonna live forever in me"], "musicnn"),
+    # phantoms: Acceptance is CLEAN-tagged (alt-rock/emo dominant), so EFFNET (sub-style) anchors their exact
+    # mid-2000s emo/pop-punk scene tighter than musicnn (which drifts to radio-alt: Bush/Goo Goo Dolls). All
+    # 33 cued tracks carry an effnet vector. Cues are their hits + album cuts across Phantoms + Colliding by Design.
+    "phantoms": ("acceptance",
+                 ["so contagious", "different", "take cover", "in too far", "permanent", "over you", "breathless",
+                  "the letter", "this conversation is over", "in the cold", "seeing is believing", "bleeding heart",
+                  "glory", "hold on", "black lines to battlefields", "colliding by design", "come closer",
+                  "we can escape", "haunted", "diagram of a simple man"], "effnet"),
 }
 _SEED_EMB_CENTROID_CACHE = {}
 
@@ -14869,11 +14911,12 @@ def _seed_emb_centroid(profile_key, essentia_cache):
     cen = None
     anchor = _EMB_ANCHOR_TRACKS.get(profile_key)
     if anchor and _NUMPY_AVAILABLE:
-        a_norm, cues = anchor
+        a_norm, cues = anchor[0], anchor[1]
+        which = anchor[2] if len(anchor) > 2 else "musicnn"   # per-anchor embedding (musicnn=vibe / effnet=sub-style)
         rks = [rk for rk, e in essentia_cache.items()
                if (e.get("artist") or "").lower() == a_norm
                and any(c in (e.get("title") or "").lower() for c in cues)]
-        cen = _emb_centroid(rks, essentia_cache, "musicnn")   # hit-anchored "sounds-like" (vibe) centroid
+        cen = _emb_centroid(rks, essentia_cache, which)       # hit-anchored centroid, in the chosen embedding
     else:
         seeds = _EMB_SEEDS.get(profile_key) or []
         if seeds and _NUMPY_AVAILABLE:
@@ -14884,8 +14927,12 @@ def _seed_emb_centroid(profile_key, essentia_cache):
     return cen
 
 def _seed_emb_which(profile_key):
-    """Which embedding a profile's _seed_emb_centroid lives in: 'musicnn' for hit-anchored profiles, else 'effnet'."""
-    return "musicnn" if profile_key in _EMB_ANCHOR_TRACKS else "effnet"
+    """Which embedding a profile's _seed_emb_centroid lives in: the hit-anchor's chosen vector (3rd tuple element,
+    default musicnn) for anchored profiles, else 'effnet' (the _EMB_SEEDS artist-average)."""
+    a = _EMB_ANCHOR_TRACKS.get(profile_key)
+    if a is not None:
+        return a[2] if len(a) > 2 else "musicnn"
+    return "effnet"
 
 _MIX_EMB_CORE_N = 40   # build the cohesion centroid from the N candidates nearest the acoustic centroid
 
