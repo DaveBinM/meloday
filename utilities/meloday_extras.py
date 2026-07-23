@@ -7917,7 +7917,8 @@ def _extras_lock_key(to_run, args):
 # ---------------------------------------------------------------------------
 def _upsert_extras_playlist(plex, name, tracks, description,
                             cover_key=None, cover_title=None, cover_subtitle=None,
-                            cover_tracks=None, existing_playlists=None, pre_ordered=False):
+                            cover_tracks=None, existing_playlists=None, pre_ordered=False,
+                            pre_canonicalized=False):
     """
     cover_tracks:        pass the mix's track list to generate a Daily Mix collage cover.
     existing_playlists:  pre-fetched {title: playlist_obj} dict; avoids a full plex.playlists()
@@ -7925,10 +7926,16 @@ def _upsert_extras_playlist(plex, name, tracks, description,
     pre_ordered:         True when the caller already DJ-sequenced the tracks (_build_mix_tracks
                          output). MUST be set there — re-smoothing would flatten the arc mixes'
                          energy arc, not just waste work.
+    pre_canonicalized:   True when the caller already chose the display copy (the _build_mix_tracks
+                         mixes canonicalize FIT-AWARE in-builder, see _fit_canonicalize) — skip the
+                         blind studio swap below, which would undo it (send a fitting remix back to
+                         the worse-fitting studio original).
     """
-    # Single chokepoint for EVERY extras playlist: show the canonical (studio-original) copy of each song.
+    # Single chokepoint for the personal builders: show the canonical (studio-original) copy of each song.
     # Post-selection, order-preserving — ranking/length unchanged; live/remix/extended keep their own copy.
-    tracks = _canonicalize_tracks(plex, tracks, meloday._essentia_cache)
+    # The _build_mix_tracks mixes pass pre_canonicalized=True (already chose the best-ranked copy per mix).
+    if not pre_canonicalized:
+        tracks = _canonicalize_tracks(plex, tracks, meloday._essentia_cache)
     valid = [t for t in tracks if getattr(t, "ratingKey", None)]
     if not valid:
         xlog(f"[WARN] '{name}': no valid tracks — skipping.")
@@ -14620,11 +14627,70 @@ def _canonical_rk_map(essentia_cache):
     return m
 
 
+_SONG_COPIES_CACHE = {}   # id(essentia_cache) -> {song_key -> [rk, ...]}
+def _song_copies_map(essentia_cache):
+    """song_key -> [rk, ...] over the whole cache (memoised per cache, mirrors _canonical_rk_map). Lets the
+    fit-aware canonicalization find a selected song's OTHER copies to compare."""
+    cid = id(essentia_cache)
+    m = _SONG_COPIES_CACHE.get(cid)
+    if m is None:
+        m = {}
+        for rk, e in essentia_cache.items():
+            sk = _entry_song_key(e)
+            if not sk[1]:                            # no title -> can't group
+                continue
+            m.setdefault(sk, []).append(rk)
+        _SONG_COPIES_CACHE.clear()                   # only the current run's cache is ever needed
+        _SONG_COPIES_CACHE[cid] = m
+    return m
+
+
+def _fit_canonicalize(plex, tracks, cand_key_set, score_fn, essentia_cache):
+    """Swap each SELECTED track for the best copy of its song AMONG the mix's ELIGIBLE copies (cand_key_set =
+    the _cand_keys gate-passing set), so we never send a copy to an ineligible/worse one. Two rankings:
+      • score_fn set (FIT-ranked mixes) → keep the best-`_combined_score` copy (acoustic fit); among equally-
+        fitting copies prefer the studio. The selected copy already ranks best (dedup keeps the min-score copy
+        per song key), so this KEEPS it — never trades a better-fitting copy for a worse one, even if both pass
+        the gate. WHY: the blind studio swap sent "One More Night (Cutmore Club Mix)" (house, passes the EDM
+        gate) back to the reggae studio original (fails it).
+      • score_fn=None (POPULARITY mixes: era/geo/hits/radio) → copies of one song are ~equally popular (listener
+        counts differ only by Last.fm-lookup noise), so ranking by listeners would pick a remix that happens to
+        have +10 listeners; instead pick the STUDIO copy (non-rework, lowest penalty, earliest) — the canon.
+    A remix/live/bare-'mix' rework is treated as a worse canonical (_noncanon) so the studio wins ties even when
+    `_canonical_penalty` doesn't mark it (e.g. '(Wideboys club mix)' scores 0). Runs INSIDE _build_mix_tracks
+    (needs _combined_score + _cand_keys); those mixes upsert pre_canonicalized=True. Order/length preserved."""
+    if not tracks or not essentia_cache:
+        return tracks
+    copies = _song_copies_map(essentia_cache)
+    def _noncanon(c):                                # remix/live/…/bare-'mix' rework = worse canonical than studio
+        ti = essentia_cache.get(c, {}).get("title") or ""
+        return meloday.is_alt_recording(ti) or _is_rework(ti)
+    targets = []                                     # (original track, chosen rk)
+    for t in tracks:
+        rk = str(t.ratingKey)
+        e  = essentia_cache.get(rk)
+        sk = _entry_song_key(e) if e else _song_key(t)
+        cand = [c for c in copies.get(sk, (rk,)) if c in cand_key_set] or [rk]
+        if score_fn is None:                         # popularity mix: same-song copies ~equal -> studio canonical
+            best = min(cand, key=lambda c: (_noncanon(c), _canonical_penalty(essentia_cache.get(c, {})),
+                                            essentia_cache.get(c, {}).get("year") or 9999, c))
+        else:                                        # fit-ranked: best-fitting copy; studio only among ties
+            best = min(cand, key=lambda c: (round(score_fn(c), 4), _noncanon(c),
+                                            _canonical_penalty(essentia_cache.get(c, {})),
+                                            essentia_cache.get(c, {}).get("year") or 9999, c))
+        targets.append((t, best))
+    need = {cr for t, cr in targets if cr != str(t.ratingKey)}
+    swapped = resolve_tracks_by_keys(plex, list(need)) if need else {}
+    return [swapped.get(cr) or t for t, cr in targets]   # fall back to the original if it can't resolve
+
+
 def _canonicalize_tracks(plex, tracks, essentia_cache):
     """Swap each track for the canonical copy of its song (studio original over live/remix/compilation),
     preserving order and length. Selection/ranking is already done — this only changes WHICH copy shows,
     so it's safe even on play-ranked playlists (On Repeat etc.). Meaningfully-different recordings and
-    single-copy songs map to themselves (no-op). Resolves only the copies that actually change."""
+    single-copy songs map to themselves (no-op). Resolves only the copies that actually change.
+    NB: the _build_mix_tracks mixes canonicalize fit-aware INSIDE the builder (see _fit_canonicalize) and
+    upsert with pre_canonicalized=True to skip this blind studio swap; this path serves the personal builders."""
     if not tracks or not essentia_cache:
         return tracks
     cmap = _canonical_rk_map(essentia_cache)
@@ -15709,6 +15775,15 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             - _rating_dist_bonus(getattr(t, "userRating", None))
         ))
     combined = combined[:mix_size]
+    # Fit-aware canonicalization: show the copy of each song that ranks BEST by this mix's own _combined_score
+    # (acoustic-fit for fit-ranked mixes, popularity for showcases), studio-preferred only among ties — so a
+    # fitting remix isn't swapped for a worse-fitting original (the "One More Night (Cutmore Club Mix)" -> reggae
+    # album bug) yet decades still resolve to the studio hit. Done HERE (not the _upsert chokepoint) because it
+    # needs _combined_score + the eligible _cand_keys; these mixes then upsert pre_canonicalized=True. BEFORE
+    # _dj_order so sequencing uses the final copies.
+    combined = _fit_canonicalize(plex, combined, set(_cand_keys),
+                                 (None if (_is_showcase or _is_geo_hits or _is_geo_radio) else _combined_score),
+                                 essentia_cache)
     # DJ flow: re-sequence EVERY mix for smooth mixing (arc for the beat-driven set). The decade mixes
     # were originally left on their day-seeded shuffle, but per the user's call (2026-07-11) every
     # non-arc playlist plays as a Smooth-sequenced set. Ordering only — it runs AFTER the
@@ -15850,7 +15925,8 @@ def _run_playlist(playlist_id, plex, music, ec, history, centroid, excluded_albu
                 cover_key=profile_key,
                 cover_title=name.replace(" • Meloday+", ""),
                 existing_playlists=ep,
-                pre_ordered=True)   # _build_mix_tracks already Smooth/Arc-sequenced these
+                pre_ordered=True,        # _build_mix_tracks already Smooth/Arc-sequenced these
+                pre_canonicalized=True)  # ...and already fit-aware canonicalized (don't blind-swap to studio)
 
 
 
