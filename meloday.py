@@ -899,6 +899,9 @@ def load_essentia_cache(profile="core"):
     try:
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         _ensure_db_schema(conn)
+        # WHY: full-table scan of a ~1.5 GB db — mmap reads via the OS page cache
+        # without a second userspace copy (roughly halves the cold-scan time).
+        conn.execute("PRAGMA mmap_size=2147483648")
         cache = {}
         for row in conn.execute("SELECT rating_key, " + ", ".join(cols) + " FROM essentia_cache"):
             rk, entry = _row_to_entry(row, cols)

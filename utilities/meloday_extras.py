@@ -31,6 +31,11 @@ from collections import Counter, defaultdict
 
 # --- Plex / Meloday Imports ---
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# WHY: extras only READS the cache — embeddings/TF heads are consumed pre-computed, never produced
+# here. Set BEFORE `import meloday` so its module-level TF block skips loading the TF C++ runtime
+# + 14 .pb models: ~0.7-1 GB RSS + 10-30 s wasted in every hourly extras run, on a box with OOM
+# history. setdefault so an explicit operator override (MELODAY_SKIP_TF_MODELS=0/unset) still wins.
+os.environ.setdefault("MELODAY_SKIP_TF_MODELS", "1")
 import meloday  # required so load_essentia_cache() populates meloday._essentia_cache
 from meloday import (
     load_config,
@@ -7963,8 +7968,19 @@ def _upsert_extras_playlist(plex, name, tracks, description,
 
         if cover_key and cover_title:
             if cover_tracks is not None:
+                # Daily Mix collage depends on THIS run's tracks — never skippable.
                 cover_path = _generate_daily_mix_cover(
                     plex, cover_tracks, cover_key, cover_title, cover_subtitle)
+            elif existing is not None and _cover_fresh_this_week(cover_key):
+                # WHY: static covers are seeded by (key, ISO year, ISO week), so a file rendered
+                # this week is what a re-render would produce — and the surviving playlist already
+                # wears it. Skip the PIL raster AND the poster upload (anytime mixes rotate back
+                # onto the slate ~6×/day; each skipped rebuild saves ~100-300 ms + one Plex upload).
+                # A NEWLY created playlist (existing is None) has no poster yet, so it always falls
+                # through to render+upload; the first build of a new ISO week finds last week's
+                # mtime → stale → re-renders.
+                cover_path = None
+                xlog(f"[OK] Cover fresh this week — skipped render/upload for '{cover_key}'.")
             else:
                 cover_path = _generate_extras_cover(cover_key, cover_title, cover_subtitle)
             if cover_path:
@@ -12281,6 +12297,18 @@ def _extract_dominant_color(image):
     if total < 0.01:
         return (80, 100, 200)          # fallback if no saturated pixels found
     return (int(wr / total), int(wg / total), int(wb / total))
+
+
+def _cover_fresh_this_week(key):
+    """True when extras_{key}.webp exists and was written in the current ISO week — the render
+    seed's granularity, so 'fresh' means 'identical to what we would render now'. Lets the
+    upsert skip the PIL raster + poster upload for playlists rotating back onto the slate."""
+    p = os.path.join(COVER_IMAGE_DIR, f"extras_{key}.webp")
+    try:
+        m = date.fromtimestamp(os.path.getmtime(p))
+    except OSError:
+        return False
+    return m.isocalendar()[:2] == date.today().isocalendar()[:2]
 
 
 def _generate_extras_cover(key, title, subtitle=None):

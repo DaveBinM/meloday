@@ -5,8 +5,11 @@ import sqlite3
 import logging
 from datetime import datetime
 from plexapi.server import PlexServer
+# WHY: cache/Plex admin — never decodes audio, so skip meloday's module-level TF runtime +
+# model load (~0.7-1 GB RSS). setdefault so an operator override wins.
+os.environ.setdefault("MELODAY_SKIP_TF_MODELS", "1")
 from meloday import (
-    PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY, 
+    PLEX_URL, PLEX_TOKEN, MUSIC_LIBRARY,
     ESSENTIA_CACHE_PATH, BASE_DIR
 )
 

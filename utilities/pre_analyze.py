@@ -100,6 +100,9 @@ def load_essentia_cache_exclusive():
         conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
         _ensure_db_schema(conn)
+        # WHY: full-table scan of a ~1.5 GB db — mmap reads via the OS page cache
+        # without a second userspace copy (roughly halves the cold-scan time).
+        conn.execute("PRAGMA mmap_size=2147483648")
         rows = conn.execute(
             "SELECT rating_key, bpm, key, energy, danceability, brightness, year, artist, genres, styles, moods, file_path, "
             "track_updated_at, album_updated_at, artist_updated_at, "
@@ -259,6 +262,22 @@ def upsert_essentia_cache_entries(entries):
         conn.close()
     except Exception as e:
         log_msg(f"[ERROR] Cache upsert failed: {e}", level="error")
+
+
+def _tune_db_connection(conn, big_read=False):
+    """WAL + synchronous=NORMAL for the ad-hoc writer/flush connections. WHY: they set WAL only
+    (or nothing), inheriting synchronous=FULL — one fsync per commit, the dominant stall for the
+    batch writers (100-500-row commits). NORMAL under WAL fsyncs at checkpoint instead; a power
+    cut can lose tail transactions but cannot corrupt — the same durability trade
+    _ensure_db_schema already makes for every other connection in the repo. big_read additionally
+    maps the DB file (mmap_size=2 GiB) so a full-table scan reads via the OS page cache without a
+    second userspace copy. cache_size deliberately NOT raised: it is per-connection PRIVATE RAM
+    and several callers live in worker/thread contexts — multiplying it defeats the memory work."""
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    if big_read:
+        conn.execute("PRAGMA mmap_size=2147483648")
+    return conn
 
 
 def update_analysis_columns(entries):
@@ -1212,10 +1231,23 @@ def _ensure_meta_fields(conn):
 
 
 def repair_artist_names(limit=None, dry_run=False):
-    """One-off: re-derive the cache `artist` for every track via canonical_artist — the PRIMARY artist from
-    the file's MusicBrainz artist-ID (real Groups kept whole, collaborations -> primary, compilation tracks
-    -> the per-track performer; classical keeps the performer). Build the name map first with
-    --sync-artist-names. One bulk Plex search; only rows whose artist changes are updated. --dry-run previews."""
+    """Re-derive the cache `artist` via canonical_artist — the PRIMARY artist from the file's
+    MusicBrainz artist-ID (Groups kept whole, collaborations -> primary, comp tracks -> performer;
+    classical keeps the performer). Build the name map first with --sync-artist-names.
+
+    Two phases (WHY: the old single pass streamed the ENTIRE library from Plex every --full run,
+    ~5 min — yet measured ~78% of rows resolve on canonical_artist's fast path from the mbid->name
+    map alone, no Plex object needed; with new music imported hourly a whole-run skip would never
+    fire, so the split is what actually saves the time):
+      1. map-derived rows (mapped mbid + non-classical): computed straight from the DB + map —
+         seconds, runs every time, catches map renames AND newly-imported rows same-run.
+      2. residual rows (classical / no-mbid / unmapped-mbid, ~20% — these need the Plex track for
+         the performer/fallback path): batched fetchItems on JUST those keys, and skipped entirely
+         when the residual fingerprint (map hash + residual count) matches the last completed run.
+         Staleness accepted: a Plex-side artist edit on a fallback row waits until the residual
+         set next changes; rm assets/artist_repair_state.json to force."""
+    import meloday as _md
+    import hashlib
     import json as _json
     def _j(x):
         try: return _json.loads(x) if x else None
@@ -1226,32 +1258,107 @@ def repair_artist_names(limit=None, dry_run=False):
     ent = {rk: {"artist": a, "artist_mbid": mb, "genres": _j(g), "styles": _j(st), "genre_discogs": _j(gd)}
            for rk, a, mb, g, st, gd in conn.execute(
                "SELECT rating_key, artist, artist_mbid, genres, styles, genre_discogs FROM essentia_cache")}
-    music = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600).library.section(MUSIC_LIBRARY)
+    mbid_map = _md._MBID_ARTIST_MAP or {}
     pend, changed, checked, samples = [], 0, 0, []
-    for t in music.search(libtype='track', container_size=5000):
-        rk = str(t.ratingKey)
-        e = ent.get(rk)
-        if e is None:
+
+    def _flush():
+        nonlocal pend
+        if not dry_run and pend:
+            conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
+            conn.commit()
+        pend = []
+
+    # ---- Phase 1: map-derived rows — no Plex. Mirrors canonical_artist's fast path exactly:
+    # mapped mbid + non-classical -> norm_text(map[mbid]); the track object is never consulted.
+    residual = []
+    for rk, e in ent.items():
+        nm = mbid_map.get(e["artist_mbid"]) if e["artist_mbid"] else None
+        if nm and not _md._is_classical(e):
+            checked += 1
+            new = norm_text(nm)
+            if new and new != e["artist"]:
+                changed += 1
+                if len(samples) < 25:
+                    samples.append(f"{e['artist']!r}->{new!r}")
+                pend.append((new, rk))
+                if len(pend) >= 500:
+                    _flush()
+            if limit and checked >= int(limit):
+                break
+        else:
+            residual.append(rk)
+    _flush()
+    log_msg(f"[INFO] Artist-name repair phase 1 (map-derived, no Plex): "
+            f"{changed} of {checked} rows {'WOULD change (dry-run)' if dry_run else 'corrected'}; "
+            f"{len(residual)} residual (classical/no-mbid/unmapped).")
+
+    if limit:
+        # A capped run is a debug probe — phase 1 already honoured the cap; don't touch Plex
+        # and never write the fingerprint (an incomplete run must not mark the library repaired).
+        conn.close()
+        return changed
+
+    # ---- Phase 2: residual rows — the only ones whose name needs the Plex track object.
+    try:
+        with open(_md.MBID_ARTIST_MAP_PATH, "rb") as _f:
+            _map_sha = hashlib.sha256(_f.read()).hexdigest()
+    except OSError:
+        _map_sha = "no-map"
+    _fp = {"map_sha": _map_sha, "residual": len(residual)}
+    _state_path = os.path.join(os.path.dirname(_md.MBID_ARTIST_MAP_PATH), "artist_repair_state.json")
+    if not dry_run:
+        try:
+            with open(_state_path) as _f:
+                if _json.load(_f) == _fp:
+                    conn.close()
+                    log_msg("[INFO] Artist-name repair phase 2: residual set + map unchanged "
+                            "since last repair — Plex pass skipped.")
+                    return changed
+        except (OSError, ValueError):
+            pass
+
+    p2_changed = p2_checked = 0
+    srv = PlexServer(PLEX_URL, PLEX_TOKEN, timeout=600)
+    for i in range(0, len(residual), 200):
+        keys = []
+        for rk in residual[i:i + 200]:
+            try:
+                keys.append(int(rk))
+            except (TypeError, ValueError):
+                continue
+        if not keys:
             continue
-        checked += 1
-        new = canonical_artist(t, e)
-        if new and new != e["artist"]:
-            changed += 1
-            if len(samples) < 25:
-                samples.append(f"{e['artist']!r}->{new!r}")
-            pend.append((new, rk))
-            if not dry_run and len(pend) >= 500:
-                conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
-                conn.commit(); pend = []
-        if limit and checked >= int(limit):
-            break
-    if not dry_run and pend:
-        conn.executemany("UPDATE essentia_cache SET artist=? WHERE rating_key=?", pend)
-        conn.commit()
+        try:
+            items = srv.fetchItems(keys)
+        except Exception:
+            continue   # deleted/moved keys — the admin prune owns cleaning those rows
+        for t in items:
+            rk = str(t.ratingKey)
+            e = ent.get(rk)
+            if e is None:
+                continue
+            p2_checked += 1
+            new = canonical_artist(t, e)
+            if new and new != e["artist"]:
+                p2_changed += 1
+                if len(samples) < 25:
+                    samples.append(f"{e['artist']!r}->{new!r}")
+                pend.append((new, rk))
+                if len(pend) >= 500:
+                    _flush()
+    _flush()
     conn.close()
-    log_msg(f"[INFO] Artist-name repair: {changed} of {checked} tracks "
-            f"{'WOULD change (dry-run)' if dry_run else 'corrected'}. e.g. " + "; ".join(samples[:25]))
-    return changed
+    if not dry_run:
+        # Persist AFTER a completed, uncapped, non-dry run only.
+        try:
+            with open(_state_path, "w") as _f:
+                _json.dump(_fp, _f)
+        except OSError:
+            pass
+    log_msg(f"[INFO] Artist-name repair phase 2 (Plex, residual only): {p2_changed} of "
+            f"{p2_checked} rows {'WOULD change (dry-run)' if dry_run else 'corrected'}. "
+            f"e.g. " + "; ".join(samples[:25]))
+    return changed + p2_changed
 
 
 def sync_artist_names(limit=None):
@@ -1407,7 +1514,7 @@ def _run_concurrent(todo, fetch_fn, update_sql, workers, label, verbose=False):
     q = _queue.Queue(maxsize=4000); STOP = object(); cnt = {"n": 0}; start = time.time(); _last = [0.0]
 
     def _writer():
-        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
+        wc = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
         batch = []
         while True:
             it = q.get()
@@ -1787,7 +1894,7 @@ def sync_artist_origin(limit=None):
     q = _queue.Queue(maxsize=2000); STOP = object(); cnt = {"a": 0, "t": 0}; start = time.time(); _last = [0.0]
 
     def _writer():
-        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60); wc.execute("PRAGMA journal_mode=WAL")
+        wc = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
         batch = []
         while True:
             it = q.get()
@@ -1875,8 +1982,7 @@ def sync_original_release_dates(limit=None):
             f"({no_rg:,} tracks untagged) — querying MusicBrainz at <=1 req/s...")
 
     # 2) Query each unique release-group's first-release-date; write it to every track in that group.
-    conn = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30))
     ok = miss = 0
     pending = []
     def _flush():
@@ -2291,8 +2397,7 @@ def sync_lyrics(limit=None, force=False):
     _last = [0.0]
 
     def _writer():
-        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
-        wc.execute("PRAGMA journal_mode=WAL")
+        wc = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
         batch = []
         while True:
             item = q.get()
@@ -2591,7 +2696,7 @@ def sync_lyrics_batch(limit=None, force=False, poll_interval=60, resume=False,
 
     def _flush_nolyr():
         if nolyr:
-            c = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+            c = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
             c.executemany("UPDATE essentia_cache SET lyric_lang=?, lyrics_synced_at=?, lyric_themes=NULL, "
                           "lyric_themes_raw=NULL, lyric_valence=NULL WHERE rating_key=?",
                           [(lang, time.time(), rk) for rk, lang in nolyr])
@@ -2720,7 +2825,7 @@ def _write_one_batch(client, b, langmap):
         except Exception:
             continue
     if batch:
-        wc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+        wc = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
         wc.executemany("UPDATE essentia_cache SET lyric_valence=?, lyric_themes=?, lyric_themes_raw=?, "
                        "lyric_lang=?, lyrics_synced_at=? WHERE rating_key=?", batch)
         wc.commit(); wc.close()
@@ -2734,7 +2839,7 @@ def _copy_lyric_dupes(dupes):
     failed batch) so its duplicates stay due for the next run."""
     if not dupes:
         return
-    rc = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60)
+    rc = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=60))
     n = 0
     for rep, dl in dupes.items():
         row = rc.execute("SELECT lyric_themes, lyric_themes_raw, lyric_lang FROM essentia_cache "
@@ -2981,8 +3086,7 @@ def sync_embeddings(limit=None, dry_run=False, workers=None, nice=True):
     def _emb_flush(pending):
         if not pending:
             return
-        c = sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30)
-        c.execute("PRAGMA journal_mode=WAL")
+        c = _tune_db_connection(sqlite3.connect(ESSENTIA_CACHE_PATH, timeout=30))
         c.executemany("UPDATE essentia_cache SET emb_effnet=?, emb_musicnn=? WHERE rating_key=?",
                       [(d.get("emb_effnet"), d.get("emb_musicnn"), rk) for rk, d in pending.items()])
         c.commit(); c.close()

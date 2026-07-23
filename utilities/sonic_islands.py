@@ -7,6 +7,9 @@ import concurrent.futures
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from plexapi.server import PlexServer
 from tqdm import tqdm
+# WHY: Plex-metadata-only analysis — never decodes audio, so skip meloday's module-level TF
+# runtime + model load (~0.7-1 GB RSS). setdefault so an operator override wins.
+os.environ.setdefault("MELODAY_SKIP_TF_MODELS", "1")
 import meloday
 from meloday import (
     load_config, primary_artist, get_optimal_workers

@@ -8,6 +8,8 @@ assets/lastfm_artist_top_tracks.json
 
 # Runtime single-instance lockfiles (created by single_instance_guard) — never commit
 assets/locks/
+# Artist-repair phase-2 fingerprint (runtime state; rm to force a full Plex pass)
+assets/artist_repair_state.json
 
 # Dev-only: holds the real Plex token + OpenAI key — never commit
 live/
