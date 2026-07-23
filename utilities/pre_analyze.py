@@ -481,12 +481,30 @@ def _bf_wait_for_memory(need_gb, buffer_gb=2.0, timeout=90):
 _THREAD_CAP_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
                     "TF_NUM_INTRAOP_THREADS", "TF_NUM_INTEROP_THREADS")
 
-def _set_thread_caps():
-    """Cap every numeric-lib threadpool to 1 in subsequently-spawned workers; return prior values."""
+def _set_thread_caps(threads=1):
+    """Cap every numeric-lib threadpool in subsequently-spawned workers; return prior values.
+    threads>1 is used by the TF embedding backfill only: when the pool is RAM-capped (or shrunk
+    after an OOM break) to fewer workers than cores, 1 thread/worker STRANDS the spare cores —
+    observed on prod as 4-5 workers × 1 thread on a 22-core box = 0.2 tracks/s (ETA ~4 days).
+    Giving each worker floor(cores/workers) TF intra-op threads keeps the box busy at the SAME
+    RAM, without the N×cores oversubscription this cap exists to prevent. bulk_analyze keeps the
+    default 1 (its workers are TF-free; base essentia is single-threaded C++, so extra threads
+    there are pure oversubscription risk)."""
     prev = {k: os.environ.get(k) for k in _THREAD_CAP_VARS}
     for k in _THREAD_CAP_VARS:
-        os.environ[k] = "1"
+        os.environ[k] = str(max(1, int(threads)))
     return prev
+
+
+def _bf_threads_per_worker(n_workers):
+    """floor(physical cores / workers), min 1 — each worker's TF intra-op budget so the whole
+    pool sums to ~the physical core count (no oversubscription, no stranded cores)."""
+    try:
+        import psutil
+        physical = psutil.cpu_count(logical=False) or os.cpu_count() or 2
+    except Exception:
+        physical = os.cpu_count() or 2
+    return max(1, physical // max(1, n_workers))
 
 def _restore_env(prev):
     """Restore env vars captured by _set_thread_caps (None → unset)."""
@@ -504,6 +522,9 @@ from concurrent.futures.process import BrokenProcessPool as _BrokenProcessPool
 _BF_RESTART_CAP  = 40   # absolute max pool rebuilds before giving up (resumable — re-run continues)
 _BF_WORKER_FLOOR = 4    # never self-throttle workers below this on repeated breaks
 _BF_MAX_ATTEMPTS = 3    # an item in-flight across this many breaks is a poison pill → skip it as err
+_BF_RECOVER_ITEMS = 500  # completions a SHRUNK pool must bank before earning one worker back — the old
+                         # shrink was one-way, stranding a multi-hour run at the floor long after the
+                         # memory pressure passed; 500 amortises the respawn (TF reload per worker)
 
 def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worker_gb,
                                 workers=None, nice=True, label="backfill", update_cache=None,
@@ -561,9 +582,9 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
         return ok, nofile, err
 
     # Toggle TF loading / emb-only / thread caps for the spawned workers (they inherit these env vars
-    # at import). Thread caps are the dominant speed fix; emb_only loads only the 2 embedding models
-    # (not all ~13). Set ONCE here and restored in the outer finally — they persist across the pool
-    # rebuilds below.
+    # at import). emb_only loads only the 2 embedding models (not all ~13). The TF/emb toggles are set
+    # once here and restored in the outer finally; the THREAD caps are re-derived per pool generation
+    # (just before each spawn) so a shrunk/recovered pool always gets floor(cores/workers) threads.
     _prev_skip = os.environ.get("MELODAY_SKIP_TF_MODELS")
     _prev_emb_only = os.environ.get("MELODAY_EMB_ONLY")
     if load_tf:
@@ -606,12 +627,20 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
             if not remaining:
                 break
 
+            # Re-derive each generation's thread budget from ITS worker count — the caps set above
+            # were for the initial n; after a shrink (or recovery grow) the right budget changes.
+            # Workers read these env vars at import, so setting them before the spawn is sufficient.
+            _gen_threads = str(_bf_threads_per_worker(n_cur))
+            for _k in _THREAD_CAP_VARS:
+                os.environ[_k] = _gen_threads
             executor = concurrent.futures.ProcessPoolExecutor(
                 max_workers=n_cur, mp_context=mp_ctx, initializer=_bf_init, initargs=(force_emb, nice))
             _bf_active_ex[0] = executor
             it = iter(remaining)
             inflight = {}
             broke = False
+            recycle = False
+            done_gen = 0
             try:
                 for _ in range(n_cur * 3):       # prime the pool (bounded in-flight, ~3x workers)
                     try: item = next(it)
@@ -628,10 +657,17 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
                             raise                # bubble out to rebuild — NOT a per-task error
                         except Exception as ex:
                             r_data, e = None, f"err:{ex}"
-                        done += 1; completed.add(rk); _consume(rk, r_data, e)
-                        try: nxt = next(it)      # keep the pool fed
-                        except StopIteration: pass
-                        else: _submit(nxt)
+                        done += 1; done_gen += 1; completed.add(rk); _consume(rk, r_data, e)
+                        # RECOVERY: a shrunk pool that has proven stable for _BF_RECOVER_ITEMS
+                        # completions earns one worker back (cap: the initial n). Stop feeding,
+                        # let in-flight drain, then fall through to the normal teardown+respawn
+                        # path — the same generation lifecycle as a break, minus the shrink.
+                        if n_cur < n and done_gen >= _BF_RECOVER_ITEMS:
+                            recycle = True
+                        if not recycle:
+                            try: nxt = next(it)  # keep the pool fed
+                            except StopIteration: pass
+                            else: _submit(nxt)
                     _paint(done)
             except _BrokenProcessPool:
                 broke = True
@@ -649,6 +685,12 @@ def _parallel_essentia_backfill(todo, flush_fn, *, load_tf, force_emb, per_worke
                 executor.shutdown(wait=False, cancel_futures=True)
                 _bf_active_ex[0] = None
             if not broke:
+                if recycle:
+                    n_cur = min(n, n_cur + 1)
+                    log_msg(f"\n[INFO] {label}: stable for {_BF_RECOVER_ITEMS} items — growing back "
+                            f"to {n_cur}/{n} worker(s).")
+                    _bf_wait_for_memory(n_cur * per_worker_gb)   # only grow into real headroom
+                    continue                     # loop rebuilds; exits at the top if nothing remains
                 break                            # clean finish — every item reached a terminal state
             restarts += 1
             left = sum(1 for item in todo if item[0] not in completed)
