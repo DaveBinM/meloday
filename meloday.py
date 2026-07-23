@@ -835,7 +835,11 @@ def _entry_to_row(rk, d):
             json.dumps(d["lastfm_track_tags"]) if d.get("lastfm_track_tags") is not None else None,
             json.dumps(d["artist_origin"]) if d.get("artist_origin") is not None else None,
             d.get("lastfm_listeners"), d.get("lyric_valence"),
-            json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None,
+            # extras-profile entries carry lyric_themes as its raw JSON TEXT (lazy parse) — pass a
+            # str through unchanged so a round-trip can't double-encode it. Defensive: extras never
+            # upserts cache entries, and the core profile never loads this column.
+            (d["lyric_themes"] if isinstance(d.get("lyric_themes"), str)
+             else json.dumps(d["lyric_themes"]) if d.get("lyric_themes") is not None else None),
             d.get("lyric_lang"), d.get("title"), d.get("release_date"),
             d.get("lastfm_synced_at"), d.get("geo_synced_at"), d.get("lyrics_synced_at"),
             json.dumps(d["lyric_themes_raw"]) if d.get("lyric_themes_raw") is not None else None,
@@ -845,21 +849,59 @@ def _entry_to_row(rk, d):
 # JSON columns and their empty-value defaults: list-tags load as [] (callers iterate them
 # directly), dict/enrichment columns load as None (callers guard with `or {}` / is-None checks).
 _CACHE_LIST_COLUMNS = frozenset({"genres", "styles", "moods"})
-_CACHE_JSON_COLUMNS = frozenset({
-    "moodtheme", "genre_discogs", "lastfm_artist_tags", "lastfm_track_tags",
-    "artist_origin", "lyric_themes", "lyric_themes_raw", "release_types",
+# Small-vocabulary JSON columns: the same TEXT recurs across thousands of rows (measured:
+# artist_origin 4,342 distinct / lastfm_artist_tags 5,331 / styles ~6k combos over 164k+ rows),
+# so identical texts share ONE parsed object via _memo_json — this alone was ~600 MB of duplicate
+# parsed objects. SAFE because no consumer mutates a loaded tag list/dict in place — only
+# whole-key rebinds (verified across meloday + extras + pre_analyze); any future in-place
+# mutation of an entry's tag fields would corrupt every sharer, so don't.
+_CACHE_MEMO_JSON_COLUMNS = frozenset({
+    "lastfm_artist_tags", "lastfm_track_tags", "artist_origin", "release_types",
 })
+# Per-track float-dict columns (whole texts ~unique — per-track confidences — so whole-object
+# memoing can't help), but 98-99% of their KEY strings are duplicates ("Rock---Indie Rock",
+# moodtheme tags): parse fresh, intern the keys.
+_CACHE_FLOATDICT_COLUMNS = frozenset({"moodtheme", "genre_discogs"})
+# lyric_themes is deliberately NOT parsed at load (extras profile only): 497 MB parsed vs 96 MB
+# raw text, and it has a single consumer (_lyric_boost) — extras parses lazily on first touch
+# via _entry_lyric_themes. lyric_themes_raw is loaded by no profile; the branch stays for safety.
+_CACHE_JSON_COLUMNS = frozenset({"lyric_themes_raw"})
+# Scalar columns with heavy duplication (artist ~4.5k distinct × ~37 copies; musical key ~24
+# values; lyric_lang a few dozen codes).
+_CACHE_INTERN_COLUMNS = frozenset({"artist", "key", "lyric_lang"})
+
+_EMPTY_LIST = []       # shared []-default for the list columns (same no-mutation contract)
+_JSON_PARSE_MEMO = {}  # raw JSON text -> parsed object; cleared after each load (keys hold the texts)
+
+def _memo_json(text):
+    try:
+        return _JSON_PARSE_MEMO[text]
+    except KeyError:
+        v = _JSON_PARSE_MEMO[text] = json.loads(text)
+        return v
 
 def _row_to_entry(row, cols):
     """Builds a cache entry {col: value} from a (rating_key, *cols) row. Tuple-driven so the
     same code path serves every load profile; entry keys are the shared module-level column-name
-    strings, so 164k entries don't duplicate key objects."""
+    strings, so 164k+ entries don't duplicate key objects."""
     entry = {}
     for name, val in zip(cols, row[1:]):
-        if name in _CACHE_JSON_COLUMNS:
-            entry[name] = json.loads(val) if val else None
+        if name in _CACHE_MEMO_JSON_COLUMNS:
+            entry[name] = _memo_json(val) if val else None
         elif name in _CACHE_LIST_COLUMNS:
-            entry[name] = json.loads(val) if val else []
+            entry[name] = _memo_json(val) if val else _EMPTY_LIST
+        elif name in _CACHE_FLOATDICT_COLUMNS:
+            if val:
+                gd = json.loads(val)
+                # legacy rows may hold a plain list — pass through untouched (consumers handle both)
+                entry[name] = ({sys.intern(k): v for k, v in gd.items()}
+                               if isinstance(gd, dict) else gd)
+            else:
+                entry[name] = None
+        elif name in _CACHE_JSON_COLUMNS:
+            entry[name] = json.loads(val) if val else None
+        elif name in _CACHE_INTERN_COLUMNS and isinstance(val, str):
+            entry[name] = sys.intern(val)
         else:
             entry[name] = val
     return row[0], entry
@@ -907,6 +949,9 @@ def load_essentia_cache(profile="core"):
             rk, entry = _row_to_entry(row, cols)
             cache[rk] = entry
         conn.close()
+        # The memo's KEYS are the raw JSON texts — dead weight once loading ends (the parsed
+        # values stay alive via the entries that share them). Drop them; a reload re-seeds.
+        _JSON_PARSE_MEMO.clear()
         _essentia_cache = cache
     except Exception as e:
         m_print(f"[WARN] Could not load Essentia cache: {e}")

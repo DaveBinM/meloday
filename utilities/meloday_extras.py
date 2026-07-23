@@ -7553,6 +7553,26 @@ def _lyric_lang_penalty(entry, profile_key):
     lang = (entry.get("lyric_lang") or "").lower()
     return _LYRIC_LANG_PENALTY if (lang and lang not in _LYRIC_LANG_KEEP) else 0.0
 
+def _entry_lyric_themes(entry):
+    """lyric_themes as its parsed dict/list, parsing the profile-loader's raw JSON TEXT on first
+    touch and caching the result back onto the entry (a whole-KEY rebind — the allowed mutation
+    form). WHY lazy: parsed dicts cost ~500 MB across the library vs ~96 MB raw text, and only
+    lyric-mapped profiles' candidates ever get here. Theme keys are interned on parse: the vocab
+    is a small canonical set repeated per track. ALL lyric_themes reads must go through this
+    accessor — a bare entry.get() now sees a raw str and would silently no-op."""
+    lt = entry.get("lyric_themes")
+    if isinstance(lt, str):
+        try:
+            lt = json.loads(lt)
+            if isinstance(lt, dict):
+                lt = {sys.intern(g): ({sys.intern(t): w for t, w in v.items()}
+                                      if isinstance(v, dict) else v)
+                      for g, v in lt.items()}
+        except ValueError:
+            lt = None
+        entry["lyric_themes"] = lt
+    return lt
+
 def _lyric_boost(entry, profile_key):
     """Pull tracks whose lyrics match the mix's wanted moods/themes; PUSH OUT tracks whose lyrics
     actively EXCLUDE them (the veto — e.g. a danceable breakup song kept out of a party mix). The new
@@ -7563,7 +7583,7 @@ def _lyric_boost(entry, profile_key):
         return 0.0
     w = _PROFILE_LYRIC_WEIGHT.get(profile_key, _LYRIC_THEME_WEIGHT)   # per-profile pull (default 0.35; hybrids dial down)
     boost = 0.0
-    lt = entry.get("lyric_themes")
+    lt = _entry_lyric_themes(entry)
     if isinstance(lt, dict):
         # A POSITIVE match wins: a song carrying a wanted mood/theme belongs even if it also excludes one
         # (genuine party songs exclude breakup themes yet are obviously party). Only veto when there's NO
