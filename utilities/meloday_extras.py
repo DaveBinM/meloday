@@ -2122,7 +2122,7 @@ _MOOD_PROFILES = {
     # dominant "k-pop") and her acoustic profile is generic mid-tempo pop, so the ACOUSTIC centroid barely
     # scopes her — the mix is driven by _PROFILE_LYRIC_THEMES (playful/flirtatious/cheeky) + the _EMB_SEEDS
     # pop-girlie seed. Centroid = her measured means (high vocal, mid valence/danceability), kept honest.
-    "short_n_sweet": {"bpm": 115, "energy": -9, "danceability": 0.42, "brightness": 0.17, "beat_confidence": 0.55, "onset_rate": 4.2, "dynamic_complexity": 0.45, "arousal": 0.57, "valence": 0.63, "vocal_presence": 0.85},
+    "short_n_sweet": {"bpm": 116, "energy": -9, "danceability": 0.38, "brightness": 0.15, "beat_confidence": 2.03, "onset_rate": 3.9, "dynamic_complexity": 4.13, "arousal": 0.59, "valence": 0.61, "vocal_presence": 0.91},   # DATA-derived: mean acoustic features of Sabrina's 25 hits. Secondary (effnet hit-embedding at weight 5 leads) — agrees with the embedding instead of the old generic-pop values
     # all_too_well: Taylor Swift's confessional storytelling. Like short_n_sweet her genre is mis-tagged and her
     # acoustic is generic — the mix is driven by _PROFILE_LYRIC_THEMES (bittersweet/nostalgic/heartbreak) + the
     # _EMB_SEEDS confessional-pop seed; centroid = her measured means (very vocal, mid valence), kept as ballast.
@@ -7325,6 +7325,16 @@ def _listening_hour_boost(rk):
 # ---------------------------------------------------------------------------
 _LYRIC_THEME_WEIGHT   = 0.35   # strong pull for lyrically-defined mixes (festive/summer/road)
 _LYRIC_VALENCE_WEIGHT = 0.12   # light only — lyric sentiment is noisy and overlaps mood_sad/happy
+# Per-profile override of the lyric-theme pull (mirrors _PROFILE_EMB_WEIGHT). Default _LYRIC_THEME_WEIGHT (0.35)
+# makes the lyric lever DOMINATE (right for a lyric-ANCHORED mix). A HYBRID mix whose SOUND leads (hit-anchored
+# embedding) dials it DOWN to a light nudge, so the flirty/emotional lyric refines WITHIN the sound-lane instead
+# of pulling lyric-matches across genres/eras. short_n_sweet=0.15 (swept: 0.15 is where the flirty lever stops
+# dragging in off-sound tracks yet still leans playful).
+_PROFILE_LYRIC_WEIGHT = {
+    "short_n_sweet": 0.15,   # dialed DOWN from 0.35 — the hit-anchored effnet SOUND leads, flirty is a light
+                             # nudge. Swept 0.35/0.20/0.15/0.10/0.0: at 0.15 the flirty lever stops dragging in
+                             # off-sound tracks (off-sound 7, = zero) yet still leans playful (~3 flirty picks).
+}
 
 # Profile -> lyric themes it wants (from the sync's _LYRIC_THEMES vocabulary).
 _PROFILE_LYRIC_THEMES = {
@@ -7546,6 +7556,7 @@ def _lyric_boost(entry, profile_key):
     wanted = _PROFILE_LYRIC_THEMES.get(profile_key)
     if not wanted:
         return 0.0
+    w = _PROFILE_LYRIC_WEIGHT.get(profile_key, _LYRIC_THEME_WEIGHT)   # per-profile pull (default 0.35; hybrids dial down)
     boost = 0.0
     lt = entry.get("lyric_themes")
     if isinstance(lt, dict):
@@ -7555,12 +7566,12 @@ def _lyric_boost(entry, profile_key):
         pos = {**(lt.get("moods") or {}), **(lt.get("themes") or {})}
         matched = [pos[t] for t in wanted if t in pos]
         if matched:
-            boost -= _LYRIC_THEME_WEIGHT * max(matched)            # pull: core fires fully, faint a quarter
+            boost -= w * max(matched)                              # pull: core fires fully, faint a quarter
         elif any(t in (lt.get("excluded_themes") or {}) for t in wanted):
-            boost += _LYRIC_THEME_WEIGHT * 1.5                     # excludes a wanted tag, no positive -> push OUT
+            boost += w * 1.5                                       # excludes a wanted tag, no positive -> push OUT
     elif isinstance(lt, list):                                     # legacy keyword list (pre-backfill)
         if any(t in lt for t in wanted):
-            boost -= _LYRIC_THEME_WEIGHT
+            boost -= w
     # lyric sentiment lean — legacy VADER; lv is None for batch-tagged tracks, so this is a no-op there
     # (the happy/sad valence profiles re-map to mood tags in the Phase D mapping rebuild).
     lean = _PROFILE_LYRIC_VALENCE.get(profile_key)
@@ -8105,6 +8116,9 @@ _PROFILE_EMB_WEIGHT = {
     "phantoms": 9.0,  # effnet hit-anchor LEADS. Higher than gravity's 5.0 because EFFNET cosines run lower/
                       # tighter than musicnn (p50 .63 vs .70), so a given lead needs more weight. Swept 6/10:
                       # scene-core rises (23->24 of 36) while outliers hold at 4; 9 sits in that tight regime.
+    "short_n_sweet": 5.0,   # effnet hit-anchor LEADS (converts the old lyric-anchored mix to sound-led). Sweep
+                            # 3/5/7 all held off-sound at 7; 5 is the gravity-tier lead where sound beats the
+                            # (dialed-down) flirty lyric + acoustic terms.
 }
 
 def _track_emb(entry, which="effnet"):
@@ -14833,10 +14847,11 @@ _EMB_SEEDS = {
     # bright-anthemic lane and down-ranks the EDM/indie-electronic that shares the synth 4/4.
     "neon_glow": ["chvrches", "purity ring", "m83", "passion pit", "robyn", "ladytron", "broods",
                   "the naked and famous", "sylvan esso", "st lucia"],
-    # short_n_sweet: Sabrina Carpenter + her pop-girlie peers (all collision-checked). The seed centroid
-    # holds the bright-female-pop sound while _PROFILE_LYRIC_THEMES pulls the cheeky/flirty lane within it.
-    "short_n_sweet": ["sabrina carpenter", "ariana grande", "tate mcrae", "charli xcx", "olivia rodrigo",
-                      "chappell roan", "carly rae jepsen", "meghan trainor", "katy perry", "dua lipa"],
+    # short_n_sweet: now HIT-ANCHORED (see _EMB_ANCHOR_TRACKS) — its embedding centroid comes from Sabrina's HIT
+    # tracks (effnet), NOT this list, so _seed_emb_centroid ignores it. Trimmed to the single source marker the
+    # _ARTIST_FOCUS_PROFILES cap reads (_EMB_SEEDS[key][0]). The old peer-average centroid was too broad and let
+    # the flirty-lyric lever drag in off-sound tracks; the hit-anchor holds her actual sound instead.
+    "short_n_sweet": ["sabrina carpenter"],
     # all_too_well: Taylor Swift + her confessional-pop / singer-songwriter scene (collision-checked; "reneé
     # rapp" is stored accented, so the token keeps the é). Sharpens the loose gate toward the bittersweet lane.
     "all_too_well": ["taylor swift", "olivia rodrigo", "gracie abrams", "conan gray", "lorde",
@@ -14898,6 +14913,17 @@ _EMB_ANCHOR_TRACKS = {
                   "the letter", "this conversation is over", "in the cold", "seeing is believing", "bleeding heart",
                   "glory", "hold on", "black lines to battlefields", "colliding by design", "come closer",
                   "we can escape", "haunted", "diagram of a simple man"], "effnet"),
+    # short_n_sweet: CONVERTED from lyric-anchored to sound-led hybrid (user: "tracks fit lyrically but don't
+    # sound like Sabrina"). effnet even though she's genre-MIS-tagged (61/86 "k-pop") — the rule is effnet when
+    # the tag CONSISTENTLY clusters the scene (her k-pop mis-tag is a consistent polished-modern-pop proxy, so
+    # effnet groups the right crowd + pushes vintage production down: ABBA 84%ile, disco/retro-soul 60-73%),
+    # musicnn only when the tag SCATTERS the artist (Mayer). Measured off-sound 27->7. All 86 tracks carry effnet.
+    "short_n_sweet": ("sabrina carpenter",
+                      ["espresso", "please please please", "taste", "bed chem", "feather", "nonsense",
+                       "because i liked a boy", "emails i can't send", "vicious", "fast times", "read your mind",
+                       "juno", "sharpest tool", "dumb & poetic", "opposite", "skinny dipping", "manchild",
+                       "good graces", "tears", "coincidence", "when did you get hot", "house tour",
+                       "tornado warnings", "slim pickins", "lie to girls"], "effnet"),
 }
 _SEED_EMB_CENTROID_CACHE = {}
 
