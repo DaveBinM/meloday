@@ -8164,30 +8164,49 @@ _PROFILE_EMB_WEIGHT = {
                             # (dialed-down) flirty lyric + acoustic terms.
 }
 
+_EMB_DECODE_CACHE = {}     # blob bytes -> normalised ndarray (or None for a rejected blob)
+_EMB_DECODE_MISS = object()
+
 def _track_emb(entry, which="effnet"):
     """L2-normalised float32 embedding for a track, or None (missing blob / numpy absent / corrupt —
     wrong-size or non-finite).
-    `which`: 'effnet' (1280-d Discogs — genre / sub-style) or 'musicnn' (200-d MSD — vibe / sounds-like)."""
+    `which`: 'effnet' (1280-d Discogs — genre / sub-style) or 'musicnn' (200-d MSD — vibe / sounds-like).
+    Memoised on the blob BYTES: without it the same track was re-decoded+re-normalised for every
+    (mix × candidate) pair — millions of redundant norm/divide ops per heavy build. Safe because
+    bytes are immutable (hash computed once, cached by CPython) and the blobs live exactly as long
+    as the entries that own them (extras never re-analyses, so no rebinds); keying on the blob also
+    dedupes identical-file twins. Unbounded by design — extras builds once per process then exits;
+    worst case is one normalised copy per touched blob (~150-300 MB), traded against those calls."""
     if not _NUMPY_AVAILABLE:
         return None
     blob = entry.get("emb_musicnn" if which == "musicnn" else _EMB_FIELD)
     if not blob:
         return None
+    v = _EMB_DECODE_CACHE.get(blob, _EMB_DECODE_MISS)
+    if v is not _EMB_DECODE_MISS:
+        return v
     try:
         v = np.frombuffer(blob, dtype=np.float32)
     except (TypeError, ValueError):
+        _EMB_DECODE_CACHE[blob] = None
         return None
     # WHY: reject a wrong-size or non-finite blob so it degrades to the graceful acoustic fallback rather
     # than reaching np.dot. A file that fails the 16 kHz decode stores a 4-byte NaN scalar (mean() of an
     # empty model output); its shape (1,) vs a centroid's (200,)/(1280,) raises "shapes not aligned" and,
     # at the unguarded weather call-site, aborted the whole mood-mix build. isfinite(n) is O(1) on the norm
-    # we already compute and also neutralises any future full-size NaN blob.
+    # we already compute and also neutralises any future full-size NaN blob. (A wrong-size rejection is
+    # `which`-dependent, but a given blob only ever arrives via the field whose dims it should have, and
+    # a corrupt 4-byte blob fails BOTH sizes — so caching None per-blob is equivalent.)
     if v.size != _EMB_DIMS.get(which, 0):
+        _EMB_DECODE_CACHE[blob] = None
         return None
     n = float(np.linalg.norm(v))
     if not (n and np.isfinite(n)):
+        _EMB_DECODE_CACHE[blob] = None
         return None
-    return v / n
+    out = v / n
+    _EMB_DECODE_CACHE[blob] = out
+    return out
 
 def _emb_cosine(a, b):
     """Cosine similarity of two already-normalised embeddings (a dot product); 0.0 if either is None or
@@ -15076,15 +15095,19 @@ def _seed_emb_which(profile_key):
 
 _MIX_EMB_CORE_N = 40   # build the cohesion centroid from the N candidates nearest the acoustic centroid
 
-def _mix_emb_centroid(cand_keys, essentia_cache, target, which):
+def _mix_emb_centroid(cand_keys, essentia_cache, target, which, dist=None):
     """Two-pass "sounds-like" cohesion centroid: take the _MIX_EMB_CORE_N candidates closest to the mix's
     ACOUSTIC centroid (its core sound), return the mean normalised `which` embedding of those. None (no-op)
     if numpy is absent or <5 of the core carry the vector — graceful under partial coverage. emb_musicnn
-    (vibe, cross-genre) for fuzzy mood mixes; emb_effnet (sub-style) for genre-gated mixes."""
+    (vibe, cross-genre) for fuzzy mood mixes; emb_effnet (sub-style) for genre-gated mixes.
+    `dist`: optional precomputed {rk: acoustic distance} — _build_mix_tracks computes the pool distance
+    once and shares it with _combined_score (it used to be computed twice over the full pool). Values
+    identical either way, so the nsmallest core (≡ sorted[:n], tie-stable) is unchanged."""
     if not _NUMPY_AVAILABLE:
         return None
-    core = heapq.nsmallest(_MIX_EMB_CORE_N, cand_keys,
-                           key=lambda rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target))
+    _key = dist.__getitem__ if dist is not None else \
+        (lambda rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target))
+    core = heapq.nsmallest(_MIX_EMB_CORE_N, cand_keys, key=_key)
     return _emb_centroid(core, essentia_cache, which)
 
 def _embedding_boost(entry, cen, which, weight=_EMB_WEIGHT):
@@ -15149,6 +15172,39 @@ def _danceability_penalty(entry, profile_key):
     return _DANCE_PENALTY_WEIGHT * (_DANCE_FLOOR - dhl)   # positive = worse score (pushed down)
 
 
+# Per-run candidate-scan memos, keyed per cache object (same idiom as _YIELD_CACHE). WHY: every
+# built mix re-ran up to three FULL-cache passes (style gate / screen filter / fragment regex)
+# over identical inputs — ~dozens of mixes × ~180k entries on a heavy slot-boundary build. The
+# predicates are pure per-entry, so compute each once per run. Lists preserve cache (insertion)
+# order — the sorts downstream are stable, so candidate ORDER is part of the determinism
+# contract, not just membership.
+_STYLE_GATE_CACHE = {}   # (id(cache), profile_key) -> [rk...] passing _has_required_style, cache order
+_FRAGMENT_RK_CACHE = {}  # id(cache) -> frozenset(rk) whose title matches _FRAGMENT_TITLE_RE
+_SCREEN_RK_CACHE = {}    # id(cache) -> frozenset(rk) that are screen content
+
+def _style_gated_keys(essentia_cache, profile_key):
+    ck = (id(essentia_cache), profile_key)
+    v = _STYLE_GATE_CACHE.get(ck)
+    if v is None:
+        v = _STYLE_GATE_CACHE[ck] = [rk for rk, e in essentia_cache.items()
+                                     if _has_required_style(e, profile_key)]
+    return v
+
+def _fragment_rks(essentia_cache):
+    v = _FRAGMENT_RK_CACHE.get(id(essentia_cache))
+    if v is None:
+        v = _FRAGMENT_RK_CACHE[id(essentia_cache)] = frozenset(
+            rk for rk, e in essentia_cache.items()
+            if _FRAGMENT_TITLE_RE.search(e.get("title") or ""))
+    return v
+
+def _screen_rks(essentia_cache):
+    v = _SCREEN_RK_CACHE.get(id(essentia_cache))
+    if v is None:
+        v = _SCREEN_RK_CACHE[id(essentia_cache)] = frozenset(
+            rk for rk, e in essentia_cache.items() if _is_screen_content(e))
+    return v
+
 def _build_mix_tracks(profile_key, essentia_cache, history_entries,
                       excluded_album_keys, mix_size, plex, hard_exclude_rks=None):
     """Build the mix_size-track list for a single mix profile.
@@ -15179,7 +15235,8 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         if _is_showcase:
             return -(entry.get("lastfm_listeners") or 0)
         score = (
-            _acoustic_distance_to_centroid(entry, target)
+            # precomputed once over the pool (see _dist below) — this closure resolves it at call time
+            _dist[rk]
             + _moodclass_boost(entry, profile_key)
             + _origin_boost(entry, profile_key)
             + _popularity_boost(entry, profile_key)
@@ -15210,27 +15267,39 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     # runs over the eligible subset (often ~1-2% of the library) rather than the whole cache.
     # WHY output-identical: filtering then sorting == sorting then filtering for a deterministic
     # key, and this style gate has no fallback.
+    # (The style/screen/fragment predicates come from the per-run memos above — computed once per
+    # process instead of once per mix; list order == cache order, exactly as the inline scans gave.)
     if profile_key in _STYLE_DEFINED_PROFILES:
-        _cand_keys = [rk for rk in essentia_cache
-                      if _has_required_style(essentia_cache.get(rk, {}), profile_key)]
+        _cand_keys = list(_style_gated_keys(essentia_cache, profile_key))
         if profile_key in _SOUNDTRACK_RADIO:   # scores are INSTRUMENTAL film/TV/game content — drop soundtrack
-            _cand_keys = [rk for rk in _cand_keys                        # SONGS (vocals) AND non-score instrumentals
-                          if (essentia_cache[rk].get("vocal_presence") or 0) < 0.4   # (jazz/trance/indie/classical)
-                          and _is_screen_content(essentia_cache[rk])]    # via curated tags, not the Discogs audio model
+            _scr = _screen_rks(essentia_cache)                           # SONGS (vocals) AND non-score instrumentals
+            _cand_keys = [rk for rk in _cand_keys                        # (jazz/trance/indie/classical)
+                          if (essentia_cache[rk].get("vocal_presence") or 0) < 0.4
+                          and rk in _scr]                                # KEEPS screen content (curated tags)
     else:
         _cand_keys = list(essentia_cache)
     # Catalogue S4: mixes the score-cue pool polluted drop screen content outright (inverse of the
     # soundtracks gate). S8: fragments/karaoke artifacts are excluded from every generated mix.
     if profile_key in _SCREEN_EXCLUDED_PROFILES:
-        _cand_keys = [rk for rk in _cand_keys if not _is_screen_content(essentia_cache[rk])]
-    _cand_keys = [rk for rk in _cand_keys
-                  if not _FRAGMENT_TITLE_RE.search(essentia_cache[rk].get("title") or "")]
+        _scr = _screen_rks(essentia_cache)
+        _cand_keys = [rk for rk in _cand_keys if rk not in _scr]
+    _frag = _fragment_rks(essentia_cache)
+    _cand_keys = [rk for rk in _cand_keys if rk not in _frag]
     # Catalogue S15: hard facet bounds (see _PROFILE_FACET_BOUNDS) — tracks without the facet stay eligible.
     for _f, _lo, _hi in _PROFILE_FACET_BOUNDS.get(profile_key, ()):
         _cand_keys = [rk for rk in _cand_keys
                       if not isinstance(essentia_cache[rk].get(_f), (int, float))
                       or ((_lo is None or essentia_cache[rk][_f] >= _lo)
                           and (_hi is None or essentia_cache[rk][_f] <= _hi))]
+
+    # One acoustic-distance pass feeds BOTH the cohesion-centroid core selection and _combined_score
+    # below — it used to be computed twice over the full pool. Values identical, so the nsmallest
+    # core and every score are unchanged. (Showcases never read the distance — they rank by
+    # popularity — so skip the pass for them.)
+    _dist = None
+    if not _is_showcase:
+        _dist = {rk: _acoustic_distance_to_centroid(essentia_cache.get(rk, {}), target)
+                 for rk in _cand_keys}
 
     # Embedding "sounds-like" cohesion: compute the mix's core embedding centroid ONCE, then
     # _combined_score pulls candidates toward it. emb_effnet (sub-style) for genre-gated mixes, emb_musicnn
@@ -15242,15 +15311,23 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if _emb_cen is not None:
         _emb_which = _seed_emb_which(profile_key)               # effnet artist-seed, or musicnn hit-anchor
     elif not _is_showcase:
-        _emb_cen = _mix_emb_centroid(_cand_keys, essentia_cache, target, _emb_which)
+        _emb_cen = _mix_emb_centroid(_cand_keys, essentia_cache, target, _emb_which, dist=_dist)
+
+    # Score every candidate ONCE. WHY: _combined_score (6-10 boost fns — it IS the per-mix cost) was
+    # re-evaluated by the two initial sorts, again by _eff_score over the 8x slices, and again by the
+    # final combined.sort. One pass + dict lookups is ~1/3 the boost-fn work and turns every later
+    # sort into O(n log n) over floats. Determinism: the same values feed the same stable sorts, so
+    # selections are bit-identical. (_fit_canonicalize keeps the raw function — it scores copies of
+    # already-selected songs, all within _cand_keys, a handful of calls.)
+    _score = {rk: _combined_score(rk) for rk in _cand_keys}
 
     history_rks = sorted(
         [rk for rk in _cand_keys if rk in play_counts],
-        key=lambda rk: (_combined_score(rk), -play_counts.get(rk, 0))
+        key=lambda rk: (_score[rk], -play_counts.get(rk, 0))
     )
     library_rks = sorted(
         [rk for rk in _cand_keys if not play_counts.get(rk)],
-        key=_combined_score
+        key=_score.__getitem__
     )
     # Artist-focused mix: feature the SOURCE artist (_EMB_SEEDS[key][0]) up to 10% (5 of 50) instead of 1/artist.
     # Pull their STUDIO tracks (not remixes/reworks OF them) to the FRONT of the full score-sorted library HERE —
@@ -15782,7 +15859,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     if not _is_showcase:
         def _eff_score(rk):
             t = track_map.get(rk)
-            return _combined_score(rk) - _rating_dist_bonus(getattr(t, "userRating", None) if t else None)
+            return _score[rk] - _rating_dist_bonus(getattr(t, "userRating", None) if t else None)
         # City mixes: tier stays the PRIMARY key (city -> region -> nation); acoustic + loved-track lean order
         # WITHIN each tier. Selection order only — _dj_order re-sequences the final picks sonically.
         _key = (lambda rk: (_tier_of[rk], _eff_score(rk))) if _tier_of else _eff_score
@@ -15819,7 +15896,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     combined = history_tracks + library_tracks
     if not _is_showcase:                   # showcases (decade + geo) are rotation/popularity-chosen, not score-ranked
         combined.sort(key=lambda t: (
-            _combined_score(str(t.ratingKey))
+            _score[str(t.ratingKey)]       # every resolved candidate is in _cand_keys, hence in _score
             - _rating_dist_bonus(getattr(t, "userRating", None))
         ))
     combined = combined[:mix_size]
