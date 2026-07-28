@@ -1207,6 +1207,23 @@ def _release_age_days(release_date, year, now):
             pass
     return 1e9
 
+def _geo_complete(origin):
+    """True if a resolved artist origin has SUB-COUNTRY detail (a region or city) — i.e. it's FINISHED, not a
+    bare country like "United Kingdom". WHY: a country-only origin is present-yet-unfinished (MB editors flesh
+    these out over time), so it must NOT count as "has data" for the geo refresh cadence — otherwise it settles
+    to yearly and we miss the refinement for up to a year (e.g. Dylan John Thomas resolved UK-only, then MB added
+    his Scottish area 15 days later — unseen until the yearly re-query). `region`/`city` are the Subdivision/City
+    nodes set by _artist_origin (begin_area/area can themselves be a country, so they don't count). Accepts the
+    stored JSON string or a dict; None/empty/unparseable -> False (treat as incomplete so it re-resolves)."""
+    if not origin:
+        return False
+    if isinstance(origin, str):
+        try:
+            origin = json.loads(origin)
+        except Exception:
+            return False
+    return bool(origin.get("region") or origin.get("city"))
+
 def _refresh_due(synced_at, release_date, year, has_data, source, now):
     """Should this track's <source> data be (re)fetched? Never-synced -> yes. Otherwise the cadence
     adapts to ORIGINAL release age (release_date, else Plex year): empty GEO retries monthly regardless
@@ -1222,8 +1239,11 @@ def _refresh_due(synced_at, release_date, year, has_data, source, now):
         # WHY geo is flat 30d (not release-age tiered): artist origin is editor-CONTRIBUTED and accrues
         # independent of release age, so an old release still missing geo is just as likely to get filled as
         # a new one — the "old + empty = probably never" assumption is wrong for geo (it left a just-added MB
-        # origin unseen for up to 180d). The empty pool is tiny (~300 artists ~= 5 min at <=1 req/s), so a
-        # monthly recheck of every empty is cheap.
+        # origin unseen for up to 180d). NOTE the geo caller passes _geo_complete(origin), NOT origin-is-non-null,
+        # so this fast pool is empty-origin AND country-only origins ("United Kingdom", no region/city — ~13k rows,
+        # deduped to the artist MBID for the lookup): a coarse resolution is unfinished and must be re-checked at
+        # this cadence to catch MB refinements within a month, not a year. Cheap at <=1 req/s (the first run after
+        # this landed does a one-time catch-up of the coarse backlog, resumable across runs).
         if source == "geo":
             threshold = 30
         elif source == "lastfm":                    # aggressive retry so a new release is caught once LFM indexes it
@@ -1909,7 +1929,7 @@ def sync_artist_origin(limit=None):
         "FROM essentia_cache WHERE artist IS NOT NULL").fetchall()
     # MBID-only: a track with no file MBID is never queued (we never name-match for geo). Count the skips.
     due = [(rk, art, mbid) for rk, art, rd, yr, syn, data, mbid in rows
-           if _refresh_due(syn, rd, yr, data is not None, "geo", now)]
+           if _refresh_due(syn, rd, yr, _geo_complete(data), "geo", now)]   # country-only = incomplete -> fast cadence
     todo = [t for t in due if t[2]]
     n_skipped = len(due) - len(todo)
     if limit:
