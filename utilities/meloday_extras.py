@@ -207,6 +207,7 @@ _EXTRAS_COVER_COLORS = {
     "hayden_house": ((255, 140, 70), (55, 30, 95)),        # warm coral-orange → dusk purple — sunset melodic house
     "feel_so_close": ((255, 50, 130), (40, 25, 120)),      # hot pink → deep indigo — festival big-room EDM
     "ulla": ((190, 45, 70), (22, 20, 62)),                # Martian red → deep-space blue — cosmic melodic house
+    "ceilidh": ((60, 210, 150), (22, 24, 66)),            # emerald aurora-green → midnight indigo — the Highland "Mirrie Dancers" (aurora) over a Scottish prog-breaks ceilidh
     "gravity": ((196, 138, 74), (52, 44, 82)),            # warm honey-amber → dusk plum — acoustic songwriter at dusk
     "phantoms": ((150, 80, 170), (32, 28, 66)),          # violet phantom → dark indigo — moody mid-2000s emo
     "neon_glow": ((0, 210, 255), (230, 20, 160)),          # electric cyan → hot magenta — neon synth-pop
@@ -540,6 +541,7 @@ _COVER_BG_STYLES = {
     "hayden_house": ("ripples", 1),    # no glyph — warm sunset ripples carry the melodic-house cover
     "feel_so_close": ("laser_fan", 5), # no glyph — festival lasers carry the big-room EDM cover
     "ulla": ("starfield", 6),          # no glyph — a cosmic starfield carries the space-themed melodic-house cover
+    "ceilidh": ("aurora", 6),          # no glyph — aurora ribbons (the Scots "Mirrie Dancers" = dancing lights) carry the Scottish trad-electronic dance cover; variant 6 free (0-5 mood mixes, 7 Top Songs pool)
     "gravity": ("acoustic_guitar", 1),  # fingerpicked acoustic guitar — the singer-songwriter cover (folk_acoustic uses variant 0)
     "phantoms": ("lightning", 4),       # storm-bolt energy — the emo/pop-punk angst cover (guitar/amp_stack families full)
     "neon_glow": ("concentric_pulse", 3),  # no glyph — 80s-synth neon pulse carries the synth-pop cover
@@ -2122,6 +2124,7 @@ _MOOD_PROFILES = {
     # reliably tagged); the gate + _EMB_SEEDS scene do the scoping, centroid = his measured means. Uses DJ-Arc.
     "feel_so_close": {"bpm": 125, "energy": -8, "danceability": 0.42, "brightness": 0.16, "beat_confidence": 0.60, "onset_rate": 4.5, "dynamic_complexity": 0.45, "arousal": 0.60, "valence": 0.67, "vocal_presence": 0.68},
     "ulla": {"bpm": 126, "energy": -13, "danceability": 0.51, "brightness": 0.12, "beat_confidence": 1.35, "onset_rate": 3.9, "dynamic_complexity": 3.96, "arousal": 0.53, "valence": 0.56, "vocal_presence": 0.61},   # THE seed track's own features (The Eve of the War (Cosmos mix), rk 309816) — the acoustic centre; secondary to the single-track effnet embedding anchor (weight 15)
+    "ceilidh": {"bpm": 128, "energy": -12, "danceability": 0.41, "brightness": 0.13, "beat_confidence": 1.81, "onset_rate": 5.70, "dynamic_complexity": 2.99, "arousal": 0.65, "valence": 0.59, "vocal_presence": 0.19},   # THE seed track's own features (Hò-Rò by Valtos, rk 361376) — the dancey acoustic centre; secondary to the single-track effnet embedding anchor (weight 5) + the Scotland origin lean
     "gravity": {"bpm": 112, "energy": -11, "danceability": 0.40, "brightness": 0.12, "beat_confidence": 0.55, "onset_rate": 3.7, "dynamic_complexity": 0.45, "arousal": 0.52, "valence": 0.47, "vocal_presence": 0.81},   # DATA-derived: mean acoustic features of his 26 hits — mid-tempo, warm/dark, high-vocal. Secondary here (the hit-embedding at weight 5.0 leads); keeps the acoustic term from fighting the sound
     "phantoms": {"bpm": 115, "energy": -9, "danceability": 0.35, "brightness": 0.14, "beat_confidence": 2.05, "onset_rate": 3.2, "dynamic_complexity": 3.33, "arousal": 0.57, "valence": 0.63, "vocal_presence": 0.95},   # DATA-derived: mean acoustic features of Acceptance's hits — mid-tempo anthemic emo, high-vocal. Secondary (effnet hit-embedding at weight 9 leads)
     # neon_glow: CHVRCHES' bright anthemic synth-pop. Genre-gated (synth-pop is reliably tagged), so the gate +
@@ -4737,6 +4740,7 @@ _MOOD_MIX_NAMES = {
     "hayden_house": "Hayden's House • Meloday+",
     "feel_so_close": "Feel So Close • Meloday+",
     "ulla": "Ulla • Meloday+",
+    "ceilidh": "Ceilidh • Meloday+",
     "gravity": "Gravity • Meloday+",
     "phantoms": "Phantoms • Meloday+",
     "neon_glow": "Neon Glow • Meloday+",
@@ -5242,7 +5246,7 @@ _PROFILE_SCHEDULE = {
     "power_nap":         [(None, 13, 16)],
 }
 # Dance / EDM family — present when going out (Fri + weekend nights) AND during workouts (high-energy).
-_DANCE_SCHEDULE_KEYS = {"ulla", "rave_cave", "bounce_room", "hayden_house", "festival_edm", "techno", "trance", "dnb", "house_party",
+_DANCE_SCHEDULE_KEYS = {"ulla", "ceilidh", "rave_cave", "bounce_room", "hayden_house", "festival_edm", "techno", "trance", "dnb", "house_party",
                         "uk_garage", "bass_drop", "deep_house", "hyperpop", "industrial",
                         "dance_pop", "funk_disco"}
 for _dk in _DANCE_SCHEDULE_KEYS:
@@ -5326,6 +5330,7 @@ _PROFILE_CATEGORY = {
     # electronic_edm_pop
     "festival_edm": "electronic_edm_pop", "rave_cave": "electronic_edm_pop", "hyperpop": "electronic_edm_pop",
     "bounce_room": "electronic_edm_pop", "feel_so_close": "electronic_edm_pop", "ulla": "electronic_house_techno",
+    "ceilidh": "electronic_house_techno",   # Hò-Rò sound-anchored Scottish prog-breaks — groups with the house/techno mixes for slate diversity
     "gravity": "rock_indie",   # warm acoustic singer-songwriter / roots — groups with the indie/singer-songwriter mixes for slate diversity
     "phantoms": "rock_punk",   # mid-2000s emo/pop-punk — groups with emo_poppunk/punk_energy for slate diversity
     "dance_pop": "electronic_edm_pop", "chiptune": "electronic_edm_pop",
@@ -5475,6 +5480,7 @@ _PROFILE_MOOD_SIGNALS = {
     "hayden_house": (["euphoric", "uplifting", "warm", "sunny", "sensual", "groovy"], ["aggressive", "gritty", "harsh", "sombre"]),
     "feel_so_close": (["euphoric", "energetic", "uplifting", "exciting", "exuberant", "sparkling"], ["sombre", "gentle", "mellow", "gritty"]),
     "ulla": (["hypnotic", "driving", "atmospheric", "propulsive", "brooding", "sleek"], ["gentle", "acoustic", "twangy"]),   # soft-only (style-defined skips tag boosts); the single-track embedding drives selection
+    "ceilidh": (["driving", "propulsive", "energetic", "uplifting", "hypnotic", "euphoric"], ["gentle", "acoustic", "twangy"]),   # soft-only (style-defined skips tag boosts); the single-track embedding + Scotland origin drive selection
     "gravity": (["warm", "earnest", "intimate", "mellow", "organic", "tender"], ["aggressive", "boisterous", "euphoric"]),   # warm acoustic singer-songwriter — John Mayer's hit-sound (folk_acoustic warmth), not party/aggressive
     "phantoms": (["yearning", "earnest", "cathartic", "anthemic", "bittersweet", "fierce"], ["calm", "peaceful", "serene"]),   # anthemic-emotional emo/pop-punk — Acceptance's yearning-hook lane (emo_poppunk kin), not calm
     "neon_glow": (["euphoric", "uplifting", "bittersweet", "dreamy", "anthemic", "wistful"], ["aggressive", "gritty", "silly", "folksy"]),
@@ -5864,6 +5870,7 @@ _PROFILE_STYLE_SIGNALS = {
     "hayden_house": (["deep house", "tropical house", "house", "progressive house", "nu-disco", "indie dance", "melodic house"], ["ambient", "folk", "classical", "gospel", "hardstyle", "gabber", "hard techno"]),  # Hayden James' melodic/deep/tropical house — broad 'house' positive keeps his signature bare-'house'-dominant cuts (e.g. "Just Friends"); _EMB_SEEDS (Hayden + Rüfüs/Kygo/Purple Disco/CamelPhat scene) sharpens toward melodic house, _PROFILE_BLOCKED_DOMINANT rejects the big-room/festival EDM that shares the 4/4 sound
     "feel_so_close": (["house", "electro house", "big room", "electro", "progressive house", "dance-pop", "nu-disco", "tropical house", "complextro", "future house", "dutch house", "eurodance"], ["metal", "folk", "classical", "country"]),  # Calvin Harris' festival big-room/electro-house. Genre reliably tagged (house 74/206 + electro-house 34); the mainstream EDM giants (Guetta/Tiësto/Avicii) that leak into Hayden's House are Calvin's genuine LANE here, so his _EMB_SEEDS seeds them and the blockdom keeps big-room. Distinct from hayden_house (peak-time festival vs sunset-melodic)
     "ulla": ([], ["metal"]),  # NO positive subs -> parent-only COHERENCE gate (_PROFILE_GENRE_PARENT {electronic}). SOUND-anchored mix: the single-track effnet embedding (The Eve of the War (Cosmos mix), weight 15) is the selector, so the gate just keeps it electronic. Must be in _STYLE_DEFINED_PROFILES for the gate to run
+    "ceilidh": ([], ["metal"]),  # NO positive subs -> parent-only COHERENCE gate (_PROFILE_GENRE_PARENT {electronic}), like ulla. The single-track effnet embedding (Hò-Rò, weight 5) selects + the Scotland _origin_boost leans it Scottish; the gate just keeps it electronic (verified redundant here — the anchor already does — but kept for robustness). Must be in _STYLE_DEFINED_PROFILES for the gate to run
     "gravity": (["folk", "indie rock", "alternative rock", "pop rock", "folk rock", "country", "country rock", "americana", "neo soul", "soul", "blues rock", "modern electric blues", "electric blues", "southern rock", "rhythm & blues", "psychedelic rock", "bluegrass", "singer/songwriter", "acoustic"], ["edm", "techno", "trap"]),  # HIT-ANCHORED (embedding-LED, not genre-gated): John Mayer's Discogs tags scatter across folk/indie/alt-rock/neo-soul (his hits read folk/indie, NOT blues) — no genre gate isolates him. So this is a broad COHERENCE gate (his whole lane) that just strips non-lane noise (EDM/hip-hop via the parent gate + _PROFILE_BLOCKED_DOMINANT); the real selector is _EMB_ANCHOR_TRACKS (his hits' musicnn "sounds-like" centroid) at _PROFILE_EMB_WEIGHT 5.0. Verified: the hit-embedding surfaces his true sound = warm acoustic singer-songwriter (Jack Johnson/Paul Simon/Nick Mulvey/David Gray/Iron & Wine) + roots-soul (Ben Harper/Mavis Staples/Marcus King), his hits (Slow Dancing, Gravity) featured
     "phantoms": (["emo", "pop punk", "post-hardcore", "alternative rock", "pop rock", "indie rock", "hard rock", "punk", "screamo", "melodic hardcore", "emo-pop", "power pop", "post-grunge", "arena rock"], ["metal", "techno", "trap"]),  # HIT-ANCHORED (embedding-LED). UNLIKE gravity, Acceptance's genre is CLEAN (dominant alt-rock 51/71, Last.fm alt-rock-100/emo-40), so this broad rock COHERENCE gate + parent {rock} just scopes the scene and the EFFNET hit-anchor (sub-style, tighter than musicnn for a clean-tagged band) at _PROFILE_EMB_WEIGHT 9 does the selecting. Positives span their own tags (some tracks read hard rock/arena rock/AOR). Verified: nails the mid-2000s emo/pop-punk scene (Anberlin/Jimmy Eat World/Taking Back Sunday/The Used/Saosin/Mayday Parade/Dashboard/Yellowcard), Acceptance's 5 hits (So Contagious/Take Cover/The Letter) featured
     "neon_glow": (["synth-pop", "synthpop", "electropop", "indie electronic", "synthwave", "new wave", "dream pop", "indietronica"], ["metal", "gabber", "hardstyle", "drill"]),  # CHVRCHES' bright synth-pop. Genre RELIABLY tagged (synth-pop dominant 38/87) so this is a genuine gate; _EMB_SEEDS (CHVRCHES + Purity Ring/M83/Ladytron/Robyn scene) sharpens toward their bright-anthemic lane, _PROFILE_BLOCKED_DOMINANT rejects the EDM/hip-hop that shares the synth 4/4
@@ -6058,7 +6065,7 @@ _STYLE_DEFINED_PROFILES = {
     # --- Meloday+ gap-fill mixes (hard style gate) ---
     "neoclassical", "yacht_rock", "swagger",
     "chart_pop", "dance_pop", "indie_pop", "synth_pop",
-    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity", "phantoms", "ulla",
+    "indie_rock", "post_grunge", "rap_rock", "festival_edm", "soundtracks", "rave_cave", "bounce_room", "hayden_house", "short_n_sweet", "all_too_well", "neon_glow", "feel_so_close", "gravity", "phantoms", "ulla", "ceilidh",
     # global genre RADIO stations (genre gate composed with the radio branch; no geo gate)
     "electronic_radio", "rock_radio", "pop_radio", "indie_radio", "soundtracks_radio",
     "festive",
@@ -6419,6 +6426,7 @@ _PROFILE_GENRE_PARENT = {
     "rave_cave": {"electronic"}, "bounce_room": {"electronic"}, "hayden_house": {"electronic"},
     "feel_so_close": {"electronic", "pop"},
     "ulla": {"electronic"},   # light COHERENCE gate only — dominant Discogs parent must be electronic; the single-track effnet embedding (weight 15) does the selecting
+    "ceilidh": {"electronic"},   # light COHERENCE gate only — dominant Discogs parent must be electronic; the single-track effnet embedding (Hò-Rò, weight 5) selects, the Scotland _origin_boost leans it Scottish. Self-selects the dancey scene (Valtos/Niteworks/Barry Can't Swim electronic-parent) & drops pure-trad (Mànran/Capercaillie, folk/rock parent) that wouldn't fit prog-breaks anyway
     "gravity": {"rock", "folk, world, & country", "funk / soul", "blues"},   # his lane's Discogs parents — the coherence gate: dominant parent must be one of these, which strips the EDM/hip-hop/pop the hit-embedding would otherwise pull. "folk, world, & country" spelled with commas (exact parent string); rock+folk+funk/soul+blues span singer-songwriter/roots/soul
     "phantoms": {"rock"},   # dominant parent must be rock — the coherence gate that strips the pop/electronic/hip-hop the effnet hit-embedding might otherwise pull; the emo/pop-punk scene is rock-parent throughout
     "neon_glow": {"electronic", "pop"},
@@ -6795,6 +6803,7 @@ _PROFILE_MOODTHEME = {
     "hayden_house": ["party", "energetic", "uplifting", "positive"],
     "feel_so_close": ["party", "energetic", "uplifting", "upbeat"],
     "ulla": ["energetic", "dark", "deep"],
+    "ceilidh": ["energetic", "uplifting", "deep"],
     "gravity": ["emotional", "melancholic", "love", "relaxing"],
     "phantoms": ["emotional", "melancholic", "energetic", "powerful"],
     "neon_glow": ["energetic", "uplifting", "emotional", "melodic"],
@@ -6883,6 +6892,7 @@ _PROFILE_MOODCLASS = {
     "hayden_house": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1, "mood_happy": 1},
     "feel_so_close": {"danceability_hl": 1, "mood_party": 1, "mood_electronic": 1},
     "ulla": {"mood_electronic": 1, "danceability_hl": 1},   # electronic + danceable nudge (a base-score term); secondary to the embedding
+    "ceilidh": {"mood_electronic": 1, "danceability_hl": 1},   # electronic + danceable nudge (a base-score term); secondary to the embedding + Scotland origin lean
     "gravity": {"mood_acoustic": 1, "mood_relaxed": 1},   # warm, acoustic, mellow singer-songwriter — leans acoustic + relaxed, away from party/electronic/aggressive
     # phantoms: intentionally NO moodclass — no Essentia mood-class fits emo (mood_sad fought their upbeat-anthemic
     # valence 0.63 and pulled harder post-grunge; measured CORE 26->27, OUT 7->5 dropping it). The effnet hit-embedding leads.
@@ -7087,6 +7097,14 @@ _PROFILE_ORIGIN.update({
     # their MB origin (South Korea / Japan) can. Everyone else (incl origin-unknown) is unaffected.
     "short_n_sweet": {"exclude": {"south korea", "korea", "seoul", "japan", "tokyo"}},
     "celtic_folk":  {"places": {"ireland", "scotland", "wales"}},
+    # ceilidh — the Scottish-IDENTITY lever for the Hò-Rò sound-anchored mix (NOT a geo showcase): a soft
+    # _origin_boost at the DEFAULT weight (0.5) that leans the prog-breaks blend Scottish (~60/40) alongside the
+    # effnet sound anchor. Just "scotland" is enough AND collision-safe: MB's area-parent chain already resolves
+    # every Scottish region/city (Highland/Skye/Glasgow/Edinburgh) up to it (16,027 cache tracks carry it), so
+    # adding those adds nobody — while "aberdeen" would falsely pull Nirvana (Aberdeen, WASHINGTON). WHY origin not
+    # tags: it's a clean geographic MB signal that catches Scottish ELECTRONIC acts (Barry Can't Swim) which carry
+    # no Celtic Last.fm tag, and it's a base-score term so it fires under the hard electronic gate.
+    "ceilidh":      {"places": {"scotland"}},
     "latin_heat":   {"places": {"mexico", "spain", "colombia", "argentina", "chile", "puerto rico",
                                 "cuba", "venezuela", "peru", "dominican republic"}},
     "reggae_dub":   {"places": {"jamaica"}},
@@ -8175,6 +8193,10 @@ _PROFILE_EMB_WEIGHT = {
     "ulla": 15.0,           # sound is THE priority — the single-track effnet anchor fully DOMINATES. Higher than
                             # the artist mixes (5-9) so the whole mix is "sounds like this one track"; verified the
                             # top 50 stays a coherent house crowd (43/50 dominant house) at 15.
+    "ceilidh": 5.0,         # a BLEND, not a pure clone — the effnet Hò-Rò anchor LEADS (production) but at ulla's
+                            # /3 (5 not 15) so the base-score Scotland origin lean (_origin_boost, default 0.5)
+                            # can lift the Scottish scene alongside the sound-alikes. Measured: 5 gives ~60/40
+                            # Scottish while the top-50 stays dancey prog-house/house/breaks (seed Hò-Rò @1).
 }
 
 _EMB_DECODE_CACHE = {}     # blob bytes -> normalised ndarray (or None for a rejected blob)
@@ -14793,7 +14815,7 @@ def _canonicalize_tracks(plex, tracks, essentia_cache):
 # Pure-acoustic (cached bpm/key/energy); no per-track Plex calls.
 # ---------------------------------------------------------------------------
 _DJ_ARC_PROFILES = {
-    "ulla", "rave_cave", "bounce_room", "hayden_house", "feel_so_close", "techno", "trance", "deep_house", "house_party", "dnb", "bass_drop",
+    "ulla", "ceilidh", "rave_cave", "bounce_room", "hayden_house", "feel_so_close", "techno", "trance", "deep_house", "house_party", "dnb", "bass_drop",
     "uk_garage", "festival_edm", "dance_pop", "funk_disco",
     "glasgow_house", "glasgow_underground", "glasgow_bass",
     "london_garage", "london_grime", "london_dubstep", "london_jungle",
@@ -15078,6 +15100,11 @@ _EMB_ANCHOR_TRACKS = {
     # coherent modern melodic-house crowd (43/50 house: Jamie xx/Cerrone/Gorgon City/Kaskade/deadmau5/Duke Dumont)
     # vs musicnn's broader melodic-electronic. Needs _emb_centroid(min_n=1) since it's a lone-track centroid.
     "ulla": ("jeff wayne", ["cosmos mix"], "effnet"),
+    # ceilidh: a SINGLE-TRACK sound anchor like ulla — the centroid IS one track's embedding (Hò-Rò by Valtos,
+    # rk 361376; the cue "hò-rò" matches only it) — but at a MODERATE weight (5, vs ulla's 15) so the production
+    # LEADS while the Scotland origin lean (_PROFILE_ORIGIN) blends in the Scottish scene (a production×identity
+    # BLEND, not a pure sound clone). effnet (sub-style) gives the tightest prog-breaks match. min_n=1 (lone track).
+    "ceilidh": ("valtos", ["hò-rò"], "effnet"),
 }
 _SEED_EMB_CENTROID_CACHE = {}
 
