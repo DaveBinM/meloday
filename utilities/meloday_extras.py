@@ -7984,6 +7984,14 @@ def _upsert_extras_playlist(plex, name, tracks, description,
                          blind studio swap below, which would undo it (send a fitting remix back to
                          the worse-fitting studio original).
     """
+    # GLOBAL live-track exclusion (user: no live songs in ANY playlist). This is the universal guarantee — every
+    # extras playlist (all mixes + the 11 personal builders) funnels through this one chokepoint. Drop live
+    # recordings (meloday._is_live: MB release_types 'live' OR a delimited-'live' title) BEFORE canonicalize/order.
+    # Order-preserving. The _build_mix_tracks mixes already excluded live from their candidate pool, so this is
+    # their no-op backstop; for the personal builders it's the actual filter (they may end up ~0-1 short — live is
+    # ~1.1% of the cache, so ~0-1 per 50; accepted, they're play-ranked/variable-length).
+    _ec = meloday._essentia_cache
+    tracks = [t for t in tracks if not meloday._is_live(_ec.get(str(getattr(t, "ratingKey", ""))))]
     # Single chokepoint for the personal builders: show the canonical (studio-original) copy of each song.
     # Post-selection, order-preserving — ranking/length unchanged; live/remix/extended keep their own copy.
     # The _build_mix_tracks mixes pass pre_canonicalized=True (already chose the best-ranked copy per mix).
@@ -15229,6 +15237,7 @@ def _danceability_penalty(entry, profile_key):
 _STYLE_GATE_CACHE = {}   # (id(cache), profile_key) -> [rk...] passing _has_required_style, cache order
 _FRAGMENT_RK_CACHE = {}  # id(cache) -> frozenset(rk) whose title matches _FRAGMENT_TITLE_RE
 _SCREEN_RK_CACHE = {}    # id(cache) -> frozenset(rk) that are screen content
+_LIVE_RK_CACHE = {}      # id(cache) -> frozenset(rk) that are live recordings (meloday._is_live)
 
 def _style_gated_keys(essentia_cache, profile_key):
     ck = (id(essentia_cache), profile_key)
@@ -15244,6 +15253,16 @@ def _fragment_rks(essentia_cache):
         v = _FRAGMENT_RK_CACHE[id(essentia_cache)] = frozenset(
             rk for rk, e in essentia_cache.items()
             if _FRAGMENT_TITLE_RE.search(e.get("title") or ""))
+    return v
+
+def _live_rks(essentia_cache):
+    # Per-run memo of live-recording rks (meloday._is_live: MB release_types 'live' OR a delimited-'live'
+    # title). Excluded from every mix's candidate pool so mixes never SELECT a live track (keeps them at
+    # target size). Mirrors _fragment_rks. The _upsert_extras_playlist backstop is the belt-and-braces catch.
+    v = _LIVE_RK_CACHE.get(id(essentia_cache))
+    if v is None:
+        v = _LIVE_RK_CACHE[id(essentia_cache)] = frozenset(
+            rk for rk, e in essentia_cache.items() if meloday._is_live(e))
     return v
 
 def _screen_rks(essentia_cache):
@@ -15333,6 +15352,11 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         _cand_keys = [rk for rk in _cand_keys if rk not in _scr]
     _frag = _fragment_rks(essentia_cache)
     _cand_keys = [rk for rk in _cand_keys if rk not in _frag]
+    # Live-track exclusion (user: no live songs in any playlist) — every mix branch derives from _cand_keys, so
+    # dropping live rks HERE keeps mixes at target size (they never select a live track). The _upsert_extras_
+    # playlist backstop is the belt-and-braces guarantee for the personal builders that bypass this pool.
+    _live = _live_rks(essentia_cache)
+    _cand_keys = [rk for rk in _cand_keys if rk not in _live]
     # Catalogue S15: hard facet bounds (see _PROFILE_FACET_BOUNDS) — tracks without the facet stay eligible.
     for _f, _lo, _hi in _PROFILE_FACET_BOUNDS.get(profile_key, ()):
         _cand_keys = [rk for rk in _cand_keys

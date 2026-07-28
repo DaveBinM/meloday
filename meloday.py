@@ -626,6 +626,10 @@ _CACHE_COLUMNS_CORE = (
     "beat_confidence", "integrated_loudness", "onset_rate", "dynamic_complexity",
     "arousal", "valence", "vocal_presence",
     "mood_happy", "moodtheme", "genre_discogs", "release_date", "artist_mbid",
+    "release_types",   # live-album exclusion (_is_live_track): the authoritative 'live' signal is ABSENT on Plex
+                       # objects (a track's album subtype may be blank) and its album name gives nothing away for
+                       # live albums like "Bullet In A Bible" — so core reads release_types from the cache. Small
+                       # memoised JSON column (a few distinct interned lists); negligible RAM vs the dropped heads.
 )
 _CACHE_COLUMNS_EXTRAS = tuple(c for c in _CACHE_ALL_COLUMNS if c not in {
     "lyric_themes_raw",                                                # dead in RAM everywhere (SQL-only readers)
@@ -1541,6 +1545,12 @@ def filter_excluded_tracks(tracks, now=None):
         if (getattr(t, "duration", 0) or 0) > MAX_TRACK_MS:
             continue
 
+        # Live-recording exclusion (user: no live songs in any playlist) — a delimited-'live' title OR a
+        # live-type album (is_live_like). Runs pre-selection so the backfill loop keeps playlists full.
+        if _is_live_track(t):
+            log_text(f"[EXCLUSION] Track '{t.title}' skipped: live recording.")
+            continue
+
         cleaned.append(t)
     return cleaned
 
@@ -1878,6 +1888,45 @@ def is_live_like(track) -> bool:
         return True
     title = meta.get("album_title", "") or (getattr(track, "parentTitle", "") or "")
     return bool(_LIVE_TITLE_RE.search(title))
+
+# Live-ONLY delimited title marker, for HARD EXCLUSION (user: no live songs in any playlist). Deliberately
+# NARROWER than meloday_extras._TITLE_LIVE_DEMO (which is a canonical PENALTY and also covers demo): that
+# regex's "\blive in\b" branch false-positives on STUDIO songs ("Live in the Moment", "I Should Live in Salt",
+# "The House I Live In", "Let's Live In Peace") — fine for a penalty, unacceptable for deletion. This keeps the
+# delimited forms + only the unambiguous venue/session phrases. Data-verified over the 189k cache: 1 residual FP
+# ("You Can Live at Home"); keeps "Live and Let Die"/"You Only Live Once"/"Live While We're Young".
+_TITLE_LIVE = re.compile(
+    r"[\(\[\-]\s*live\b"                                          # (Live  [Live  - Live
+    r"|\blive\s*[\)\]]"                                           # live)  live]
+    r"|\blive (?:at|from|session|recording|concert|version)\b",   # live at/from/session/recording/concert/version
+    re.IGNORECASE)
+
+def _is_live(entry):
+    """True if a CACHE entry is a live recording. (a) MB release_types includes 'live' (a live album — the
+    authoritative signal, 99% coverage) OR (b) a delimited 'live' title marker. Needs the entry's title +
+    release_types (both present under the EXTRAS profile). The core path filters Plex Track objects (which carry
+    no release_types), so it uses the _is_live_track variant. Used by meloday_extras via meloday._is_live(entry)."""
+    if not entry:
+        return False
+    if "live" in {str(x).lower() for x in (entry.get("release_types") or [])}:
+        return True
+    return bool(_TITLE_LIVE.search(entry.get("title") or ""))
+
+def _is_live_track(t):
+    """True if a Plex Track is a live recording — the core-path variant (Track objects carry .title but no
+    release_types). Three signals, cheapest first: (b) a delimited 'live' TITLE; (a) MB release_types 'live'
+    read from the cache (now in the core profile) — the authoritative live-album signal that catches name-cue-less
+    live albums like 'Bullet In A Bible'; (a') a live-type ALBUM via is_live_like (Plex album subtype/name) as a
+    fallback for tracks not in the cache."""
+    if _TITLE_LIVE.search(getattr(t, "title", "") or ""):
+        return True
+    entry = _essentia_cache.get(str(getattr(t, "ratingKey", "") or "")) if _essentia_cache else None
+    if entry and "live" in {str(x).lower() for x in (entry.get("release_types") or [])}:
+        return True
+    try:
+        return is_live_like(t)   # Plex album fallback — also covers cached tracks whose release_types is empty
+    except Exception:
+        return False
 
 def title_variant_rank(track) -> int:
     """Lower is better. Prefer plain/original titles when deduping."""
