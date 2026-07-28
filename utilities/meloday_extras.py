@@ -15881,7 +15881,23 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             r = _artist_top_rank(e)
             if r is not None and r <= _ERA_RESCUE_TOP_N:
                 pool.append(rk); _seen.add(rk)
-        random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(pool)
+        # Per-artist representative = the MOST POPULAR track surviving the recently-played exclusion — while the
+        # ROSTER stays the same diverse, day-rotating cast (keep the eclectic long-tail, don't collapse to the
+        # biggest-50). WHY: the pool is listener-ranked, but a uniform shuffle picked a RANDOM one of each artist's
+        # non-played top-5 -> deep cuts ("Dumb" repping Nirvana); a GLOBAL popularity sort fixes the track but also
+        # takes the top-50 artists, stripping the mid/indie acts (Slint/Cat Power/Alanis...). So do BOTH: sort each
+        # artist's songs by listeners (their hit first), then shuffle the ARTIST ORDER (day-seed) — the 1-per-artist
+        # _take then keeps the varied roster but shows each artist's hit. Play that track and the next rebuild's
+        # played-exclusion (mood_mix_exclude_played_days) drops it, so the next-most-popular surfaces (track
+        # rotation is play-driven; roster variety stays daily). `rk` secondary key = deterministic within-artist ties.
+        _by_a = {}
+        for _rk in pool:
+            _by_a.setdefault((essentia_cache.get(_rk, {}).get("artist") or "").lower(), []).append(_rk)
+        for _rks in _by_a.values():
+            _rks.sort(key=lambda rk: (-(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0), rk))
+        _artists = list(_by_a)
+        random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(_artists)
+        pool = [rk for _a in _artists for rk in _by_a[_a]]
         history_rks, library_rks = [], pool
 
     n_history = min(int(mix_size * 0.40), len(history_rks))
