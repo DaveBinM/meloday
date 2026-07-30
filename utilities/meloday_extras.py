@@ -14208,6 +14208,10 @@ _ERA_ARTIST_SONGS = 5          # each artist's max decade-pool footprint (via _c
                                # 60s pool was 46% Beatles (78/168 slots) -> a 32-artist cast airing near-
                                # identically daily; capping widens it to ~47 while keeping every artist's
                                # top-5 anthems. Measured no-op for the wider decades (70s-20s ±1-2 artists).
+_ERA_POP_BIAS = 1.25           # decade ROSTER popularity bias: each artist is weighted by (hit_listeners/1e6) **
+                               # this in the cross-artist pick, so the roster leans to the big acts and only ~20%
+                               # of slots are the eclectic long-tail (measured below the pool median, 90s/00s).
+                               # Higher -> fewer eclectic; 0 -> uniform (the whole long-tail, pre-bias behaviour).
 _GEO_HITS_POOL = 200           # geo HITS mixes (Scottish/Australian/London Hits): keep the top-N songs by
                                # global Last.fm listeners per origin. N IS the auto per-location floor — the
                                # Nth-song listener count varies by place (London's bar ~2.5x Scotland's) and
@@ -15895,8 +15899,18 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
             _by_a.setdefault((essentia_cache.get(_rk, {}).get("artist") or "").lower(), []).append(_rk)
         for _rks in _by_a.values():
             _rks.sort(key=lambda rk: (-(essentia_cache.get(rk, {}).get("lastfm_listeners") or 0), rk))
-        _artists = list(_by_a)
-        random.Random(f"decade-{date.today().toordinal()}-{profile_key}").shuffle(_artists)
+        # Bias the ROSTER toward the popular artists (~80%) so only ~20% is the eclectic long-tail (user's call):
+        # weight each artist by their HIT's listeners ** _ERA_POP_BIAS, then an Efraimidis-Spirakis weighted shuffle
+        # (day-seed) so bigger acts tend to fill the slots while the long-tail rotates through the ~20%. The /1e6
+        # scaling brings the huge counts into a range where the E-S key `u**(1/w)` actually discriminates (raw
+        # counts make every key ~1). Within-artist order (hit first) + the floor/rescue pool are untouched, so the
+        # roster is the same set biased in ORDER — each shown artist still gets their biggest hit.
+        _rng = random.Random(f"decade-{date.today().toordinal()}-{profile_key}")
+        _wkey = {}
+        for _a, _rks in _by_a.items():   # _rks[0] = the artist's hit (values sorted hit-first just above)
+            _w = ((essentia_cache.get(_rks[0], {}).get("lastfm_listeners") or 1) / 1e6) ** _ERA_POP_BIAS
+            _wkey[_a] = _rng.random() ** (1.0 / max(_w, 1e-9))
+        _artists = sorted(_by_a, key=lambda a: _wkey[a], reverse=True)
         pool = [rk for _a in _artists for rk in _by_a[_a]]
         history_rks, library_rks = [], pool
 
