@@ -2374,7 +2374,7 @@ _DASH_KW_RE = re.compile(rf"\s-\s.*(?:{_KW_ALT}).*$", re.IGNORECASE)
 _RECORDING_KEYWORDS = sorted([
     "remix", "live", "acoustic", "instrumental", "unplugged", "karaoke", "acapella", "a cappella", "demo",
     "dub", "cover", "rework", "re-edit", "bootleg", "vip", "rehearsal", "re-recorded", "rerecorded",
-    "session", "sessions", "alternate", "take", "dj mix", "mix cut", "mashup", "flip", "refix", "reprise",
+    "session", "sessions", "alternate", "take", "dj mix", "mix cut", "mashup", "flip", "refix", "rerub", "reprise",
     "extended",   # extended mix/edit/version = a meaningfully different (longer) recording -> its own song
 ], key=len, reverse=True)
 _RECORDING_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _RECORDING_KEYWORDS)
@@ -2382,6 +2382,13 @@ _RECORDING_ALT = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in _RECORDIN
 # "(Remixes)", "(Remix1)"), so the KEEP test must match those same inflected forms or they'd collapse onto
 # the studio cut. The stem keeps every remix-rooted form distinct (premix etc. excluded by the \b).
 _RECORDING_KW_RE = re.compile(rf"\b(?:{_RECORDING_ALT})\b|\bre-?mix\w*", re.IGNORECASE)
+# is_alt_recording's version-position detectors, sourced from _RECORDING_KEYWORDS ITSELF (not the separate
+# _VERSION_KEYWORDS_SORTED, which lacks demo/unplugged/mashup/reprise/… so a bare "(demo)" was read as non-alt —
+# 310/355 demos missed, and unlisted "rerub" too). A recording keyword inside (parens) / [brackets] / after
+# " - " = a different recording. Word-bounded so "relive"/"demons" don't false-match.
+_REC_PAREN_RE   = re.compile(rf"\([^)]*\b(?:{_RECORDING_ALT}|re-?mix\w*)\b[^)]*\)", re.IGNORECASE)
+_REC_BRACKET_RE = re.compile(rf"\[[^\]]*\b(?:{_RECORDING_ALT}|re-?mix\w*)\b[^\]]*\]", re.IGNORECASE)
+_REC_DASH_RE    = re.compile(rf"\s[-–]\s+.*\b(?:{_RECORDING_ALT}|re-?mix\w*)\b", re.IGNORECASE)
 
 
 def lastfm_query_title(title):
@@ -2417,8 +2424,7 @@ def is_alt_recording(title):
     WHY: the resync re-fetches exactly these — their cached count must flip from the canonical to their own."""
     if not title:
         return False
-    return any(_RECORDING_KW_RE.search(m.group(0))
-               for rx in (_PAREN_KW_RE, _BRACKET_KW_RE, _DASH_KW_RE) for m in rx.finditer(title))
+    return any(rx.search(title) for rx in (_REC_PAREN_RE, _REC_BRACKET_RE, _REC_DASH_RE))
 
 
 def process_tracks(tracks):
