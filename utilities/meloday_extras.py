@@ -6727,7 +6727,7 @@ def _profile_yield(profile_key, essentia_cache, cap=_MIN_PROFILE_YIELD):
     if not (style_gated or yw or geo):
         _YIELD_CACHE[ck] = _YIELD_FILLABLE
         return _YIELD_FILLABLE
-    smy    = _song_min_year_map(essentia_cache) if yw else None
+    smy    = _era_decade_year_map(essentia_cache) if yw else None   # match the era gate's comp-inclusive dating
     lo, hi = yw if yw else (None, None)
     n = 0
     for e in essentia_cache.values():
@@ -14584,6 +14584,29 @@ def _song_year_anycopy_map(essentia_cache):
     return m
 
 
+_ERA_DECADE_YEAR_CACHE = {}
+def _era_decade_year_map(essentia_cache):
+    """Per-song year for the DECADE/era gate: the earliest year across ALL copies (comps INCLUDED), but only for
+    songs that have >=1 non-comp copy. WHY: dating by the min over NON-comp copies alone (_song_min_year_map)
+    mis-dates a genuinely-old song whose ONLY non-comp copy is a late single-artist REISSUE that _era_is_comp
+    can't detect (release_types ['album'], filed under the artist folder, not /Various Artists) — e.g. The
+    Temptations' "My Girl" on "Papa Was A Rolling Stone [2020]" dated the 1960s song to 2020 and put it in the
+    20s mix, though it also sits on 1983/1992/2008 comps. A comp/reissue appearance PROVES the song is at least
+    that old, so the comp-inclusive earliest year is the tightest lower bound (it can only ever pull a song
+    EARLIER, so it never reopens the comp forward-dating that _song_min_year_map's non-comp exclusion fixed).
+    Songs with NO non-comp copy are OMITTED (fall through to the _entry_original_year fallback at the gate, then
+    dropped by _era_is_comp) — the VA-only 'God Only Knows' drop is preserved. Memoised per cache object."""
+    cid = id(essentia_cache)
+    m = _ERA_DECADE_YEAR_CACHE.get(cid)
+    if m is None:
+        smy = _song_min_year_map(essentia_cache)      # eligibility: has a non-comp copy
+        ayr = _song_year_anycopy_map(essentia_cache)  # earliest over ALL copies, comps included
+        m = {sk: ayr[sk] for sk in smy if sk in ayr}
+        _ERA_DECADE_YEAR_CACHE.clear()                # only the current run's cache is ever needed
+        _ERA_DECADE_YEAR_CACHE[cid] = m
+    return m
+
+
 _HISTORY_PLAY_COUNTS_CACHE = {}   # id(history_entries) -> Counter of plays per rating_key
 def _history_play_counts(history_entries):
     """Per-track play Counter, memoised on the history_entries object so the several mix builds in
@@ -15446,7 +15469,7 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
     _yw = _PROFILE_YEAR_WINDOW.get(profile_key)
     if _yw:
         lo, hi = _yw
-        _smy = _song_min_year_map(essentia_cache)
+        _smy = _era_decade_year_map(essentia_cache)   # comp-INCLUSIVE earliest year (reissue can't forward-date)
         def _orig_in(rk):
             e  = essentia_cache.get(rk, {})
             oy = _smy.get(_entry_song_key(e)) or _entry_original_year(e)
