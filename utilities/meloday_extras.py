@@ -14797,9 +14797,22 @@ def _fit_canonicalize(plex, tracks, cand_key_set, score_fn, essentia_cache):
             best = min(cand, key=lambda c: (_noncanon(c), _canonical_penalty(essentia_cache.get(c, {})),
                                             essentia_cache.get(c, {}).get("year") or 9999, c))
         else:                                        # fit-ranked: best-fitting copy; studio only among ties
-            best = min(cand, key=lambda c: (round(score_fn(c), 4), _noncanon(c),
-                                            _canonical_penalty(essentia_cache.get(c, {})),
-                                            essentia_cache.get(c, {}).get("year") or 9999, c))
+            # Same-recording copies (ALL clean — no rework/live/remix among them, since a rework carries its
+            # own lastfm_query_title song key and groups separately) differ in _combined_score ONLY by per-file
+            # Essentia analysis noise (a comp's m4a vs the studio flac), which the 4dp rounding doesn't absorb
+            # — so the comp copy could out-score the studio and surface (Grouplove "Tongue Tied" showed from
+            # Triple J's Hottest 100 over Never Trust a Happy Song, score gap 0.0007 > 0.0001). WHY: for the
+            # same recording fit is meaningless, so pick the canonical copy (studio/non-comp, earliest); keep
+            # fit PRIMARY only when a genuinely different rework shares the key (the "One More Night (Cutmore
+            # Club Mix)" contract — and an ineligible studio isn't in cand, so that case is unaffected).
+            if all(not _noncanon(c) for c in cand):
+                best = min(cand, key=lambda c: (_canonical_penalty(essentia_cache.get(c, {})),
+                                                essentia_cache.get(c, {}).get("year") or 9999,
+                                                round(score_fn(c), 4), c))
+            else:
+                best = min(cand, key=lambda c: (round(score_fn(c), 4), _noncanon(c),
+                                                _canonical_penalty(essentia_cache.get(c, {})),
+                                                essentia_cache.get(c, {}).get("year") or 9999, c))
         targets.append((t, best))
     need = {cr for t, cr in targets if cr != str(t.ratingKey)}
     swapped = resolve_tracks_by_keys(plex, list(need)) if need else {}
