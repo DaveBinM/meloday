@@ -14607,6 +14607,60 @@ def _era_decade_year_map(essentia_cache):
     return m
 
 
+# ---------------------------------------------------------------------------
+# Per-song re-record detection — a NEW recording of the artist's OWN old song.
+# The geo-radio "contemporary" gate already dates a re-cut old when its title EXACTLY song-keys the original
+# (via _song_year_anycopy_map / lastfm_query_title). This catches the ones that MISS that exact match because a
+# stray tag or spelling makes the re-cut's title differ from the original's — e.g. Bay City Rollers re-recorded
+# "Shang-a-Lang" in 2024, but their 1974 original is filed "Shang‐A‐Lang [Explicit]" (a bracket tag clean_title
+# leaves on), so the song-keys differ and the 2024 re-cut read as brand-new Scottish music in Scotland Now.
+# Per-song (not album-level): album detection can't separate a re-record repackage from a genuine album that
+# reuses titles (measured false positives: BTS / Bicep / Bring Me The Horizon). The >=20y gap + strip-tags/spaces
+# base key make coincidental same-era title reuse a non-issue.
+# ---------------------------------------------------------------------------
+_RERECORD_GAP = 20        # the older same-title copy must predate the re-cut by >=20y (measured: kills same-era reuse)
+_RR_STOP = {"intro", "outro", "interlude", "reprise", "prelude", "overture", "untitled", "medley"}
+_RR_TAG_RE = re.compile(r'[\(\[][^)\]]*[\)\]]')   # any (parenthetical) or [bracketed] tag segment
+def _rerecord_base_key(title):
+    """Robust SONG identity for re-record matching: strip EVERY ()/[] tag segment (incl. the "[Explicit]" that
+    clean_title leaves on) and spaces, then norm_text — so "Shang-a-Lang", "Shang‐A‐Lang [Explicit]" and
+    "Summer Love Sensation" / "Summerlove Sensation" collapse together."""
+    return norm_text(_RR_TAG_RE.sub('', title or '')).replace(" ", "")
+_ARTIST_SONG_EARLIEST_CACHE = {}
+def _artist_song_earliest_map(essentia_cache):
+    """(norm primary-artist, _rerecord_base_key) -> earliest original year over ALL of the artist's copies of that
+    song (marked or not — a 1974 remix/version still proves the SONG is 1974). Memoised per cache object."""
+    cid = id(essentia_cache)
+    m = _ARTIST_SONG_EARLIEST_CACHE.get(cid)
+    if m is None:
+        m = {}
+        for e in essentia_cache.values():
+            a = norm_text(primary_artist(e.get("artist") or "")); bk = _rerecord_base_key(e.get("title") or "")
+            oy = _entry_original_year(e)
+            if a and bk and oy:
+                k = (a, bk)
+                if oy < m.get(k, 9999):
+                    m[k] = oy
+        _ARTIST_SONG_EARLIEST_CACHE.clear()               # only the current run's cache is ever needed
+        _ARTIST_SONG_EARLIEST_CACHE[cid] = m
+    return m
+def _is_own_rerecord(entry, earliest_map):
+    """True if this track is a NEW recording of the SAME artist's OWN song from >=_RERECORD_GAP years earlier — a
+    re-recording the exact-title song-key misses because a stray tag/spelling makes the re-cut's title differ from
+    the original's. Skips already-marked copies (remix/live/reissue are handled upstream) and generic structural
+    titles (_RR_STOP) so a coincidental "Interlude" isn't demoted. The >=20y gap never flags the original itself
+    (gap 0) nor same-era title reuse."""
+    t = entry.get("title") or ""
+    if meloday.is_alt_recording(t) or _is_rework(t):
+        return False
+    bk = _rerecord_base_key(t)
+    if len(bk) < 4 or bk in _RR_STOP:
+        return False
+    oy = _entry_original_year(entry) or 0
+    by = earliest_map.get((norm_text(primary_artist(entry.get("artist") or "")), bk))
+    return by is not None and oy - by >= _RERECORD_GAP
+
+
 _HISTORY_PLAY_COUNTS_CACHE = {}   # id(history_entries) -> Counter of plays per rating_key
 def _history_play_counts(history_entries):
     """Per-track play Counter, memoised on the history_entries object so the several mix builds in
@@ -15615,11 +15669,14 @@ def _build_mix_tracks(profile_key, essentia_cache, history_entries,
         recent_by_a, throw_by_a = defaultdict(list), defaultdict(list)
         midthrow_by_a           = defaultdict(list)                      # RECENT-throwback: the preceding recent_years band
         new_by_a,   rec36_by_a  = defaultdict(list), defaultdict(list)   # 0-3mo / 3-6mo recency-featured tiers (non-window)
+        _rr = _artist_song_earliest_map(essentia_cache)   # for the re-record clause on is_re below
         for rk in uniq:
             e = essentia_cache.get(rk, {}); a = (e.get("artist") or "").lower()
             if not a or a in _skip:
                 continue
-            t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t))
+            # is_re folds in _is_own_rerecord: a NEW cut of the artist's OWN >=20y-older song (Bay City Rollers'
+            # 2024 "Shang-a-Lang") the exact-title song-key misses -> treated as the old song it is, not "current".
+            t = e.get("title") or ""; ay = _ay(rk); is_re = bool(_REISSUE_RE.search(t)) or _is_own_rerecord(e, _rr)
             if _win:                                   # release-window station: windowed new material only, no throwback
                 if _in_window(rk) and ay >= _win_start_year and not is_re and not meloday.is_alt_recording(t) and not _is_rework(t):
                     recent_by_a[a].append(rk)
